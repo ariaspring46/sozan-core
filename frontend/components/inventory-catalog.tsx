@@ -1,0 +1,253 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { AuthImage } from "@/components/auth-image";
+import { ProductEditor, type CatalogResponse, type CategoryOption, type Product, type ShopMeta, type SyncResult } from "@/components/product-editor";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { api, catalogImageUrl } from "@/lib/api";
+import { money, priceText } from "@/lib/digits";
+import { EmptyState } from "@/components/empty-state";
+
+function applyCatalog(
+  data: CatalogResponse,
+  setProducts: (rows: Product[]) => void,
+  setCategories: (rows: CategoryOption[]) => void,
+  setShop: (row: ShopMeta | null) => void,
+  setHint: (text: string) => void,
+) {
+  setProducts(data.products || []);
+  if (data.categories) setCategories(data.categories);
+  if (data.shop) setShop(data.shop);
+  const sync = data.sync as SyncResult | undefined;
+  if (sync?.hint) setHint(sync.hint);
+  else if (sync?.error) setHint(sync.error);
+}
+
+export function InventoryCatalog() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [shop, setShop] = useState<ShopMeta | null>(null);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [hint, setHint] = useState("");
+  const [editor, setEditor] = useState<Product | null | "new">(null);
+
+  async function load() {
+    const catalog = await api<CatalogResponse>("/catalog").catch(() => ({
+      products: [] as Product[],
+      categories: [] as CategoryOption[],
+      shop: null,
+    }));
+    setProducts(catalog.products || []);
+    setCategories(catalog.categories || []);
+    setShop(catalog.shop || null);
+  }
+
+  useEffect(() => {
+    void load()
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const visible = useMemo(() => {
+    const needle = query.trim();
+    return products.filter((product) => {
+      if (category && product.category !== category) return false;
+      if (!needle) return true;
+      const blob = `${product.title} ${product.category || ""} ${product.subcategory || ""} ${product.sku || ""}`;
+      return blob.includes(needle);
+    });
+  }, [products, query, category]);
+
+  async function bump(id: string, delta: number) {
+    setBusy(true);
+    setError("");
+    try {
+      const data = await api<CatalogResponse>(`/catalog/${id}/stock`, {
+        method: "POST",
+        body: JSON.stringify({ delta }),
+      });
+      applyCatalog(data, setProducts, setCategories, setShop, setHint);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="h-full space-y-4 overflow-y-auto p-4">
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {shop?.needsBuild ? (
+          <p className="rounded-xl border border-line px-3 py-2 text-sm leading-7">
+            برای نمایش کالاها روی سایت، بیلد بزن{" "}
+            <Link href="/shop" className="text-warm">
+              رفتن به فروشگاه
+            </Link>
+          </p>
+        ) : shop?.live ? (
+          <p className="rounded-xl bg-canvas px-3 py-2 text-sm leading-7 text-muted">تغییرات همان لحظه روی سایت می‌رود.</p>
+        ) : (
+          <p className="rounded-xl bg-canvas px-3 py-2 text-sm leading-7 text-muted">
+            فروشگاه هنوز ساخته نشده؛ کالاها بعد از بیلد می‌آیند.
+          </p>
+        )}
+        {hint ? (
+          <p className="rounded-xl border border-line px-3 py-2 text-sm leading-7">
+            {hint}{" "}
+            <Link href="/shop" className="text-warm">
+              رفتن به فروشگاه
+            </Link>
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            className="min-w-40 flex-1"
+            value={query}
+            placeholder="جستجو"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <Button type="button" onClick={() => setEditor("new")}>
+            افزودن کالا
+          </Button>
+        </div>
+        {categories.length ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`rounded-full border px-3 py-1 text-sm ${category ? "border-line" : "border-accent bg-accent text-onAccent"}`}
+              onClick={() => setCategory("")}
+            >
+              همه
+            </button>
+            {categories.map((item) => (
+              <button
+                key={item.title}
+                type="button"
+                className={`rounded-full border px-3 py-1 text-sm ${
+                  category === item.title ? "border-accent bg-accent text-onAccent" : "border-line"
+                }`}
+                onClick={() => setCategory(item.title)}
+              >
+                {item.title}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {loading ? (
+          <ul className="space-y-2">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <li key={index} className="h-24 animate-pulse rounded-2xl bg-canvas" />
+            ))}
+          </ul>
+        ) : visible.length === 0 ? (
+          <EmptyState
+            title="هنوز کالایی نیست"
+            detail="کانال را وصل کن یا کالا را دستی اضافه کن."
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Link
+                  href="/more/channels"
+                  className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent"
+                >
+                  وصل کردن کانال
+                </Link>
+                <Button type="button" variant="ghost" onClick={() => setEditor("new")}>
+                  افزودن کالا
+                </Button>
+              </div>
+            }
+          />
+        ) : (
+          <ul className="space-y-2">
+            {visible.map((product) => {
+              const thumb = product.images?.[0] || product.image;
+              const discounted = Boolean(product.discount && product.finalPrice);
+              return (
+                <li key={product.id}>
+                  <Card className="flex cursor-pointer items-start gap-3" onClick={() => setEditor(product)}>
+                    {thumb ? (
+                      <AuthImage
+                        src={catalogImageUrl(thumb)}
+                        alt={product.title}
+                        className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="h-16 w-16 shrink-0 rounded-lg bg-canvas" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{product.title}</p>
+                      {product.category || product.subcategory ? (
+                        <p className="text-xs text-muted">
+                          {[product.category, product.subcategory].filter(Boolean).join(" › ")}
+                        </p>
+                      ) : null}
+                      {product.priceLabel ? (
+                        <p className="text-sm">{product.priceLabel}</p>
+                      ) : discounted ? (
+                        <p className="text-sm">
+                          <span className="text-muted line-through">{money(product.price)}</span>{" "}
+                          {money(product.finalPrice || 0)} تومان
+                        </p>
+                      ) : (
+                        <p className="text-sm">{priceText(product.price, product.priceLabel)}</p>
+                      )}
+                      {product.source ? (
+                        <p className="text-xs text-warm">
+                          از {product.source === "instagram" ? "اینستاگرام" : product.source} {product.sourceHandle || ""}
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex items-center justify-between gap-3" onClick={(event) => event.stopPropagation()}>
+                        <p className="text-sm">موجودی {money(product.stock)}</p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-paper text-lg"
+                            disabled={busy || product.stock < 1}
+                            onClick={() => void bump(product.id, -1)}
+                          >
+                            −
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-accent bg-accent text-lg text-onAccent"
+                            disabled={busy}
+                            onClick={() => void bump(product.id, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      {editor !== null ? (
+        <ProductEditor
+          product={editor === "new" ? null : editor}
+          categories={categories}
+          onClose={() => setEditor(null)}
+          onSaved={(data) => {
+            applyCatalog(data, setProducts, setCategories, setShop, setHint);
+            setEditor(null);
+          }}
+          onDeleted={(data) => {
+            applyCatalog(data, setProducts, setCategories, setShop, setHint);
+            setEditor(null);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}

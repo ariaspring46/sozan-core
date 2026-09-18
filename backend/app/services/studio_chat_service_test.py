@@ -1,0 +1,214 @@
+import asyncio
+import tempfile
+import unittest
+from contextlib import contextmanager
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+from uuid import uuid4
+
+from app.services import studio_chat_service
+
+
+@contextmanager
+def _nolock(_name: str = "studio"):
+    yield
+
+
+class FakeCampaigns:
+    def __init__(self) -> None:
+        self.created = 0
+        self.raw: list[str] = []
+        self.composed = 0
+        self.last_id = uuid4()
+        self.outputs: list[dict] = []
+        self.kwargs: dict = {}
+
+    async def create(self, **kwargs):
+        self.created += 1
+        self.kwargs = kwargs
+        return SimpleNamespace(id=self.last_id)
+
+    async def save_raw(self, campaign_id, filename, data):
+        self.raw.append(filename)
+        return SimpleNamespace(id=uuid4())
+
+    async def compose(self, campaign_id):
+        self.composed += 1
+        return SimpleNamespace(id=campaign_id)
+
+    async def preview_outputs(self, campaign_id):
+        return self.outputs
+
+    async def update_copy(self, campaign_id, **kwargs):
+        return SimpleNamespace(id=campaign_id)
+
+
+class StudioChatTests(unittest.TestCase):
+    def _patches(self, root: Path, rows=None):
+        stored = {"rows": list(rows or [])}
+
+        def reader(name, default=None):
+            return list(stored["rows"])
+
+        def writer(name, payload):
+            stored["rows"] = list(payload)
+
+        return (
+            patch("app.services.studio_chat_service.read_json", side_effect=reader),
+            patch("app.services.studio_chat_service.write_json", side_effect=writer),
+            patch("app.services.studio_chat_service.emit_later"),
+            patch("app.services.studio_chat_service.tenant_file_lock", _nolock),
+            patch("app.state_store.tenant_dir", return_value=root),
+        )
+
+    def test_greeting_skips_campaign(self) -> None:
+        campaigns = FakeCampaigns()
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw))
+            with patches[0], patches[1], patches[2], patches[3], patches[4]:
+                result = asyncio.run(studio_chat_service.chat("سلام", campaigns))
+        self.assertEqual(campaigns.created, 0)
+        self.assertEqual(result["campaignId"], "")
+        self.assertIn("اینستاگرام", result["messages"][-1]["text"])
+        self.assertNotIn("attachments", result["messages"][-1])
+
+    def test_greeting_variants(self) -> None:
+        self.assertTrue(studio_chat_service._is_greeting("سلام خوبی؟"))
+        self.assertTrue(studio_chat_service._is_greeting("سلام، چطوری"))
+        self.assertFalse(studio_chat_service._is_greeting("پست اینستاگرام بساز"))
+
+    def test_image_starts_background_compose(self) -> None:
+        campaigns = FakeCampaigns()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            media_dir = root / "chat-media"
+            media_dir.mkdir()
+            still = media_dir / "pic-image.png"
+            still.write_bytes(b"png")
+            patches = self._patches(root)
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(
+                    return_value={
+                        "reply": "کپشن آماده شد.",
+                        "title": "ویترین شب",
+                        "subtitle": "",
+                        "cta": "ببین",
+                        "instagram": "کپشن اینستا",
+                        "telegram": "کپشن تلگرام",
+                        "whatsapp": "پیام واتساپ",
+                        "compose": False,
+                        "imagePrompt": "a shop window, no text",
+                    }
+                ),
+            ), patch("app.services.chat_media_service.tenant_dir", return_value=root), patch(
+                "app.services.studio_compose_service.start", return_value="job-1"
+            ) as started:
+                result = asyncio.run(
+                    studio_chat_service.chat(
+                        "پست اینستاگرام بساز",
+                        campaigns,
+                        {"kind": "image", "name": still.name},
+                    )
+                )
+        self.assertEqual(campaigns.created, 1)
+        self.assertEqual(campaigns.composed, 0)
+        self.assertEqual(campaigns.kwargs.get("whatsapp_caption"), "پیام واتساپ")
+        self.assertTrue(started.called)
+        assistant = result["messages"][-1]
+        self.assertEqual(assistant["captions"]["whatsapp"], "پیام واتساپ")
+        self.assertIn("در حال ساخت", assistant["text"])
+
+    def test_llm_error_emits_failed(self) -> None:
+        campaigns = FakeCampaigns()
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw))
+            with patches[0], patches[1], patches[2] as emit, patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(return_value={"error": "llm_unreachable", "reply": "مدل پاسخ نداد. پیام را دوباره بفرست."}),
+            ):
+                result = asyncio.run(studio_chat_service.chat("پست بساز", campaigns))
+        self.assertEqual(campaigns.created, 0)
+        self.assertTrue(result["messages"][-1]["text"])
+        failed = [call for call in emit.call_args_list if (call.kwargs or {}).get("status") == "failed"]
+        self.assertTrue(failed)
+
+    def test_mark_published_and_regenerate_caption(self) -> None:
+        campaigns = FakeCampaigns()
+        message_id = str(uuid4())
+        rows = [
+            {
+                "id": message_id,
+                "role": "assistant",
+                "text": "کپشن آماده شد.",
+                "campaignId": str(campaigns.last_id),
+                "captions": {"instagram": "قدیمی", "telegram": "تلگرام", "whatsapp": "واتساپ"},
+                "attachments": [{"kind": "image", "name": "pic-image.png"}],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw), rows)
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(
+                    return_value={"reply": "تازه", "instagram": "اینستا تازه", "telegram": "تلگرام تازه", "whatsapp": "واتساپ تازه"}
+                ),
+            ):
+                marked = studio_chat_service.mark_published(message_id, "telegram")
+                self.assertTrue(marked["messages"][0]["published"]["telegram"])
+                result = asyncio.run(
+                    studio_chat_service.regenerate(message_id=message_id, part="caption", campaigns=campaigns)
+                )
+        self.assertEqual(result["messages"][0]["captions"]["instagram"], "اینستا تازه")
+
+    def test_question_without_captions_skips_campaign(self) -> None:
+        campaigns = FakeCampaigns()
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw))
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(
+                    return_value={
+                        "reply": "چه محصولی؟",
+                        "title": "",
+                        "instagram": "",
+                        "telegram": "",
+                        "whatsapp": "",
+                        "compose": False,
+                    }
+                ),
+            ), patch("app.services.studio_compose_service.start") as started:
+                result = asyncio.run(studio_chat_service.chat("پست بساز", campaigns))
+        self.assertEqual(campaigns.created, 0)
+        started.assert_not_called()
+        self.assertEqual(result["campaignId"], "")
+        self.assertEqual(result["messages"][-1]["text"], "چه محصولی؟")
+
+    def test_stub_schema_reply_uses_caption(self) -> None:
+        campaigns = FakeCampaigns()
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw))
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(
+                    return_value={
+                        "reply": "متن فارسی",
+                        "title": "تیتر کوتاه",
+                        "instagram": "ویترین امشب با نور نرم آماده است.",
+                        "telegram": "ویترین امشب باز است.",
+                        "whatsapp": "ویترین آماده‌ست.",
+                        "compose": True,
+                        "imagePrompt": "shop window still, no text",
+                    }
+                ),
+            ), patch("app.services.studio_compose_service.start", return_value="job-1"):
+                result = asyncio.run(studio_chat_service.chat("پست اینستاگرام بساز", campaigns))
+        self.assertEqual(campaigns.created, 1)
+        self.assertNotIn("متن فارسی", result["messages"][-1]["text"])
+        self.assertIn("ویترین", result["messages"][-1]["text"])
+        self.assertEqual(campaigns.kwargs.get("title"), "کمپین جدید")
+
+
+if __name__ == "__main__":
+    unittest.main()

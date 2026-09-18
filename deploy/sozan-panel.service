@@ -1,0 +1,18 @@
+[Unit]
+Description=Sozan Core panel
+After=network-online.target sozan-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/sozan-core/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3010
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/npx next start --port 3010 --hostname 127.0.0.1
+Restart=on-failure
+RestartSec=4
+
+[Install]
+WantedBy=multi-user.target

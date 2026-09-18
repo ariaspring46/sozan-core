@@ -1,0 +1,254 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { AppShell } from "@/components/app-shell";
+import { Field } from "@/components/field";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
+import { formatWhen, money, parseNonNegativeInt } from "@/lib/digits";
+import { EmptyState } from "@/components/empty-state";
+
+type LedgerRow = { id: string; at: number; kind: string; amount: number; note?: string; orderId?: string };
+type WithdrawRow = {
+  id: string;
+  at: number;
+  amount: number;
+  iban: string;
+  name?: string;
+  status: string;
+  phone?: string;
+};
+type WalletSnap = {
+  available: number;
+  pendingWithdraw: number;
+  lifetimeSales: number;
+  lifetimeCommission: number;
+  smsUsed: number;
+  smsQuota: number;
+  smsOverageToman: number;
+  commissionBps: number;
+  ledger: LedgerRow[];
+  withdrawals: WithdrawRow[];
+};
+
+const KIND: Record<string, string> = {
+  sale_sozan: "فروش درگاه سوزان",
+  commission: "کمیسیون سوزان",
+  sale_external: "فروش روی درگاه شخصی",
+  plan: "اشتراک",
+  sms: "پیامک اضافه",
+  withdraw_hold: "در انتظار برداشت",
+  withdraw_paid: "برداشت تأیید شد",
+  withdraw_reject: "رد برداشت",
+};
+
+const STATUS: Record<string, string> = {
+  pending: "در انتظار تأیید",
+  paid: "واریز شد",
+  rejected: "رد شد",
+};
+
+export default function WalletPage() {
+  const [wallet, setWallet] = useState<WalletSnap | null>(null);
+  const [adminRows, setAdminRows] = useState<WithdrawRow[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [iban, setIban] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function load() {
+    const [snap, me] = await Promise.all([
+      api<WalletSnap>("/wallet"),
+      api<{ isAdmin?: boolean }>("/auth/me"),
+    ]);
+    setWallet(snap);
+    setIsAdmin(Boolean(me.isAdmin));
+    if (me.isAdmin) {
+      const admin = await api<{ withdrawals: WithdrawRow[] }>("/wallet/admin/withdrawals");
+      setAdminRows(admin.withdrawals || []);
+    }
+  }
+
+  useEffect(() => {
+    void load().catch((err) => setError(err instanceof Error ? err.message : "خطا"));
+  }, []);
+
+  async function requestWithdraw(event: FormEvent) {
+    event.preventDefault();
+    const nextAmount = parseNonNegativeInt(amount);
+    if (nextAmount === null || nextAmount < 1) {
+      setError("مبلغ را با عدد بنویس.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const data = await api<{ wallet: WalletSnap }>("/wallet/withdraw", {
+        method: "POST",
+        body: JSON.stringify({ amount: nextAmount, iban, name }),
+      });
+      setWallet(data.wallet);
+      setAmount("");
+      setNotice("درخواست برداشت ثبت شد. بعد از تأیید مدیر واریز می‌شود.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function decide(id: string, ok: boolean) {
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/wallet/admin/withdrawals/${id}`, {
+        method: "POST",
+        body: JSON.stringify({ ok }),
+      });
+      await load();
+      setNotice(ok ? "برداشت تأیید شد." : "برداشت رد شد و به کیف برگشت.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AppShell
+      header={
+        <div>
+          <p className="text-sm text-muted">
+            <Link href="/more" className="text-warm">
+              بیشتر
+            </Link>
+          </p>
+          <h1 className="text-lg font-bold">کیف پول</h1>
+        </div>
+      }
+    >
+      <div className="h-full space-y-4 overflow-y-auto p-4">
+        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {notice ? <p className="text-sm text-signal">{notice}</p> : null}
+        {wallet ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <p className="text-xs text-muted">قابل‌برداشت</p>
+                <p className="mt-1 text-lg font-bold">{money(wallet.available)} تومان</p>
+              </Card>
+              <Card>
+                <p className="text-xs text-muted">در انتظار برداشت</p>
+                <p className="mt-1 text-lg font-bold">{money(wallet.pendingWithdraw)} تومان</p>
+              </Card>
+              <Card>
+                <p className="text-xs text-muted">فروش آنلاین</p>
+                <p className="mt-1 font-bold">{money(wallet.lifetimeSales)} تومان</p>
+              </Card>
+              <Card>
+                <p className="text-xs text-muted">کمیسیون سوزان</p>
+                <p className="mt-1 font-bold">{money(wallet.lifetimeCommission)} تومان</p>
+              </Card>
+            </div>
+            <Card>
+              <p className="text-sm leading-7 text-muted">
+                فروش دستی وارد کیف نمی‌شود. اگر مرچنت شخصی داشته باشی پول در حساب خودت می‌ماند و اینجا فقط ثبت می‌شود.
+                درگاه سوزان {wallet.commissionBps / 100}٪ کمیسیون دارد.
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                پیامک این ماه: {money(wallet.smsUsed)} از {money(wallet.smsQuota)}
+                {wallet.smsOverageToman ? ` · بعد از سقف هر پیامک ${money(wallet.smsOverageToman)} تومان` : ""}
+              </p>
+            </Card>
+            <Card>
+              <h2 className="font-bold">برداشت با شبا</h2>
+              <form className="mt-3 space-y-3" onSubmit={(event) => void requestWithdraw(event)}>
+                <Field label="مبلغ به تومان">
+                  <Input dir="ltr" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} />
+                </Field>
+                <Field label="شبا">
+                  <Input dir="ltr" placeholder="IR و ۲۴ رقم" value={iban} onChange={(event) => setIban(event.target.value)} />
+                </Field>
+                <Field label="نام صاحب حساب">
+                  <Input value={name} onChange={(event) => setName(event.target.value)} />
+                </Field>
+                <Button type="submit" disabled={busy || !iban.trim()}>
+                  ثبت درخواست برداشت
+                </Button>
+              </form>
+            </Card>
+            {isAdmin ? (
+              <Card className="space-y-3">
+                <h2 className="font-bold">تأیید برداشت‌ها</h2>
+                {adminRows.length === 0 ? (
+                  <p className="text-sm text-muted">درخواست معلقی نیست.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {adminRows.map((row) => (
+                      <li key={row.id} className="rounded-xl bg-canvas p-3">
+                        <p className="text-sm">{row.phone}</p>
+                        <p className="font-medium">{money(row.amount)} تومان</p>
+                        <p dir="ltr" className="text-xs text-muted">{row.iban}</p>
+                        <div className="mt-2 flex gap-2">
+                          <Button disabled={busy} onClick={() => void decide(row.id, true)}>
+                            تأیید
+                          </Button>
+                          <Button variant="ghost" disabled={busy} onClick={() => void decide(row.id, false)}>
+                            رد
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            ) : null}
+            <Card>
+              <h2 className="font-bold">گردش کیف</h2>
+              {(wallet.ledger || []).length === 0 ? (
+                <EmptyState title="هنوز گردشی نیست" detail="فروش درگاهی اینجا می‌آید." />
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {wallet.ledger.map((row) => (
+                    <li key={row.id} className="flex items-start justify-between gap-3 text-sm">
+                      <div>
+                        <p>{KIND[row.kind] || row.kind}</p>
+                        {row.note ? <p className="text-xs text-muted">{row.note}</p> : null}
+                        {row.at ? <p className="text-xs text-muted">{formatWhen(row.at)}</p> : null}
+                      </div>
+                      <p className={row.amount < 0 ? "text-danger" : "text-signal"}>{money(row.amount)}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+            {(wallet.withdrawals || []).length ? (
+              <Card>
+                <h2 className="font-bold">درخواست‌های برداشت</h2>
+                <ul className="mt-3 space-y-2">
+                  {wallet.withdrawals.map((row) => (
+                    <li key={row.id} className="text-sm">
+                      <p>
+                        {money(row.amount)} تومان · {STATUS[row.status] || row.status}
+                      </p>
+                      <p className="text-xs text-muted">{row.iban}</p>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-sm text-muted">در حال خواندن کیف…</p>
+        )}
+      </div>
+    </AppShell>
+  );
+}

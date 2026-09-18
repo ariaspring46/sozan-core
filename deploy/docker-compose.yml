@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sozan
+      POSTGRES_PASSWORD: sozan
+      POSTGRES_DB: sozan_ads
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - sozan_pg:/var/lib/postgresql/data
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:16379:6379"
+    restart: unless-stopped
+
+volumes:
+  sozan_pg:

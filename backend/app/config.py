@@ -1,0 +1,99 @@
+from pathlib import Path
+
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=str(ROOT / ".env"), extra="ignore")
+
+    database_url: str = "postgresql+asyncpg://sozan:sozan@127.0.0.1:5432/sozan_ads"
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    jwt_secret: str = "change-me-to-a-long-random-secret"
+    jwt_expire_minutes: int = 720
+    admin_phone: str = "09120000000"
+    otp_ttl_seconds: int = 300
+    otp_dev: bool = True
+    sms_provider: str = "smsir"
+    sms_ir_api_key: str = ""
+    sms_ir_template_id: str = ""
+    sms_ir_token_name: str = "Code"
+    zarinpal_merchant_id: str = ""
+    zarinpal_amount_unit: str = "rial"
+    telegram_bot_token: str = ""
+    telegram_bot_handle: str = ""
+    telegram_post_target: str = ""
+    plan_price_pro: int = 490000
+    plan_price_promax: int = 1490000
+    commission_bps: int = 200
+    sms_overage_toman: int = 200
+    sms_quota_free: int = 50
+    sms_quota_pro: int = 500
+    sms_quota_promax: int = 2000
+    cors_origins: str = "http://127.0.0.1:3000,http://localhost:3000"
+    campaigns_dir: str = str(ROOT / "campaigns")
+    fonts_dir: str = str(ROOT / "brand" / "fonts")
+    audio_bed: str = str(ROOT / "brand" / "audio" / "bed.mp3")
+    brand_dir: str = str(ROOT / "brand")
+    state_dir: str = str(ROOT / "backend" / "data")
+    site_builder_dir: str = "/home/demon/local-ai/smoke-workspace/site-builder"
+    local_llm_url: str = "http://127.0.0.1:9292/v1"
+    local_llm_model: str = "qwen3.8-27b"
+    local_llm_token: str = "sk-local"
+    chat_llm_model: str = "ornith-1.5-35b"
+    studio_llm_model: str = "qwen3.5-9b"
+    cloud_llm_url: str = ""
+    cloud_llm_model: str = "deepseek-v4.1-flash:cloud"
+    cloud_llm_token: str = Field(default="", validation_alias=AliasChoices("CLOUD_LLM_TOKEN", "OLLAMA_API_KEY"))
+    cloud_llm_proxy: str = ""
+    arvan_api_key: str = ""
+    arvan_zone: str = "sozan-core.ir"
+    arvan_origin_ip: str = ""
+    arvan_origin_port: int = 80
+    gateway_sozan_url: str = ""
+    channel_proxy: str = ""
+    sozan_npm_proxy: str = ""
+    public_api_url: str = "https://api.sozan-core.ir"
+    panel_url: str = "https://app.sozan-core.ir"
+    instagram_app_id: str = ""
+    instagram_app_secret: str = ""
+    instagram_redirect_uri: str = ""
+    unipile_dsn: str = ""
+    unipile_api_key: str = ""
+    unipile_proxy: str = ""
+    sendbox_base_url: str = "https://api.sendbox.chat/api/v1"
+    sendbox_api_key: str = ""
+    sendbox_oauth_url: str = ""
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [x.strip() for x in self.cors_origins.split(",") if x.strip()]
+
+    @property
+    def campaigns_path(self) -> Path:
+        return Path(self.campaigns_dir).resolve()
+
+    @property
+    def fonts_path(self) -> Path:
+        return Path(self.fonts_dir).resolve()
+
+    @property
+    def audio_bed_path(self) -> Path:
+        return Path(self.audio_bed).resolve()
+
+    @property
+    def brand_path(self) -> Path:
+        return Path(self.brand_dir).resolve()
+
+    @property
+    def state_path(self) -> Path:
+        return Path(self.state_dir).resolve()
+
+    @property
+    def factory_script(self) -> Path:
+        return Path(self.site_builder_dir).resolve() / "tools" / "sozan_factory_fastpath.py"
+
+
+settings = Settings()

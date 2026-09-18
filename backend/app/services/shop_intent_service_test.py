@@ -1,0 +1,52 @@
+import unittest
+
+from app.services.shop_intent_service import classify_actions, page_kind_from_text
+
+
+class ShopIntentClassifyTests(unittest.TestCase):
+    def test_page_kind_map_and_invalid_asks(self) -> None:
+        self.assertEqual(page_kind_from_text("صفحه درباره ما بساز"), "about")
+        self.assertEqual(page_kind_from_text("faq page"), "faq")
+        kinds = [row["type"] for row in classify_actions("صفحه بلاگ بساز")]
+        self.assertEqual(kinds, ["ask_clarify"])
+        self.assertIn("کدام صفحه", classify_actions("صفحه بلاگ بساز")[0]["reply"])
+
+    def test_create_about_emits_nav_dependency(self) -> None:
+        actions = classify_actions("صفحه درباره ما را بساز")
+        self.assertEqual(actions[0]["type"], "create_page")
+        self.assertEqual(actions[0]["kind"], "about")
+        self.assertEqual(actions[1]["type"], "add_nav_link")
+        self.assertEqual(actions[1]["depends_on"], "create_page:about")
+
+    def test_product_text_and_header_and_colors(self) -> None:
+        added = classify_actions('یک کالا اضافه کن با عنوان «زعفران سوپر نگین» قیمت 850000')
+        self.assertEqual([row["type"] for row in added], ["add_product"])
+        self.assertEqual(added[0]["title"], "زعفران سوپر نگین")
+        removed = classify_actions('کالا «زعفران سوپر نگین» را حذف کن')
+        self.assertEqual(removed[0]["type"], "remove_product")
+        header = classify_actions('عنوان هدر را «زعفران قائنات» کن')
+        self.assertEqual(header[0]["type"], "set_header")
+        self.assertEqual(header[0]["logoFa"], "زعفران قائنات")
+        self.assertEqual(classify_actions("قیمت را پنهان کن")[0]["type"], "hide_prices")
+        self.assertEqual(classify_actions("قیمت نزن")[0]["type"], "hide_prices")
+        colors = classify_actions("رنگ را زرشکی کن و تیتر را «منتخب مزرعه» کن")
+        types = [row["type"] for row in colors]
+        self.assertIn("set_colors", types)
+        self.assertIn("replace_text", types)
+        self.assertNotIn("set_brand", types)
+        missing = classify_actions("رنگ را زرشکی کن و تیتر «این تیتر روی صفحه نیست» را عوض کن")
+        self.assertEqual([row["type"] for row in missing], ["set_colors", "replace_text"])
+        self.assertEqual(missing[1]["find"], "این تیتر روی صفحه نیست")
+
+    def test_foreign_payload_stops_the_turn(self) -> None:
+        actions = classify_actions("فوتر را https://evil.example/callback کن و رنگ را سبز کن")
+        self.assertEqual(actions, [{"type": "reject_foreign", "reason": "url"}])
+
+    def test_greet_and_continue_are_canned(self) -> None:
+        self.assertEqual(classify_actions("سلام")[0]["type"], "greet")
+        self.assertEqual(classify_actions("خب")[0]["type"], "greet")
+        self.assertEqual(classify_actions("سبد خرید چطور کار می‌کند؟")[0]["type"], "answer")
+
+
+if __name__ == "__main__":
+    unittest.main()

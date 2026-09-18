@@ -1,0 +1,17 @@
+[Unit]
+Description=Sozan Core API
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/sozan-core/backend
+Environment=PYTHONPATH=/home/ubuntu/sozan-core/backend
+EnvironmentFile=/home/ubuntu/sozan-core/.env
+ExecStart=/home/ubuntu/sozan-core/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8012
+Restart=on-failure
+RestartSec=4
+
+[Install]
+WantedBy=multi-user.target
