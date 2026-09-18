@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import time
+from pathlib import Path
 
 import httpx
 
@@ -23,6 +26,13 @@ CLOUD_SURFACES = frozenset({"factory"})
 GPU1_LOCAL = frozenset(
     {"qwen3.8-27b", "ornith-1.5-35b", "muse-glimmer-30b", "gpt-oss-20b", "qwen3-coder-next"}
 )
+# While the site-builder holds GPU1 (ACTIVE build lock or a GPU1 phase in
+# queue/phase.json) the hub must not evict its worker; it shares 27B when that
+# is what is loaded, else falls back to the always-on 9b.
+FACTORY_GPU1_PHASES = frozenset({"TRANSITION", "DESIGN_27B", "DESIGN", "CODE_LIGHT", "CODE_HEAVY", "SUPERVISE", "COMFY"})
+FACTORY_PHASE_MAX_AGE_SEC = 900
+SHARED_GPU1_MODEL = "qwen3.8-27b"
+ALWAYS_ON_MODEL = "qwen3.5-9b"
 
 LLM_UNREACHABLE = {
     "reply": "مدل پاسخ نداد. پیام را دوباره بفرست.",
@@ -200,14 +210,90 @@ async def _unload_model(model: str) -> None:
         log.warning("llm unload %s failed: %s", model, type(exc).__name__)
 
 
-async def _ensure_gpu1(model: str) -> None:
+def _factory_queue() -> Path:
+    return Path(settings.site_builder_dir) / "queue"
+
+
+def _pid_alive(pid: object) -> bool:
+    try:
+        os.kill(int(pid), 0)  # type: ignore[arg-type]
+    except (TypeError, ValueError, ProcessLookupError):
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _phase_age_sec(raw: object) -> float | None:
+    if raw in (None, ""):
+        return None
+    try:
+        return max(0.0, time.time() - float(raw))
+    except (TypeError, ValueError):
+        pass
+    try:
+        stamp = time.mktime(time.strptime(str(raw), "%Y-%m-%d %H:%M:%S"))
+    except ValueError:
+        return None
+    return max(0.0, time.time() - stamp)
+
+
+def factory_holds_gpu1() -> str:
+    """Why the site-builder owns GPU1 right now ('' when it does not).
+
+    Signals: queue/fastpath/ACTIVE with a live pid (a build is running), or
+    queue/phase.json in a GPU1 phase that was updated recently."""
+    queue = _factory_queue()
+    try:
+        lock = json.loads((queue / "fastpath" / "ACTIVE").read_text(encoding="utf-8"))
+        if str(lock.get("status") or "") == "running" and _pid_alive(lock.get("pid")):
+            return f"build:{lock.get('id') or ''}"
+    except (OSError, ValueError, TypeError):
+        pass
+    try:
+        state = json.loads((queue / "phase.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return ""
+    phase = str(state.get("phase") or "").upper()
+    if phase not in FACTORY_GPU1_PHASES:
+        return ""
+    age = _phase_age_sec(state.get("updatedAt"))
+    if age is None or age > FACTORY_PHASE_MAX_AGE_SEC:
+        return ""
+    return f"phase:{phase}"
+
+
+async def _ensure_gpu1(model: str) -> str:
+    """Make `model` usable on GPU1; returns the model to actually call.
+
+    Evicts other GPU1 workers only when the factory is idle. While a build
+    holds GPU1 the hub shares qwen3.8-27b if that is loaded, else qwen3.5-9b."""
     if model not in GPU1_LOCAL:
-        return
+        return model
     found = await _running_models()
     if found is None:
-        return
-    for other in (found & GPU1_LOCAL) - {model}:
-        await _unload_model(other)
+        return model
+    others = (found & GPU1_LOCAL) - {model}
+    if not others:
+        return model
+    holder = factory_holds_gpu1()
+    if not holder:
+        for other in others:
+            await _unload_model(other)
+        return model
+    pick = SHARED_GPU1_MODEL if SHARED_GPU1_MODEL in found else ALWAYS_ON_MODEL
+    log.warning("llm gpu1 held by factory (%s); %s -> %s", holder, model, pick)
+    emit_later(
+        kind="llm",
+        title="gpu1-busy",
+        surface="llm",
+        status="fallback",
+        stage="gpu1-busy",
+        payload={"holder": holder, "requested": model, "used": pick, "loaded": sorted(found & GPU1_LOCAL)},
+    )
+    return pick
 
 
 def _classify_llm_error(exc: Exception) -> str:
@@ -279,7 +365,7 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
         body["reasoning_format"] = "none"
         if route["token"]:
             headers["Authorization"] = f"Bearer {route['token']}"
-        await _ensure_gpu1(route["model"])
+        body["model"] = await _ensure_gpu1(route["model"])
     last_exc: Exception | None = None
     for attempt in (1, 2):
         try:

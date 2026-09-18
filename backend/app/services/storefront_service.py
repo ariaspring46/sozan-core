@@ -224,6 +224,14 @@ def add_product(
     return {"product": public_product(row), "products": [public_product(item) for item in rows]}
 
 
+def count_scanned_handle(source_handles: list[str]) -> int:
+    """Products already imported from any of `source_handles`."""
+    wanted = {str(item or "").strip() for item in source_handles if str(item or "").strip()}
+    if not wanted:
+        return 0
+    return sum(1 for row in _list("products.json") if str(row.get("sourceHandle") or "").strip() in wanted)
+
+
 def remove_scanned_handle(source_handle: str) -> None:
     handle = source_handle.strip()
     if not handle:

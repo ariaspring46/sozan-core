@@ -248,7 +248,7 @@ class ChannelScanTests(unittest.TestCase):
         )
         self.assertEqual(rows[0]["priceStatus"], "direct")
 
-    def _scan_accounts(self, products: list[dict], *, fetched: bool = True):
+    def _scan_accounts(self, products: list[dict], *, fetched: bool = True, llm_error: str = "", previous: dict | None = None):
         account = {
             "platform": "instagram",
             "handle": "optic_day",
@@ -257,11 +257,13 @@ class ChannelScanTests(unittest.TestCase):
             "about": "",
             "colors": [],
             "categories": [],
+            "llmError": llm_error,
         }
         with tempfile.TemporaryDirectory() as raw:
             with (
                 patch.object(settings, "state_dir", raw),
                 tenant_scope("09111234567"),
+                patch.object(channel_scan_service, "get_scan", return_value=dict(previous or {})),
                 patch.object(channel_scan_service, "scan_account", new=AsyncMock(return_value=account)),
                 patch.object(channel_scan_service, "emit_later"),
                 patch("app.services.channel_scan_service.voice_service.merge_summary"),
@@ -286,11 +288,14 @@ class ChannelScanTests(unittest.TestCase):
         self.assertEqual(out["productCount"], 1)
 
     def test_zero_candidates_skips_upsert_and_needs_review(self) -> None:
-        out, upsert, remove = self._scan_accounts([], fetched=True)
+        with patch("app.services.channel_scan_service.storefront_service.count_scanned_handle", return_value=1) as count:
+            out, upsert, remove = self._scan_accounts([], fetched=True)
         upsert.assert_not_called()
         remove.assert_not_called()
+        count.assert_called_once_with(["optic_day"])
         self.assertTrue(out.get("needsReview"))
         self.assertEqual(out["quality"]["imported"], 0)
+        self.assertEqual(out["quality"]["kept"], 1)
 
     def test_large_low_image_scan_imports_with_soft_review(self) -> None:
         products = [{"title": f"کالا {i}", "price": 0, "image": "", "stableKey": f"k{i}"} for i in range(6)]
@@ -299,6 +304,59 @@ class ChannelScanTests(unittest.TestCase):
         remove.assert_called_once()
         self.assertTrue(out.get("needsReview"))
         self.assertEqual(out["quality"]["imported"], 6)
+
+    def test_model_outage_keeps_previous_scan_and_reports_error(self) -> None:
+        previous = {
+            "accounts": [{"platform": "instagram", "handle": "optic_day", "products": [{"title": "جلد زیپی"}]}],
+            "productCount": 1,
+            "quality": {"imported": 1},
+        }
+        out, upsert, remove = self._scan_accounts([], fetched=True, llm_error="llm_unreachable", previous=previous)
+        upsert.assert_not_called()
+        remove.assert_not_called()
+        self.assertEqual(out["error"], channel_scan_service.SCAN_MODEL_ERROR)
+        self.assertFalse(out.get("needsReview"))
+        self.assertEqual(out["productCount"], 1)
+        self.assertEqual(out["quality"]["imported"], 1)
+
+    def test_model_outage_with_caption_candidates_still_imports(self) -> None:
+        out, upsert, _ = self._scan_accounts(
+            [{"title": "جلد زیپی", "price": 0, "image": "", "stableKey": "k1"}], llm_error="llm_unreachable"
+        )
+        upsert.assert_called_once()
+        self.assertNotIn("error", out)
+        self.assertEqual(out["quality"]["imported"], 1)
+
+    def test_start_scan_model_outage_sets_error_status_and_keeps_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with (
+                patch.object(settings, "state_dir", raw),
+                tenant_scope("09111234567"),
+                patch.object(channel_scan_service, "emit_later"),
+                patch.object(
+                    channel_scan_service,
+                    "scan_accounts",
+                    new=AsyncMock(return_value={"error": channel_scan_service.SCAN_MODEL_ERROR, "productCount": 1}),
+                ),
+                patch("app.services.shop_service.rebuild_from_channel_catalog") as rebuild,
+            ):
+                channel_scan_service._set_scan_status(
+                    status="done", product_count=1, handles=["optic_day"], extra={"imported": 1, "noImage": 1}
+                )
+
+                async def run() -> dict:
+                    channel_scan_service.start_scan([{"platform": "instagram", "handle": "optic_day"}])
+                    await asyncio.sleep(0.05)
+                    return channel_scan_service.scan_status()
+
+                status = asyncio.run(run())
+            rebuild.assert_not_called()
+        self.assertEqual(status["status"], "error")
+        self.assertEqual(status["errorClass"], channel_scan_service.SCAN_MODEL_ERROR)
+        self.assertIn("دوباره اسکن", status["error"])
+        self.assertEqual(status["imported"], 1)
+        self.assertEqual(status["productCount"], 1)
+        self.assertFalse(status["needsReview"])
 
 
 if __name__ == "__main__":

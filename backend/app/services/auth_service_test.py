@@ -1,0 +1,115 @@
+from __future__ import annotations
+
+import asyncio
+import unittest
+from unittest.mock import AsyncMock, patch
+
+from fastapi import HTTPException
+
+from app.services import auth_service
+from app.services.auth_service import AuthService
+
+
+class _FakeRedis:
+    """Minimal async Redis: get/setex/ttl/delete/incr/expire with fixed TTL bookkeeping."""
+
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+        self.ttls: dict[str, int] = {}
+        self.counters: dict[str, int] = {}
+
+    async def get(self, key: str):
+        return self.store.get(key)
+
+    async def setex(self, key: str, ttl: int, value: str) -> None:
+        self.store[key] = value
+        self.ttls[key] = ttl
+
+    async def ttl(self, key: str) -> int:
+        return self.ttls.get(key, -2)
+
+    async def delete(self, key: str) -> None:
+        self.store.pop(key, None)
+        self.ttls.pop(key, None)
+
+    async def incr(self, key: str) -> int:
+        self.counters[key] = self.counters.get(key, 0) + 1
+        return self.counters[key]
+
+    async def expire(self, key: str, ttl: int) -> None:
+        self.ttls[key] = ttl
+
+
+class _Users:
+    def __init__(self) -> None:
+        self.user = None
+
+    async def get_by_phone(self, phone: str):
+        return self.user
+
+    async def create(self, *, phone: str, role: str):
+        self.user = type("U", (), {"id": 7, "role": role, "phone": phone})()
+        return self.user
+
+
+class OtpResendTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.redis = _FakeRedis()
+        self.svc = AuthService(_Users())
+        self.patches = [
+            patch.object(auth_service, "redis_client", self.redis),
+            patch.object(auth_service, "get_settings", return_value={"mockSms": True}),
+        ]
+        for item in self.patches:
+            item.start()
+
+    def tearDown(self) -> None:
+        for item in self.patches:
+            item.stop()
+
+    def test_resend_within_ttl_reuses_same_code(self) -> None:
+        first = asyncio.run(self.svc.send_otp("09111234567"))["dev_code"]
+        self.redis.ttls["otp:09111234567"] = 200
+        second = asyncio.run(self.svc.send_otp("09111234567"))["dev_code"]
+        self.assertEqual(first, second)
+
+    def test_resend_near_expiry_issues_fresh_code(self) -> None:
+        first = asyncio.run(self.svc.send_otp("09111234567"))["dev_code"]
+        self.redis.ttls["otp:09111234567"] = auth_service.OTP_REUSE_MIN_TTL - 1
+        with patch.object(auth_service.secrets, "randbelow", return_value=int(first) + 1 if first != "999999" else 0):
+            second = asyncio.run(self.svc.send_otp("09111234567"))["dev_code"]
+        self.assertNotEqual(first, second)
+        self.assertEqual(self.redis.store["otp:09111234567"], second)
+
+    def test_verify_accepts_persian_digits_and_spaces(self) -> None:
+        self.redis.store["otp:09111234567"] = "123456"
+        self.redis.ttls["otp:09111234567"] = 100
+        with patch("app.services.profile_service.touch", return_value={}), patch.object(
+            auth_service, "encode_token", return_value="jwt"
+        ):
+            out = asyncio.run(self.svc.verify_otp("09111234567", " ۱۲۳ ۴۵۶ "))
+        self.assertEqual(out.get("token") or out.get("access_token") or "jwt", "jwt")
+        self.assertNotIn("otp:09111234567", self.redis.store)
+
+    def test_verify_rejects_wrong_or_empty_code(self) -> None:
+        self.redis.store["otp:09111234567"] = "123456"
+        with self.assertRaises(HTTPException):
+            asyncio.run(self.svc.verify_otp("09111234567", "654321"))
+        with self.assertRaises(HTTPException):
+            asyncio.run(self.svc.verify_otp("09111234567", ""))
+
+    def test_failed_resend_keeps_reused_code(self) -> None:
+        first = asyncio.run(self.svc.send_otp("09111234567"))["dev_code"]
+        self.redis.ttls["otp:09111234567"] = 200
+        with patch.object(auth_service, "get_settings", return_value={"mockSms": False}), patch(
+            "app.services.wallet_service.consume_sms"
+        ), patch.object(auth_service.sms_service, "resolve_sms", return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "code"}), patch.object(
+            auth_service.sms_service, "send_otp", new=AsyncMock(side_effect=RuntimeError("gateway"))
+        ):
+            with self.assertRaises(HTTPException):
+                asyncio.run(self.svc.send_otp("09111234567"))
+        self.assertEqual(self.redis.store.get("otp:09111234567"), first)
+
+
+if __name__ == "__main__":
+    unittest.main()

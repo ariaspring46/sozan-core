@@ -382,5 +382,18 @@ class LiveShopChatRouteTests(unittest.TestCase):
             self.assertNotIn("sozan.sozan-core.ir", names)
 
 
+class OperatorErrorTests(unittest.TestCase):
+    def test_readiness_catalog_maps_to_persian(self) -> None:
+        self.assertIn("کاتالوگ", shop_service._operator_error("readiness failed: catalog"))
+
+    def test_gpu_busy_maps_to_persian(self) -> None:
+        raw = (
+            "ensure DESIGN_27B failed: WARN: GPU1 still loaded ['ornith-1.5-35b']; last-resort full unload\n"
+            "FAIL: extra GPU1 LLMs still loaded: ['ornith-1.5-35b']\n"
+        )
+        self.assertIn("مشغول", shop_service._operator_error(raw))
+        self.assertIn("مشغول", shop_service._operator_error("gpu_busy: qwen3.8-27b in flight"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     local_llm_url: str = "http://127.0.0.1:9292/v1"
     local_llm_model: str = "qwen3.8-27b"
     local_llm_token: str = "sk-local"
-    chat_llm_model: str = "ornith-1.5-35b"
+    chat_llm_model: str = "qwen3.8-27b"
     studio_llm_model: str = "qwen3.5-9b"
     cloud_llm_url: str = ""
     cloud_llm_model: str = "deepseek-v4.1-flash:cloud"

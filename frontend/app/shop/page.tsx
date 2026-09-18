@@ -14,7 +14,9 @@ type ScanState = {
   error?: string;
   handles?: string[];
   needsReview?: boolean;
+  errorClass?: string;
   imported?: number;
+  kept?: number;
   noImage?: number;
   noPrice?: number;
   rejected?: number;
@@ -89,19 +91,23 @@ export default function ShopPage() {
   const scanNote =
     scan?.status === "running"
       ? `در حال خواندن اینستاگرام ${scan.handles?.join("، ") || ""}… کالاها به فروش می‌آیند.`
+      : scan?.status === "error"
+        ? (scan.error || "اسکن کانال کامل نشد.") +
+          (importedCount ? ` ${importedCount} کالای قبلی سر جایش است.` : "") +
+          " برای تلاش دوباره، همان آدرس را دوباره بفرست."
       : scan?.needsReview && importedCount
         ? `${importedCount} کالا وارد شد؛ عکس کم است، بعداً عکس بگذار.`
         : scan?.needsReview
-          ? `اسکن مشکوک است؛ ${importedCount} کالا در صف بازبینی است.`
+          ? scan.kept
+            ? `چیزی تازه از این صفحه خوانده نشد؛ ${scan.kept} کالای قبلی سر جایش است.`
+            : "چیزی از این صفحه خوانده نشد؛ دوباره اسکن کن یا کالا را دستی اضافه کن."
         : scan?.status === "done" && importedCount
           ? `${importedCount} کالا وارد شد` +
             (scan.rejected ? `، ${scan.rejected} رد` : "") +
             (scan.noImage ? `، ${scan.noImage} بدون عکس` : "") +
             (scan.noPrice ? `، ${scan.noPrice} بدون قیمت` : "") +
             "."
-          : scan?.status === "error"
-            ? scan.error || "اسکن کانال کامل نشد."
-            : "";
+          : "";
   const turnNote = turn
     ? `فهمیدم: ${turn.route || "—"}. اکشن‌ها: ${(turn.actions || []).join("، ") || "—"}. ${
         turn.rolledBack ? "برگشت داده شد." : turn.verified ? "verify شد." : ""

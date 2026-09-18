@@ -41,6 +41,10 @@ STYLE_WORDS = ("مجلسی", "دوشی", "دستی", "دانشجویی", "زنا
 MATERIALS = ("چرم", "ساتن", "جیر", "مروارید")
 COLOR_WORDS = ("قهوه‌ای", "قهوه ای", "کرم", "سفید", "مشکی", "طلایی", "عسلی", "نخی", "صورتی")
 CAPTION_MAX = 400
+# complete_json() error markers that mean "the model failed", not "the page was empty".
+LLM_ERRORS = frozenset({"llm_unreachable", "llm_bad_json"})
+SCAN_MODEL_ERROR = "llm_unreachable"
+SCAN_MODEL_ERROR_FA = "مدل هوش مصنوعی در دسترس نبود؛ چند لحظه بعد دوباره اسکن کن."
 
 
 def _category_from_text(text: str) -> str:
@@ -176,7 +180,9 @@ def scan_status() -> dict:
         "error": str(data.get("error") or ""),
         "handles": [str(item) for item in (data.get("handles") or []) if str(item).strip()],
         "needsReview": bool(data.get("needsReview")),
+        "errorClass": str(data.get("errorClass") or ""),
         "imported": int(data.get("imported") or data.get("productCount") or 0),
+        "kept": int(data.get("kept") or 0),
         "noImage": int(data.get("noImage") or 0),
         "noPrice": int(data.get("noPrice") or 0),
         "rejected": int(data.get("rejected") or 0),
@@ -202,6 +208,7 @@ def start_scan(accounts: list[dict]) -> dict:
     from app.state_store import current_tenant, tenant_scope
 
     handles = [str(item.get("handle") or "") for item in accounts if item.get("handle")]
+    before = scan_status()
     _set_scan_status(status="running", handles=handles)
     phone = current_tenant()
     copied = [dict(item) for item in accounts]
@@ -210,6 +217,29 @@ def start_scan(accounts: list[dict]) -> dict:
         with tenant_scope(phone):
             try:
                 out = await scan_accounts(copied)
+                if str(out.get("error") or "") == SCAN_MODEL_ERROR:
+                    _set_scan_status(
+                        status="error",
+                        product_count=int(before.get("productCount") or 0),
+                        error=SCAN_MODEL_ERROR_FA,
+                        handles=handles,
+                        extra={
+                            "errorClass": SCAN_MODEL_ERROR,
+                            "needsReview": False,
+                            "imported": int(before.get("imported") or 0),
+                            "noImage": int(before.get("noImage") or 0),
+                            "noPrice": int(before.get("noPrice") or 0),
+                            "rejected": 0,
+                        },
+                    )
+                    emit_later(
+                        kind="scan",
+                        surface="scan",
+                        title="scan-error",
+                        status="failed",
+                        payload={"handles": handles, "errorClass": SCAN_MODEL_ERROR},
+                    )
+                    return
                 count = int(out.get("productCount") or 0)
                 quality = out.get("quality") if isinstance(out.get("quality"), dict) else {}
                 imported = int(quality.get("imported") or 0)
@@ -221,6 +251,7 @@ def start_scan(accounts: list[dict]) -> dict:
                     extra={
                         "needsReview": bool(out.get("needsReview")),
                         "imported": imported,
+                        "kept": int(quality.get("kept") or 0),
                         "noImage": max(0, imported - with_image),
                         "noPrice": int(quality.get("noPrice") or 0),
                         "rejected": int(quality.get("rejectedAccounts") or 0),
@@ -941,6 +972,9 @@ title نام کوتاه کالاست مثل «صندل لوکا» یا «کفش 
         ),
         surface="scan",
     )
+    llm_error = str(parsed.get("error") or "") if str(parsed.get("error") or "") in LLM_ERRORS else ""
+    if llm_error:
+        notes.append("مدل هوش مصنوعی به این اسکن نرسید")
     llm_rows = parsed.get("products") if isinstance(parsed.get("products"), list) else []
     products = enrich_scan_products(_caption_products(pages[0], brand=page_brand), llm_rows)
     colors = _parse_colors(parsed)
@@ -1013,7 +1047,16 @@ title نام کوتاه کالاست مثل «صندل لوکا» یا «کفش 
         "products": imported,
         "fetched": bool(pages),
         "winner": winner,
+        "llmError": llm_error,
     }
+
+
+def _model_unavailable(results: list[dict], candidates: list[dict]) -> bool:
+    """True when the scan produced nothing because the model failed, not because the page was empty."""
+    if candidates:
+        return False
+    fetched = [item for item in results if item.get("fetched")]
+    return bool(fetched) and all(item.get("llmError") for item in fetched)
 
 
 async def scan_accounts(accounts: list[dict]) -> dict:
@@ -1096,6 +1139,18 @@ async def scan_accounts(accounts: list[dict]) -> dict:
         if price <= 0:
             no_price += 1
     rejected = sum(1 for item in results if not item.get("fetched"))
+    if _model_unavailable(results, candidates):
+        # Model outage (e.g. GPU1 evicted mid-request): keep the previous scan and
+        # products untouched and let start_scan report a retryable error.
+        emit_later(
+            kind="scan",
+            surface="scan",
+            title="scan-candidates",
+            scan_id=str(payload["scanId"]),
+            status="failed",
+            payload={"fetchedAccounts": fetched, "candidates": 0, "errorClass": SCAN_MODEL_ERROR},
+        )
+        return {**previous, "error": SCAN_MODEL_ERROR, "scanId": payload["scanId"], "quality": {**(previous.get("quality") or {}), "error": SCAN_MODEL_ERROR}}
     thin_or_empty = len(candidates) == 0
     poor_coverage = len(candidates) >= 5 and with_image / max(len(candidates), 1) < 0.2
     needs_review = thin_or_empty or poor_coverage
@@ -1119,7 +1174,11 @@ async def scan_accounts(accounts: list[dict]) -> dict:
         payload=quality,
     )
     if thin_or_empty:
+        # Nothing new from the page: keep what earlier scans imported and say so.
         payload["needsReview"] = True
+        quality["kept"] = storefront_service.count_scanned_handle(
+            [str(item.get("handle") or "") for item in results]
+        )
         if payload["about"]:
             voice_service.merge_summary(str(payload["about"]))
         return _save_scan(payload)

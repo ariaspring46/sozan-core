@@ -4,6 +4,11 @@ IRAN_MOBILE = re.compile(r"^09\d{9}$")
 _DIGIT_MAP = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 
 
+def normalize_digits(raw: str) -> str:
+    """Persian/Arabic-Indic digits to ASCII, other characters untouched."""
+    return (raw or "").translate(_DIGIT_MAP)
+
+
 def normalize_phone(raw: str) -> str:
     mapped = (raw or "").translate(_DIGIT_MAP)
     digits = re.sub(r"\D", "", mapped)

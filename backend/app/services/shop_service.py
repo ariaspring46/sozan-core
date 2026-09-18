@@ -458,6 +458,14 @@ def _operator_error(raw: str) -> str:
         return "شناسه این بیلد در کارخانه پیدا نشد."
     if "Traceback" in text or ".py\", line" in text or '.py", line' in text:
         return "کارخانه وضعیت خوانا نداد."
+    if "readiness failed: catalog" in text:
+        return "کاتالوگ سایت خالی رسید؛ اول کالا اضافه کن، بعد دوباره بساز."
+    if "readiness failed: http" in text:
+        return "سایت ساخته شد اما هنوز پاسخ نمی‌دهد؛ چند لحظه بعد دوباره بساز."
+    if "readiness failed: image" in text:
+        return "عکس کالاها کم بود؛ عکس بگذار یا بدون عکس بساز."
+    if "gpu_busy" in text or "extra GPU1 LLMs still loaded" in text or "could not acquire RESOURCE_LOCK" in text:
+        return "پردازندهٔ کارخانه مشغول چت بود؛ چند لحظه بعد دوباره بساز."
     if "header search" in text or "data-sozan-search" in text:
         return "قالب جستجو در سربرگ نداشت."
     if "gateway_down" in text:

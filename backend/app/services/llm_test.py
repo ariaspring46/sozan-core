@@ -1,8 +1,16 @@
+import asyncio
+import json
+import os
+import tempfile
+import time
 import unittest
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 from app.services.llm import (
     _classify_llm_error,
+    _ensure_gpu1,
+    factory_holds_gpu1,
     parse_json_object,
     report_llm_fail,
     route_for_surface,
@@ -184,6 +192,85 @@ class ChatFailReportTests(unittest.TestCase):
 
         self.assertEqual(_classify_llm_error(httpx.TimeoutException("late")), "timeout")
         self.assertEqual(_classify_llm_error(httpx.ConnectError("down")), "unreachable")
+
+
+class Gpu1GuardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        (self.root / "queue" / "fastpath").mkdir(parents=True)
+        self.settings = patch("app.services.llm.settings.site_builder_dir", str(self.root))
+        self.settings.start()
+
+    def tearDown(self) -> None:
+        self.settings.stop()
+        self.tmp.cleanup()
+
+    def _phase(self, phase: str, age_sec: float = 0) -> None:
+        stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time() - age_sec))
+        (self.root / "queue" / "phase.json").write_text(json.dumps({"phase": phase, "updatedAt": stamp}), encoding="utf-8")
+
+    def _active(self, pid: int) -> None:
+        (self.root / "queue" / "fastpath" / "ACTIVE").write_text(
+            json.dumps({"id": "fp-1", "status": "running", "pid": pid}), encoding="utf-8"
+        )
+
+    def test_idle_factory_does_not_hold(self) -> None:
+        self.assertEqual(factory_holds_gpu1(), "")
+        self._phase("CHAT")
+        self.assertEqual(factory_holds_gpu1(), "")
+
+    def test_running_build_holds(self) -> None:
+        self._active(os.getpid())
+        self.assertEqual(factory_holds_gpu1(), "build:fp-1")
+
+    def test_dead_build_pid_ignored(self) -> None:
+        self._active(2147483646)
+        self.assertEqual(factory_holds_gpu1(), "")
+
+    def test_fresh_design_phase_holds_and_stale_does_not(self) -> None:
+        self._phase("DESIGN_27B")
+        self.assertEqual(factory_holds_gpu1(), "phase:DESIGN_27B")
+        self._phase("DESIGN_27B", age_sec=3600)
+        self.assertEqual(factory_holds_gpu1(), "")
+
+    def test_idle_factory_evicts_other_gpu1_model(self) -> None:
+        unload = AsyncMock()
+        with patch("app.services.llm._running_models", new=AsyncMock(return_value={"qwen3.8-27b", "qwen3.5-9b"})), patch(
+            "app.services.llm._unload_model", new=unload
+        ):
+            used = asyncio.run(_ensure_gpu1("ornith-1.5-35b"))
+        self.assertEqual(used, "ornith-1.5-35b")
+        unload.assert_awaited_once_with("qwen3.8-27b")
+
+    def test_busy_factory_shares_27b_without_unload(self) -> None:
+        self._active(os.getpid())
+        unload = AsyncMock()
+        captured = {}
+        with patch("app.services.llm._running_models", new=AsyncMock(return_value={"qwen3.8-27b", "qwen3.5-9b"})), patch(
+            "app.services.llm._unload_model", new=unload
+        ), patch("app.services.llm.emit_later", new=lambda **kw: captured.update(kw)):
+            used = asyncio.run(_ensure_gpu1("ornith-1.5-35b"))
+        self.assertEqual(used, "qwen3.8-27b")
+        unload.assert_not_awaited()
+        self.assertEqual(captured["title"], "gpu1-busy")
+        self.assertEqual(captured["payload"]["holder"], "build:fp-1")
+
+    def test_busy_factory_falls_back_to_9b(self) -> None:
+        self._phase("TRANSITION")
+        unload = AsyncMock()
+        with patch("app.services.llm._running_models", new=AsyncMock(return_value={"muse-glimmer-30b", "qwen3.5-9b"})), patch(
+            "app.services.llm._unload_model", new=unload
+        ), patch("app.services.llm.emit_later", new=lambda **kw: None):
+            used = asyncio.run(_ensure_gpu1("qwen3.8-27b"))
+        self.assertEqual(used, "qwen3.5-9b")
+        unload.assert_not_awaited()
+
+    def test_requested_model_already_loaded_is_kept(self) -> None:
+        self._active(os.getpid())
+        with patch("app.services.llm._running_models", new=AsyncMock(return_value={"qwen3.8-27b", "qwen3.5-9b"})):
+            self.assertEqual(asyncio.run(_ensure_gpu1("qwen3.8-27b")), "qwen3.8-27b")
+        self.assertEqual(asyncio.run(_ensure_gpu1("qwen3.5-9b")), "qwen3.5-9b")
 
 
 if __name__ == "__main__":
