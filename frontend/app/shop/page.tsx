@@ -85,13 +85,16 @@ export default function ShopPage() {
     return () => window.clearInterval(timer);
   }, [building, scanning, load]);
 
+  const importedCount = scan?.imported || scan?.productCount || 0;
   const scanNote =
     scan?.status === "running"
       ? `در حال خواندن اینستاگرام ${scan.handles?.join("، ") || ""}… کالاها به فروش می‌آیند.`
-      : scan?.needsReview
-        ? `اسکن مشکوک است؛ ${scan.imported || scan.productCount || 0} کالا در صف بازبینی است.`
-        : scan?.status === "done" && (scan.productCount || scan.imported)
-          ? `${scan.imported || scan.productCount || 0} کالا وارد شد` +
+      : scan?.needsReview && importedCount
+        ? `${importedCount} کالا وارد شد؛ عکس کم است، بعداً عکس بگذار.`
+        : scan?.needsReview
+          ? `اسکن مشکوک است؛ ${importedCount} کالا در صف بازبینی است.`
+        : scan?.status === "done" && importedCount
+          ? `${importedCount} کالا وارد شد` +
             (scan.rejected ? `، ${scan.rejected} رد` : "") +
             (scan.noImage ? `، ${scan.noImage} بدون عکس` : "") +
             (scan.noPrice ? `، ${scan.noPrice} بدون قیمت` : "") +

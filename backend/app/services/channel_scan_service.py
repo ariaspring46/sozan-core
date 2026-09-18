@@ -212,14 +212,16 @@ def start_scan(accounts: list[dict]) -> dict:
                 out = await scan_accounts(copied)
                 count = int(out.get("productCount") or 0)
                 quality = out.get("quality") if isinstance(out.get("quality"), dict) else {}
+                imported = int(quality.get("imported") or 0)
+                with_image = int(quality.get("withImage") or 0)
                 _set_scan_status(
                     status="done",
                     product_count=count,
                     handles=handles,
                     extra={
                         "needsReview": bool(out.get("needsReview")),
-                        "imported": int(quality.get("candidates") or count),
-                        "noImage": max(0, int(quality.get("candidates") or 0) - int(quality.get("withImage") or 0)),
+                        "imported": imported,
+                        "noImage": max(0, imported - with_image),
                         "noPrice": int(quality.get("noPrice") or 0),
                         "rejected": int(quality.get("rejectedAccounts") or 0),
                     },
@@ -1094,6 +1096,9 @@ async def scan_accounts(accounts: list[dict]) -> dict:
         if price <= 0:
             no_price += 1
     rejected = sum(1 for item in results if not item.get("fetched"))
+    thin_or_empty = len(candidates) == 0
+    poor_coverage = len(candidates) >= 5 and with_image / max(len(candidates), 1) < 0.2
+    needs_review = thin_or_empty or poor_coverage
     quality = {
         "fetchedAccounts": fetched,
         "candidates": len(candidates),
@@ -1101,7 +1106,8 @@ async def scan_accounts(accounts: list[dict]) -> dict:
         "withCategory": with_cat,
         "noPrice": no_price,
         "rejectedAccounts": rejected,
-        "needsReview": fetched == 0 or (candidates and with_image / max(len(candidates), 1) < 0.2),
+        "needsReview": needs_review,
+        "imported": 0,
     }
     payload["quality"] = quality
     emit_later(
@@ -1109,27 +1115,33 @@ async def scan_accounts(accounts: list[dict]) -> dict:
         surface="scan",
         title="scan-candidates",
         scan_id=str(payload["scanId"]),
-        status="review" if quality["needsReview"] else "ready",
+        status="review" if needs_review else "ready",
         payload=quality,
     )
-    if quality["needsReview"]:
+    if thin_or_empty:
         payload["needsReview"] = True
         if payload["about"]:
             voice_service.merge_summary(str(payload["about"]))
         return _save_scan(payload)
+    if poor_coverage:
+        payload["needsReview"] = True
     seen_keys: set[str] = set()
     for item in results:
         handle = str(item.get("handle") or "")
         if handle:
             storefront_service.remove_scanned_handle(handle)
+    imported = 0
     for row in candidates:
         key = str(row.get("stableKey") or "")
         if key and key in seen_keys:
             continue
         if key:
             seen_keys.add(key)
+        title = str(row.get("title") or "").strip()
+        if not title:
+            continue
         storefront_service.upsert_scanned_product(
-            title=str(row.get("title") or ""),
+            title=title,
             price=int(row.get("price") or 0),
             description=str(row.get("description") or ""),
             sku=str(row.get("sku") or ""),
@@ -1149,6 +1161,9 @@ async def scan_accounts(accounts: list[dict]) -> dict:
             stableKey=key,
             stock=int(row["stock"]) if str(row.get("stock") or "").isdigit() else 24,
         )
+        imported += 1
+    quality["imported"] = imported
+    payload["productCount"] = imported
     if payload["about"]:
         voice_service.merge_summary(str(payload["about"]))
     return _save_scan(payload)

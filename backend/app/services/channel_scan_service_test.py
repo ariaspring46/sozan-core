@@ -248,6 +248,58 @@ class ChannelScanTests(unittest.TestCase):
         )
         self.assertEqual(rows[0]["priceStatus"], "direct")
 
+    def _scan_accounts(self, products: list[dict], *, fetched: bool = True):
+        account = {
+            "platform": "instagram",
+            "handle": "optic_day",
+            "fetched": fetched,
+            "products": products,
+            "about": "",
+            "colors": [],
+            "categories": [],
+        }
+        with tempfile.TemporaryDirectory() as raw:
+            with (
+                patch.object(settings, "state_dir", raw),
+                tenant_scope("09111234567"),
+                patch.object(channel_scan_service, "scan_account", new=AsyncMock(return_value=account)),
+                patch.object(channel_scan_service, "emit_later"),
+                patch("app.services.channel_scan_service.voice_service.merge_summary"),
+                patch("app.services.channel_scan_service.storefront_service.remove_scanned_handle") as remove,
+                patch("app.services.channel_scan_service.storefront_service.upsert_scanned_product") as upsert,
+            ):
+                out = asyncio.run(
+                    channel_scan_service.scan_accounts(
+                        [{"platform": "instagram", "handle": "optic_day"}]
+                    )
+                )
+            return out, upsert, remove
+
+    def test_one_candidate_without_image_is_imported(self) -> None:
+        out, upsert, remove = self._scan_accounts(
+            [{"title": "جلد زیپی", "price": 0, "image": "", "stableKey": "k1", "sourceHandle": "optic_day"}]
+        )
+        upsert.assert_called_once()
+        remove.assert_called_once_with("optic_day")
+        self.assertFalse(out.get("needsReview"))
+        self.assertEqual(out["quality"]["imported"], 1)
+        self.assertEqual(out["productCount"], 1)
+
+    def test_zero_candidates_skips_upsert_and_needs_review(self) -> None:
+        out, upsert, remove = self._scan_accounts([], fetched=True)
+        upsert.assert_not_called()
+        remove.assert_not_called()
+        self.assertTrue(out.get("needsReview"))
+        self.assertEqual(out["quality"]["imported"], 0)
+
+    def test_large_low_image_scan_imports_with_soft_review(self) -> None:
+        products = [{"title": f"کالا {i}", "price": 0, "image": "", "stableKey": f"k{i}"} for i in range(6)]
+        out, upsert, remove = self._scan_accounts(products)
+        self.assertEqual(upsert.call_count, 6)
+        remove.assert_called_once()
+        self.assertTrue(out.get("needsReview"))
+        self.assertEqual(out["quality"]["imported"], 6)
+
 
 if __name__ == "__main__":
     unittest.main()
