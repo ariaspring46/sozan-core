@@ -3,8 +3,10 @@ from typing import Any
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.config import settings
+from app.phone import normalize_phone
 from app.security import require_permission
-from app.services.settings_service import public_settings, save_settings
+from app.services.settings_service import STUDIO_KEYS, public_settings, save_settings
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -29,6 +31,13 @@ class SettingsIn(BaseModel):
     plan: str | None = None
 
 
+def _is_hub_admin(user) -> bool:
+    try:
+        return normalize_phone(user.phone) == normalize_phone(settings.admin_phone)
+    except ValueError:
+        return False
+
+
 @router.get("")
 async def read_settings(_user=Depends(require_permission("campaigns:read"))) -> dict[str, Any]:
     return public_settings()
@@ -37,9 +46,15 @@ async def read_settings(_user=Depends(require_permission("campaigns:read"))) -> 
 @router.patch("")
 async def patch_settings(
     body: SettingsIn,
-    _user=Depends(require_permission("campaigns:write")),
+    user=Depends(require_permission("campaigns:write")),
 ) -> dict[str, Any]:
+    patch = body.model_dump(exclude_none=True)
+    hub_admin = _is_hub_admin(user)
+    if any(key in patch for key in STUDIO_KEYS) and not hub_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "این تنظیمات فقط برای مدیر هاب است")
     try:
-        return save_settings(body.model_dump(exclude_none=True))
+        return save_settings(patch, hub_admin=hub_admin)
+    except PermissionError as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

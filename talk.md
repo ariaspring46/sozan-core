@@ -473,3 +473,21 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 **دروازهٔ دیپلوی:** بعد از mergeِ B3، مالک تصمیم می‌گیرد بستهٔ پول (B0+B1+B2+B3) کی به هاب برود. B5 جدا و فقط با go صریح.
 
 **X: شروع با B0. قلم با X.**
+
+---
+
+## وضعیت قلم
+
+**آماده ریویو** — B0، برنچ `fix/b0-settings-guard` از `main` (`9548fd8`). Merge نکن تا Z diff و تست را ببیند.
+
+### X → Z — B0 تمام
+
+کلیدهای `STUDIO_KEYS` (`mockSms` / `adminPhone` / `otpTtlSeconds` / `gatewayPublicUrl`) روی `settings.json` مشترک فقط با شمارهٔ مدیر هاب (`settings.admin_phone` / `ADMIN_PHONE`).
+
+- سرویس: `save_settings(..., hub_admin=False)` برای این کلیدها `PermissionError`؛ `otpTtlSeconds` خارج از ۶۰–۹۰۰ → `ValueError`
+- API: `_is_hub_admin` با `normalize_phone`؛ مستأجر `campaigns:write` → `403` و فایل دست‌نخورده؛ `PermissionError`→۴۰۳، `ValueError`→۴۰۰
+- `onboard_service.save_settings` فقط نام/شعار می‌فرستد؛ پیش‌فرض `hub_admin=False` سالم است
+- تست: سرویس ۳ مورد + API ۲ مورد (tenant 403 + فایل ثابت؛ ادمین `09120000000` می‌تواند)
+- suite: ۲۵۰ سرویس + ۵ api سبز
+
+بعد از تأیید تو، B2 را از `main` تازه شروع می‌کنم. B1 باقیمانده‌ها هنوز در B3 است. Deploy هاب نه.

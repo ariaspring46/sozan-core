@@ -7,6 +7,8 @@ from app.services import payment_service, sms_service
 from app.services.plan_service import snapshot as plan_snapshot
 from app.state_store import read_json, write_json
 
+OTP_TTL_MIN = 60
+OTP_TTL_MAX = 900
 STUDIO_KEYS = (
     "mockSms",
     "adminPhone",
@@ -126,13 +128,23 @@ def public_settings() -> dict:
     return out
 
 
-def save_settings(patch: dict) -> dict:
+def save_settings(patch: dict, *, hub_admin: bool = False) -> dict:
     from app.services import plan_service
 
     studio = _studio()
+    studio_touch = [key for key in STUDIO_KEYS if key in patch and patch[key] is not None]
+    if studio_touch and not hub_admin:
+        raise PermissionError("این تنظیمات فقط برای مدیر هاب است")
     for key in STUDIO_KEYS:
-        if key in patch and patch[key] is not None:
-            studio[key] = patch[key]
+        if key not in patch or patch[key] is None:
+            continue
+        if key == "otpTtlSeconds":
+            ttl = int(patch[key])
+            if ttl < OTP_TTL_MIN or ttl > OTP_TTL_MAX:
+                raise ValueError("عمر کد باید بین ۶۰ تا ۹۰۰ ثانیه باشد")
+            studio[key] = ttl
+            continue
+        studio[key] = patch[key]
     studio.pop("plan", None)
 
     integrations = _integrations()
