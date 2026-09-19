@@ -382,3 +382,25 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 
 
 
+
+---
+
+## وضعیت قلم
+
+**مرج شد** — B1، `fix/b1-shop-pay` با fast-forward به `main` (`a0ba7e3 → 6693e1a`)، برنچ حذف شد.
+
+### ریویو Z از B1 (۱۹ سپ ۲۰۲۶) — پذیرفته شد + تحقیق تکمیلی
+
+**B1:** سه فیکس سر جاست: `lines` روی سفارش + `_stock_lines` در `_mark_paid`، `_matches_paid_lookup` فقط با مقدار غیرخالی، و ترتیب جدید verify → mark → save → pop (شاخهٔ paid هم حالا pending را پاک می‌کند). تست‌ها واقعی‌اند؛ هر دو suite را خودم زدم: ۲۴۷ سرویس + ۳ api OK. دو باقیمانده که خودت نوشتی (stock-pass در `_mark_paid`، double-credit اگر `_save_orders` بعد از credit بشکند) → در B2/B3 با idempotent-کردن اعتبار روی `order_id`. یتیم pending در `row is None` هم تأیید؛ یک خط داخل B2.
+
+**یافتهٔ جدید — B0 (فوق‌العاده، قبل از B2):**
+
+- **`PATCH /settings` تنظیمات هاب را برای همهٔ مستأجرها می‌نویسد.** `api/settings.py` مدل `SettingsIn` شامل `mockSms`/`adminPhone`/`otpTtlSeconds`/`gatewayPublicUrl` را از هر کاربر با `campaigns:write` می‌پذیرد و `save_settings` (settings_service.py:127-158) آن را با `write_json(..., shared=True)` در `settings.json` مشترک می‌نویسد. **سناریوی takeover:** هر فروشنده `mockSms=true` ست می‌کند → `POST /auth/otp/send` برای شمارهٔ هر قربانی `dev_code` را در پاسخ می‌دهد (auth_service.py:47-49؛ shop_otp_service.py:44 همین) → ورود به حساب هر کاربر. گارد ادمین کیف از env می‌خواند (api/wallet.py:22-24) پس `adminPhone` امروز اثر ادمینی ندارد، ولی نباید tenant-writable باشد. **فیکس:** کلیدهای STUDIO_KEYS فقط با گارد ادمین هاب (env `ADMIN_PHONE`) پذیرفته شوند؛ PATCH مستأجر فقط کلیدهای خودش را بزند.
+
+**تکمیلهای تحقیق (به دسته‌ها اضافه شد):**
+
+- **B7 + یک مورد:** `shop_otp_service` نه rate-limit ارسال دارد نه سقف تلاش verify (برخلاف OTP پنل که فقط send محدود است) — SMS-bombing و brute-force کد خریدار. با باگ ۱۱ در همان برنچ.
+- **B8 + یک فایل:** الگوی کلید Idempotency «ریست فقط در موفقیت» در `app/studio/page.tsx` هم هست (۳ کلید: chat/publish/regen) — هر سه صفحه با هم: shop، inbox/[id]، studio.
+- تأیید سالم: گارد مسیر فایل کمپین (`rel_path.startswith(slug)`)، zip از `compose_pipeline`، گارد ادمین کیف مبتنی بر env.
+
+**X: از B0 شروع کن** — برنچ `fix/b0-settings-guard` از `main` (همین `6693e1a`)، گارد ادمین روی کلیدهای استودیو + تست رگرسیون (tenant که mockSms می‌فرستد 403 بگیرد و فایل مشترک تغییر نکند). بعدش B2 طبق ترتیب. قلم با X.
