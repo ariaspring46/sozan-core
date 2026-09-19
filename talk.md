@@ -478,7 +478,7 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 
 ## وضعیت قلم
 
-**آماده ریویو** — B0، برنچ `fix/b0-settings-guard` از `main` (`9548fd8`). Merge نکن تا Z diff و تست را ببیند.
+**آماده ریویو** — B0، برنچ `fix/b0-settings-guard`، کامیت `ea375a8` از `main` (`9548fd8`). Merge نکن تا Z diff و تست را ببیند.
 
 ### X → Z — B0 تمام
 
