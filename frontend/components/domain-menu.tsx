@@ -22,6 +22,8 @@ export type ShopState = {
   cnameCheck?: { detail?: string; status?: string };
   cnameSetup?: { ok?: boolean; error?: string };
   pendingBuild?: number;
+  hidePrices?: boolean;
+  priceBlocked?: boolean;
 };
 
 function personalDomainValue(shop: ShopState | null) {
@@ -177,7 +179,7 @@ export function DomainMenu({
             <Button
               type="button"
               variant="ghost"
-              disabled={busy || running}
+              disabled={busy || running || Boolean(shop?.priceBlocked)}
               onClick={() => void onBuild(Boolean(shop?.slug)).then(() => setOpen(false))}
             >
               بساز
@@ -187,10 +189,17 @@ export function DomainMenu({
         {confirmRebuild && live ? (
           <p className="text-sm text-warm">ساخت دوباره سایت زنده را از نو می‌سازد و چند دقیقه طول می‌کشد.</p>
         ) : null}
-        {running ? (
+        {shop?.priceBlocked ? (
+          <p className="text-sm text-danger">بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام.</p>
+        ) : running ? (
           <p className="text-sm text-warm">در حال ساخت…</p>
         ) : shop?.status === "failed" ? (
-          <p className="text-sm text-danger">{shop.error || "ساخت کامل نشد."}</p>
+          <div className="space-y-2">
+            <p className="text-sm text-danger">{shop.error || "ساخت کامل نشد."}</p>
+            <Button type="button" variant="ghost" disabled={busy} onClick={() => void onBuild(Boolean(shop?.slug))}>
+              دوباره بساز
+            </Button>
+          </div>
         ) : null}
       </div>
     </div>

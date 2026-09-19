@@ -105,18 +105,16 @@ export default function ShopPage() {
           ? `${importedCount} کالا وارد شد` +
             (scan.rejected ? `، ${scan.rejected} رد` : "") +
             (scan.noImage ? `، ${scan.noImage} بدون عکس` : "") +
-            (scan.noPrice ? `، ${scan.noPrice} بدون قیمت` : "") +
+            (scan.noPrice ? `، ${scan.noPrice} بدون قیمت — قبل از ساخت سایت قیمت بگذار یا بگو قیمت‌ها را مخفی کن` : "") +
             "."
           : "";
-  const turnNote = turn
-    ? `فهمیدم: ${turn.route || "—"}. اکشن‌ها: ${(turn.actions || []).join("، ") || "—"}. ${
-        turn.rolledBack ? "برگشت داده شد." : turn.verified ? "verify شد." : ""
-      } ${turn.needsRebuild ? "نیاز به بیلد دارد." : "روی سایت زنده است."}`
-    : "";
+  const turnNote =
+    turn && turn.verified && !turn.route && !(turn.actions || []).length ? "انجام شد؛ روی پیش‌نمایش ببین." : "";
+  const priceBlocked = Boolean(shop?.priceBlocked && !shop?.hidePrices);
+  const shopPublic = shopPublicUrl(shop, build?.url);
   const live = Boolean(
     shop && (shop.status === "ready" || (shop.slug && (shop.url || shop.publicHost || shop.port))),
   );
-  const chatting = live || Boolean(shop && shop.status !== "idle");
   const thread = messages.filter((msg) => msg.kind !== "build");
 
   const runBuild = useCallback(async (rebuild?: boolean, reviseOnly?: boolean) => {
@@ -174,26 +172,42 @@ export default function ShopPage() {
       <div className={cn("relative flex h-full flex-col", building ? "sozan-aurora" : "sozan-chat")}>
         {error ? <p className="relative px-4 pt-3 text-sm text-danger">{error}</p> : null}
         {turnNote ? <p className="relative px-4 pt-3 text-sm text-warm">{turnNote}</p> : null}
+        {priceBlocked ? (
+          <div className="relative mx-4 mt-3 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3">
+            <p className="text-sm font-bold text-danger">بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام.</p>
+            <a href="/more/inventory?focus=price" className="mt-2 inline-flex text-sm text-warm underline">
+              ثبت قیمت
+            </a>
+          </div>
+        ) : null}
         {scanNote ? (
           <p className={`relative px-4 pt-3 text-sm ${scan?.status === "error" ? "text-danger" : "text-warm"}`}>
             {scanNote}
           </p>
+        ) : null}
+        {live && shopPublic ? (
+          <a href={shopPublic} target="_blank" rel="noreferrer" className="relative px-4 pt-3 text-sm text-warm underline">
+            باز کردن ویترین
+          </a>
         ) : null}
         <div className="relative min-h-0 flex-1">
           <ChatThread
             messages={thread}
             busy={busy}
             pendingText={pending}
+            sanitize
+            welcome
             livePanel={
               <ShopLiveBuild
                 build={build}
-                href={shopPublicUrl(shop, build?.url)}
+                href={shopPublic}
                 previewKey={previewKey}
                 pendingBuild={Number(shop?.pendingBuild || 0)}
                 buildBusy={busy || building}
                 applyPatch={applyPatch}
                 seekPath={seekPath}
                 onBuild={() => void runBuild(true, true)}
+                onRetry={() => void runBuild(true, true)}
                 onViewPath={setViewPath}
                 onViewTarget={setViewTarget}
               />
@@ -203,9 +217,7 @@ export default function ShopPage() {
                 ? viewTarget
                   ? `درباره «${viewTarget}» بگو چه عوض شود.`
                   : "روی همین صفحه بگو چه عوض شود. چند تغییر را در کادر ببین، بعد بیلد بزن."
-                : chatting
-                  ? "از فروشگاه بپرس، یا اگر آماده بودی بگو بساز."
-                  : "اول حس فروشگاه را بگو، بعد رنگ، بعد ویژگی‌ها."
+                : "بگو چه فروشگاهی می‌خواهی؛ وقتی آماده بودی بنویس بساز."
             }
             onSend={async (payload) => {
               setBusy(true);

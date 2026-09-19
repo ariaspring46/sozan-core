@@ -32,6 +32,19 @@ export type ChatMsg = {
 
 export type ChatSend = { text: string; file?: File };
 
+const SHOP_DENY = /seed phrase|bitcoin|private key|mnemonic|Traceback|FAIL:/i;
+const SHOP_WELCOME = [
+  "۱) حس فروشگاه را بگو.",
+  "۲) کالا و قیمت تومان را کامل کن.",
+  "۳) وقتی آماده بودی بنویس بساز.",
+];
+
+export function sanitizeShopText(text: string, enabled?: boolean) {
+  if (!enabled) return text;
+  if (SHOP_DENY.test(text || "")) return "پیام نامعتبر حذف شد";
+  return text;
+}
+
 const WAIT_LINES = ["دارم فکر می‌کنم…", "یک لحظه…", "جواب را می‌چینم…"];
 
 function WaitSignal({ label }: { label: string }) {
@@ -63,6 +76,8 @@ export function ChatThread({
   onSaveCaptions,
   onEditDraft,
   showTime = false,
+  sanitize = false,
+  welcome = false,
 }: {
   messages: ChatMsg[];
   busy: boolean;
@@ -78,6 +93,8 @@ export function ChatThread({
   onApproveDraft?: (payload: { messageId: string; text: string }) => Promise<void>;
   onSaveCaptions?: (payload: { messageId: string; captions: StudioCaptions }) => void | Promise<void>;
   onEditDraft?: (payload: { messageId: string; text: string }) => void;
+  sanitize?: boolean;
+  welcome?: boolean;
   showTime?: boolean;
 }) {
   const [draft, setDraft] = useState("");
@@ -187,7 +204,15 @@ export function ChatThread({
       >
         <div className="space-y-3 px-4 py-5">
           {messages.length === 0 && !pendingText ? (
-            <p className="pt-10 text-center text-sm leading-7 text-muted">پیام را پایین بنویس.</p>
+            welcome ? (
+              <div className="space-y-2 pt-8 text-center text-sm leading-7 text-muted">
+                {SHOP_WELCOME.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            ) : (
+              <p className="pt-10 text-center text-sm leading-7 text-muted">پیام را پایین بنویس.</p>
+            )
           ) : (
             messages.map((msg) => (
               <article
@@ -206,7 +231,7 @@ export function ChatThread({
                     {[msg.platformLabel || msg.platform, msg.sender].filter(Boolean).join(" · ")}
                   </p>
                 ) : null}
-                {msg.text ? <p className="whitespace-pre-wrap">{msg.text}</p> : null}
+                {msg.text ? <p className="whitespace-pre-wrap">{sanitizeShopText(msg.text, sanitize)}</p> : null}
                 {showTime && msg.at ? (
                   <p className="mt-1 text-[11px] opacity-70">
                     {formatWhen(msg.at)}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { InventoryCatalog } from "@/components/inventory-catalog";
@@ -18,7 +19,9 @@ export default function InventoryPage() {
         </div>
       }
     >
-      <InventoryCatalog />
+      <Suspense fallback={<p className="px-4 text-sm text-muted">در حال بارگذاری انبار…</p>}>
+        <InventoryCatalog />
+      </Suspense>
     </AppShell>
   );
 }

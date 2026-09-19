@@ -115,7 +115,7 @@ function ShopLiveReady({ href }: { href: string }) {
       >
         {inner}
         <span className="mt-3 inline-flex items-center gap-1 text-sm text-warm">
-          ورود به فروشگاه
+          باز کردن ویترین
           <ExternalLink size={14} />
         </span>
       </a>
@@ -166,6 +166,7 @@ function ShopLivePreview({
   buildBusy = false,
   applyPatch,
   onBuild,
+  onRetry,
   onViewPath,
   onViewTarget,
   seekPath,
@@ -179,6 +180,7 @@ function ShopLivePreview({
   buildBusy?: boolean;
   applyPatch?: PreviewPatch | null;
   onBuild?: () => void;
+  onRetry?: () => void;
   onViewPath?: (path: string) => void;
   onViewTarget?: (text: string) => void;
   seekPath?: string;
@@ -190,8 +192,17 @@ function ShopLivePreview({
   const [mode, setMode] = useState<"design" | "browse">("design");
   const [reload, setReload] = useState(0);
   const [pick, setPick] = useState("");
+  const [frameLoaded, setFrameLoaded] = useState(false);
+  const [frameStale, setFrameStale] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const src = useMemo(() => frameUrl(href, path, bust + reload, mode), [href, path, bust, reload, mode]);
+
+  useEffect(() => {
+    setFrameLoaded(false);
+    setFrameStale(false);
+    const timer = window.setTimeout(() => setFrameStale(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [src]);
   const pipeline = build?.pipeline || [];
   const live = overlay && (build?.status === "running" || build?.status === "queued");
   const failed = overlay && build?.status === "failed";
@@ -376,6 +387,8 @@ function ShopLivePreview({
             height="100%"
             className={cn("h-full border-0 bg-white", phone ? "mx-auto w-full max-w-[430px]" : "w-full min-w-full")}
             onLoad={() => {
+              setFrameLoaded(true);
+              setFrameStale(false);
               if (!applyPatch || applyPatch.reload || applyPatch.reset) return;
               frameRef.current?.contentWindow?.postMessage(
                 { source: "sozan-panel", type: "apply", patch: applyPatch },
@@ -384,17 +397,34 @@ function ShopLivePreview({
             }}
           />
         </div>
+        {pendingBuild > 0 && !overlay ? (
+          <button
+            type="button"
+            onClick={() => setReload((value) => value + 1)}
+            className="absolute inset-x-3 top-3 rounded-2xl border border-accent/30 bg-paper/95 px-3 py-2 text-sm text-warm shadow-card"
+          >
+            پیش‌نمایش را تازه کن
+          </button>
+        ) : null}
+        {frameStale && !frameLoaded && !overlay ? (
+          <div className="absolute inset-x-3 top-3 rounded-2xl border border-danger/30 bg-paper/95 px-3 py-2 shadow-card">
+            <p className="text-sm text-danger">پیش‌نمایش بار نشد — تازه کن</p>
+            <button type="button" className="mt-1 text-sm text-warm underline" onClick={() => setReload((value) => value + 1)}>
+              تازه کن
+            </button>
+          </div>
+        ) : null}
         {overlay ? (
           <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-accent/25 bg-paper/95 px-3 py-2 shadow-card">
-            <p className="text-[11px] tracking-[0.18em] text-warm">{live ? "شعله روشن است" : "آخرین ساخت"}</p>
+            <p className="text-[11px] tracking-[0.18em] text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
             <p className={cn("mt-0.5 text-sm", failed ? "text-danger" : "text-ink")}>{title}</p>
             <p className={cn("text-xs", failed ? "text-danger" : "text-muted")}>
-              {live ? `زمان ساخت ${clock(seconds)}` : build?.error || ""}
+              {live ? `زمان ساخت ${clock(seconds)}` : failed ? "ساخت کامل نشد." : ""}
             </p>
-            {build?.errorClass || build?.jobId ? (
-              <p className="truncate text-[11px] text-muted" dir="ltr">
-                {[build?.jobId, build?.errorClass, build?.releaseId].filter(Boolean).join(" · ")}
-              </p>
+            {failed && onRetry ? (
+              <button type="button" className="mt-2 text-sm text-warm underline" onClick={onRetry}>
+                دوباره بساز
+              </button>
             ) : null}
             {pipeline.length ? (
               <ol className="mt-2 space-y-1">
@@ -428,11 +458,13 @@ function ShopPipeline({
   live,
   failed,
   seconds,
+  onRetry,
 }: {
   build: BuildLive;
   live: boolean;
   failed: boolean;
   seconds: number;
+  onRetry?: () => void;
 }) {
   const pipeline = build.pipeline || [];
   const title = live ? build.stepLabel || "کارخانه در حال ساخت سایت است…" : "ساخت کامل نشد";
@@ -454,17 +486,15 @@ function ShopPipeline({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] tracking-[0.22em] text-warm">{live ? "شعله روشن است" : "آخرین ساخت"}</p>
+          <p className="text-[11px] tracking-[0.22em] text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
           <p className="mt-1 text-sm font-medium leading-6 text-ink">{title}</p>
           <p className={cn("mt-0.5 text-xs", failed ? "text-danger" : "text-muted")}>
-            {live ? `زمان ساخت ${clock(seconds)}` : build.error || "کارخانه ساخت را تمام نکرد."}
+            {live ? `زمان ساخت ${clock(seconds)}` : "ساخت کامل نشد."}
           </p>
-          {build.jobId || build.errorClass || build.releaseId ? (
-            <p className="mt-1 truncate text-[11px] text-muted" dir="ltr">
-              {[build.jobId, build.errorClass, build.releaseId, build.runAttempt ? `try ${build.runAttempt}` : ""]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
+          {failed && onRetry ? (
+            <button type="button" className="mt-2 text-sm text-warm underline" onClick={onRetry}>
+              دوباره بساز
+            </button>
           ) : null}
         </div>
       </div>
@@ -507,6 +537,7 @@ export function ShopLiveBuild({
   buildBusy = false,
   applyPatch,
   onBuild,
+  onRetry,
   onViewPath,
   onViewTarget,
   seekPath,
@@ -518,6 +549,7 @@ export function ShopLiveBuild({
   buildBusy?: boolean;
   applyPatch?: PreviewPatch | null;
   onBuild?: () => void;
+  onRetry?: () => void;
   onViewPath?: (path: string) => void;
   onViewTarget?: (text: string) => void;
   seekPath?: string;
@@ -549,6 +581,7 @@ export function ShopLiveBuild({
         buildBusy={buildBusy}
         applyPatch={applyPatch}
         onBuild={onBuild}
+        onRetry={onRetry}
         onViewPath={onViewPath}
         onViewTarget={onViewTarget}
         seekPath={seekPath}
@@ -556,5 +589,5 @@ export function ShopLiveBuild({
     );
   }
   if (ready) return <ShopLiveReady href="" />;
-  return <ShopPipeline build={build} live={live} failed={failed} seconds={seconds} />;
+  return <ShopPipeline build={build} live={live} failed={failed} seconds={seconds} onRetry={onRetry} />;
 }

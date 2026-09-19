@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AuthImage } from "@/components/auth-image";
 import { ProductEditor, type CatalogResponse, type CategoryOption, type Product, type ShopMeta, type SyncResult } from "@/components/product-editor";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,9 @@ export function InventoryCatalog() {
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
   const [editor, setEditor] = useState<Product | null | "new">(null);
+  const searchParams = useSearchParams();
+  const focus = searchParams.get("focus");
+  const focusedRef = useRef(false);
 
   async function load() {
     const catalog = await api<CatalogResponse>("/catalog").catch(() => ({
@@ -54,6 +58,16 @@ export function InventoryCatalog() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (loading || editor || focusedRef.current) return;
+    if (focus !== "price") return;
+    const missing = products.find((product) => !(Number(product.price) > 0) || product.priceNote);
+    if (missing) {
+      focusedRef.current = true;
+      setEditor(missing);
+    }
+  }, [loading, products, focus, editor]);
 
   const visible = useMemo(() => {
     const needle = query.trim();
