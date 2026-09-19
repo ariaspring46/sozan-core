@@ -70,6 +70,7 @@ async def studio_publish(request: Request, body: PublishIn, _user=Depends(requir
             media_name=body.mediaName,
             media_kind=body.mediaKind,
             message_id=body.messageId,
+            campaign_id=body.campaignId,
             force=body.force,
         )
     except HTTPException:

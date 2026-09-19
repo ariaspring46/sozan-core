@@ -213,6 +213,112 @@ class StudioPublishTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             public_media_service.resolve_token("not-a-token")
 
+    def test_clips_caption_to_platform_limit(self) -> None:
+        send_photo = AsyncMock()
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "pic-image.png"
+            path.write_bytes(b"png")
+            with patch(
+                "app.services.studio_publish_service.channel_service.account_for_platform",
+                return_value={"id": "tg", "platform": "telegram"},
+            ), patch(
+                "app.services.studio_publish_service.channel_service.token_for",
+                return_value="tok",
+            ), patch(
+                "app.services.studio_publish_service.channel_service.post_target_for",
+                return_value="@myshop",
+            ), patch(
+                "app.services.studio_publish_service.chat_media_service.resolve",
+                return_value=path,
+            ), patch(
+                "app.services.studio_publish_service.telegram_service.send_photo",
+                new=send_photo,
+            ):
+                asyncio.run(
+                    studio_publish_service.publish(
+                        platform="telegram",
+                        caption="س" * 2000,
+                        media_name=path.name,
+                        media_kind="image",
+                    )
+                )
+        self.assertEqual(len(send_photo.await_args.kwargs["caption"]), 1024)
+
+    def test_force_bypasses_duplicate_window(self) -> None:
+        send_photo = AsyncMock()
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "pic-image.png"
+            path.write_bytes(b"png")
+            with patch(
+                "app.services.studio_publish_service.studio_chat_service.recently_published",
+                return_value=True,
+            ), patch(
+                "app.services.studio_publish_service.channel_service.account_for_platform",
+                return_value={"id": "tg", "platform": "telegram"},
+            ), patch(
+                "app.services.studio_publish_service.channel_service.token_for",
+                return_value="tok",
+            ), patch(
+                "app.services.studio_publish_service.channel_service.post_target_for",
+                return_value="@myshop",
+            ), patch(
+                "app.services.studio_publish_service.chat_media_service.resolve",
+                return_value=path,
+            ), patch(
+                "app.services.studio_publish_service.telegram_service.send_photo",
+                new=send_photo,
+            ), patch(
+                "app.services.studio_publish_service.studio_chat_service.mark_published",
+                return_value={"messages": []},
+            ), patch("app.services.studio_publish_service.emit_later"):
+                result = asyncio.run(
+                    studio_publish_service.publish(
+                        platform="telegram",
+                        caption="سلام",
+                        media_name=path.name,
+                        media_kind="image",
+                        message_id="m1",
+                        force=True,
+                    )
+                )
+        self.assertTrue(result["ok"])
+        self.assertFalse(result.get("skipped"))
+        send_photo.assert_awaited_once()
+
+    def test_provider_error_emits_publish_failed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "pic-image.png"
+            path.write_bytes(b"png")
+            with patch(
+                "app.services.studio_publish_service.channel_service.account_for_platform",
+                return_value={"id": "tg", "platform": "telegram"},
+            ), patch(
+                "app.services.studio_publish_service.channel_service.token_for",
+                return_value="tok",
+            ), patch(
+                "app.services.studio_publish_service.channel_service.post_target_for",
+                return_value="@myshop",
+            ), patch(
+                "app.services.studio_publish_service.chat_media_service.resolve",
+                return_value=path,
+            ), patch(
+                "app.services.studio_publish_service.telegram_service.send_photo",
+                new=AsyncMock(side_effect=RuntimeError("httpx")),
+            ), patch("app.services.studio_publish_service.emit_later") as emit:
+                with self.assertRaises(ValueError):
+                    asyncio.run(
+                        studio_publish_service.publish(
+                            platform="telegram",
+                            caption="سلام",
+                            media_name=path.name,
+                            media_kind="image",
+                            campaign_id="c1",
+                        )
+                    )
+        titles = [call.kwargs.get("title") for call in emit.call_args_list]
+        self.assertIn("publish-failed", titles)
+        self.assertEqual(emit.call_args.kwargs.get("operation_id"), "c1")
+
 
 if __name__ == "__main__":
     unittest.main()

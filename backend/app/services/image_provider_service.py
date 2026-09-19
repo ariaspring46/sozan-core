@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 import os
+import time
 
 import httpx
 
@@ -78,6 +80,32 @@ def _openai_images(prompt: str, *, width: int, height: int, route: dict) -> byte
     except Exception as exc:
         log.warning("cloud images failed: %s", type(exc).__name__)
         return b""
+
+
+async def probe_ollama_cloud_once() -> dict:
+    from app.state_store import read_json, write_json
+    from app.services.observe_client import emit_later
+
+    try:
+        stored = read_json("image-probe.json", {}, shared=True)
+        if isinstance(stored, dict) and stored.get("at"):
+            return stored
+        result = await asyncio.to_thread(probe_ollama_cloud)
+        payload = {**result, "at": time.time()}
+        write_json("image-probe.json", payload, shared=True)
+        emit_later(
+            kind="routing",
+            surface="image",
+            title="image-probe",
+            status="ready" if result.get("ok") else "failed",
+            payload={"ok": bool(result.get("ok")), "status": result.get("status"), "error": result.get("error") or ""},
+        )
+        return payload
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        log.warning("image probe failed: %s", type(exc).__name__)
+        return {"ok": False, "error": type(exc).__name__}
 
 
 def probe_ollama_cloud() -> dict:

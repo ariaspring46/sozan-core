@@ -77,8 +77,13 @@ export function StudioPublishCard({
   const [confirmFor, setConfirmFor] = useState("");
   const [savedHint, setSavedHint] = useState(false);
   const [mediaByChannel, setMediaByChannel] = useState<Record<string, string>>({});
+  const [sentAt, setSentAt] = useState<Record<string, number>>(published || {});
   const fileRef = useRef<HTMLInputElement>(null);
   const primed = useRef(false);
+
+  useEffect(() => {
+    setSentAt((prev) => ({ ...prev, ...(published || {}) }));
+  }, [published]);
 
   useEffect(() => {
     setDrafts({
@@ -118,7 +123,7 @@ export function StudioPublishCard({
   async function send(platform: (typeof CHANNELS)[number]["platform"], force = false) {
     const spec = CHANNELS.find((item) => item.platform === platform);
     if (!spec) return;
-    const sentAlready = Boolean(published?.[platform]);
+    const sentAlready = Boolean(sentAt[platform] || published?.[platform]);
     if (sentAlready && !force) {
       setConfirmFor(platform);
       return;
@@ -143,6 +148,7 @@ export function StudioPublishCard({
         setNotice(result.message || "به‌تازگی ارسال شده؛ برای ارسال دوباره تأیید کن");
         setConfirmFor(platform);
       } else {
+        setSentAt((prev) => ({ ...prev, [platform]: Date.now() / 1000 }));
         setNotice(`به ${spec.label} ارسال شد.`);
       }
     } catch (err) {
@@ -214,7 +220,7 @@ export function StudioPublishCard({
         const target = byPlatform[channel.platform];
         const key = channel.platform as keyof StudioCaptions;
         const selected = mediaByChannel[channel.platform] || pickMedia(attachments, channel.platform).name;
-        const sent = Boolean(published?.[channel.platform]);
+        const sent = Boolean(sentAt[channel.platform] || published?.[channel.platform]);
         return (
           <div key={channel.platform} className="space-y-2">
             <label className="block text-[11px] text-muted">{channel.label}</label>

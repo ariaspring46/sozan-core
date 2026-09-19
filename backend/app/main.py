@@ -71,25 +71,20 @@ async def lifespan(_app: FastAPI):
     await migrate_campaign_ids()
     poller = asyncio.create_task(_channel_poll_loop())
     housekeeper = asyncio.create_task(_housekeeping_loop())
-    from app.services import llm_routing_service
+    from app.services import image_provider_service, llm_routing_service
 
+    probe_task = asyncio.create_task(image_provider_service.probe_ollama_cloud_once())
     router_task = asyncio.create_task(llm_routing_service.refresh_loop())
     yield
     poller.cancel()
     housekeeper.cancel()
+    probe_task.cancel()
     router_task.cancel()
-    try:
-        await poller
-    except asyncio.CancelledError:
-        pass
-    try:
-        await housekeeper
-    except asyncio.CancelledError:
-        pass
-    try:
-        await router_task
-    except asyncio.CancelledError:
-        pass
+    for task in (poller, housekeeper, probe_task, router_task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
     await engine.dispose()
 
 

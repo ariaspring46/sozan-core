@@ -45,6 +45,7 @@ async def publish(
     media_name: str,
     media_kind: str,
     message_id: str = "",
+    campaign_id: str = "",
     force: bool = False,
 ) -> dict:
     key = platform.strip().lower()
@@ -101,6 +102,7 @@ async def publish(
             title="publish-failed",
             status="failed",
             turn_id=message_id,
+            operation_id=campaign_id,
             payload={"platform": key, "kind": kind, "error": "validation"},
         )
         raise
@@ -111,7 +113,8 @@ async def publish(
             title="publish-failed",
             status="failed",
             turn_id=message_id,
-            payload={"platform": key, "kind": kind, "error": type(exc).__name__},
+            operation_id=campaign_id,
+            payload={"platform": key, "kind": kind, "error": type(exc).__name__, "errorClass": type(exc).__name__},
         )
         raise ValueError(_persian_provider_error(exc)) from exc
     extra: dict = {}
@@ -123,6 +126,7 @@ async def publish(
         title="publish-ok",
         status="ready",
         turn_id=message_id,
+        operation_id=campaign_id,
         payload={"platform": key, "kind": kind},
     )
     return {"ok": True, "platform": key, "message": f"به {LABELS[key]} ارسال شد.", **extra}

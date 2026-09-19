@@ -209,6 +209,98 @@ class StudioChatTests(unittest.TestCase):
         self.assertIn("ویترین", result["messages"][-1]["text"])
         self.assertEqual(campaigns.kwargs.get("title"), "کمپین جدید")
 
+    def test_campaign_create_failure_emits(self) -> None:
+        campaigns = FakeCampaigns()
+        campaigns.create = AsyncMock(side_effect=RuntimeError("db"))
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw))
+            with patches[0], patches[1], patches[2] as emit, patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(
+                    return_value={
+                        "reply": "کپشن آماده شد.",
+                        "title": "ویترین",
+                        "instagram": "کپشن اینستا",
+                        "telegram": "تلگرام",
+                        "whatsapp": "واتساپ",
+                        "compose": True,
+                    }
+                ),
+            ), patch("app.services.studio_compose_service.start") as started:
+                result = asyncio.run(studio_chat_service.chat("پست بساز", campaigns))
+        started.assert_not_called()
+        titles = [(call.kwargs or {}).get("title") for call in emit.call_args_list]
+        self.assertIn("campaign-create-failed", titles)
+        self.assertEqual(result["campaignId"], "")
+
+    def test_caption_regen_llm_error_raises(self) -> None:
+        campaigns = FakeCampaigns()
+        message_id = str(uuid4())
+        rows = [
+            {
+                "id": message_id,
+                "role": "assistant",
+                "text": "کپشن آماده شد.",
+                "campaignId": str(campaigns.last_id),
+                "captions": {"instagram": "قدیمی", "telegram": "تلگرام", "whatsapp": "واتساپ"},
+            }
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw), rows)
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(return_value={"error": "llm_unreachable", "reply": "مدل کپشن تازه نداد."}),
+            ):
+                with self.assertRaises(ValueError):
+                    asyncio.run(studio_chat_service.regenerate(message_id=message_id, part="caption", campaigns=campaigns))
+
+    def test_mark_published_lock_serialises(self) -> None:
+        import threading
+
+        message_id = str(uuid4())
+        stored = {
+            "rows": [
+                {"id": message_id, "role": "assistant", "text": "x", "published": {}},
+            ]
+        }
+
+        def reader(name, default=None):
+            return list(stored["rows"])
+
+        def writer(name, payload):
+            stored["rows"] = list(payload)
+
+        with tempfile.TemporaryDirectory() as raw:
+            with patch("app.services.studio_chat_service.read_json", side_effect=reader), patch(
+                "app.services.studio_chat_service.write_json", side_effect=writer
+            ), patch("app.services.studio_chat_service.emit_later"), patch(
+                "app.services.tenant_lock.tenant_dir", return_value=Path(raw)
+            ), patch("app.services.tenant_lock.current_tenant", return_value="09120001111"):
+                errors = []
+
+                def ig():
+                    try:
+                        studio_chat_service.mark_published(message_id, "instagram")
+                    except Exception as exc:
+                        errors.append(exc)
+
+                def tg():
+                    try:
+                        studio_chat_service.mark_published(message_id, "telegram")
+                    except Exception as exc:
+                        errors.append(exc)
+
+                a = threading.Thread(target=ig)
+                b = threading.Thread(target=tg)
+                a.start()
+                b.start()
+                a.join()
+                b.join()
+                self.assertFalse(errors)
+                published = stored["rows"][0].get("published") or {}
+                self.assertIn("instagram", published)
+                self.assertIn("telegram", published)
+
 
 if __name__ == "__main__":
     unittest.main()
