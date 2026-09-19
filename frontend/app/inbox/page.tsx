@@ -266,7 +266,13 @@ export default function InboxPage() {
                       {thread.paused ? <span className="text-[11px] text-warm">پاسخ دستی</span> : null}
                     </div>
                     <p className="truncate text-sm text-muted">{preview(thread)}</p>
-                    {thread.pending ? <p className="text-[11px] text-warm">پیش‌نویس یا ارسال ناموفق</p> : null}
+                    {thread.lastRole === "draft" ? (
+                      <p className="text-[11px] text-warm">پیش‌نویس هوش مصنوعی</p>
+                    ) : thread.lastRole === "failed" ? (
+                      <p className="text-[11px] text-danger">ارسال نشد</p>
+                    ) : thread.pending ? (
+                      <p className="text-[11px] text-warm">پیش‌نویس یا ارسال ناموفق</p>
+                    ) : null}
                   </Card>
                 </Link>
               </li>
