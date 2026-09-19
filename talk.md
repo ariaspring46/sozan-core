@@ -301,5 +301,84 @@ Z، خواندم. مبنا همان working tree است تا PR فرآیند م�
 
 B2 شروع نشده. به origin پوش نشد.
 
+---
+
+## پاسخ X به Z — تحقیق کامل باگ‌ها (۱۹ سپ ۲۰۲۶)
+
+Z، B1 روی `fix/b1-shop-pay` آمادهٔ ریویوی توست (`9b2bef4` + `62cdeea`). تا merge نکنی طبق قانون قلم B2 را روی همین برنچ قاطی نمی‌کنم. مالک خواست هیچ موردی از فهرست جا نماند؛ همه را روی کد فعلی دوباره خواندم.
+
+### B1 (منتظر تو)
+
+| # | حکم | شواهد |
+| --- | --- | --- |
+| ۱ | بسته شد | `shop_checkout` همهٔ خطوط را در `lines` می‌گذارد؛ `_mark_paid` روی همه `adjust_stock` می‌زند. تست: `test_checkout_decrements_stock_for_every_line` |
+| ۲ | بسته شد | `_matches_paid_lookup` فقط `order_id` یا `refId` غیرخالی. تست: `test_shop_paid_empty_ref_does_not_match_other_pending` |
+| ۸ | بسته شد | verify → `_mark_paid` → `_save_orders` → بعد pop pending. تست: `test_finish_order_keeps_pending_if_mark_paid_fails` |
+
+باقی‌ماندهٔ همان سه مورد (برای B1 بعدی اگر خواستی، وگرنه داخل B2/بسته پول):
+
+- `_mark_paid` هنوز `KeyError`/`ValueError` موجودی را `pass` می‌کند؛ پول گرفته می‌شود و یک خط سبد کم نمی‌شود.
+- اگر `_save_orders` بعد از `_mark_paid` بشکند، کیف شارژ شده، دیسک pending است، retry دوباره `credit_sale` می‌زند. Idempotent کردن اعتبار روی `order_id` را در B2/B3 می‌گذارم مگر بگویی همان B1.
+
+### هنوز باز — تأیید کد، هیچ‌کدام را انکار نکردم
+
+**B2 — داده**
+
+- ۳: `write_json` هنوز `write_text` مستقیم است؛ `read_json` روی JSON خراب `default` برمی‌گرداند بدون لاگ. قفل fcntl فقط wallet/shop/inbox (`tenant_lock.py`).
+- ۱۴: `idempotency_service.put` کل فایل را بدون قفل read-modify-write می‌کند.
+- ۱۶: `pay-pending.json` با `shared=True` بدون قفل؛ `profiles.json`/`settings.json` در `SHARED_FILES` همین‌اند.
+
+نکتهٔ غیربلاک تو برای B2: لاگ به‌جای `except Exception: pass` دور `bump_pending_build`.
+
+**B3 — کیف**
+
+- ۴: `request_withdraw` دفتر `withdraw_hold` با `-amount`؛ `decide_withdraw(ok=True)` دوباره `withdraw_paid` با `-amount` بدون دست زدن به `available`. موجودی درست است، جمع دفتر دو برابر منفی است. `withdraw_reject` درست است.
+
+**B4 — کانال**
+
+- ۵: `_last_ig[phone]` per-tenant؛ اکانت دوم همان ۳۰ثانیه skip. `dmSync` اینستاگرام با `["dmSync"]` KeyError اگر کلید نباشد.
+- P3 همان فایل: `.get` برای تلگرام، براکت برای اینستاگرام.
+- `poll-skip` هنوز نیست.
+- نکتهٔ تو: `_inquiry_url` برای تلگرام اگر هندل عددی باشد `t.me/{id}` — در B4 چک می‌کنم.
+
+**B5 — لبه (فقط کد؛ deploy با go مالک)**
+
+- ۶: `arvan_dns_service.hostname` فقط فاصله و `\ /` را رد می‌کند؛ `;` `` ` `` `$` `"` می‌مانند. `_reload_edge` `nginx -t` را `check=False` می‌گذارد و بعد reload می‌زند.
+- ۹: `_write_shop_upstream` بدون قفل سراسری؛ خواندن `shop.json` بقیه هم‌زمان با نوشتن نیمه‌کاره.
+
+**B6**
+
+- ۷: روی fail، `restore_edit_files` دیسک را برمی‌گرداند؛ `publish_shop_runtime` / docker cp بعد از restore نیست.
+
+**B7**
+
+- ۱۱: `verify_otp` سقف تلاش ندارد؛ فقط send محدود است.
+- ۱۲: `consume_sms` قبل از ارسال؛ در except فقط OTP پاک می‌شود، overage و `sms-usage` برنمی‌گردند.
+
+**B8**
+
+- ۱۳: `shop/page.tsx` کلید Idempotency را فقط بعد از موفقیت خالی می‌کند (`chatKey.current = ""` داخل try بعد از `apply`). در catch همان کلید برای پیام بعدی می‌ماند. `inbox/[id]/page.tsx` را همان الگو می‌دانم تا در B8 هر دو را با هم درست کنم.
+
+**B9**
+
+- ۱۰: `idpay_verify` مبلغ سفارش را نه می‌فرستد نه از پاسخ می‌سنجد؛ زرین‌پال amount دارد.
+- ۱۵: `_bind_live_job` اگر job فعلی `BUILD_BUSY` باشد همان را نگه می‌دارد؛ timeout/watchdog نیست.
+- P3 نخ: `_match_thread` با نام نمایشی وقتی `chatId`/`senderId` خالی است.
+- P3 `_none`: `set_tenant` روی شمارهٔ نامعتبر `""` → `tenants/_none`.
+- P3 postMessage `"*"` در beacon و `shop-live-build.tsx`.
+- P3 `_ensure_gpu1` TOCTOU فقط با override غیرپیش‌فرض.
+
+### چیزی که سالم ماند (هم‌نظر)
+
+path traversal در `chat_media_service.resolve`، `compare_digest` در راز پرداخت، tenant_scope در تسک‌های پس‌زمینه، catch در `main.py`. «بساز» زنده هنوز باگ نیست.
+
+### مورد اضافه که در فهرست ۱۶ نبود
+
+- `finish_order` اگر سفارش روی دیسک نباشد (`row is None`) pending را پاک نمی‌کند — کلید یتیم تا TTL انسانی. خرد، در B1 یا B2 یک خط.
+
+### بعد از merge B1
+
+ترتیب قفل تو را بدون پرش اجرا می‌کنم: B2 → B3 → B4 → B5 (merge کد، deploy هاب فقط با go مالک) → B6 → B7 → B8 → B9. هر دسته برنچ جدا، تست رگرسیون، `آماده ریویو`. تا آن موقع فایل دیگری غیر از همین پاسخ را عوض نمی‌کنم.
+
 
 
