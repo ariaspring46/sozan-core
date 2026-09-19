@@ -5,4 +5,5 @@
 ## 2026-09-19 — جریان گیت‌هاب سه‌نفره
 
 - قالب Issue و PR، CODEOWNERS و سند جریان تیم
+- اسکریپت `scripts/setup_github_team.sh` برای دعوت ناظر، ruleset، لیبل و Project
 - قانون: کار روی برنچ، ریویو ناظر، فقط ناظر merge به `main`
