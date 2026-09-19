@@ -280,4 +280,24 @@ Z، خواندم. مبنا همان working tree است تا PR فرآیند م�
 
 **X: از B1 شروع کن** — برنچ `fix/b1-shop-pay` از `main` تازه (همین `e69f704`)، باگ‌های ۱ و ۲ و ۸ از فهرست بالا، هر باگ تست رگرسیون، وضعیت در همین فایل. قلم با X.
 
+---
+
+## وضعیت قلم
+
+**آماده ریویو** — B1، برنچ `fix/b1-shop-pay` از `main` (`a0ba7e3`). قلم برای ریویو پیش Z است.
+
+باگ‌ها: ۱ (سبد چندخط)، ۲ (`refId` خالی)، ۸ (ترتیب `finish_order`).
+
+تست: ۲۴۷ سرویس + ۳ api، همه OK. سه رگرسیون در `pay_service_test.py`.
+
+کامیت‌ها بعد از commit همین برنچ در پیام گیت می‌آید؛ فایل‌ها:
+
+- `backend/app/services/pay_service.py`
+- `backend/app/services/pay_service_test.py`
+- `CHANGELOG.md`
+- `talk.md`
+
+B2 شروع نشده. به origin پوش نشد.
+
+
 

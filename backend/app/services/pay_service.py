@@ -52,6 +52,37 @@ def _save_pending(rows: dict) -> None:
     write_json("pay-pending.json", rows, shared=True)
 
 
+def _checkout_lines(lines: list[dict] | None, *, product_id: str, qty: int) -> list[dict]:
+    packed: list[dict] = []
+    for line in lines or []:
+        pid = str(line.get("productId") or "").strip()
+        count = max(0, int(line.get("qty") or 0))
+        if pid and count >= 1:
+            packed.append({"productId": pid, "qty": count})
+    if packed:
+        return packed
+    if product_id and qty >= 1:
+        return [{"productId": product_id, "qty": qty}]
+    return []
+
+
+def _stock_lines(row: dict) -> list[dict]:
+    raw = row.get("lines")
+    if isinstance(raw, list) and raw:
+        return _checkout_lines(raw, product_id="", qty=0)
+    return _checkout_lines(None, product_id=str(row.get("productId") or ""), qty=int(row.get("qty") or 1))
+
+
+def _matches_paid_lookup(row: dict, *, order_id: str, ref_id: str) -> bool:
+    oid = str(order_id or "").strip()
+    rid = str(ref_id or "").strip()
+    if oid and str(row.get("id") or "") == oid:
+        return True
+    if rid and str(row.get("refId") or "") == rid:
+        return True
+    return False
+
+
 def _new_id() -> str:
     return secrets.token_urlsafe(8).replace("-", "").replace("_", "")[:12]
 
@@ -116,6 +147,7 @@ async def create_order(
     channel: str = "دایرکت",
     thread_id: str = "",
     mobile: str = "",
+    lines: list[dict] | None = None,
 ) -> dict:
     product, from_product = _product_amount(product_id, qty)
     total = int(amount or 0) or from_product
@@ -133,6 +165,7 @@ async def create_order(
         "amount": total,
         "productId": str((product or {}).get("id") or product_id or ""),
         "qty": max(1, int(qty or 1)),
+        "lines": _checkout_lines(lines, product_id=str((product or {}).get("id") or product_id or ""), qty=max(1, int(qty or 1))),
         "customer": (customer or "مشتری").strip()[:80],
         "channel": channel.strip() or "دایرکت",
         "threadId": thread_id,
@@ -248,12 +281,14 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
         if row is None:
             return panel_pay_url(order_id, "missing")
         if str(row.get("status") or "") == "paid":
-            return panel_pay_url(order_id, "ok")
-        if not ok:
             pending.pop(key, None)
             _save_pending(pending)
+            return panel_pay_url(order_id, "ok")
+        if not ok:
             row["status"] = "failed"
             _save_orders(orders)
+            pending.pop(key, None)
+            _save_pending(pending)
             return panel_pay_url(order_id, "cancel")
         try:
             if str(row.get("gateway") or gateway) == "idpay":
@@ -274,10 +309,10 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
                 )
         except ValueError:
             return panel_pay_url(order_id, "fail")
-        pending.pop(key, None)
-        _save_pending(pending)
         _mark_paid(row, ref_id=str(verified.get("refId") or ""))
         _save_orders(orders)
+        pending.pop(key, None)
+        _save_pending(pending)
     return panel_pay_url(order_id, "ok")
 
 
@@ -304,11 +339,9 @@ def _mark_paid(row: dict, *, ref_id: str) -> None:
         customer=str(row.get("customer") or "مشتری"),
         channel=str(row.get("channel") or "دایرکت"),
     )
-    product_id = str(row.get("productId") or "").strip()
-    qty = int(row.get("qty") or 1)
-    if product_id and qty:
+    for line in _stock_lines(row):
         try:
-            storefront_service.adjust_stock(product_id, -qty)
+            storefront_service.adjust_stock(str(line["productId"]), -int(line["qty"]))
         except (KeyError, ValueError):
             pass
 
@@ -373,8 +406,7 @@ async def shop_checkout(
     with tenant_scope(tenant):
         total = 0
         titles = []
-        product_id = ""
-        qty = 1
+        packed: list[dict] = []
         for line in lines or []:
             pid = str(line.get("productId") or "").strip()
             count = max(0, int(line.get("qty") or 0))
@@ -385,9 +417,7 @@ async def shop_checkout(
                 continue
             total += amount
             titles.append(str(product.get("title") or pid))
-            if not product_id:
-                product_id = pid
-                qty = count
+            packed.append({"productId": pid, "qty": count})
         if total <= 0:
             raise ValueError("سبد خالی است")
         customer = name.strip() or "مشتری"
@@ -395,14 +425,16 @@ async def shop_checkout(
             mobile = normalize_phone(phone) if phone.strip() else ""
         except ValueError:
             mobile = ""
+        first = packed[0]
         order = await create_order(
             title="، ".join(titles)[:120],
             amount=total,
-            product_id=product_id,
-            qty=qty,
+            product_id=str(first["productId"]),
+            qty=int(first["qty"]),
             customer=customer,
             channel="فروشگاه",
             mobile=mobile,
+            lines=packed,
         )
         return {**order, "url": order["startPayUrl"] or order["payUrl"], "orderId": order["id"]}
 
@@ -413,7 +445,10 @@ def shop_paid(*, slug: str, order_id: str, amount: int, title: str, customer: st
         raise ValueError("فروشگاه پیدا نشد")
     with tenant_scope(phone):
         orders = _orders()
-        existing = next((row for row in orders if str(row.get("id")) == order_id or str(row.get("refId")) == ref_id), None)
+        existing = next(
+            (row for row in orders if _matches_paid_lookup(row, order_id=order_id, ref_id=ref_id)),
+            None,
+        )
         if existing and str(existing.get("status") or "") == "paid":
             return public_order(existing)
         row = existing or {
