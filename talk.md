@@ -404,3 +404,72 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 - تأیید سالم: گارد مسیر فایل کمپین (`rel_path.startswith(slug)`)، zip از `compose_pipeline`، گارد ادمین کیف مبتنی بر env.
 
 **X: از B0 شروع کن** — برنچ `fix/b0-settings-guard` از `main` (همین `6693e1a`)، گارد ادمین روی کلیدهای استودیو + تست رگرسیون (tenant که mockSms می‌فرستد 403 بگیرد و فایل مشترک تغییر نکند). بعدش B2 طبق ترتیب. قلم با X.
+
+---
+
+## پلن نهایی رفع باگ — مطابقت Z↔X و ترتیب قفل (Z، ۱۹ سپ ۲۰۲۶)
+
+### مطابقت‌سازی فهرست‌ها
+
+فهرست من (۱۶ + P3) در برابر تحقیق X: **هیچ موردی اختلافی نیست** — X همه را روی کد تأیید کرد، هیچ‌یک را رد نکرد. سهSource نهایی:
+
+- فهرست اولیهٔ Z (۱۶ + P3) — همه تأیید X
+- افزودنی X: کلید یتیم pending در `finish_order` وقتی `row is None` (تأیید Z)
+- افزودنی Z پس از جاروی دوم: **B0** (نوشتن تنظیمات مشترک توسط مستأجر)، بی‌سقفیِ OTP فروشگاه، الگوی کلید idempotency در studio
+
+| # | باگ | X | وضعیت |
+| --- | --- | --- | --- |
+| ۱ | سبد چندکالایی فقط کالای اول | ✓ | **بسته (B1، مرج شد)** |
+| ۲ | تطبیق refId خالی | ✓ | **بسته (B1)** |
+| ۸ | ترتیب finish_order | ✓ | **بسته (B1)** — دو باقیمانده → B3 |
+| — | *B0: PATCH /settings تنظیمات مشترک (takeover با mockSms)* | جدید Z | **باز — اول از همه** |
+| ۳ | write_json غیراتمیک + read_json ساکت | ✓ | باز — B2 |
+| ۱۴ | idempotency بدون قفل | ✓ | باز — B2 |
+| ۱۶ | فایل‌های shared بدون قفل (۵ نقطه) | ✓ | باز — B2 |
+| — | *کلید یتیم pending در row-is-none* | جدید X | باز — B2 (یک خط) |
+| ۴ | دفتر withdraw_paid دوبار منفی | ✓ | باز — B3 |
+| — | *اعتبار idempotent روی order_id (double-credit) + stock-pass در _mark_paid* | باقیماندهٔ B1 | باز — B3 |
+| ۵ | _last_ig per-tenant + dmSync براکت + poll-skip | ✓ | باز — B4 |
+| ۶ | تزریق server_name + nginx -t بی‌چک | ✓ | باز — B5 |
+| ۹ | race نقشهٔ nginx | ✓ | باز — B5 |
+| ۷ | rollback بدون republish کانتینر | ✓ | باز — B6 |
+| ۱۱+۱۲ | سقف verify OTP + برگشت overage پیامک | ✓ | باز — B7 |
+| — | *OTP فروشگاه: بدون rate-limit و سقف تلاش* | جدید Z | باز — B7 |
+| ۱۳ | کلید idempotency فرانت (shop + inbox/[id] + **studio**) | ✓ (+تکملهٔ Z) | باز — B8 |
+| ۱۰ | amount در idpay_verify | ✓ | باز — B9 |
+| ۱۵ | stuck در BUILD_BUSY | ✓ | باز — B9 |
+| P3ها | نخ هم‌نام، _none ساکت، postMessage «*»، TOCTOU گارد GPU1، _inquiry_url عددی، لاگ bump_pending_build | ✓ | باز — پخش در B2/B4/B5/B9 |
+
+هم‌نظر سالم: path traversal رسانه، compare_digest راز/امضا، tenant_scope پس‌زمینه، catch حلقه‌ها، گارد فایل کمپین، «بساز» زنده.
+
+### ترتیب اجرای قفل‌شده
+
+**B0 → B2 → B3 → B4 → B5 → B6 → B7 → B8 → B9** (B1 انجام شد)
+
+**B0 — `fix/b0-settings-guard` (فوری، پیش از همه):**
+- `api/settings.py` + `settings_service.save_settings`: کلیدهای `STUDIO_KEYS` (mockSms/adminPhone/otpTtlSeconds/gatewayPublicUrl) فقط با شمارهٔ `ADMIN_PHONE` env پذیرفته شود؛ در غیر این صورت 403 و فایل مشترک دست‌نخورده. سقف معقول روی `otpTtlSeconds` (مثلاً 60–900) هم همین‌جا.
+- تست: tenant با `campaigns:write` که mockSms می‌فرستد → 403 و `settings.json` مشترک تغییر نمی‌کند؛ ادمین می‌تواند.
+
+**B2 — `fix/b2-data-layer`:** نوشتن اتمیک tmp+rename در `write_json` + لاگ هشدار در `read_json` خراب؛ قفل فایل مشترک (قفل سراسری جدا از tenant_lock) برای هر ۵ نقطهٔ shared؛ قفل دور `idempotency_service`؛ پاک‌کردن کلید یتیم pending؛ لاگ به‌جای `except: pass` دور `bump_pending_build`.
+
+**B3 — `fix/b3-wallet-ledger`:** `withdraw_paid` بدون کسر دوباره (دفتر = موجودی، تست جمع)؛ `credit_sale` idempotent روی `order_id`؛ خط سبد کم‌ناشده لاگ/رویداد observe به‌جای pass.
+
+**B4 — `fix/b4-channel-poll`:** کلید `_last_ig` per-account؛ `.get("dmSync")` همه‌جا؛ رویداد `poll-skip` بعد از دو cycle؛ هندل عددی تلگرام در `_inquiry_url`.
+
+**B5 — `fix/b5-edge-hostname`:** `hostname` فقط `[a-z0-9.-]`؛ چک خروج `nginx -t` و توقف قبل از reload؛ نوشتن اتمیک + قفل سراسری نقشه/names؛ **deploy هاب فقط با go صریح مالک**.
+
+**B6 — `fix/b6-edit-rollback`:** بعد از `restore_edit_files` در مسیر fail، فایل‌های ترن با `publish_shop_runtime` به کانتینر برگردند.
+
+**B7 — `fix/b7-otp-hardening`:** سقف تلاش verify پنل (مثلاً ۵ در ۵ دقیقه در Redis)؛ برگشت overage و مصرف در شکست ارسال؛ rate-limit ارسال + سقف تلاش OTP فروشگاه.
+
+**B8 — `fix/b8-frontend-idempotency`:** هر سه صفحه (shop، inbox/[id]، studio) — کلید فقط برای retry همان درخواست؛ در خطا/شروع پیام جدید کلید تازه. `tsc --noEmit` در DoD.
+
+**B9 — `fix/b9-leftovers`:** amount در `idpay_verify`؛ timeout/job-stale در `_bind_live_job`؛ نخ هم‌نام؛ `_none` ساکت؛ target origin در postMessage؛ TOCTOU `_ensure_gpu1` اگر ارزان بود.
+
+### تعریف تمام (همهٔ دسته‌ها)
+
+برنچ تازه از `main`، فقط فایل‌های همان دسته، تست رگرسیون برای هر باگ، هر دو suite سبز (`discover` سرویس + api)، `tsc --noEmit` برای دسته‌های فرانت، بند CHANGELOG فارسی، وضعیت `آماده ریویو` در همین فایل. ریویو Z = diff خط‌به‌خط + اجرای تست با دست خودم → merge محلی یا `تغییر خواسته شد`.
+
+**دروازهٔ دیپلوی:** بعد از mergeِ B3، مالک تصمیم می‌گیرد بستهٔ پول (B0+B1+B2+B3) کی به هاب برود. B5 جدا و فقط با go صریح.
+
+**X: شروع با B0. قلم با X.**
