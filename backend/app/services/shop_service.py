@@ -37,8 +37,15 @@ COLOR_Q = "رنگ‌های اصلی سایت چه باشد؟ مثلاً کرم �
 FEATURE_Q = "چه چیزهایی روی سایت باشد؟ جستجو، داستان برند، لینک شبکه‌ها، سبد خرید."
 READY_Q = "سبک و رنگ ثبت شد. اگر ویژگی دیگری نیست، بگو بساز تا سایت را با کالاهای کانال‌هایت بسازم."
 
-OPENING = STYLE_Q
+OPENING = "برای ساخت فروشگاه سه قدم است: ۱) حس فروشگاه ۲) کالا و قیمت تومان ۳) بنویس بساز."
 LIVE_OPENING = "فروشگاه زنده‌ست. صفحه را همین‌جا ببین و بگو چه عوض شود."
+LIVE_OPENING_INCOMPLETE = "سایت بالا آمد؛ قیمت تومان و عکس را کامل کن."
+CHECKLIST_ID = "shop-ready-check"
+CHECKLIST = "قبل از انتشار: ۱) قیمت تومان ۲) عکس کالا ۳) لینک ویترین را باز کن"
+SAFE_BUILD = "مشکل موقت در ساخت؛ دوباره بساز."
+SHOP_DENY = re.compile(r"seed phrase|bitcoin|private key|mnemonic|Traceback|FAIL:", re.I)
+EDIT_FAIL_ONE = "این تغییر روی صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
+EDIT_FAIL_MARKERS = ("صفحه ساخته نشد", "روی این صفحه پیدا نشد", "تیتر روی این صفحه پیدا نشد", "دوباره بفرست")
 
 SHOP_SYSTEM = """تو دستیار فروشگاه سوزان هستی. جواب را JSON بده: {"reply":"متن فارسی کوتاه"}
 به سؤال‌های فروشنده جواب بده. نگو پیام ویرایش فروشگاه نیست.
@@ -54,6 +61,7 @@ SHOP_LIVE_HINT = """فروشگاه همین الان زنده است. مصاحب
 درخواست تغییر متن، رنگ یا تصویر همان صفحهٔ پیش‌نمایش است نه ساخت سایت جدید. تغییر همان لحظه در کادر دیده می‌شود؛ کارخانه را راه نینداز.
 سلام را کوتاه جواب بده. دکمهٔ بیلد فقط سایت را با next build تازه می‌کند. کارخانهٔ کامل فقط اگر صریح گفت از نو بساز."""
 
+PRICE_MISSING = "بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام."
 BUILD_MSG_ID = "shop-build-live"
 BUILD_BUSY = frozenset({"running", "queued"})
 EXPLICIT_BUILD = ("بیلد کن", "دوباره بیلد", "دوباره بساز", "rebuild", "فروشگاه را بساز")
@@ -233,6 +241,69 @@ def _save_messages(rows: list[dict]) -> None:
     write_json("shop-messages.json", rows[-80:])
 
 
+def _looks_raw_operator(text: str) -> bool:
+    blob = str(text or "")
+    if not blob:
+        return False
+    if "FAIL:" in blob or blob.startswith("File ") or "Traceback" in blob:
+        return True
+    letters = [ch for ch in blob if ch.isalpha()]
+    if not letters:
+        return False
+    latin = sum(1 for ch in letters if ch.isascii())
+    return latin * 10 >= len(letters) * 6
+
+
+def sanitize_shop_text(text: str) -> str:
+    raw = str(text or "")
+    if SHOP_DENY.search(raw):
+        return "پیام نامعتبر حذف شد"
+    return raw
+
+
+def _is_edit_fail(text: str) -> bool:
+    blob = str(text or "")
+    if blob == EDIT_FAIL_ONE:
+        return True
+    return any(marker in blob for marker in EDIT_FAIL_MARKERS)
+
+
+def _sanitize_row(row: object) -> dict:
+    if not isinstance(row, dict):
+        return {"id": str(uuid4()), "role": "assistant", "text": "", "at": int(time.time())}
+    out = dict(row)
+    out["text"] = sanitize_shop_text(str(out.get("text") or ""))
+    return out
+
+
+def _append_assistant(rows: list[dict], assistant: dict) -> dict:
+    text = sanitize_shop_text(str(assistant.get("text") or ""))
+    if _is_edit_fail(text):
+        text = EDIT_FAIL_ONE
+    assistant = dict(assistant)
+    assistant["text"] = text
+    last = rows[-1] if rows else None
+    if (
+        last
+        and last.get("role") == "assistant"
+        and str(last.get("id") or "") not in {BUILD_MSG_ID, CHECKLIST_ID}
+        and _is_edit_fail(str(last.get("text") or ""))
+        and _is_edit_fail(text)
+    ):
+        last["text"] = EDIT_FAIL_ONE
+        last["at"] = int(assistant.get("at") or time.time())
+        return last
+    rows.append(assistant)
+    return assistant
+
+
+def bump_pending_build() -> None:
+    shop = _shop()
+    if not shop.get("slug"):
+        return
+    _bump_pending(shop)
+
+
 def reset_for_brand(*, name: str, tagline: str) -> dict:
     shop = {
         "brand": name,
@@ -263,17 +334,25 @@ def _shop_is_live(shop: dict) -> bool:
 def _public_shop(shop: dict) -> dict:
     out = dict(shop)
     out.pop("paySecret", None)
+    out["priceBlocked"] = _missing_sellable_price(shop)
     return out
+
+
+def _opening_text(shop: dict) -> str:
+    if not _shop_is_live(shop):
+        return OPENING
+    if _missing_sellable_price(shop):
+        return LIVE_OPENING_INCOMPLETE
+    return LIVE_OPENING
 
 
 def snapshot() -> dict:
     from app.services import channel_scan_service
 
     shop = _refresh_job(_shop())
-    rows = _messages()
+    rows = [_sanitize_row(row) for row in _messages()]
     if not rows:
-        opening = LIVE_OPENING if _shop_is_live(shop) else OPENING
-        rows = [{"id": str(uuid4()), "role": "assistant", "text": opening, "at": int(time.time())}]
+        rows = [{"id": str(uuid4()), "role": "assistant", "text": _opening_text(shop), "at": int(time.time())}]
         _save_messages(rows)
     build = _factory_status(shop)
     rows = _sync_build_note(rows, shop, build)
@@ -384,6 +463,8 @@ def _run_factory(args: list[str]) -> dict:
             payload["error"] = err
     elif not payload:
         payload = {"ok": False, "error": "خروجی کارخانه نامعتبر است"}
+    if isinstance(payload, dict) and payload.get("error"):
+        payload["error"] = _operator_error(str(payload["error"])) or SAFE_BUILD
     return payload if isinstance(payload, dict) else {"ok": False, "error": "خروجی کارخانه نامعتبر است"}
 
 
@@ -457,7 +538,9 @@ def _operator_error(raw: str) -> str:
     if "FileNotFoundError" in text or "job not found" in text or "load_job" in text:
         return "شناسه این بیلد در کارخانه پیدا نشد."
     if "Traceback" in text or ".py\", line" in text or '.py", line' in text:
-        return "کارخانه وضعیت خوانا نداد."
+        return SAFE_BUILD
+    if "price_missing" in text or "بدون قیمت تومان" in text or "قیمت کالاها ثبت نشده" in text:
+        return PRICE_MISSING
     if "readiness failed: catalog" in text:
         return "کاتالوگ سایت خالی رسید؛ اول کالا اضافه کن، بعد دوباره بساز."
     if "readiness failed: http" in text:
@@ -478,7 +561,9 @@ def _operator_error(raw: str) -> str:
         return "سایت روشن نشد؛ کارخانه در npm یا داکر ماند."
     line = text.splitlines()[-1].strip()
     if len(line) > 180 or line.startswith("File "):
-        return "کارخانه ساخت را تمام نکرد."
+        return SAFE_BUILD
+    if _looks_raw_operator(line[:180]):
+        return SAFE_BUILD
     return line[:180]
 
 
@@ -636,6 +721,8 @@ def _persian_build_text(build: dict) -> str:
         label = str(build.get("stepLabel") or "") or "کارخانه در حال ساخت سایت است…"
         return f"در حال ساخت فروشگاه. {label}"
     if status == "ready":
+        if _missing_sellable_price(_shop()):
+            return LIVE_OPENING_INCOMPLETE
         url = str(build.get("url") or "").strip()
         live = "سایت زنده است." if build.get("urlOk") or url else "ساخت تمام شد."
         return f"{live} {url}".strip()
@@ -664,8 +751,23 @@ def _sync_build_note(rows: list[dict], shop: dict, build: dict) -> list[dict]:
     existing = next((row for row in rows if str(row.get("id") or "") == BUILD_MSG_ID), None)
     if existing:
         existing.update(note)
+        return _ensure_checklist(rows, build)
+    return _ensure_checklist(rest + [note], build)
+
+
+def _ensure_checklist(rows: list[dict], build: dict) -> list[dict]:
+    if str(build.get("status") or "") != "ready":
         return rows
-    return rest + [note]
+    if any(str(row.get("id") or "") == CHECKLIST_ID for row in rows):
+        return rows
+    return list(rows) + [
+        {
+            "id": CHECKLIST_ID,
+            "role": "assistant",
+            "text": CHECKLIST,
+            "at": int(time.time()),
+        }
+    ]
 
 
 def _refresh_job(shop: dict) -> dict:
@@ -865,6 +967,9 @@ def _factory_catalog_payload() -> dict:
             item["priceLabel"] = label
         if src is not None and src.is_file():
             item["sourceImage"] = str(src)
+        inquiry = _inquiry_url(row)
+        if inquiry:
+            item["inquiryUrl"] = inquiry
         colors = [str(item_color).strip() for item_color in (row.get("colors") or []) if str(item_color).strip()]
         specs = []
         if colors:
@@ -885,6 +990,17 @@ def _factory_catalog_payload() -> dict:
         "items": items,
     }
     return _ensure_generated_catalog_photos(payload)
+
+
+def _inquiry_url(row: dict | None = None) -> str:
+    handle = str((row or {}).get("sourceHandle") or "").strip().lstrip("@")
+    source = str((row or {}).get("source") or "").strip().lower()
+    if not handle:
+        return ""
+    handle = handle.split("/")[-1]
+    if source in {"telegram", "tg"}:
+        return f"https://t.me/{handle}"
+    return f"https://ig.me/m/{handle}"
 
 
 def _write_factory_catalog(slug: str) -> Path | None:
@@ -1012,6 +1128,25 @@ PROTECTED_SHOP_SLUGS = frozenset({"joahr-froshi", "cahrm-srai-pars"})
 PROTECTED_TENANTS = frozenset({"09120007777"})
 
 
+def _missing_sellable_price(shop: dict) -> bool:
+    if bool(shop.get("hidePrices")):
+        return False
+    from app.services import storefront_service
+
+    products = storefront_service.list_products().get("products") or []
+    for row in products:
+        if not isinstance(row, dict):
+            continue
+        try:
+            price = int(row.get("price") or 0)
+        except (TypeError, ValueError):
+            price = 0
+        note = str(row.get("priceNote") or "").strip()
+        if price > 0 and not note:
+            return False
+    return True
+
+
 def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) -> dict:
     shop = _shop()
     if current_tenant() in PROTECTED_TENANTS or str(shop.get("slug") or "") in PROTECTED_SHOP_SLUGS:
@@ -1020,6 +1155,12 @@ def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) 
         return result
     if str(shop.get("status") or "") in BUILD_BUSY:
         result = {"ok": False, "error": "ساخت قبلی هنوز تمام نشده", "queued": True}
+        _emit_build(result, shop, rebuild=rebuild)
+        return result
+    if _missing_sellable_price(shop):
+        shop["error"] = PRICE_MISSING
+        _save_shop(shop)
+        result = {"ok": False, "code": "price_missing", "error": PRICE_MISSING}
         _emit_build(result, shop, rebuild=rebuild)
         return result
     full_rebuild = _wants_full_rebuild(prompt)
@@ -1094,6 +1235,8 @@ def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) 
         _save_shop(shop)
         if shop.get("slug"):
             record_site(str(shop["slug"]))
+    if result.get("error"):
+        result["error"] = _operator_error(str(result["error"])) or SAFE_BUILD
     _emit_build(result, shop, rebuild=rebuild)
     return result
 
@@ -1440,8 +1583,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
         user_msg["mediaName"] = media["name"]
     rows = _messages()
     if not rows:
-        opening = LIVE_OPENING if _shop_is_live(shop) else OPENING
-        rows = [{"id": str(uuid4()), "role": "assistant", "text": opening, "at": int(time.time())}]
+        rows = [{"id": str(uuid4()), "role": "assistant", "text": _opening_text(shop), "at": int(time.time())}]
     rows.append(user_msg)
     brief = onboard_service.get_brief()
     if spoken and not shop_edit_service.looks_like_foreign_payload(spoken):
@@ -1457,7 +1599,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
             "text": reply,
             "at": int(time.time()),
         }
-        rows.append(assistant)
+        _append_assistant(rows, assistant)
         return _pack(shop, rows, assistant)
     live = _shop_is_live(shop)
     if not media_only and not live:
@@ -1469,7 +1611,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
                 "text": guided,
                 "at": int(time.time()),
             }
-            rows.append(assistant)
+            _append_assistant(rows, assistant)
             return _pack(shop, rows, assistant)
     if not media_only and ((live and _explicit_rebuild(raw)) or (not live and _explicit_build(raw))):
         if not live and not onboard_service.brief_ready():
@@ -1484,7 +1626,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
                 "text": "اول " + " و ".join(missing or ["سبک و رنگ"]) + " را بگو، بعد می‌سازم.",
                 "at": int(time.time()),
             }
-            rows.append(assistant)
+            _append_assistant(rows, assistant)
             return _pack(shop, rows, assistant)
         result = start_build(
             prompt=raw,
@@ -1504,7 +1646,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
             "text": reply,
             "at": int(time.time()),
         }
-        rows.append(assistant)
+        _append_assistant(rows, assistant)
         return _pack(shop, rows, assistant)
     if live and media and str(media.get("kind") or "") == "image" and not shop_edit_service.wants_hero_image(raw):
         reply = _add_media_product(raw, media)
@@ -1519,7 +1661,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
             "text": reply,
             "at": int(time.time()),
         }
-        rows.append(assistant)
+        _append_assistant(rows, assistant)
         return _pack(shop, rows, assistant)
     live = _shop_is_live(shop)
     if live and not media_only:
@@ -1555,7 +1697,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
                 "text": reply,
                 "at": int(time.time()),
             }
-            rows.append(assistant)
+            _append_assistant(rows, assistant)
             return _pack(
                 shop,
                 rows,
@@ -1604,7 +1746,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
         "text": reply,
         "at": int(time.time()),
     }
-    rows.append(assistant)
+    _append_assistant(rows, assistant)
     from app.services.shop_route_service import shop_state
     from app.services import onboard_service as onboard_mod
 

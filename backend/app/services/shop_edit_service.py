@@ -854,6 +854,17 @@ async def apply_hero_image(shop: dict, root: Path, prompt: str) -> dict:
     }
 
 
+EDIT_FAIL_ONE = "این تغییر روی صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
+EDIT_FAIL_MARKERS = ("صفحه ساخته نشد", "روی این صفحه پیدا نشد", "تیتر روی این صفحه پیدا نشد", "دوباره بفرست")
+
+
+def unify_edit_fail(text: str) -> str:
+    blob = str(text or "")
+    if blob == EDIT_FAIL_ONE or any(marker in blob for marker in EDIT_FAIL_MARKERS):
+        return EDIT_FAIL_ONE
+    return blob
+
+
 def spoken_reply(prompt: str, reply: str, patched: bool, kind: str, detail: str = "") -> str:
     text = (reply or "").strip()
     compact = re.sub(r"\s+", "", text)
@@ -861,8 +872,8 @@ def spoken_reply(prompt: str, reply: str, patched: bool, kind: str, detail: str 
     too_thin = (not text) or len(text) < 12 or compact == prompt_compact or (detail and text == detail)
     if not patched:
         if too_thin or SUCCESS_CLAIM_RE.search(text):
-            return "این تغییر روی این صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
-        return text
+            return EDIT_FAIL_ONE
+        return unify_edit_fail(text)
     if kind == "revert":
         return "به ویرایش قبلی برگشت."
     if too_thin:
@@ -925,7 +936,7 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
         text = "تغییر روی همین صفحه اعمال شد." if ok else "این تغییر روی این صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
     if ok and frame_only and "کادر" not in text:
         text = f"{text} تغییر در کادر است؛ وقتی آماده بودی بیلد بزن."
-    return text
+    return unify_edit_fail(text)
 
 
 def _execute_action(shop: dict, root: Path, action: dict, view_path: str) -> dict:

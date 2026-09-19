@@ -145,6 +145,9 @@ class LiveShopChatRouteTests(unittest.TestCase):
     def test_start_build_clears_pending_and_skips_protected(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="کیف", price=850000, stock=1, sku="k", category="کیف")
                 shop_service._save_shop(
                     {
                         **shop_service._shop(),
@@ -382,6 +385,99 @@ class LiveShopChatRouteTests(unittest.TestCase):
             self.assertNotIn("sozan.sozan-core.ir", names)
 
 
+class PriceMissingBuildTests(unittest.TestCase):
+    def test_start_build_blocks_when_all_prices_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="جلد زیپی", price=0, stock=1, sku="z", category="جلد زیپی")
+                shop_service._save_shop({**shop_service._shop(), "slug": "demo", "status": "ready", "hidePrices": False})
+                with patch.object(shop_service, "_run_factory") as factory, patch.object(shop_service, "_emit_build"):
+                    result = shop_service.start_build(prompt="از نو بساز", rebuild=True)
+                factory.assert_not_called()
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["code"], "price_missing")
+                self.assertIn("قیمت", result["error"])
+
+    def test_contact_and_direct_notes_still_block(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(
+                    title="جلد زیپی",
+                    price=0,
+                    stock=1,
+                    sku="z",
+                    category="جلد زیپی",
+                    priceNote="تماس بگیرید",
+                )
+                shop_service._save_shop({**shop_service._shop(), "slug": "demo", "status": "ready", "jobId": "j1"})
+                with (
+                    patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
+                    patch.object(shop_service, "_run_factory") as factory,
+                    patch.object(shop_service, "_emit_build"),
+                ):
+                    result = shop_service.start_build(prompt="بیلد کن", rebuild=True, revise_only=True)
+                spawn.assert_not_called()
+                factory.assert_not_called()
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["code"], "price_missing")
+                self.assertIn("استعلام", result["error"])
+
+                storefront_service.update_product(
+                    storefront_service.list_products()["products"][0]["id"],
+                    {"priceNote": "دایرکت"},
+                )
+                with (
+                    patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
+                    patch.object(shop_service, "_run_factory") as factory,
+                    patch.object(shop_service, "_emit_build"),
+                ):
+                    result = shop_service.start_build(prompt="از نو بساز", rebuild=True)
+                spawn.assert_not_called()
+                factory.assert_not_called()
+                self.assertEqual(result["code"], "price_missing")
+
+    def test_empty_catalog_blocks_unless_hide_prices(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                shop_service._save_shop({**shop_service._shop(), "slug": "demo", "status": "ready", "hidePrices": False})
+                with patch.object(shop_service, "_run_factory") as factory, patch.object(shop_service, "_emit_build"):
+                    result = shop_service.start_build(prompt="از نو بساز", rebuild=True)
+                factory.assert_not_called()
+                self.assertEqual(result["code"], "price_missing")
+
+    def test_inquiry_url_from_instagram_handle(self) -> None:
+        self.assertEqual(
+            shop_service._inquiry_url({"sourceHandle": "@optic_day", "source": "instagram"}),
+            "https://ig.me/m/optic_day",
+        )
+        self.assertEqual(
+            shop_service._inquiry_url({"sourceHandle": "shop_tg", "source": "telegram"}),
+            "https://t.me/shop_tg",
+        )
+        self.assertEqual(shop_service._inquiry_url({"sourceHandle": "", "source": "instagram"}), "")
+
+    def test_start_build_allows_hide_prices(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="جلد زیپی", price=0, stock=1, sku="z", category="جلد زیپی")
+                shop_service._save_shop({**shop_service._shop(), "slug": "demo", "status": "ready", "hidePrices": True})
+                with (
+                    patch.object(shop_service, "_run_factory", return_value={"ok": True, "jobId": "j", "status": "running"}),
+                    patch.object(shop_service, "_emit_build"),
+                    patch.object(shop_service, "_publish_dns", side_effect=lambda shop: shop),
+                    patch("app.services.shop_service.get_settings", return_value={"storeName": "دمو"}),
+                    patch("app.services.shop_service.record_site"),
+                ):
+                    result = shop_service.start_build(prompt="از نو بساز", rebuild=True)
+                self.assertTrue(result.get("ok"))
+
+
 class OperatorErrorTests(unittest.TestCase):
     def test_readiness_catalog_maps_to_persian(self) -> None:
         self.assertIn("کاتالوگ", shop_service._operator_error("readiness failed: catalog"))
@@ -393,6 +489,25 @@ class OperatorErrorTests(unittest.TestCase):
         )
         self.assertIn("مشغول", shop_service._operator_error(raw))
         self.assertIn("مشغول", shop_service._operator_error("gpu_busy: qwen3.8-27b in flight"))
+
+    def test_raw_fail_and_traceback_use_safe_persian(self) -> None:
+        self.assertEqual(shop_service._operator_error("FAIL: GPU exploded"), shop_service.SAFE_BUILD)
+        self.assertEqual(shop_service._operator_error("Traceback (most recent call last):"), shop_service.SAFE_BUILD)
+
+    def test_denylist_strips_seed_and_fail(self) -> None:
+        self.assertEqual(shop_service.sanitize_shop_text("send your seed phrase now"), "پیام نامعتبر حذف شد")
+        self.assertEqual(shop_service.sanitize_shop_text("FAIL: GPU exploded"), "پیام نامعتبر حذف شد")
+        self.assertEqual(shop_service.sanitize_shop_text("ساخت فروشگاه شروع شد."), "ساخت فروشگاه شروع شد.")
+
+    def test_edit_fail_coalesces_to_one_bubble(self) -> None:
+        first = {"id": "a1", "role": "assistant", "text": "صفحه ساخته نشد.", "at": 1}
+        rows = [first]
+        again = shop_service._append_assistant(
+            rows,
+            {"id": "a2", "role": "assistant", "text": "تیتر روی این صفحه پیدا نشد.", "at": 2},
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(again["text"], shop_service.EDIT_FAIL_ONE)
 
 
 if __name__ == "__main__":

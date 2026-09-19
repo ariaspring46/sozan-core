@@ -174,7 +174,7 @@ class ChannelScanTests(unittest.TestCase):
                 (_scan_dir() / "scan.jpg").write_bytes(b"jpg")
                 storefront_service.add_product(
                     title="کیف دوشی",
-                    price=0,
+                    price=850000,
                     stock=1,
                     sku="ig",
                     source="instagram",
@@ -205,9 +205,23 @@ class ChannelScanTests(unittest.TestCase):
                 catalog_path = Path(captured[0][captured[0].index("--catalog") + 1])
                 payload = json.loads(catalog_path.read_text(encoding="utf-8"))
                 self.assertEqual(payload["items"][0]["title"], "کیف دوشی")
-                self.assertEqual(payload["items"][0]["price"], 0)
+                self.assertEqual(payload["items"][0]["price"], 850000)
                 self.assertTrue(payload.get("lockItems"))
                 self.assertNotIn("مانتو", json.dumps(payload, ensure_ascii=False))
+
+    def test_site_type_hint_unknown_category_is_general_store(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(
+                    title="جلد زیپی",
+                    price=0,
+                    stock=1,
+                    sku="zip",
+                    category="جلد زیپی",
+                )
+                self.assertEqual(channel_scan_service.site_type_hint(), "general-store")
 
     def test_site_type_hint_saffron_not_bags(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

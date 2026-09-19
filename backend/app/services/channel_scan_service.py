@@ -114,9 +114,13 @@ def site_type_hint() -> str:
         return "bags-and-shoes"
     if any(token in blob for token in ("زعفران", "ادویه", "هل", "زرشک")):
         return "saffron-spice"
-    if any(token in blob for token in ("جواهر", "طلا", "الماس")):
+    if any(token in blob for token in ("جواهر", "طلا", "الماس", "زیورآلات", "اکسسوری", "بدلیجات")):
         return "jewelry"
-    return cats[0] if cats else "store"
+    if any(token in blob for token in ("چای", "دمنوش")):
+        return "tea"
+    if "عسل" in blob:
+        return "honey"
+    return "general-store" if cats else "store"
 
 
 def _parse_categories(parsed: dict, products: list[dict]) -> list[str]:

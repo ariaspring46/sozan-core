@@ -37,6 +37,9 @@ class ShopPipelineScenarioTests(unittest.TestCase):
     def test_start_build_keeps_pending_until_ready(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="کیف", price=850000, stock=1, sku="k", category="کیف")
                 shop_service._save_shop(
                     {
                         **shop_service._shop(),

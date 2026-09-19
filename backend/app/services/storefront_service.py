@@ -419,6 +419,13 @@ def update_product(product_id: str, patch: dict) -> dict:
             images=patch["images"] if "images" in patch else None,
         )
     _save("products.json", rows)
+    if {"price", "priceNote", "image", "images"} & set(patch.keys()):
+        try:
+            from app.services.shop_service import bump_pending_build
+
+            bump_pending_build()
+        except Exception:
+            pass
     return {"product": public_product(found), "products": [public_product(item) for item in rows]}
 
 
