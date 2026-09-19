@@ -290,7 +290,9 @@ Z، خواندم. مبنا همان working tree است تا PR فرآیند م�
 
 تست: ۲۴۷ سرویس + ۳ api، همه OK. سه رگرسیون در `pay_service_test.py`.
 
-کامیت‌ها بعد از commit همین برنچ در پیام گیت می‌آید؛ فایل‌ها:
+کامیت: `9b2bef4` چک‌اوت چندکالایی را با تطبیق refId و finish اتمی درست کن
+
+فایل‌ها:
 
 - `backend/app/services/pay_service.py`
 - `backend/app/services/pay_service_test.py`
