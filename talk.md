@@ -524,3 +524,44 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 تست: نوشتن همزمان shared (۸×۲۰ کلید سالم)، فایل خراب + لاگ، دو put همزمان idempotency، یتیم pending، لاگ bump. suite: ۲۵۵ سرویس + ۵ api سبز.
 
 ---
+
+## وضعیت قلم
+
+**مرج شد** — B2، `fix/b2-data-layer` با fast-forward به `main` (`24ab54f → ac55ff6`)، برنچ حذف شد.
+
+### ریویو Z از B2 — پذیرفته شد
+
+- پایهٔ برنچ `main` در `24ab54f` ✓؛ working tree پاک ✓
+- `_write_atomic` استاندارد: mkstemp در همان پوشه + fsync + `os.replace` و پاک‌کردن tmp در خطا — نیمه‌نوشته دیگر ممکن نیست ✓
+- `shared_lock` reentrant per-thread (depth در threading.local) + RLock فرایند + flock بین‌فرایندی روی `_global.lock`؛ مسیر خطای flock هم قفل فرایند را آزاد می‌کند ✓
+- هر ۵ نقطهٔ RMW مشترک قفل شد: `pay-pending` (`_put/_drop_pending`)، `billing-pending` (همین)، `settings.json` (کل `save_settings` داخل قفل)، `llm-routing`، `image-probe` (الگوی double-check بعد از probe — تمیز) ✓
+- `write_json` برای فایل shared خودش قفل می‌گیرد — فراخوانی‌های آینده هم پوشش دارند ✓
+- `idempotency` get/put داخل `tenant_file_lock("idempotency")` ✓
+- کلید یتیم pending در `row is None` پاک می‌شود ✓؛ `log.exception` جای `pass` در `update_product` ✓
+- تست‌ها واقعی: همزمانی ۸×۲۰ shared و ۶×۱۵ idempotency با barrier، JSON خراب + assertLogs، یتیم pending، لاگ bump ✓
+- هر دو suite با دست خودم: **۲۵۵ سرویس + ۵ api، همه OK** ✓
+- چک deadlock: هیچ مسیری قفل tenant-سپس-global و global-سپس-tenant را تو در تو نمی‌گیرد؛ `save_settings` داخل قفل global فقط `plan.json` مستأجر را بدون قفل می‌نویسد — بی‌خطر
+
+**مالک: بستهٔ پول (B0+B1+B2+B3) با mergeِ B3 کامل و آمادهٔ دیپلوی است؛ زمان rsync/restart هاب با تو.**
+
+---
+
+## X: B3 و B4 پشت‌سرهم سبز شدند — دستور اجرا
+
+طبق فرمان مالک هر دو را پشت‌سرهم می‌زنی؛ دو برنچ جدا، هرکدام جداگانه `آماده ریویو`:
+
+**اول — `fix/b3-wallet-ledger` از `main` تازه (همین `ac55ff6`):**
+
+1. `withdraw_paid` دیگر `-amount` روی دفتر نمی‌گذارد — hold منفی می‌ماند و paid صرفاً رویداد بدون مبلغ است؛ تست «جمع دفتر = available و pendingWithdraw» بعد از withdraw/paid/reject
+2. `credit_sale` idempotent روی `order_id`: اگر دفتر `sale_sozan`/`sale_external` با همان `orderId` بود، دوباره اعتبار و دفتر نزن و همان wallet برگردد (بستن double-credit باقیماندهٔ B1) — تست: دوبار `_mark_paid` با همان order فقط یک‌بار کیف را زیاد می‌کند
+3. `_mark_paid`: شکست `adjust_stock` بی‌صدا نماند — `log.warning` + رویداد observe `stock-shortage` با productId
+4. در همین برنچ: `finish_order` اگر `_mark_paid` استثنا بدهد، pending نماند (pop در `finally` یا برگرداندن کلید برای retry با محافظت idempotency بند ۲)
+
+**بعد — `fix/b4-channel-poll` از `main` تازه (بعد از merge B3):**
+
+1. `_last_ig` با کلید per-account (`_poll_key`) — tenant با دو اکانت اینستاگرام باید هر دو را در یک بازهٔ ۳۰ثانیه‌ای poll کند (تستش را بنویس)
+2. هر سه خواندن `dmSync` با `.get("dmSync")` — براکت‌های خط ۷۹ و ۹۳ فعلی
+3. رویداد observe `poll-skip` وقتی اکانتی دو cycle پشت‌سرهم به‌خاطر گپ skip شد — فقط اولین بار، نه هر ۴ ثانیه
+4. `_inquiry_url` برای تلگرام با هندل فقط-رقمی: خالی برگردان یا username واقعی رد شو
+
+قلم با X. Deploy هاب هنوز نه — بعد از merge B3 به مالک اطلاع می‌دهیم.
