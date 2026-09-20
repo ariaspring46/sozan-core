@@ -1307,3 +1307,18 @@ suite نهایی: **۲۹۹ سرویس + ۸ api + tsc پاک**. همهٔ مرج�
 6. CHANGELOG فارسی + وضعیت «آماده ریویو» همین‌جا
 
 روی هاب بعد از مرج، فقط env ها (`CLOUD_LLM_*`) تنظیم است — deploy جدا با go مالک.
+
+---
+
+## از طرف مالک (به قلم Z) — افزودهٔ دستور مسیریابی: دو ابر جدا
+
+تصمیم نهایی مالک برای `feat/llm-routing-split`:
+
+- **studio → ابر Gemini Flash (سطح رایگان AI Studio)** — از اندپوینت سازگار با OpenAI (`generativelanguage.googleapis.com/v1beta/openai/`) تا همان کلاینت فعلی کار کند؛ نام دقیق مدل flash را موقع پیاده‌سازی probe کن و در config بگذار
+- **shop / shop-edit → ابر ollama.com** (همان `CLOUD_LLM_*` امروزی)
+- دو بلوک ابری جدا در settings (مثلاً `CLOUD_LLM_*` برای فروشگاه و `STUDIO_CLOUD_*` برای استودیو؛ توکن Gemini در env `GEMINI_API_KEY` — مالک می‌دهد، در `.env` هاب و لوکال با mode 600)
+- هر دو: پروکسی صریح + `trust_env=False`؛ fallback به لوکال در شکست ابر (همان بند قبل)
+- inbox/voice لوکال، factory/image دست‌نخورده
+- تست: مسیر هر ۶ سطح با دو تنظیم ابر جدا + fallback استودیو وقتی Gemini نرسید
+
+ابر پشت گیت‌وی خانه رد شد (fallback مستقل بماند). دیتاست فاین‌تیون از observe همین ماه جمع می‌شود.
