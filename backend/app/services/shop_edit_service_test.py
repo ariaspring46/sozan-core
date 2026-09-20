@@ -24,6 +24,7 @@ from app.services.shop_edit_service import (
     wants_hero_image,
     wants_revert,
     write_intent,
+    _catalog_product_image,
     _finish_edit,
 )
 from app.state_store import tenant_scope
@@ -115,6 +116,11 @@ class ShopEditPatchTests(unittest.TestCase):
         self.assertTrue(looks_like_foreign_payload("https://api.sozan-core.ir/channels/instagram/callback"))
         self.assertTrue(looks_like_foreign_payload("deadbeefdeadbeefdeadbeefdeadbeef"))
         self.assertFalse(looks_like_foreign_payload("میخواهم رنگ آن قرمز باشد"))
+
+    def test_catalog_image_skips_hero_placeholder(self) -> None:
+        self.assertEqual(_catalog_product_image("کیف", "/images/hero.png", {}), "")
+        self.assertEqual(_catalog_product_image("کیف", "", {"کیف": "/images/hero.png"}), "")
+        self.assertEqual(_catalog_product_image("کیف", "/products/a.jpg", {}), "/products/a.jpg")
         self.assertEqual(
             spoken_reply("بنویس خانه", "خانه", True, "write", "خانه"),
             "متن به «خانه» تغییر کرد.",

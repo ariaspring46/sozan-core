@@ -352,6 +352,7 @@ def spawn_rebuild(job_id: str, shop: dict) -> None:
         path.write_text(json.dumps(job, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     shop["status"] = "running"
     shop["error"] = ""
+    shop["buildAt"] = int(time.time())
     _save_shop(shop)
     script = settings.factory_script
     log = _fastpath_root() / "logs" / f"{job_id}-edit.log"
@@ -615,6 +616,17 @@ def replace_exported_ts_array(text: str, decl: str, body: str) -> str | None:
     return None
 
 
+def _catalog_product_image(title: str, image: str, prior: dict[str, str]) -> str:
+    raw = (image or "").strip()
+    if raw.endswith("/hero.png") or raw == "/images/hero.png":
+        raw = ""
+    if not raw:
+        raw = str(prior.get(title) or "").strip()
+    if raw.endswith("/hero.png") or raw == "/images/hero.png":
+        return ""
+    return raw
+
+
 def write_catalog_json(root: Path, products: list[dict]) -> Path:
     prior: dict[str, str] = {}
     catalog_path = root / "public" / "catalog.json"
@@ -638,11 +650,7 @@ def write_catalog_json(root: Path, products: list[dict]) -> Path:
         title = str(row.get("title") or "").strip()
         if not title:
             continue
-        image = str(row.get("image") or "").strip()
-        if not image or image == "/images/hero.png":
-            image = prior.get(title) or image
-        if not image:
-            image = "/images/hero.png"
+        image = _catalog_product_image(title, str(row.get("image") or ""), prior)
         item = {
             "id": str(row.get("id") or index),
             "title": title,
@@ -656,6 +664,13 @@ def write_catalog_json(root: Path, products: list[dict]) -> Path:
             value = row.get(key)
             if value not in (None, "", []):
                 item[key] = value
+        photos = [str(path) for path in (item.get("images") or []) if path and "hero.png" not in str(path)]
+        if photos:
+            item["images"] = photos
+            if not item.get("image"):
+                item["image"] = photos[0]
+        else:
+            item.pop("images", None)
         items.append(item)
     catalog_path.parent.mkdir(parents=True, exist_ok=True)
     catalog_path.write_text(json.dumps({"products": items}, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -679,11 +694,7 @@ def sync_products_ts(root: Path, products: list[dict]) -> bool:
         title = str(row.get("title") or "").strip()
         if not title:
             continue
-        image = str(row.get("image") or "").strip()
-        if not image or image == "/images/hero.png":
-            image = prior.get(title) or image
-        if not image:
-            image = "/images/hero.png"
+        image = _catalog_product_image(title, str(row.get("image") or ""), prior)
         item = {
             "id": str(row.get("id") or index),
             "title": title,

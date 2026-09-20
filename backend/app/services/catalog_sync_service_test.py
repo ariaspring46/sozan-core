@@ -161,6 +161,22 @@ class CatalogSyncServiceTests(unittest.TestCase):
         self.assertGreaterEqual(int(shop.get("pendingBuild") or 0), 1)
         publish.assert_not_called()
 
+    def test_missing_product_image_is_not_hero(self) -> None:
+        root = Path(self.build.name)
+        (root / "public").mkdir()
+        self._overlay(root)
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", self.dir.name), patch(
+            "app.services.shop_edit_service.build_dir_for", return_value=root
+        ), patch("app.services.shop_edit_service.publish_shop_runtime"), patch("app.services.catalog_sync_service.emit_later"):
+            self._live_shop()
+            storefront_service.add_product(title="بی‌عکس", price=1000, stock=1, sku="")
+            out = catalog_sync_service.sync_live()
+        catalog = json.loads((root / "public" / "catalog.json").read_text(encoding="utf-8"))
+        row = catalog["products"][0]
+        self.assertTrue(out["live"])
+        self.assertNotIn("hero.png", str(row.get("image") or ""))
+        self.assertEqual(row.get("image") or "", "")
+
 
 if __name__ == "__main__":
     unittest.main()

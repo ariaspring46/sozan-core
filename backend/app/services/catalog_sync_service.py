@@ -42,13 +42,13 @@ def _shop_image_paths(row: dict) -> tuple[str, list[str]]:
     names: list[str] = []
     for item in row.get("images") or []:
         name = Path(str(item or "")).name
-        if name and name not in names:
+        if name and name not in names and name != "hero.png":
             names.append(name)
     main = Path(str(row.get("image") or "")).name
-    if main and main not in names:
+    if main and main not in names and main != "hero.png":
         names.insert(0, main)
     paths = [f"/products/{name}" for name in names]
-    return (paths[0] if paths else "/images/hero.png"), paths
+    return (paths[0] if paths else ""), paths
 
 
 def catalog_rows(shop: dict, *, prior_cats: dict[str, str], prior_subs: dict[str, str]) -> tuple[list[dict], bool]:
