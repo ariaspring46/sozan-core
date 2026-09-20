@@ -302,7 +302,7 @@ class UnipilePublishTests(unittest.TestCase):
                             media_kind="image",
                         )
                     )
-        self.assertEqual(str(ctx.exception), channel_service.IG_STUDIO_WAIT)
+        self.assertEqual(str(ctx.exception), channel_service.IG_RECONNECT)
 
 
 if __name__ == "__main__":

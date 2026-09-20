@@ -374,6 +374,8 @@ async def send_message(*, account_id: str, recipient_id: str, text: str) -> None
             headers=_headers(),
             json={"account_id": ident, "recipient_id": target, "message": body[:1000]},
         )
+    if response.status_code in {401, 403}:
+        raise ValueError(channel_service.IG_RECONNECT)
     if response.status_code >= 400:
         raise ValueError("اینستاگرام پیام را از BoxAPI نفرستاد.")
 

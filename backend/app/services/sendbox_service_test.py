@@ -367,3 +367,51 @@ class SendboxServiceTests(unittest.TestCase):
             self.assertFalse(client.trust_env)
         finally:
             asyncio.run(client.aclose())
+
+    def test_send_message_unauthorized_asks_reconnect(self) -> None:
+        from types import SimpleNamespace
+
+        fake = AsyncMock()
+        fake.__aenter__.return_value = fake
+        fake.__aexit__.return_value = False
+        fake.post = AsyncMock(return_value=SimpleNamespace(status_code=401))
+        with patch("app.services.sendbox_service._client", return_value=fake):
+            with self.assertRaises(ValueError) as ctx:
+                asyncio.run(
+                    sendbox_service.send_message(account_id="acc-1", recipient_id="cust", text="سلام")
+                )
+        self.assertEqual(str(ctx.exception), channel_service.IG_RECONNECT)
+
+    def test_deliver_telegram_empty_token_is_persian(self) -> None:
+        from app.services import channel_outbound_service
+
+        row = {"platform": "telegram", "credentials": {}}
+        with patch(
+            "app.services.channel_outbound_service.channel_service.account_for_platform", return_value=row
+        ), patch("app.services.channel_outbound_service.channel_service.token_for", return_value=""):
+            with self.assertRaises(ValueError) as ctx:
+                asyncio.run(
+                    channel_outbound_service.deliver(
+                        platform="telegram", sender_id="1", chat_id="9", text="سلام"
+                    )
+                )
+        self.assertIn("توکن", str(ctx.exception))
+
+    def test_deliver_network_error_is_persian(self) -> None:
+        import httpx
+        from app.services import channel_outbound_service
+
+        row = {"platform": "instagram", "credentials": {"sendboxAccountId": "acc-1"}}
+        with patch(
+            "app.services.channel_outbound_service.channel_service.account_for_platform", return_value=row
+        ), patch(
+            "app.services.channel_outbound_service.sendbox_service.send_message",
+            new=AsyncMock(side_effect=httpx.ConnectError("fail")),
+        ):
+            with self.assertRaises(ValueError) as ctx:
+                asyncio.run(
+                    channel_outbound_service.deliver(
+                        platform="instagram", sender_id="cust1", chat_id="cust1", text="سلام"
+                    )
+                )
+        self.assertIn("شبکه", str(ctx.exception))

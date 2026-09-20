@@ -309,6 +309,31 @@ class StudioPublishTests(unittest.TestCase):
         self.assertIn("publish-failed", titles)
         self.assertEqual(emit.call_args.kwargs.get("operation_id"), "c1")
 
+    def test_instagram_legacy_token_asks_reconnect(self) -> None:
+        from app.services import channel_service
+
+        row = {"id": "ig", "platform": "instagram", "credentials": {"accessToken": "meta"}}
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "pic-image.png"
+            path.write_bytes(b"png")
+            with patch(
+                "app.services.studio_publish_service.channel_service.account_for_platform",
+                return_value=row,
+            ), patch(
+                "app.services.studio_publish_service.chat_media_service.resolve",
+                return_value=path,
+            ):
+                with self.assertRaises(ValueError) as ctx:
+                    asyncio.run(
+                        studio_publish_service.publish(
+                            platform="instagram",
+                            caption="کپشن اینستا",
+                            media_name=path.name,
+                            media_kind="image",
+                        )
+                    )
+        self.assertEqual(str(ctx.exception), channel_service.IG_RECONNECT)
+
 
 if __name__ == "__main__":
     unittest.main()

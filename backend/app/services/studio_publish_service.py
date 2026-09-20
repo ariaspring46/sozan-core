@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import httpx
+
 from app.services import (
     channel_service,
     chat_media_service,
@@ -18,6 +20,12 @@ LABELS = {"instagram": "اینستاگرام", "telegram": "تلگرام", "what
 
 def _row(platform: str) -> dict:
     row = channel_service.account_for_platform(platform)
+    if platform == "instagram":
+        if row is None:
+            raise ValueError("این کانال وصل نیست. از بیشتر → کانال‌ها حساب را ثبت کن.")
+        if not channel_service.sendbox_account_id(row):
+            raise ValueError(channel_service.IG_RECONNECT)
+        return row
     if row is None or not channel_service.is_connected(row):
         raise ValueError("این کانال وصل نیست. از بیشتر → کانال‌ها حساب را ثبت کن.")
     return row
@@ -31,6 +39,10 @@ def _persian_provider_error(exc: BaseException) -> str:
     text = str(exc)[:200]
     if isinstance(exc, ValueError):
         return str(exc)
+    if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError, httpx.ProxyError)):
+        return "ارسال به کانال به شبکه نرسید. اتصال را در کانال‌ها بررسی کن."
+    if any(marker in text.lower() for marker in ("httpx", "timeout", "connect", "proxy", "socks")):
+        return "ارسال به کانال به شبکه نرسید. اتصال را در کانال‌ها بررسی کن."
     return "ارسال به کانال نشد. اتصال را در کانال‌ها بررسی کن."
 
 
