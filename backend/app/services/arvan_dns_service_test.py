@@ -59,6 +59,10 @@ class ArvanCnameTests(unittest.TestCase):
     def test_hostname_rejects_reserved(self) -> None:
         self.assertEqual(arvan_dns_service.hostname("not-a-real-cname.invalid"), "")
         self.assertEqual(arvan_dns_service.hostname("https://shop.example.com/path"), "shop.example.com")
+        self.assertEqual(arvan_dns_service.hostname("evil.com;x"), "")
+        self.assertEqual(arvan_dns_service.hostname("evil.com`x"), "")
+        self.assertEqual(arvan_dns_service.hostname("evil.com$x"), "")
+        self.assertEqual(arvan_dns_service.hostname('evil.com"x'), "")
         self.assertTrue(arvan_dns_service.is_zone_host("sozan.sozan-core.ir"))
         self.assertFalse(arvan_dns_service.is_zone_host("shop.example.com"))
 

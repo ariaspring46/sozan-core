@@ -1,5 +1,6 @@
 import asyncio
 import json
+import subprocess
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -383,6 +384,28 @@ class LiveShopChatRouteTests(unittest.TestCase):
             self.assertNotIn("invalid", text)
             self.assertIn("server_name shop.example.com;", names)
             self.assertNotIn("sozan.sozan-core.ir", names)
+
+    def test_reload_edge_skips_reload_when_nginx_t_fails(self) -> None:
+        failed = subprocess.CompletedProcess(["nginx", "-t"], 1, stdout="", stderr="bad")
+
+        class FakeNginx:
+            def __init__(self, *_args, **_kwargs) -> None:
+                pass
+
+            def is_file(self) -> bool:
+                return True
+
+            def __str__(self) -> str:
+                return "/usr/sbin/nginx"
+
+        with (
+            patch("app.services.shop_service.Path", FakeNginx),
+            patch("app.services.shop_service.subprocess.run", return_value=failed) as run,
+            self.assertLogs("sozan.shop", level="WARNING") as captured,
+        ):
+            shop_service._reload_edge()
+        self.assertEqual(run.call_count, 1)
+        self.assertTrue(any("nginx -t failed" in line for line in captured.output))
 
 
 class PriceMissingBuildTests(unittest.TestCase):

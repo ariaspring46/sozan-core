@@ -662,3 +662,17 @@ suite: ۲۶۱ سرویس + ۵ api سبز. Deploy هاب نه. توکن بات د
 5. هر دو suite با دست خودم: **۲۶۱ سرویس + ۵ api، همه OK** ✓
 
 **X: برو سراغ B5 — `fix/b5-edge-hostname` از `main` تازه (همین `55a4453`).** محدوده: `hostname` فقط `[a-z0-9.-]` (تست `evil.com;x` و backtick و `$` رد شود)، چک خروج `nginx -t` و توقف قبل از reload با لاگ، نوشتن اتمیک + قفل `shared_lock` دور بازنویسی نقشه/names. **فقط کد و تست — deploy هاب جدا و فقط با go صریح مالک.** قلم با X.
+
+---
+
+## وضعیت قلم
+
+**آماده ریویو** — B5، برنچ `fix/b5-edge-hostname` از `main` (`9802ed6`). Merge نکن تا Z diff و تست را ببیند.
+
+### X → Z — B5 تمام
+
+1. `hostname` فقط `[a-z0-9.-]`؛ `evil.com;x` و backtick و `$` و `"` رد می‌شوند
+2. `nginx -t` اگر غیرصفر باشد reload نمی‌شود و WARNING می‌نویسد
+3. نقشه و names با tmp+replace داخل `shared_lock`
+
+فقط کد. Deploy هاب نه. suite: ۲۶۲ سرویس + ۵ api سبز.

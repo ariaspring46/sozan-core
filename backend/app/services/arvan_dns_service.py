@@ -52,7 +52,11 @@ def hostname(domain: str) -> str:
     if "://" not in raw:
         raw = "https://" + raw
     host = (urlparse(raw).hostname or "").strip().rstrip(".")
-    if not host or "." not in host or any(ch in host for ch in " /\\"):
+    if not host or "." not in host:
+        return ""
+    if any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for ch in host):
+        return ""
+    if host.startswith("-") or host.endswith("-") or ".." in host:
         return ""
     if host.endswith(".invalid") or host.endswith(".localhost") or host.endswith(".local"):
         return ""

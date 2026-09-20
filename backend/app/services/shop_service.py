@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from uuid import uuid4
@@ -17,7 +19,9 @@ from app.services.pipeline_release import BEHAVIOR_VERSION, hub_release_id
 from app.services.plan_service import allow_new_site, record_site
 from app.services.settings_service import get_settings
 from app.services.tenant_lock import tenant_file_lock
-from app.state_store import current_tenant, read_json, tenant_dir, write_json
+from app.state_store import current_tenant, read_json, shared_lock, tenant_dir, write_json
+
+log = logging.getLogger("sozan.shop")
 
 DEFAULT_SHOP = {
     "brand": "فروشگاه",
@@ -171,11 +175,26 @@ def _shop_upstream_lines(shop: dict) -> list[str]:
     return lines
 
 
+def _atomic_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def _write_shop_upstream(shop: dict) -> None:
     from app.state_store import current_tenant, iter_tenants, read_json, tenant_scope
 
     dest = _shop_map_path()
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    names = _shop_custom_names_path()
     collected: list[str] = []
     seen: set[str] = set()
 
@@ -190,37 +209,38 @@ def _write_shop_upstream(shop: dict) -> None:
         for line in _shop_upstream_lines(row):
             add_line(line)
 
-    add(shop)
-    me = current_tenant()
-    for phone in iter_tenants():
-        if phone == me:
-            continue
-        with tenant_scope(phone):
-            row = read_json("shop.json", {})
-        if isinstance(row, dict):
-            add(row)
-    from app.services import arvan_dns_service
-
-    zone = arvan_dns_service.zone()
-    if dest.is_file():
-        for line in dest.read_text(encoding="utf-8").splitlines():
-            raw = line.strip()
-            if not raw or raw.startswith("#"):
+    with shared_lock():
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        add(shop)
+        me = current_tenant()
+        for phone in iter_tenants():
+            if phone == me:
                 continue
-            host = raw.split()[0]
-            if host == zone or host.endswith("." + zone):
-                add_line(raw)
-    dest.write_text("\n".join(collected) + ("\n" if collected else ""), encoding="utf-8")
-    custom_hosts = [
-        line.split()[0]
-        for line in collected
-        if line.split() and line.split()[0] != zone and not line.split()[0].endswith("." + zone)
-    ]
-    names = _shop_custom_names_path()
-    if custom_hosts:
-        names.write_text("server_name " + " ".join(custom_hosts) + ";\n", encoding="utf-8")
-    else:
-        names.write_text("# no custom shop hosts\n", encoding="utf-8")
+            with tenant_scope(phone):
+                row = read_json("shop.json", {})
+            if isinstance(row, dict):
+                add(row)
+        from app.services import arvan_dns_service
+
+        zone = arvan_dns_service.zone()
+        if dest.is_file():
+            for line in dest.read_text(encoding="utf-8").splitlines():
+                raw = line.strip()
+                if not raw or raw.startswith("#"):
+                    continue
+                host = raw.split()[0]
+                if host == zone or host.endswith("." + zone):
+                    add_line(raw)
+        _atomic_text(dest, "\n".join(collected) + ("\n" if collected else ""))
+        custom_hosts = [
+            line.split()[0]
+            for line in collected
+            if line.split() and line.split()[0] != zone and not line.split()[0].endswith("." + zone)
+        ]
+        if custom_hosts:
+            _atomic_text(names, "server_name " + " ".join(custom_hosts) + ";\n")
+        else:
+            _atomic_text(names, "# no custom shop hosts\n")
     _reload_edge()
 
 
@@ -228,7 +248,16 @@ def _reload_edge() -> None:
     nginx = Path("/usr/sbin/nginx")
     if not nginx.is_file():
         return
-    subprocess.run(["sudo", "-n", str(nginx), "-t"], check=False, capture_output=True, timeout=8)
+    probe = subprocess.run(
+        ["sudo", "-n", str(nginx), "-t"],
+        check=False,
+        capture_output=True,
+        timeout=8,
+        text=True,
+    )
+    if probe.returncode != 0:
+        log.warning("nginx -t failed: %s", (probe.stderr or probe.stdout or "")[:400])
+        return
     subprocess.run(["sudo", "-n", str(nginx), "-s", "reload"], check=False, capture_output=True, timeout=8)
 
 
