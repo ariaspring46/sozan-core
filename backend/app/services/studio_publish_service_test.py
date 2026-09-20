@@ -156,9 +156,7 @@ class StudioPublishTests(unittest.TestCase):
         self.assertTrue(result.get("skipped"))
         self.assertIn("تأیید", result.get("message") or "")
 
-    def test_instagram_sendbox_waits_for_studio_publish(self) -> None:
-        from app.services import channel_service
-
+    def test_instagram_sendbox_requires_recipient(self) -> None:
         row = {"id": "ig", "platform": "instagram", "credentials": {"sendboxAccountId": "acc-1"}}
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "pic-image.png"
@@ -166,9 +164,6 @@ class StudioPublishTests(unittest.TestCase):
             with patch(
                 "app.services.studio_publish_service.channel_service.account_for_platform",
                 return_value=row,
-            ), patch(
-                "app.services.studio_publish_service.channel_service.unipile_account_id",
-                return_value="",
             ), patch(
                 "app.services.studio_publish_service.chat_media_service.resolve",
                 return_value=path,
@@ -182,7 +177,67 @@ class StudioPublishTests(unittest.TestCase):
                             media_kind="image",
                         )
                     )
-        self.assertEqual(str(ctx.exception), channel_service.IG_STUDIO_WAIT)
+        self.assertIn("مخاطب", str(ctx.exception))
+
+    def test_instagram_sends_dm_to_selected_recipient(self) -> None:
+        send = AsyncMock()
+        row = {"id": "ig", "platform": "instagram", "credentials": {"sendboxAccountId": "acc-1"}}
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "pic-image.png"
+            path.write_bytes(b"png")
+            with tenant_scope("09120000000"), patch(
+                "app.services.studio_publish_service.channel_service.account_for_platform",
+                return_value=row,
+            ), patch(
+                "app.services.studio_publish_service.chat_media_service.resolve",
+                return_value=path,
+            ), patch(
+                "app.services.studio_publish_service.public_media_service.public_url",
+                return_value="https://api.sozan-core.ir/public-media/x",
+            ), patch(
+                "app.services.studio_publish_service.sendbox_service.send_message",
+                new=send,
+            ):
+                result = asyncio.run(
+                    studio_publish_service.publish(
+                        platform="instagram",
+                        caption="کپشن اینستا",
+                        media_name=path.name,
+                        media_kind="image",
+                        recipient_id="cust-9",
+                    )
+                )
+        send.assert_awaited_once()
+        self.assertEqual(send.await_args.kwargs["recipient_id"], "cust-9")
+        self.assertEqual(send.await_args.kwargs["account_id"], "acc-1")
+        self.assertTrue(result.get("ok"))
+        self.assertIn("دایرکت", result.get("message") or "")
+
+    def test_skips_duplicate_instagram_with_audience(self) -> None:
+        send = AsyncMock()
+        with patch(
+            "app.services.studio_publish_service.studio_chat_service.recently_published",
+            return_value=True,
+        ), patch(
+            "app.services.studio_publish_service.studio_chat_service.snapshot",
+            return_value={"messages": [{"id": "m1", "published": {"instagram": 1}}]},
+        ), patch(
+            "app.services.studio_publish_service.sendbox_service.send_message",
+            new=send,
+        ):
+            result = asyncio.run(
+                studio_publish_service.publish(
+                    platform="instagram",
+                    caption="سلام",
+                    media_name="x.png",
+                    media_kind="image",
+                    message_id="m1",
+                    recipient_id="cust-9",
+                )
+            )
+        self.assertTrue(result.get("skipped"))
+        self.assertIn("تأیید", result.get("message") or "")
+        send.assert_not_called()
 
     def test_public_media_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

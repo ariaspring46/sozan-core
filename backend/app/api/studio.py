@@ -20,6 +20,7 @@ class PublishIn(BaseModel):
     mediaName: str = Field(min_length=1, max_length=200)
     mediaKind: str = Field(min_length=1, max_length=16)
     force: bool = False
+    recipientId: str = Field(default="", max_length=80)
 
 
 class CaptionIn(BaseModel):
@@ -39,6 +40,15 @@ def _idempotency_key(request: Request) -> str:
 async def get_studio(_user=Depends(require_permission("campaigns:read"))):
     snap = studio_chat_service.snapshot()
     return {**snap, "targets": channel_service.publish_targets()}
+
+
+@router.get("/audience")
+async def studio_audience(
+    q: str = "",
+    platform: str = "instagram",
+    _user=Depends(require_permission("campaigns:read")),
+):
+    return studio_publish_service.list_audience(platform=platform, q=q)
 
 
 @router.post("/chat")
@@ -72,6 +82,7 @@ async def studio_publish(request: Request, body: PublishIn, _user=Depends(requir
             message_id=body.messageId,
             campaign_id=body.campaignId,
             force=body.force,
+            recipient_id=body.recipientId,
         )
     except HTTPException:
         raise

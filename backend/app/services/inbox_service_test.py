@@ -315,6 +315,24 @@ class InboxModeTests(unittest.TestCase):
         self.assertEqual(len(unread["threads"]), 2)
         self.assertEqual(len(ig["threads"]), 1)
         self.assertEqual(q["threads"][0]["sender"], "سارا")
+
+    def test_publish_audience_recent_and_search(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value=self._plan()):
+            inbox_service.inbound(
+                platform="telegram", sender="علی", text="سلام", sender_id="1", chat_id="9", external_id="9:l1"
+            )
+            inbox_service.inbound(
+                platform="instagram", sender="سارا", text="قیمت", sender_id="ig-2", chat_id="ig-2", external_id="ig:1"
+            )
+            recent = inbox_service.list_publish_audience(platform="instagram")
+            found = inbox_service.list_publish_audience(platform="instagram", q="سارا")
+            empty = inbox_service.list_publish_audience(platform="instagram", q="نیست")
+        self.assertEqual(len(recent), 1)
+        self.assertEqual(recent[0]["recipientId"], "ig-2")
+        self.assertEqual(found[0]["sender"], "سارا")
+        self.assertEqual(empty, [])
     def test_echo_of_recent_outbound_skips_auto_reply(self) -> None:
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_service.emit_later"

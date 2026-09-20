@@ -188,8 +188,8 @@ class SendboxServiceTests(unittest.TestCase):
                 targets = channel_service.publish_targets()
         ig = next(row for row in targets if row["platform"] == "instagram")
         self.assertTrue(ig["connected"])
-        self.assertFalse(ig["ready"])
-        self.assertIn("استودیو", ig["hint"])
+        self.assertTrue(ig["ready"])
+        self.assertIn("مخاطب", ig["hint"])
 
     def test_publish_targets_unipile_ready(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -203,8 +203,8 @@ class SendboxServiceTests(unittest.TestCase):
                 targets = channel_service.publish_targets()
         ig = next(row for row in targets if row["platform"] == "instagram")
         self.assertTrue(ig["connected"])
-        self.assertFalse(ig["ready"])
-        self.assertIn("استودیو", ig["hint"])
+        self.assertTrue(ig["ready"])
+        self.assertIn("مخاطب", ig["hint"])
 
     def test_upsert_merges_unipile_onto_sendbox_row(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

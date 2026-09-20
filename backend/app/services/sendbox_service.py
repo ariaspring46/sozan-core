@@ -358,21 +358,35 @@ async def claim_account(*, account_id: str, phone: str, handle: str = "") -> dic
         return {**channel_service.list_accounts(), "account": account}
 
 
-async def send_message(*, account_id: str, recipient_id: str, text: str) -> None:
+async def send_message(
+    *,
+    account_id: str,
+    recipient_id: str,
+    text: str,
+    media_url: str = "",
+    media_kind: str = "",
+) -> None:
     ident = str(account_id or "").strip()
     target = str(recipient_id or "").strip()
     body = text.strip()
+    media = str(media_url or "").strip()
     if not ident:
         raise ValueError("حساب اینستاگرام BoxAPI وصل نیست.")
     if not target:
         raise ValueError("شناسه مشتری اینستاگرام نیست. اول پیام مشتری را همگام کن.")
     if not body:
+        body = "ویدیو استودیو" if str(media_kind or "").lower() == "video" else "تصویر استودیو" if media else ""
+    if not body:
         raise ValueError("متن پاسخ خالی است")
+    payload: dict = {"account_id": ident, "recipient_id": target, "message": body[:1000]}
+    if media:
+        title = "دیدن ویدیو" if str(media_kind or "").lower() == "video" else "دیدن تصویر"
+        payload["buttons"] = [{"type": "web_url", "title": title, "url": media[:2000]}]
     async with _client() as client:
         response = await client.post(
             f"{base_url()}/service/actions/send_message",
             headers=_headers(),
-            json={"account_id": ident, "recipient_id": target, "message": body[:1000]},
+            json=payload,
         )
     if response.status_code in {401, 403}:
         raise ValueError(channel_service.IG_RECONNECT)

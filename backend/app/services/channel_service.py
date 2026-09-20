@@ -161,8 +161,8 @@ def publish_targets() -> list[dict]:
                     pub.get("error") or "این حساب وصل نیست."
                 )
             else:
-                ready = False
-                hint = IG_STUDIO_WAIT
+                ready = True
+                hint = "قبل از ارسال، مخاطب دایرکت را انتخاب کن."
         elif not ready:
             hint = str(pub.get("error") or "این حساب وصل نیست.")
         rows.append({**pub, "ready": ready, "hint": hint})

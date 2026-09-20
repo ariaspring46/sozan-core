@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { api } from "@/lib/api";
 
 export type StudioAttachment = { kind: string; name: string; source?: string };
 export type StudioCaptions = { instagram?: string; telegram?: string; whatsapp?: string };
@@ -21,6 +22,15 @@ export type PublishPayload = {
   mediaName: string;
   mediaKind: string;
   force?: boolean;
+  recipientId?: string;
+};
+
+type AudienceRow = {
+  id: string;
+  sender: string;
+  recipientId: string;
+  lastText: string;
+  pending?: boolean;
 };
 
 const CHANNELS = [
@@ -78,6 +88,9 @@ export function StudioPublishCard({
   const [savedHint, setSavedHint] = useState(false);
   const [mediaByChannel, setMediaByChannel] = useState<Record<string, string>>({});
   const [sentAt, setSentAt] = useState<Record<string, number>>(published || {});
+  const [audienceQ, setAudienceQ] = useState("");
+  const [audience, setAudience] = useState<AudienceRow[]>([]);
+  const [picked, setPicked] = useState<AudienceRow | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const primed = useRef(false);
 
@@ -112,6 +125,19 @@ export function StudioPublishCard({
     return () => window.clearTimeout(timer);
   }, [drafts.instagram, drafts.telegram, drafts.whatsapp, messageId, onSaveCaptions]);
 
+  const igReady = Boolean(targets.find((row) => row.platform === "instagram" && row.ready));
+
+  useEffect(() => {
+    if (!igReady) return;
+    const timer = window.setTimeout(() => {
+      const query = audienceQ.trim() ? `?q=${encodeURIComponent(audienceQ.trim())}` : "";
+      void api<{ rows?: AudienceRow[] }>(`/studio/audience${query}`)
+        .then((data) => setAudience(data.rows || []))
+        .catch(() => setAudience([]));
+    }, audienceQ ? 280 : 0);
+    return () => window.clearTimeout(timer);
+  }, [igReady, audienceQ]);
+
   const byPlatform = useMemo(() => {
     const map: Record<string, PublishTarget> = {};
     for (const row of targets) map[row.platform] = row;
@@ -123,6 +149,10 @@ export function StudioPublishCard({
   async function send(platform: (typeof CHANNELS)[number]["platform"], force = false) {
     const spec = CHANNELS.find((item) => item.platform === platform);
     if (!spec) return;
+    if (platform === "instagram" && !picked?.recipientId) {
+      setError("مخاطب دایرکت را انتخاب کن.");
+      return;
+    }
     const sentAlready = Boolean(sentAt[platform] || published?.[platform]);
     if (sentAlready && !force) {
       setConfirmFor(platform);
@@ -143,6 +173,7 @@ export function StudioPublishCard({
         mediaName: chosen.name,
         mediaKind: chosen.kind,
         force: sentAlready,
+        recipientId: platform === "instagram" ? picked?.recipientId : undefined,
       });
       if (result?.skipped) {
         setNotice(result.message || "به‌تازگی ارسال شده؛ برای ارسال دوباره تأیید کن");
@@ -245,6 +276,45 @@ export function StudioPublishCard({
                 ))}
               </div>
             ) : null}
+            {channel.platform === "instagram" && target?.ready ? (
+              <div className="space-y-2 rounded-xl border border-line/70 bg-paper/70 p-2">
+                <label className="block text-[11px] text-muted">مخاطب دایرکت</label>
+                <input
+                  className="w-full rounded-lg border border-line/80 bg-canvas px-2.5 py-1.5 text-xs outline-none"
+                  value={audienceQ}
+                  onChange={(event) => setAudienceQ(event.target.value)}
+                  placeholder="جستجو در اخیر و پیش‌نویس"
+                />
+                {picked ? (
+                  <p className="text-[11px] text-signal">
+                    انتخاب‌شده: {picked.sender}
+                    {picked.pending ? " · پیش‌نویس" : ""}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted">از اخیر یک نفر را انتخاب کن؛ بدون مخاطب ارسال نمی‌شود.</p>
+                )}
+                <div className="max-h-28 space-y-1 overflow-y-auto">
+                  {audience.length === 0 ? (
+                    <p className="text-[11px] text-muted">در صندوق مخاطب اینستاگرام نیست. اول دایرکت مشتری را همگام کن.</p>
+                  ) : (
+                    audience.map((row) => (
+                      <button
+                        key={row.id}
+                        type="button"
+                        className={`block w-full rounded-lg px-2 py-1.5 text-right text-[11px] ${
+                          picked?.recipientId === row.recipientId ? "bg-signal/15 text-warm" : "text-muted hover:bg-canvas"
+                        }`}
+                        onClick={() => setPicked(row)}
+                      >
+                        <span className="font-medium text-ink">{row.sender}</span>
+                        {row.pending ? <span className="ms-1 text-warm">پیش‌نویس</span> : null}
+                        {row.lastText ? <span className="mt-0.5 block truncate">{row.lastText}</span> : null}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            ) : null}
             <Button
               type="button"
               variant={sent ? "primary" : "ghost"}
@@ -253,7 +323,7 @@ export function StudioPublishCard({
                   ? "h-auto w-full whitespace-nowrap py-2 text-xs bg-signal text-onAccent hover:bg-signal"
                   : "h-auto w-full whitespace-nowrap py-2 text-xs"
               }
-              disabled={Boolean(busy) || !target?.ready}
+              disabled={Boolean(busy) || !target?.ready || (channel.platform === "instagram" && !picked?.recipientId)}
               onClick={() => void send(channel.platform, confirmFor === channel.platform)}
             >
               {busy === channel.platform
@@ -262,7 +332,13 @@ export function StudioPublishCard({
                   ? "مطمئنی؟ دوباره بفرست"
                   : sent
                     ? "ارسال دوباره"
-                    : `ارسال به ${channel.label}`}
+                    : channel.platform === "telegram"
+                      ? "ارسال به کانال تلگرام"
+                      : channel.platform === "instagram"
+                        ? picked
+                          ? `ارسال دایرکت به ${picked.sender}`
+                          : "ارسال دایرکت"
+                        : `ارسال به ${channel.label}`}
             </Button>
             {!target ? <p className="text-[11px] text-muted">حساب {channel.label} وصل نیست.</p> : null}
             {target && !target.ready ? <p className="text-[11px] text-warm">{target.hint}</p> : null}

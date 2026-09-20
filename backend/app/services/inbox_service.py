@@ -201,6 +201,46 @@ def list_threads(*, q: str = "", platform: str = "", status_filter: str = "") ->
     return {**_mode_meta(), "threads": out}
 
 
+def list_publish_audience(*, platform: str, q: str = "", limit: int = 24) -> list[dict]:
+    wanted = (platform or "").strip().lower()
+    needle = (q or "").strip()
+    cap = max(1, min(int(limit or 24), 50))
+    out: list[dict] = []
+    threads = sorted(_state()["threads"], key=lambda row: int(row.get("updatedAt") or 0), reverse=True)
+    for row in threads:
+        if not isinstance(row, dict):
+            continue
+        if wanted and str(row.get("platform") or "") != wanted:
+            continue
+        recipient = str(row.get("senderId") or row.get("chatId") or "").strip()
+        if not recipient:
+            continue
+        sender = str(row.get("sender") or "مشتری").strip() or "مشتری"
+        messages = row.get("messages") if isinstance(row.get("messages"), list) else []
+        last_row = messages[-1] if messages and isinstance(messages[-1], dict) else {}
+        last = str(last_row.get("text") or "")
+        pending = any(
+            str(msg.get("kind") or "") == "draft" or msg.get("status") == "failed"
+            for msg in (row.get("messages") or [])
+            if isinstance(msg, dict)
+        )
+        if needle and needle not in f"{sender} {last} {recipient}":
+            continue
+        out.append(
+            {
+                "id": row.get("id"),
+                "sender": sender,
+                "recipientId": recipient,
+                "lastText": last[:80],
+                "pending": pending,
+                "updatedAt": int(row.get("updatedAt") or 0),
+            }
+        )
+        if len(out) >= cap:
+            break
+    return out
+
+
 def unread_count() -> dict:
     return {"count": sum(_unread_count(row) for row in _state()["threads"])}
 

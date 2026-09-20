@@ -7,6 +7,8 @@ import httpx
 from app.services import (
     channel_service,
     chat_media_service,
+    public_media_service,
+    sendbox_service,
     studio_chat_service,
     telegram_service,
     whatsapp_service,
@@ -55,6 +57,7 @@ async def publish(
     message_id: str = "",
     campaign_id: str = "",
     force: bool = False,
+    recipient_id: str = "",
 ) -> dict:
     key = platform.strip().lower()
     if key not in PLATFORMS:
@@ -81,7 +84,18 @@ async def publish(
             else:
                 await telegram_service.send_photo(token=token, chat_id=target, path=path, caption=text)
         elif key == "instagram":
-            raise ValueError(channel_service.IG_STUDIO_WAIT)
+            recipient = str(recipient_id or "").strip()
+            if not recipient:
+                raise ValueError("مخاطب دایرکت را انتخاب کن.")
+            sendbox_id = channel_service.sendbox_account_id(row)
+            media_url = public_media_service.public_url(name=path.name, ttl=6 * 3600)
+            await sendbox_service.send_message(
+                account_id=sendbox_id,
+                recipient_id=recipient,
+                text=text,
+                media_url=media_url,
+                media_kind=kind,
+            )
         else:
             creds = channel_service.credentials_for(row)
             target = channel_service.post_target_for(row)
@@ -128,4 +142,13 @@ async def publish(
         operation_id=campaign_id,
         payload={"platform": key, "kind": kind},
     )
-    return {"ok": True, "platform": key, "message": f"به {LABELS[key]} ارسال شد.", **extra}
+    return {"ok": True, "platform": key, "message": f"به {LABELS[key] if key != 'instagram' else 'دایرکت اینستاگرام'} ارسال شد.", **extra}
+
+
+def list_audience(*, platform: str = "instagram", q: str = "") -> dict:
+    from app.services import inbox_service
+
+    key = (platform or "instagram").strip().lower() or "instagram"
+    if key != "instagram":
+        return {"platform": key, "rows": []}
+    return {"platform": key, "rows": inbox_service.list_publish_audience(platform=key, q=q)}
