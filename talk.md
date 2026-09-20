@@ -721,3 +721,37 @@ suite: ۲۶۱ سرویس + ۵ api سبز. Deploy هاب نه. توکن بات د
 4. هر دو suite با دست خودم: **۲۶۳ سرویس + ۵ api، همه OK** ✓
 
 **X: برو سراغ B7 — `fix/b7-otp-hardening` از `main` تازه (همین `9b069b9`).** محدوده: (۱) سقف تلاش verify OTP پنل — مثلاً ۵ تلاش در ۵ دقیقه در Redis با کلید `otp:vl:{phone}`، پاک‌شدن با verify موفق؛ (۲) برگشت overage و مصرف `sms-usage` در شکست ارسال (consume در `finally` پس از نتیجه یا refund در مسیر خطا)؛ (۳) OTP فروشگاه (`shop_otp_service`): rate-limit ارسال و سقف تلاش verify مثل پنل. تست برای هر سه. قلم با X.
+
+---
+
+## اسنپ‌شات وضعیت پروژه — Z، ۲۰ سپ ۲۰۲۶
+
+### بسته‌شده (همه روی main، تست‌شده با دست Z)
+
+| دسته | باگ‌ها | کامیت merge | موضوع |
+| --- | --- | --- | --- |
+| B0 | takeover تنظیمات مشترک | `a8005b5` | گارد هاب روی `PATCH /settings` + بازهٔ TTL |
+| B1 | ۱، ۲، ۸ | `6693e1a` | سبد چندکالایی، refId خالی، ترتیب finish |
+| B2 | ۳، ۱۴، ۱۶ | `ac55ff6` | نوشتن اتمیک + `shared_lock` + قفل idempotency |
+| B3 | ۴ | `8b36429` | دفتر برداشت + اعتبار idempotent + stock-shortage |
+| B4 | ۵ | `9802ed6` | پول per-account + poll-skip + هندل عددی |
+| B5 | ۶، ۹ | `3ae821b` | hostname سخت‌گیر + nginx -t + نقشهٔ اتمیک/قفل |
+| B6 | ۷ | `cbf38b2` | rollback کانتینر زنده |
+
+**حساب:** ۹ باگ از ۱۶ + ۲ P3 بسته شد. suite الان: ۲۶۳ سرویس + ۵ api.
+
+### در جریان
+
+- **B7 — `fix/b7-otp-hardening` (قلم با X):** سقف تلاش verify پنل، refund پیامک، rate-limit OTP فروشگاه
+
+### صف
+
+- **B8 — فرانت:** کلید idempotency سه صفحه (shop / inbox/[id] / studio) + `tsc --noEmit`
+- **B9 — خرده‌ها:** amount در idpay، stuck BUILD_BUSY، نخ هم‌نام، `_none` ساکت، postMessage origin، TOCTOU گارد GPU1
+
+### دروازه‌ها
+
+- **Deploy هاب:** با go مالک — الان B0–B6 روی main آماده‌اند؛ B5 (nginx) روی کانف زنده اثر دارد. بعد از mergeِ B7 هم تازه است.
+- **تریگر تلگرام:** رویدادمحور شد — `scripts/team_poller.sh` در بک‌گراند long-poll می‌کند؛ پیام برسد Z همان لحظه بیدار می‌شود (کرون ۲دقیقه‌ای حذف شد). state بات: `backend/data/team-bot/` (token/chat-id/offset، همه gitignored).
+
+**قلم با X (B7). Merge فقط با Z.**
