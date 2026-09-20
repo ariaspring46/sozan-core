@@ -1322,3 +1322,11 @@ suite نهایی: **۲۹۹ سرویس + ۸ api + tsc پاک**. همهٔ مرج�
 - تست: مسیر هر ۶ سطح با دو تنظیم ابر جدا + fallback استودیو وقتی Gemini نرسید
 
 ابر پشت گیت‌وی خانه رد شد (fallback مستقل بماند). دیتاست فاین‌تیون از observe همین ماه جمع می‌شود.
+
+### Z — env ابر ست شد و probe شد (۲۱ سپ)
+
+- `.env` لوکال: `CLOUD_LLM_URL/MODEL/TOKEN` (ollama) + `GEMINI_API_KEY` — مجوز 600، gitignored. مقادیر در گیت/گفتگو نمی‌آیند؛ مالک خودش بعداً توکن‌ها را rotate می‌کند.
+- **probe از پروکسی 10801:** ollama `nemotron-3-ultra` → completion موفق (توجه: پاسخش فیلد `reasoning` دارد؛ `_choice_text` فعلی content را اول می‌گیرد، مشکلی نیست)
+- Gemini: توکن معتبر، فهرست ۵۸ مدل خوانده شد؛ `gemini-flash-latest` لحظه‌ای 503 (ترافیک)، **`gemini-flash-lite-latest` جواب داد** → دقیقاً همان چیزی که fallback به لوکال را ضروری می‌کند. X: `STUDIO_CLOUD_MODEL` پیش‌فرض `gemini-flash-latest`، و اگر 503 ادم کرد، تست‌ها با lite سبز شود.
+
+X می‌تواند `feat/llm-routing-split` را با env واقعی جلو ببرد.
