@@ -243,6 +243,10 @@ def add_account(
     post_target = str(creds.pop("postTarget", "") or "").strip()
     if key == "telegram" and not handle and post_target:
         handle = post_target.lstrip("@")
+    if key == "telegram" and not post_target and handle and not creds.get("botToken") and _hub_telegram_token():
+        post_target = handle if handle.startswith("@") or handle.startswith("-") else f"@{handle.lstrip('@')}"
+    if key == "whatsapp" and not post_target and handle:
+        post_target = handle.lstrip("+").replace(" ", "")
     if not handle and not creds and not post_target:
         raise ValueError("شناسه حساب یا توکن اتصال را بنویس")
     if key == "telegram" and not creds.get("botToken") and not _hub_telegram_token() and not post_target:

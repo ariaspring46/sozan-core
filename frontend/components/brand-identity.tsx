@@ -38,7 +38,7 @@ function LogoMotionPreview({ bust }: { bust: number }) {
       muted
       loop
     />
-  )
+  );
 }
 
 export function BrandIdentitySection() {

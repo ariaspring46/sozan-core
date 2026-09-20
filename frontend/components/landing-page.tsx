@@ -14,7 +14,7 @@ const CHAPTERS = [
     id: "studio",
     kicker: "استودیو",
     title: "پست را از همان چت بفرست.",
-    body: "کپشن اینستاگرام، تلگرام و واتساپ در همان چت نوشته می‌شود؛ عکس و فیلم را هم همان‌جا می‌بینی. حساب‌ها را که وصل کنی، پست را می‌فرستی: تلگرام در کانالت، اینستاگرام روی پیجت (نه دایرکت)، واتساپ به همان شماره‌ای که گذاشته‌ای.",
+    body: "کپشن اینستاگرام، تلگرام و واتساپ در همان چت نوشته می‌شود؛ عکس و فیلم را هم همان‌جا می‌بینی. حساب‌ها را که وصل کنی، پست را می‌فرستی: تلگرام در کانالت، اینستاگرام دایرکت مخاطب انتخاب‌شده، واتساپ به همان شماره‌ای که گذاشته‌ای.",
   },
   {
     n: "۰۳",
@@ -259,8 +259,7 @@ function ChapterVisual({ id }: { id: string }) {
 }
 
 export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
-  const login = `${panelOrigin}/login`;
-  const start = panelOrigin ? `${panelOrigin}/login` : "/login";
+  const start = panelOrigin ? `${panelOrigin.replace(/\/$/, "")}/login` : "/login";
 
   return (
     <div className="sozan-landing min-h-screen overflow-x-hidden bg-canvas text-ink">
@@ -634,7 +633,7 @@ export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
               <p className="landing-lede mt-5 text-base leading-8">فقط با شماره موبایل وارد شو. پلن رایگان برای ساخت اولین فروشگاه آماده است.</p>
             </div>
             <a
-              href={login || start}
+              href={start}
               className="inline-flex h-12 items-center justify-center rounded-full bg-accent px-8 text-sm text-onAccent hover:bg-warm"
             >
               رایگان شروع کن

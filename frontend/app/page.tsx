@@ -11,9 +11,31 @@ export async function generateMetadata(): Promise<Metadata> {
   if (isPanelHost(host)) {
     return { title: "سوزان" };
   }
+  const origin = "https://sozan-core.ir";
+  const title = "سوزان — بگو، بساز، بفروش";
+  const description =
+    "سوزان فروشگاهت را از دل کانال‌هایت می‌سازد، محتوا را می‌نویسد و جواب پیام‌هایت را در همه‌ی شبکه‌های اجتماعی می‌دهد.";
+  const image = `${origin}/sozan-mark.png`;
   return {
-    title: "سوزان — بگو، بساز، بفروش",
-    description: "سوزان فروشگاهت را از دل کانال‌هایت می‌سازد، محتوا را می‌نویسد و جواب پیام‌هایت را در همه‌ی شبکه‌های اجتماعی می‌دهد.",
+    metadataBase: new URL(origin),
+    title,
+    description,
+    alternates: { canonical: origin },
+    openGraph: {
+      title,
+      description,
+      url: origin,
+      siteName: "سوزان",
+      locale: "fa_IR",
+      type: "website",
+      images: [{ url: image, width: 512, height: 512, alt: "سوزان" }],
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: [image],
+    },
   };
 }
 
