@@ -142,6 +142,26 @@ class WalletPayTests(unittest.TestCase):
                         wallet_service.consume_sms()
         self.assertIn("سقف پیامک", str(ctx.exception))
 
+    def test_refund_sms_restores_overage_and_usage(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                with (
+                    patch.object(plan_service, "current", return_value={"smsQuota": 0}),
+                    patch.object(wallet_service.env, "sms_overage_toman", 200),
+                ):
+                    wallet_service.credit_sale(
+                        amount=1000, commission=0, order_id="seed", note="", owner="hub"
+                    )
+                    charged = wallet_service.consume_sms()
+                    self.assertEqual(charged["charged"], 200)
+                    self.assertEqual(wallet_service.get()["available"], 800)
+                    self.assertEqual(wallet_service.sms_usage()["count"], 1)
+                    wallet_service.refund_sms(charged["charged"])
+                    self.assertEqual(wallet_service.get()["available"], 1000)
+                    self.assertEqual(wallet_service.sms_usage()["count"], 0)
+                    kinds = [row["kind"] for row in wallet_service.ledger()]
+        self.assertEqual(kinds.count("sms"), 2)
+
     def test_attach_pay_link_appends_url(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):

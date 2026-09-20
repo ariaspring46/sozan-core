@@ -9,9 +9,14 @@ from app.config import settings
 from app.phone import normalize_phone
 from app.redis_client import redis_client
 from app.services import sms_service, wallet_service
+from app.services.auth_service import OTP_SEND_LIMIT, OTP_SEND_WINDOW, OTP_VERIFY_LIMIT, OTP_VERIFY_WINDOW
 from app.services.pay_service import find_tenant_by_slug
 from app.services.settings_service import get_settings
 from app.state_store import tenant_scope
+
+
+class OtpLimitError(ValueError):
+    pass
 
 
 def _sign(body: str) -> str:
@@ -29,6 +34,12 @@ async def send(*, slug: str, phone: str) -> dict:
     if not tenant:
         raise ValueError("فروشگاه پیدا نشد")
     receptor = normalize_phone(phone)
+    rl_key = f"shop-otp:rl:{slug}:{receptor}"
+    hits = await redis_client.incr(rl_key)
+    if hits == 1:
+        await redis_client.expire(rl_key, OTP_SEND_WINDOW)
+    if hits > OTP_SEND_LIMIT:
+        raise OtpLimitError("تعداد درخواست بیش از حد است")
     with tenant_scope(tenant):
         overlay = get_settings()
         mock = overlay.get("mockSms")
@@ -44,7 +55,8 @@ async def send(*, slug: str, phone: str) -> dict:
             payload["dev_code"] = code
             payload["loginMode"] = "mock"
             return payload
-        wallet_service.consume_sms()
+        consumed = wallet_service.consume_sms()
+        charged = int(consumed.get("charged") or 0)
         await redis_client.setex(f"shop-otp:{slug}:{receptor}", ttl, code)
         sms = sms_service.resolve_sms(overlay)
         try:
@@ -57,6 +69,7 @@ async def send(*, slug: str, phone: str) -> dict:
                 code=code,
             )
         except Exception:
+            wallet_service.refund_sms(charged)
             await redis_client.delete(f"shop-otp:{slug}:{receptor}")
             raise
         payload["loginMode"] = "sms"
@@ -67,8 +80,15 @@ async def verify(*, slug: str, phone: str, code: str) -> dict:
     if not find_tenant_by_slug(slug):
         raise ValueError("فروشگاه پیدا نشد")
     receptor = normalize_phone(phone)
+    vl_key = f"shop-otp:vl:{slug}:{receptor}"
+    hits = await redis_client.incr(vl_key)
+    if hits == 1:
+        await redis_client.expire(vl_key, OTP_VERIFY_WINDOW)
+    if hits > OTP_VERIFY_LIMIT:
+        raise OtpLimitError("تعداد تلاش بیش از حد است")
     stored = await redis_client.get(f"shop-otp:{slug}:{receptor}")
     if stored is None or stored != code.strip():
         raise ValueError("کد یک‌بارمصرف نادرست است")
     await redis_client.delete(f"shop-otp:{slug}:{receptor}")
+    await redis_client.delete(vl_key)
     return {"ok": True, "token": mint_token(slug=slug, phone=receptor), "role": "shopper"}

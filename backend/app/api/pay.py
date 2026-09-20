@@ -78,6 +78,8 @@ async def shop_otp_send(body: ShopOtpSendIn):
 
     try:
         return await shop_otp_service.send(slug=body.slug, phone=body.phone)
+    except shop_otp_service.OtpLimitError as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
@@ -88,6 +90,8 @@ async def shop_otp_verify(body: ShopOtpVerifyIn):
 
     try:
         return await shop_otp_service.verify(slug=body.slug, phone=body.phone, code=body.code)
+    except shop_otp_service.OtpLimitError as exc:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 

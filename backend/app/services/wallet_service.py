@@ -159,6 +159,22 @@ def consume_sms() -> dict:
         return {"count": usage["count"], "quota": quota, "charged": charged}
 
 
+def refund_sms(charged: int = 0) -> dict:
+    charged = max(0, int(charged or 0))
+    with tenant_file_lock("wallet"):
+        usage = sms_usage()
+        count = max(0, int(usage["count"]) - 1)
+        usage["count"] = count
+        usage["ym"] = sms_month()
+        write_json("sms-usage.json", usage)
+        if charged > 0:
+            wallet = get()
+            wallet["available"] = int(wallet["available"]) + charged
+            _save(wallet)
+            _append("sms", charged, note="برگشت پیامک ارسال‌نشده")
+        return {"count": count, "refunded": charged}
+
+
 def request_withdraw(*, amount: int, iban: str, name: str = "") -> dict:
     amount = int(amount)
     if amount <= 0:

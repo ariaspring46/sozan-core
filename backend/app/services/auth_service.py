@@ -16,6 +16,10 @@ from app.state_store import tenant_scope
 
 # Resend keeps the same code while at least this many seconds remain on it.
 OTP_REUSE_MIN_TTL = 60
+OTP_SEND_LIMIT = 5
+OTP_SEND_WINDOW = 900
+OTP_VERIFY_LIMIT = 5
+OTP_VERIFY_WINDOW = 300
 
 
 class AuthService:
@@ -37,8 +41,8 @@ class AuthService:
         rl_key = f"otp:rl:{phone}"
         hits = await redis_client.incr(rl_key)
         if hits == 1:
-            await redis_client.expire(rl_key, 900)
-        if hits > 5:
+            await redis_client.expire(rl_key, OTP_SEND_WINDOW)
+        if hits > OTP_SEND_LIMIT:
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست بیش از حد است")
         ttl = int(overlay.get("otpTtlSeconds") or settings.otp_ttl_seconds)
         code, reused = await self._current_or_new_code(phone, ttl)
@@ -55,9 +59,11 @@ class AuthService:
             if not reused:
                 await redis_client.delete(f"otp:{phone}")
 
+        charged = 0
         try:
             with tenant_scope(phone):
-                wallet_service.consume_sms()
+                consumed = wallet_service.consume_sms()
+                charged = int(consumed.get("charged") or 0)
         except ValueError as exc:
             await drop_fresh_code()
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
@@ -72,9 +78,13 @@ class AuthService:
                 code=code,
             )
         except ValueError as exc:
+            with tenant_scope(phone):
+                wallet_service.refund_sms(charged)
             await drop_fresh_code()
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
         except Exception as exc:
+            with tenant_scope(phone):
+                wallet_service.refund_sms(charged)
             await drop_fresh_code()
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ارسال پیامک به درگاه نرسید.") from exc
         return payload
@@ -99,11 +109,18 @@ class AuthService:
             phone = normalize_phone(phone_raw)
         except ValueError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+        vl_key = f"otp:vl:{phone}"
+        hits = await redis_client.incr(vl_key)
+        if hits == 1:
+            await redis_client.expire(vl_key, OTP_VERIFY_WINDOW)
+        if hits > OTP_VERIFY_LIMIT:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد تلاش بیش از حد است")
         stored = await redis_client.get(f"otp:{phone}")
         given = re.sub(r"\D", "", normalize_digits(code))
         if stored is None or not given or stored != given:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "کد یک‌بارمصرف نادرست است")
         await redis_client.delete(f"otp:{phone}")
+        await redis_client.delete(vl_key)
         user = await self.users.get_by_phone(phone)
         existed = user is not None
         if user is None:

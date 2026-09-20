@@ -31,6 +31,7 @@ class _FakeRedis:
     async def delete(self, key: str) -> None:
         self.store.pop(key, None)
         self.ttls.pop(key, None)
+        self.counters.pop(key, None)
 
     async def incr(self, key: str) -> int:
         self.counters[key] = self.counters.get(key, 0) + 1
@@ -109,6 +110,45 @@ class OtpResendTests(unittest.TestCase):
             with self.assertRaises(HTTPException):
                 asyncio.run(self.svc.send_otp("09111234567"))
         self.assertEqual(self.redis.store.get("otp:09111234567"), first)
+
+    def test_verify_blocks_after_five_failures(self) -> None:
+        self.redis.store["otp:09111234567"] = "123456"
+        for _ in range(5):
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(self.svc.verify_otp("09111234567", "000000"))
+            self.assertEqual(ctx.exception.status_code, 400)
+        with self.assertRaises(HTTPException) as ctx:
+            asyncio.run(self.svc.verify_otp("09111234567", "123456"))
+        self.assertEqual(ctx.exception.status_code, 429)
+        self.assertEqual(self.redis.store.get("otp:09111234567"), "123456")
+
+    def test_verify_success_clears_attempt_counter(self) -> None:
+        self.redis.store["otp:09111234567"] = "123456"
+        with self.assertRaises(HTTPException):
+            asyncio.run(self.svc.verify_otp("09111234567", "000000"))
+        with patch("app.services.profile_service.touch", return_value={}), patch.object(
+            auth_service, "encode_token", return_value="jwt"
+        ):
+            asyncio.run(self.svc.verify_otp("09111234567", "123456"))
+        self.assertNotIn("otp:vl:09111234567", self.redis.counters)
+
+    def test_failed_send_refunds_sms_charge(self) -> None:
+        with patch.object(auth_service, "get_settings", return_value={"mockSms": False}), patch(
+            "app.services.wallet_service.consume_sms", return_value={"charged": 200, "count": 3, "quota": 2}
+        ) as consume, patch(
+            "app.services.wallet_service.refund_sms"
+        ) as refund, patch.object(
+            auth_service.sms_service,
+            "resolve_sms",
+            return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "code"},
+        ), patch.object(
+            auth_service.sms_service, "send_otp", new=AsyncMock(side_effect=RuntimeError("gateway"))
+        ):
+            with self.assertRaises(HTTPException):
+                asyncio.run(self.svc.send_otp("09111234567"))
+        consume.assert_called_once()
+        refund.assert_called_once_with(200)
+        self.assertNotIn("otp:09111234567", self.redis.store)
 
 
 if __name__ == "__main__":
