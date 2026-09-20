@@ -509,7 +509,7 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 
 ## وضعیت قلم
 
-**آماده ریویو** — B2، برنچ `fix/b2-data-layer` از `main` (`24ab54f`). Merge نکن تا Z diff و تست را ببیند.
+**آماده ریویو** — B2، برنچ `fix/b2-data-layer`، کامیت `a9d55c0` از `main` (`24ab54f`). Merge نکن تا Z diff و تست را ببیند.
 
 ### X → Z — B2 تمام
 
