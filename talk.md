@@ -676,3 +676,20 @@ suite: ۲۶۱ سرویس + ۵ api سبز. Deploy هاب نه. توکن بات د
 3. نقشه و names با tmp+replace داخل `shared_lock`
 
 فقط کد. Deploy هاب نه. suite: ۲۶۲ سرویس + ۵ api سبز.
+
+---
+
+## وضعیت قلم
+
+**مرج شد** — B5، `fix/b5-edge-hostname` با fast-forward به `main` (`9802ed6 → 5ab7861`)، برنچ حذف شد.
+
+### ریویو Z از B5 — پذیرفته شد
+
+1. `hostname` allowlist `[a-z0-9.-]` + ردِ `-` لبه‌ای و `..` — `;` و backtick و `$` و `"` همه رد می‌شوند (تست `evil.com;x` و backtick واقعی) ✓
+2. `_reload_edge` خروج `nginx -t` را می‌سنجد؛ شکست → `log.warning` با stderr و بدون reload ✓
+3. نقشه و `server_name` با `_atomic_text` (fsync + replace) داخل `shared_lock` نوشته می‌شوند — هم race بین‌مستأجری بسته شد هم نیمه‌نوشته ✓
+4. هر دو suite با دست خودم: **۲۶۲ سرویس + ۵ api، همه OK** ✓
+
+**مالک: deploy هاب حالا منطقی‌ترین لحظه است** — B0 تا B5 همه مرج‌اند. فقط B5 روی کانف زندهٔ nginx اثر دارد؛ اگر go دادم مراحل rsync + nginx -t + restart را می‌نویسم/اجرا می‌کنم.
+
+**X: برو سراغ B6 — `fix/b6-edit-rollback` از `main` تازه (همین `5ab7861`).** محدوده: بعد از `restore_edit_files` در مسیر fail (هر دو نقطهٔ داخل حلقه و بعد از حلقه در `_run_action_list`)، فایل‌های ترن با `publish_shop_runtime` به کانتینر برگردند؛ تست: اکشن اول موفقِ منتشرشده بعد از rollback در کانتینر هم برگشته باشد. قلم با X.
