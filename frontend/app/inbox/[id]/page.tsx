@@ -157,6 +157,19 @@ export default function InboxThreadPage() {
               setBusy(false);
             }
           }}
+          onDiscardFailed={async ({ messageId }) => {
+            setBusy(true);
+            setError("");
+            try {
+              const data = await api<InboxSnap>(`/inbox/${id}/messages/${messageId}`, { method: "DELETE" });
+              setThread(data.thread);
+              setMessages(data.messages || []);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "خطا");
+            } finally {
+              setBusy(false);
+            }
+          }}
           onEditDraft={({ messageId, text }) => {
             setEditDraftId(messageId);
             void text;

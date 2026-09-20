@@ -73,6 +73,7 @@ export function ChatThread({
   onPublish,
   onRegenerate,
   onApproveDraft,
+  onDiscardFailed,
   onSaveCaptions,
   onEditDraft,
   showTime = false,
@@ -91,6 +92,7 @@ export function ChatThread({
   onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>;
   onRegenerate?: (payload: { messageId: string; campaignId?: string; part: "image" | "caption"; file?: File }) => Promise<void>;
   onApproveDraft?: (payload: { messageId: string; text: string }) => Promise<void>;
+  onDiscardFailed?: (payload: { messageId: string }) => Promise<void>;
   onSaveCaptions?: (payload: { messageId: string; captions: StudioCaptions }) => void | Promise<void>;
   onEditDraft?: (payload: { messageId: string; text: string }) => void;
   sanitize?: boolean;
@@ -277,16 +279,29 @@ export function ChatThread({
                     <p className="text-[11px] text-danger" role="alert">
                       {msg.error || "ارسال نشد"}
                     </p>
-                    {onApproveDraft ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="mt-1 h-auto py-1 text-xs"
-                        onClick={() => void onApproveDraft({ messageId: msg.id, text: msg.text })}
-                      >
-                        دوباره بفرست
-                      </Button>
-                    ) : null}
+                    <div className="mt-1 flex gap-2">
+                      {onApproveDraft ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-auto py-1 text-xs"
+                          onClick={() => void onApproveDraft({ messageId: msg.id, text: msg.text })}
+                        >
+                          دوباره بفرست
+                        </Button>
+                      ) : null}
+                      {onDiscardFailed ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-auto py-1 text-xs"
+                          disabled={busy}
+                          onClick={() => void onDiscardFailed({ messageId: msg.id })}
+                        >
+                          حذف
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
                 {msg.compose?.status === "running" ? (
