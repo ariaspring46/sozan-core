@@ -545,10 +545,24 @@ def _job_is_stale(job: dict | None) -> bool:
     return age > JOB_STALE_SECONDS
 
 
+def _busy_started_at(shop: dict) -> float:
+    try:
+        return float(shop.get("buildAt") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _fail_stale_job(shop: dict, job: dict) -> dict:
     shop["jobId"] = str(job.get("id") or shop.get("jobId") or "")
     shop["status"] = "failed"
     shop["error"] = _operator_error(str(job.get("error") or "")) or "ساخت قبلی تمام نشد. دوباره بساز."
+    return shop
+
+
+def _mark_build_started(shop: dict) -> dict:
+    shop["status"] = "running"
+    shop["buildAt"] = int(time.time())
+    shop["error"] = ""
     return shop
 
 
@@ -565,6 +579,13 @@ def _bind_live_job(shop: dict) -> dict:
         return shop
     latest = _latest_job_for_slug(slug)
     if not latest:
+        if str(shop.get("status") or "") in BUILD_BUSY:
+            started = _busy_started_at(shop)
+            if not started:
+                shop["buildAt"] = int(time.time())
+                return shop
+            if time.time() - started > JOB_STALE_SECONDS:
+                return _fail_stale_job(shop, {"id": shop.get("jobId") or ""})
         return shop
     if _job_is_stale(latest):
         return _fail_stale_job(shop, latest)
@@ -1268,13 +1289,17 @@ def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) 
     result = _run_factory(args)
     if result.get("queued") and result.get("activeJobId"):
         shop["jobId"] = str(result.get("activeJobId") or shop.get("jobId") or "")
-        shop["status"] = "running"
+        _mark_build_started(shop)
         _save_shop(shop)
         _emit_build(result, shop, rebuild=rebuild)
         return result
     if result.get("ok"):
         shop["jobId"] = result.get("jobId") or shop.get("jobId")
-        shop["status"] = result.get("status") or "running"
+        next_status = str(result.get("status") or "running")
+        if next_status in BUILD_BUSY:
+            _mark_build_started(shop)
+        else:
+            shop["status"] = next_status
         if result.get("slug"):
             shop["slug"] = result["slug"]
         if result.get("url"):

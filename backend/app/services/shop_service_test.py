@@ -551,6 +551,20 @@ class OperatorErrorTests(unittest.TestCase):
             self.assertEqual(out["status"], "failed")
             self.assertIn("تمام نشد", out.get("error") or "")
 
+    def test_bind_live_job_fails_phantom_busy_after_stale(self) -> None:
+        shop = {
+            "slug": "demo",
+            "jobId": "ghost",
+            "status": "running",
+            "buildAt": time.time() - 31 * 60,
+        }
+        with tempfile.TemporaryDirectory() as raw:
+            (Path(raw) / "jobs").mkdir()
+            with patch.object(shop_service, "_fastpath_root", return_value=Path(raw)):
+                out = shop_service._bind_live_job(shop)
+        self.assertEqual(out["status"], "failed")
+        self.assertIn("تمام نشد", out.get("error") or "")
+
 
 if __name__ == "__main__":
     unittest.main()

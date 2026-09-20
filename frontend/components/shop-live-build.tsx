@@ -311,10 +311,10 @@ function ShopLivePreview({
             <button
               type="button"
               onClick={() => onBuild()}
-              disabled={buildBusy || overlay || pendingBuild < 1}
+              disabled={buildBusy || (overlay && !failed) || (pendingBuild < 1 && !failed)}
               className={cn(
                 "shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs",
-                pendingBuild > 0 && !overlay ? "bg-accent text-onAccent" : "text-muted",
+                (pendingBuild > 0 || failed) && !(overlay && !failed) ? "bg-accent text-onAccent" : "text-muted",
               )}
             >
               بیلد
