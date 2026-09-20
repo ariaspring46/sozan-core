@@ -45,6 +45,14 @@ async def inbox_unread(_user=Depends(require_permission("campaigns:read"))):
     return inbox_service.unread_count()
 
 
+@router.post("/sync")
+async def inbox_sync(_user=Depends(require_permission("campaigns:write"))):
+    try:
+        return await inbox_service.sync_now()
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
 @router.patch("/settings")
 async def inbox_settings(body: SettingsIn, _user=Depends(require_permission("campaigns:write"))):
     try:
@@ -67,6 +75,18 @@ async def patch_inbox(thread_id: str, body: ThreadPatchIn, _user=Depends(require
         return inbox_service.patch_thread(thread_id, paused=body.paused)
     except KeyError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+
+
+@router.delete("/{thread_id}/messages/{message_id}")
+async def delete_inbox_message(
+    thread_id: str, message_id: str, _user=Depends(require_permission("campaigns:write"))
+):
+    try:
+        return inbox_service.discard_failed_message(thread_id, message_id)
+    except KeyError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.post("/inbound")

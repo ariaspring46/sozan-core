@@ -69,6 +69,8 @@ export default function InboxPage() {
   const [planLabel, setPlanLabel] = useState("");
   const [dmSync, setDmSync] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState("");
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("");
   const [platform, setPlatform] = useState("");
@@ -142,6 +144,33 @@ export default function InboxPage() {
     }
   }
 
+  async function syncNow() {
+    mutating.current = true;
+    setSyncing(true);
+    setError("");
+    setSyncNote("");
+    try {
+      const data = await api<InboxSnap & { imported?: number; hint?: string; error?: string; ok?: boolean }>(
+        "/inbox/sync",
+        { method: "POST" },
+      );
+      setThreads(data.threads || threads);
+      setAutoReply(data.autoReplyChoice ?? data.autoReply ?? autoReply);
+      setAutoReplyMax(data.autoReplyMax || autoReplyMax);
+      setDmSync(data.dmSync !== false);
+      if (data.error) setError(data.error);
+      const imported = Number(data.imported || 0);
+      if (imported > 0) setSyncNote(`${imported.toLocaleString("fa-IR")} پیام تازه آمد.`);
+      else if (data.hint) setSyncNote(data.hint);
+      else if (!data.error) setSyncNote("پیام تازه‌ای نبود.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      mutating.current = false;
+      setSyncing(false);
+    }
+  }
+
   return (
     <AppShell
       header={
@@ -184,7 +213,17 @@ export default function InboxPage() {
           <Card>
             <p className="text-sm">همگام‌سازی دایرکت در این پلن خاموش است. پیام‌های جدید از اینستاگرام و تلگرام نمی‌آیند.</p>
           </Card>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            disabled={syncing}
+            onClick={() => void syncNow()}
+            className="min-h-11 w-full rounded-2xl border border-line/80 bg-paper px-3 text-sm text-warm disabled:opacity-50"
+          >
+            {syncing ? "در حال همگام‌سازی…" : "همگام‌سازی پیام‌ها"}
+          </button>
+        )}
+        {syncNote ? <p className="text-sm text-muted">{syncNote}</p> : null}
         <input
           className="min-h-11 w-full rounded-2xl border border-line/80 bg-paper px-3 text-[16px] outline-none"
           value={q}

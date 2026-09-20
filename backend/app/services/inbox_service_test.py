@@ -430,5 +430,62 @@ class RoutingTests(unittest.TestCase):
         self.assertEqual(route["model"], "qwen3.5-9b")
 
 
+class InboxSyncDiscardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+
+    def tearDown(self) -> None:
+        self.dir.cleanup()
+
+    def test_sync_now_pulls_telegram(self) -> None:
+        pull = AsyncMock(return_value={"ok": True, "imported": 2})
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.plan_service.current", return_value={"autoReply": "", "dmSync": True}
+        ), patch(
+            "app.services.channel_service.iter_accounts",
+            return_value=[{"platform": "telegram", "handle": "bot", "credentials": {"token": "tok"}}],
+        ), patch("app.services.channel_service.token_for", return_value="tok"), patch(
+            "app.services.telegram_service.pull_updates", new=pull
+        ):
+            out = asyncio.run(inbox_service.sync_now())
+        pull.assert_awaited()
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["imported"], 2)
+
+    def test_sync_now_plan_blocks(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.plan_service.current", return_value={"autoReply": "", "dmSync": False}
+        ):
+            with self.assertRaises(ValueError):
+                asyncio.run(inbox_service.sync_now())
+
+    def test_discard_failed_only(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": "", "dmSync": True}):
+            created = inbox_service.inbound(
+                platform="telegram", sender="علی", text="سلام", sender_id="1", chat_id="9", external_id="9:del"
+            )
+            data = inbox_service._state()
+            data["threads"][0]["messages"].append(
+                {
+                    "id": "m-fail",
+                    "role": "outbound",
+                    "kind": "failed",
+                    "status": "failed",
+                    "text": "نرفت",
+                    "at": 2,
+                }
+            )
+            inbox_service._save(data)
+            tid = created["thread"]["id"]
+            inbound_id = created["messages"][0]["id"]
+            with self.assertRaises(ValueError):
+                inbox_service.discard_failed_message(tid, inbound_id)
+            out = inbox_service.discard_failed_message(tid, "m-fail")
+        self.assertFalse(any(msg.get("id") == "m-fail" for msg in out["messages"]))
+
+
 if __name__ == "__main__":
     unittest.main()

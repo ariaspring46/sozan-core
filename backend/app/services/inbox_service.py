@@ -245,6 +245,71 @@ def unread_count() -> dict:
     return {"count": sum(_unread_count(row) for row in _state()["threads"])}
 
 
+async def sync_now() -> dict:
+    from app.services import channel_service, plan_service, telegram_service
+
+    if not plan_service.current().get("dmSync"):
+        raise ValueError("همگام‌سازی دایرکت در این پلن خاموش است.")
+    imported = 0
+    errors: list[str] = []
+    hints: list[str] = []
+    saw_telegram = False
+    saw_instagram = False
+    for row in channel_service.iter_accounts():
+        platform = str(row.get("platform") or "")
+        if platform == "telegram":
+            saw_telegram = True
+            token = channel_service.token_for(row)
+            if not token:
+                errors.append("توکن بات تلگرام نیست. از بیشتر → کانال‌ها وصل کن.")
+                continue
+            result = await telegram_service.pull_updates(token=token, handle=str(row.get("handle") or ""))
+            if result.get("ok"):
+                imported += int(result.get("imported") or 0)
+            else:
+                errors.append(str(result.get("error") or "تلگرام همگام نشد."))
+        elif platform == "instagram":
+            saw_instagram = True
+            if channel_service.sendbox_account_id(row):
+                hints.append("دایرکت اینستاگرام با وبهوک BoxAPI می‌آید.")
+            else:
+                errors.append(channel_service.IG_RECONNECT)
+    if not saw_telegram and not saw_instagram:
+        raise ValueError("حساب کانال وصل نیست. از بیشتر → کانال‌ها وصل کن.")
+    return {
+        **list_threads(),
+        "ok": not errors,
+        "imported": imported,
+        "error": errors[0] if errors else "",
+        "hint": hints[0] if hints else "",
+    }
+
+
+def discard_failed_message(thread_id: str, message_id: str) -> dict:
+    with tenant_file_lock("inbox"):
+        data = _state()
+        thread = _find_thread(data, thread_id)
+        if thread is None:
+            raise KeyError("گفتگو پیدا نشد")
+        target = None
+        for msg in thread.get("messages") or []:
+            if isinstance(msg, dict) and str(msg.get("id") or "") == message_id:
+                target = msg
+                break
+        if target is None:
+            raise KeyError("پیام پیدا نشد")
+        kind = str(target.get("kind") or "")
+        status = str(target.get("status") or "")
+        if kind != "failed" and status != "failed":
+            raise ValueError("فقط پیام ارسال‌نشده را می‌توان حذف کرد.")
+        thread["messages"] = [
+            msg for msg in (thread.get("messages") or []) if str(msg.get("id") or "") != message_id
+        ]
+        thread["updatedAt"] = int(time.time())
+        _save(data)
+    return get_thread(thread_id, mark_read=True)
+
+
 def _find_thread(data: dict, thread_id: str) -> dict | None:
     for thread in data["threads"]:
         if str(thread.get("id")) == thread_id:
