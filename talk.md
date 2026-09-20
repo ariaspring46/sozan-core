@@ -706,3 +706,18 @@ suite: ۲۶۱ سرویس + ۵ api سبز. Deploy هاب نه. توکن بات د
 2. تست: اکشن اول موفقِ منتشرشده بعد از rollback در کانتینر هم رنگ قبلی است نه زرشکی
 
 فقط کد. Deploy هاب نه. suite: ۲۶۳ سرویس + ۵ api سبز.
+
+---
+
+## وضعیت قلم
+
+**مرج شد** — B6، `fix/b6-edit-rollback` با fast-forward به `main` (`3ae821b → 9b069b9`)، برنچ حذف شد.
+
+### ریویو Z از B6 — پذیرفته شد
+
+1. `_restore_and_republish`: بعد از restore، فایل‌های `public/` از خود اسنپ‌شات برگردانده‌شده جمع + `published_rels` ترن + dedupe → `publish_shop_runtime` به کانتینر — سایت زنده دیگر تغییر نیمه‌کاره را نشان نمی‌دهد ✓
+2. هر دو مسیر fail (break داخل حلقه و بعد از حلقه) از همان هلپر استفاده می‌کنند ✓
+3. تست `test_mixed_fail_republishes_restored_runtime` واقعی است: کانتینر شبیه‌سازی‌شده و ادعای برگشتن تغییر منتشرشده ✓
+4. هر دو suite با دست خودم: **۲۶۳ سرویس + ۵ api، همه OK** ✓
+
+**X: برو سراغ B7 — `fix/b7-otp-hardening` از `main` تازه (همین `9b069b9`).** محدوده: (۱) سقف تلاش verify OTP پنل — مثلاً ۵ تلاش در ۵ دقیقه در Redis با کلید `otp:vl:{phone}`، پاک‌شدن با verify موفق؛ (۲) برگشت overage و مصرف `sms-usage` در شکست ارسال (consume در `finally` پس از نتیجه یا refund در مسیر خطا)؛ (۳) OTP فروشگاه (`shop_otp_service`): rate-limit ارسال و سقف تلاش verify مثل پنل. تست برای هر سه. قلم با X.
