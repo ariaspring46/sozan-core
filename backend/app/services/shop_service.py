@@ -999,6 +999,8 @@ def _inquiry_url(row: dict | None = None) -> str:
         return ""
     handle = handle.split("/")[-1]
     if source in {"telegram", "tg"}:
+        if handle.isdigit():
+            return ""
         return f"https://t.me/{handle}"
     return f"https://ig.me/m/{handle}"
 

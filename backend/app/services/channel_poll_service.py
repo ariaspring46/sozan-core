@@ -21,6 +21,8 @@ _FAIL_LIMIT = 3
 _last_ig: dict[str, float] = {}
 _fail_counts: dict[str, int] = {}
 _backoff_until: dict[str, float] = {}
+_gap_skips: dict[str, int] = {}
+_poll_skip_emitted: set[str] = set()
 
 
 def _poll_key(phone: str, platform: str, handle: str) -> str:
@@ -30,6 +32,28 @@ def _poll_key(phone: str, platform: str, handle: str) -> str:
 def _in_backoff(key: str) -> bool:
     until = _backoff_until.get(key) or 0.0
     return time.monotonic() < until
+
+
+def _ig_due(key: str, now: float) -> bool:
+    last = _last_ig.get(key) or 0.0
+    if now - last < _IG_GAP_SEC:
+        _gap_skips[key] = int(_gap_skips.get(key) or 0) + 1
+        if _gap_skips[key] >= 2 and key not in _poll_skip_emitted:
+            _poll_skip_emitted.add(key)
+            emit_later(
+                kind="channel",
+                surface="inbox",
+                title="poll-skip",
+                payload={"key": key},
+            )
+        return False
+    return True
+
+
+def _mark_ig_polled(key: str, now: float) -> None:
+    _last_ig[key] = now
+    _gap_skips.pop(key, None)
+    _poll_skip_emitted.discard(key)
 
 
 def _note_poll_result(key: str, ok: bool) -> None:
@@ -76,29 +100,27 @@ async def poll_tenant() -> None:
             continue
         if platform == "instagram":
             if unipile_id:
-                if not plan_service.current()["dmSync"]:
-                    continue
-                last = _last_ig.get(phone) or 0.0
-                if now - last < _IG_GAP_SEC:
+                if not plan_service.current().get("dmSync"):
                     continue
                 key = _poll_key(phone, platform, handle or unipile_id)
+                if not _ig_due(key, now):
+                    continue
                 if _in_backoff(key):
                     continue
-                _last_ig[phone] = now
+                _mark_ig_polled(key, now)
                 result = await unipile_service.pull_directs(account_id=unipile_id, handle=handle)
             else:
                 await instagram_oauth_service.refresh_row(row)
                 row = channel_service.secret_for(str(row.get("id") or "")) or row
                 token = channel_service.token_for(row)
-                if not plan_service.current()["dmSync"]:
-                    continue
-                last = _last_ig.get(phone) or 0.0
-                if now - last < _IG_GAP_SEC:
+                if not plan_service.current().get("dmSync"):
                     continue
                 key = _poll_key(phone, platform, handle)
+                if not _ig_due(key, now):
+                    continue
                 if _in_backoff(key):
                     continue
-                _last_ig[phone] = now
+                _mark_ig_polled(key, now)
                 result = await instagram_service.pull_directs(token=token, handle=handle)
             ok = bool(result.get("ok"))
             _note_poll_result(key, ok)

@@ -459,6 +459,7 @@ class PriceMissingBuildTests(unittest.TestCase):
             "https://t.me/shop_tg",
         )
         self.assertEqual(shop_service._inquiry_url({"sourceHandle": "", "source": "instagram"}), "")
+        self.assertEqual(shop_service._inquiry_url({"sourceHandle": "123456789", "source": "telegram"}), "")
 
     def test_start_build_allows_hide_prices(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
