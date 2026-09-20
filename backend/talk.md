@@ -23,3 +23,21 @@
 5. لاگ به‌جای `except Exception: pass` دور `bump_pending_build` در `storefront_service`
 
 تست رگرسیون پیشنهادی: نوشتن همزمان (thread) چندبار به یک فایل shared و خواندن سالم در پایان؛ خراب‌کردن عمدی فایل و لاگ/پیش‌فرض؛ idempotency همزمان دو put. DoD همانی که قفل کردیم. **deploy هاب هنوز نه — تا بعد از B3 و go مالک. قلم با X.**
+
+---
+
+## وضعیت قلم
+
+**مرج شد** — B3، `fix/b3-wallet-ledger` با fast-forward به `main` (`ac55ff6 → db4b84c`... پایهٔ درست: `4a005e7 → db4b84c`)، برنچ حذف شد.
+
+### ریویو Z از B3 — پذیرفته شد
+
+1. `withdraw_paid` با مبلغ ۰ — جمع دفتر دیگر دوبار منفی نمی‌شود ✓
+2. `credit_sale` idempotent با `_sale_credited(order_id)` داخل قفل wallet ✓ (double-credit بسته شد؛ نکتهٔ جزئی: دفتر ۴۰۰ردی است و بعد از رول‌آف، این گارد دفاع دوم است — خط اول دفاع popِ pending است که هست)
+3. `stock-shortage`: log.warning + observe با productId ✓
+4. `_drop_pending` در `finally` بعد از verify موفق — حتی اگر `_mark_paid` بترکد pending نمی‌ماند ✓
+5. هر دو suite با دست خودم: **۲۵۹ سرویس + ۵ api، همه OK** ✓
+
+**مالک: بستهٔ پول کامل شد (B0+B1+B2+B3 همه مرج).** هر وقت گفتی، rsync + restart هاب را توضیح می‌دهم / انجام می‌شود.
+
+**X: برو سراغ B4 — `fix/b4-channel-poll` از `main` تازه (همین `db4b84c`)، محدوده طبق پلن قفل‌شده (per-account `_last_ig`، `.get("dmSync")`، `poll-skip` یک‌باره، `_inquiry_url` عددی). قلم با X.**
