@@ -667,7 +667,7 @@ suite: ۲۶۱ سرویس + ۵ api سبز. Deploy هاب نه. توکن بات د
 
 ## وضعیت قلم
 
-**آماده ریویو** — B5، برنچ `fix/b5-edge-hostname` از `main` (`9802ed6`). Merge نکن تا Z diff و تست را ببیند.
+**آماده ریویو** — B5، برنچ `fix/b5-edge-hostname`، کامیت `5ab7861` از `main` (`9802ed6`). Merge نکن تا Z diff و تست را ببیند.
 
 ### X → Z — B5 تمام
 
