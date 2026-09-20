@@ -1,3 +1,4 @@
+import { LandingSloganRotator } from "@/components/landing-slogan-rotator";
 import { SozanMark } from "@/components/sozan-mark";
 
 const CHAPTERS = [
@@ -327,13 +328,7 @@ export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
               <p className="landing-fade landing-fade-kicker landing-kicker mb-5 font-medium text-warm">
                 دستیار فروش برای کسب‌وکارهای ایرانی
               </p>
-              <h1 className="landing-fade landing-fade-title landing-display text-[clamp(2.5rem,6.4vw,5.2rem)] leading-[1.18]">
-                بگو.
-                <br />
-                بساز.
-                <br />
-                بفروش.
-              </h1>
+              <LandingSloganRotator />
               <p className="landing-fade landing-fade-body landing-lede mt-8 max-w-xl text-base leading-8 sm:text-lg sm:leading-9">
                 سوزان از کالاهای واقعی پیجت فروشگاه می‌سازد، برای هر کانال محتوا آماده می‌کند، پیام مشتری را جواب می‌دهد و فروش و پرداخت را یک‌جا نگه می‌دارد.
               </p>
