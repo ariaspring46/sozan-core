@@ -374,6 +374,48 @@ class ShopEditFlowTests(unittest.TestCase):
             self.assertIn('"type": "reject_foreign"', traces)
             self.assertIn('"ok": true', traces)
 
+    def test_mixed_fail_republishes_restored_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = _flow_root(Path(raw))
+            public_css = root / "public" / "brand-vars.css"
+            public_css.parent.mkdir(parents=True, exist_ok=True)
+            public_css.write_text(":root { --brand-primary: #C45C26; }\n", encoding="utf-8")
+            container = Path(raw) / "container"
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                shop = shop_service._save_shop(
+                    {**shop_service._shop(), "slug": "zafran-test", "status": "ready", "jobId": "j1"}
+                )
+
+                def fake_publish(_shop, _root, rels):
+                    for rel in rels:
+                        src = root / rel
+                        if not src.is_file():
+                            continue
+                        dest = container / rel
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_bytes(src.read_bytes())
+
+                with patch("app.services.shop_edit_service.build_dir_for", return_value=root), _patch_runtime(root), patch(
+                    "app.services.shop_edit_service.publish_shop_runtime",
+                    side_effect=fake_publish,
+                ):
+                    out = asyncio.run(
+                        apply_live_edit(
+                            shop,
+                            "رنگ را زرشکی کن و تیتر را «محصول ویژه» کن",
+                            "/",
+                            "تیتر غایب",
+                        )
+                    )
+            live = (container / "public" / "brand-vars.css").read_text(encoding="utf-8")
+            disk = public_css.read_text(encoding="utf-8")
+            self.assertTrue(out.get("rolledBack"))
+            self.assertFalse(out["patched"])
+            self.assertIn("#C45C26", disk)
+            self.assertNotIn("#7A1F2B", disk)
+            self.assertIn("#C45C26", live)
+            self.assertNotIn("#7A1F2B", live)
+
     def test_revert_undoes_last_success_not_whole_turn(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = _flow_root(Path(raw))

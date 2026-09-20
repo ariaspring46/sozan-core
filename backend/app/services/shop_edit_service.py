@@ -431,6 +431,39 @@ def restore_edit_files(root: Path, dest_name: str = PREV_DIR) -> bool:
     return changed
 
 
+def _public_rels_from_snapshot(root: Path, dest_name: str) -> list[str]:
+    dest = root / dest_name
+    rels: list[str] = []
+    if not dest.is_dir():
+        return rels
+    for path in dest.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(dest).as_posix()
+        if rel.startswith("public/"):
+            rels.append(rel)
+    return rels
+
+
+def _restore_and_republish(
+    shop: dict,
+    root: Path,
+    dest_name: str,
+    extra_rels: list[str] | None = None,
+) -> bool:
+    patched = restore_edit_files(root, dest_name)
+    seen: set[str] = set()
+    rels: list[str] = []
+    for rel in _public_rels_from_snapshot(root, dest_name) + list(extra_rels or []):
+        if not rel or rel in seen:
+            continue
+        seen.add(rel)
+        rels.append(rel)
+    if rels:
+        publish_shop_runtime(shop, root, rels)
+    return patched
+
+
 def named_color_updates(prompt: str) -> dict[str, str]:
     text = prompt or ""
     found = ""
@@ -1122,6 +1155,7 @@ async def _run_action_list(
     any_fail = False
     needs_rebuild = False
     created_ok: set[str] = set()
+    published_rels: list[str] = []
     pending_before = int(shop.get("pendingBuild") or 0)
     hero = root / "public" / "images" / "hero.png"
     hero_mtime = hero.stat().st_mtime if hero.is_file() else None
@@ -1170,6 +1204,7 @@ async def _run_action_list(
             files = ["lib/brand.ts", "public/brand-vars.css", "public/storefront-flags.json", "public/catalog.json"]
             preview = _preview_payload(reset=True)
             publish_shop_runtime(shop, root, files)
+            published_rels.extend(files)
             verified = verify_action(action=action, root=root, shop=shop, files_touched=files)
             verified["ok"] = bool(patched)
         else:
@@ -1178,6 +1213,7 @@ async def _run_action_list(
             preview = executed.get("preview") or {}
             if kind in RUNTIME_VERIFY_KINDS and live:
                 publish_shop_runtime(shop, root, files)
+                published_rels.extend(files)
                 page_path = f"/{action.get('kind')}" if kind == "create_page" else ""
                 runtime = fetch_shop_runtime(shop, page_path=page_path)
             products = storefront_service.list_products().get("products") or []
@@ -1223,13 +1259,13 @@ async def _run_action_list(
                 created_ok.add(str(action.get("kind") or ""))
         else:
             any_fail = True
-            restore_edit_files(root, turn_snap)
+            _restore_and_republish(shop, root, turn_snap, published_rels)
             shop["hidePrices"] = hide_before
             _save_shop(shop)
             break
     reply = " ".join(line for line in lines if line).strip()
     if any_fail:
-        restore_edit_files(root, turn_snap)
+        _restore_and_republish(shop, root, turn_snap, published_rels)
         shop["pendingBuild"] = pending_before
         _save_shop(shop)
         return {
