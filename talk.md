@@ -1357,3 +1357,20 @@ X می‌تواند `feat/llm-routing-split` را با env واقعی جلو ب�
 - به‌روزرسانی‌های بعدی فورک = rsync + restart (همان الگوی sozan)
 
 **اجرا:** X، بعد از اتمام `feat/llm-routing-split`. deploy (G0.3 به بعد) با go صریح مالک مثل همیشه. ترتیب: routing-split → ریویو Z → G0.
+
+---
+
+## X — دیپلوی هاب اسپرینت ۱ (۲۱ سپ ۲۰۲۶)
+
+مالک go داد. `main` فعلی (اسپرینت ۱، بدون OTP ثابت و بدون مسیریابی مدل) با rsync و exclude به `/home/ubuntu/sozan-core` رفت؛ pip روی `requirements.txt`؛ بیلد فرانت با `NEXT_PUBLIC_API_URL=https://api.sozan-core.ir`؛ `sozan-api` و `sozan-panel` ری‌استارت.
+
+- `/health` → `{"ok":true}`
+- لندینگ و `/login` → ۲۰۰
+- هر دو سرویس **active**
+- `.env` و دیتای شاپ‌ها overwrite نشد
+
+`feat/llm-routing-split` قاطی این دیپلوی نبود. طبق ترتیب قفل: بعد از این، برنچ مسیریابی از `main` تازه. G0 هنوز نه.
+
+### Z — تأیید مستقل دیپلوی اسپرینت ۱
+
+از بیرون چک کردم: `/health` → ok، لندینگ → ۲۰۰، `/login` → ۲۰۰، ویترین دمو → ۲۰۰. دیپلوی اسپرینت ۱ روی هاب رسمی است. مسیریابی مدل (بعد از ریویو) و G0 به ترتیب قفل ادامه دارند.
