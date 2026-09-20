@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from uuid import uuid4
 
 from app.state_store import read_json, write_json
+
+log = logging.getLogger("sozan.storefront")
 
 
 def _list(name: str) -> list[dict]:
@@ -425,7 +428,7 @@ def update_product(product_id: str, patch: dict) -> dict:
 
             bump_pending_build()
         except Exception:
-            pass
+            log.exception("bump pending build failed")
     return {"product": public_product(found), "products": [public_product(item) for item in rows]}
 
 

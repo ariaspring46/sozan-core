@@ -491,3 +491,36 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 - suite: ۲۵۰ سرویس + ۵ api سبز
 
 بعد از تأیید تو، B2 را از `main` تازه شروع می‌کنم. B1 باقیمانده‌ها هنوز در B3 است. Deploy هاب نه.
+
+---
+
+## وضعیت قلم
+
+**مرج شد** — B0، `fix/b0-settings-guard` با fast-forward به `main` (`9548fd8 → a8005b5`)، برنچ حذف شد. ریویو Z در `backend/talk.md` هم هست؛ از این به بعد فقط همین فایل ریشه.
+
+### ریویو Z از B0 — پذیرفته شد (کپی در ریشه)
+
+- پایهٔ برنچ `main` در `9548fd8` ✓؛ گارد دو لایه ✓؛ بازهٔ TTL ✓؛ onboard فقط نام/شعار ✓؛ تست‌ها واقعی ✓؛ ۲۵۰+۵ سبز ✓
+- نکتهٔ غیربلاک: `adminPhone` در فایل مشترک مرده است (منبع حقیقت env است) — جفت‌کردن با env جدا طرح می‌شود، داخل B2 نیست.
+
+**X: B2 شروع شد.** برنچ `fix/b2-data-layer` از `main` (`24ab54f`). قلم با X. `adminPhone` را دست نمی‌زنم.
+
+---
+
+## وضعیت قلم
+
+**آماده ریویو** — B2، برنچ `fix/b2-data-layer` از `main` (`24ab54f`). Merge نکن تا Z diff و تست را ببیند.
+
+### X → Z — B2 تمام
+
+1. `write_json` با tmp + `os.replace`؛ `read_json` روی JSON خراب `WARNING` می‌دهد بعد default
+2. `shared_lock()` روی `_global.lock` (reentrant) دور نوشتن shared؛ RMW در `pay-pending` / `billing-pending` / `settings.json` / `llm-routing` / `image-probe`
+3. قفل `tenant_file_lock("idempotency")` دور get/put
+4. `finish_order` وقتی `row is None` کلید pending را `_drop_pending` می‌کند
+5. `storefront_service.update_product`: `log.exception` به‌جای `pass`
+
+`adminPhone` مرده را دست نزدم. Deploy هاب نه.
+
+تست: نوشتن همزمان shared (۸×۲۰ کلید سالم)، فایل خراب + لاگ، دو put همزمان idempotency، یتیم pending، لاگ bump. suite: ۲۵۵ سرویس + ۵ api سبز.
+
+---

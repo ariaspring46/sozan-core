@@ -10,7 +10,7 @@ from app.config import settings as env
 from app.phone import normalize_phone
 from app.services import payment_service, storefront_service, wallet_service
 from app.services.settings_service import get_settings
-from app.state_store import current_tenant, iter_tenants, read_json, tenant_scope, write_json
+from app.state_store import current_tenant, iter_tenants, read_json, shared_lock, tenant_scope, write_json
 
 
 def public_pay_url(order_id: str) -> str:
@@ -50,6 +50,20 @@ def _pending() -> dict:
 
 def _save_pending(rows: dict) -> None:
     write_json("pay-pending.json", rows, shared=True)
+
+
+def _put_pending(authority: str, hint: dict) -> None:
+    with shared_lock():
+        pending = _pending()
+        pending[authority] = hint
+        _save_pending(pending)
+
+
+def _drop_pending(key: str) -> None:
+    with shared_lock():
+        pending = _pending()
+        pending.pop(key, None)
+        _save_pending(pending)
 
 
 def _checkout_lines(lines: list[dict] | None, *, product_id: str, qty: int) -> list[dict]:
@@ -208,9 +222,7 @@ async def create_order(
     orders = _orders()
     orders.append(row)
     _save_orders(orders)
-    pending = _pending()
-    pending[row["authority"]] = {"phone": phone, "orderId": order_id, "gateway": route["id"]}
-    _save_pending(pending)
+    _put_pending(row["authority"], {"phone": phone, "orderId": order_id, "gateway": route["id"]})
     return public_order(row)
 
 
@@ -272,23 +284,21 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
     phone = str(hint.get("phone") or "").strip()
     order_id = str(hint.get("orderId") or "").strip()
     if not phone or not order_id:
-        pending.pop(key, None)
-        _save_pending(pending)
+        _drop_pending(key)
         return panel_pay_url(order_id or "missing", "fail")
     with tenant_scope(phone):
         orders = _orders()
         row = next((item for item in orders if str(item.get("id")) == order_id), None)
         if row is None:
+            _drop_pending(key)
             return panel_pay_url(order_id, "missing")
         if str(row.get("status") or "") == "paid":
-            pending.pop(key, None)
-            _save_pending(pending)
+            _drop_pending(key)
             return panel_pay_url(order_id, "ok")
         if not ok:
             row["status"] = "failed"
             _save_orders(orders)
-            pending.pop(key, None)
-            _save_pending(pending)
+            _drop_pending(key)
             return panel_pay_url(order_id, "cancel")
         try:
             if str(row.get("gateway") or gateway) == "idpay":
@@ -311,8 +321,7 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
             return panel_pay_url(order_id, "fail")
         _mark_paid(row, ref_id=str(verified.get("refId") or ""))
         _save_orders(orders)
-        pending.pop(key, None)
-        _save_pending(pending)
+        _drop_pending(key)
     return panel_pay_url(order_id, "ok")
 
 

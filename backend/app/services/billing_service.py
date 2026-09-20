@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from app.config import settings as env
 from app.services import payment_service, plan_service
-from app.state_store import read_json, write_json
+from app.state_store import read_json, shared_lock, write_json
 
 
 def _pending() -> dict:
@@ -15,6 +15,20 @@ def _pending() -> dict:
 
 def _save_pending(rows: dict) -> None:
     write_json("billing-pending.json", rows, shared=True)
+
+
+def _put_pending(authority: str, row: dict) -> None:
+    with shared_lock():
+        pending = _pending()
+        pending[authority] = row
+        _save_pending(pending)
+
+
+def _drop_pending(key: str) -> None:
+    with shared_lock():
+        pending = _pending()
+        pending.pop(key, None)
+        _save_pending(pending)
 
 
 def _history() -> list[dict]:
@@ -90,9 +104,7 @@ async def start_subscription(plan_id: str, *, phone: str) -> dict:
         "status": "pending",
         "at": int(time()),
     }
-    pending = _pending()
-    pending[authority] = row
-    _save_pending(pending)
+    _put_pending(authority, row)
     history = _history()
     history.append(row)
     write_json("billing.json", history[-80:])
@@ -118,16 +130,14 @@ async def finish_subscription(*, authority: str, ok: bool) -> str:
         return panel_return("ok" if ok else "missing")
     phone = str(row.get("phone") or "").strip()
     if not phone:
-        pending.pop(key, None)
-        _save_pending(pending)
+        _drop_pending(key)
         return panel_return("fail")
     from app.state_store import tenant_scope
 
     with tenant_scope(phone):
         history = _history()
         if not ok:
-            pending.pop(key, None)
-            _save_pending(pending)
+            _drop_pending(key)
             for item in history:
                 if item.get("authority") == key:
                     item["status"] = "failed"
@@ -140,8 +150,7 @@ async def finish_subscription(*, authority: str, ok: bool) -> str:
             )
         except ValueError:
             return panel_return("fail")
-        pending.pop(key, None)
-        _save_pending(pending)
+        _drop_pending(key)
         plan_service.set_plan(str(row.get("plan") or "free"))
         for item in history:
             if item.get("authority") == key:

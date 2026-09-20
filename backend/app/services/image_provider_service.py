@@ -83,16 +83,21 @@ def _openai_images(prompt: str, *, width: int, height: int, route: dict) -> byte
 
 
 async def probe_ollama_cloud_once() -> dict:
-    from app.state_store import read_json, write_json
+    from app.state_store import read_json, shared_lock, write_json
     from app.services.observe_client import emit_later
 
     try:
-        stored = read_json("image-probe.json", {}, shared=True)
-        if isinstance(stored, dict) and stored.get("at"):
-            return stored
+        with shared_lock():
+            stored = read_json("image-probe.json", {}, shared=True)
+            if isinstance(stored, dict) and stored.get("at"):
+                return stored
         result = await asyncio.to_thread(probe_ollama_cloud)
         payload = {**result, "at": time.time()}
-        write_json("image-probe.json", payload, shared=True)
+        with shared_lock():
+            stored = read_json("image-probe.json", {}, shared=True)
+            if isinstance(stored, dict) and stored.get("at"):
+                return stored
+            write_json("image-probe.json", payload, shared=True)
         emit_later(
             kind="routing",
             surface="image",

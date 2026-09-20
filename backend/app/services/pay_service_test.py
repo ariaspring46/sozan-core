@@ -176,3 +176,17 @@ class ShopPayB1Tests(unittest.TestCase):
         self.assertIn("pay=ok", url)
         self.assertEqual(retry["status"], "paid")
         self.assertEqual(retry["refId"], "77")
+
+    def test_finish_order_drops_orphan_pending_when_order_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                write_json("pay-orders.json", [])
+                write_json(
+                    "pay-pending.json",
+                    {"AUTH-GONE": {"phone": PHONE, "orderId": "missing-order", "gateway": "zarinpal"}},
+                    shared=True,
+                )
+                url = asyncio.run(pay_service.finish_order(authority="AUTH-GONE", ok=True))
+                pending = read_json("pay-pending.json", {}, shared=True)
+        self.assertIn("pay=missing", url)
+        self.assertNotIn("AUTH-GONE", pending)

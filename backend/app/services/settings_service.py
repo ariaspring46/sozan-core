@@ -5,7 +5,7 @@ from copy import deepcopy
 from app.config import settings as env
 from app.services import payment_service, sms_service
 from app.services.plan_service import snapshot as plan_snapshot
-from app.state_store import read_json, write_json
+from app.state_store import read_json, shared_lock, write_json
 
 OTP_TTL_MIN = 60
 OTP_TTL_MAX = 900
@@ -131,43 +131,44 @@ def public_settings() -> dict:
 def save_settings(patch: dict, *, hub_admin: bool = False) -> dict:
     from app.services import plan_service
 
-    studio = _studio()
-    studio_touch = [key for key in STUDIO_KEYS if key in patch and patch[key] is not None]
-    if studio_touch and not hub_admin:
-        raise PermissionError("این تنظیمات فقط برای مدیر هاب است")
-    for key in STUDIO_KEYS:
-        if key not in patch or patch[key] is None:
-            continue
-        if key == "otpTtlSeconds":
-            ttl = int(patch[key])
-            if ttl < OTP_TTL_MIN or ttl > OTP_TTL_MAX:
-                raise ValueError("عمر کد باید بین ۶۰ تا ۹۰۰ ثانیه باشد")
-            studio[key] = ttl
-            continue
-        studio[key] = patch[key]
-    studio.pop("plan", None)
+    with shared_lock():
+        studio = _studio()
+        studio_touch = [key for key in STUDIO_KEYS if key in patch and patch[key] is not None]
+        if studio_touch and not hub_admin:
+            raise PermissionError("این تنظیمات فقط برای مدیر هاب است")
+        for key in STUDIO_KEYS:
+            if key not in patch or patch[key] is None:
+                continue
+            if key == "otpTtlSeconds":
+                ttl = int(patch[key])
+                if ttl < OTP_TTL_MIN or ttl > OTP_TTL_MAX:
+                    raise ValueError("عمر کد باید بین ۶۰ تا ۹۰۰ ثانیه باشد")
+                studio[key] = ttl
+                continue
+            studio[key] = patch[key]
+        studio.pop("plan", None)
 
-    integrations = _integrations()
-    for key in INTEGRATION_DEFAULTS:
-        if key not in patch or patch[key] is None:
-            continue
-        if key in SECRET_KEYS and not str(patch[key]).strip():
-            continue
-        integrations[key] = patch[key]
-        if isinstance(integrations[key], str):
-            integrations[key] = integrations[key].strip()
-    payment_service.validate_patch(patch, integrations)
-    provider = str(integrations.get("smsProvider") or "smsir").strip().lower()
-    if provider not in {item["id"] for item in sms_service.PROVIDERS}:
-        raise ValueError("این درگاه پیامک پشتیبانی نمی‌شود")
-    integrations["smsProvider"] = provider
-    if "plan" in patch and patch["plan"] is not None:
-        wanted = str(patch["plan"]).strip().lower()
-        current = plan_service.current_plan_id()
-        if wanted != current and wanted != "free":
-            raise ValueError("برای اشتراک پرو از پرداخت زرین‌پال استفاده کن")
-        plan_service.set_plan(wanted)
-    write_json("settings.json", studio, shared=True)
+        integrations = _integrations()
+        for key in INTEGRATION_DEFAULTS:
+            if key not in patch or patch[key] is None:
+                continue
+            if key in SECRET_KEYS and not str(patch[key]).strip():
+                continue
+            integrations[key] = patch[key]
+            if isinstance(integrations[key], str):
+                integrations[key] = integrations[key].strip()
+        payment_service.validate_patch(patch, integrations)
+        provider = str(integrations.get("smsProvider") or "smsir").strip().lower()
+        if provider not in {item["id"] for item in sms_service.PROVIDERS}:
+            raise ValueError("این درگاه پیامک پشتیبانی نمی‌شود")
+        integrations["smsProvider"] = provider
+        if "plan" in patch and patch["plan"] is not None:
+            wanted = str(patch["plan"]).strip().lower()
+            current = plan_service.current_plan_id()
+            if wanted != current and wanted != "free":
+                raise ValueError("برای اشتراک پرو از پرداخت زرین‌پال استفاده کن")
+            plan_service.set_plan(wanted)
+        write_json("settings.json", studio, shared=True)
     write_json("integrations.json", integrations)
     if "storeName" in patch or "storeTagline" in patch:
         shop = read_json("shop.json", {})

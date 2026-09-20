@@ -104,6 +104,18 @@ class StorefrontServiceTests(unittest.TestCase):
         shoe = next(row for row in cats if row["title"] == "کفش")
         self.assertEqual(shoe["count"], 0)
 
+    def test_update_product_logs_when_pending_build_fails(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", self.root):
+            created = storefront_service.add_product(title="کیف", price=100, stock=1, sku="bag")
+            pid = created["product"]["id"]
+            with patch(
+                "app.services.shop_service.bump_pending_build",
+                side_effect=RuntimeError("lock"),
+            ):
+                with self.assertLogs("sozan.storefront", level="ERROR") as captured:
+                    storefront_service.update_product(pid, {"price": 250})
+        self.assertTrue(any("bump pending build failed" in line for line in captured.output))
+
 
 if __name__ == "__main__":
     unittest.main()

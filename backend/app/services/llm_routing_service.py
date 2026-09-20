@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from app.services.observe_client import observe_base
-from app.state_store import read_json, write_json
+from app.state_store import read_json, shared_lock, write_json
 
 log = logging.getLogger("sozan.llm-routing")
 
@@ -20,7 +20,8 @@ _stale_emitted = False
 
 
 def _persist(payload: dict) -> None:
-    write_json(STORE, payload, shared=True)
+    with shared_lock():
+        write_json(STORE, payload, shared=True)
 
 
 def _load_disk() -> dict:
