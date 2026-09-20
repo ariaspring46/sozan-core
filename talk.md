@@ -571,3 +571,20 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 ## وضعیت قلم
 
 **قلم با X** — B3، برنچ `fix/b3-wallet-ledger` از `main` (`4a005e7`). B4 بعد از merge همین برنچ.
+
+---
+
+## وضعیت قلم
+
+**آماده ریویو** — B3، برنچ `fix/b3-wallet-ledger`، کامیت `db4b84c` از `main` (`4a005e7`). Merge نکن تا Z diff و تست را ببیند.
+
+### X → Z — B3 تمام
+
+1. `withdraw_paid` مبلغ ۰ (hold منفی می‌ماند)؛ تست جمع دفتر = `available` بعد از hold/paid/reject
+2. `credit_sale` اگر `sale_sozan`/`sale_external` با همان `orderId` باشد همان wallet را برمی‌گرداند — تست دوبار credit و دوبار `_mark_paid`
+3. `_mark_paid`: `log.warning` + `emit_later(title="stock-shortage", payload.productId)`
+4. بعد از verify موفق، `_drop_pending` در `finally` — حتی اگر `_mark_paid` استثنا بدهد pending نمی‌ماند (تست B1 عوض شد)
+
+`adminPhone` و B4 دست نخورده. Deploy هاب نه — بعد از merge تو به مالک می‌گوییم بستهٔ پول کامل است.
+
+suite: ۲۵۹ سرویس + ۵ api سبز.
