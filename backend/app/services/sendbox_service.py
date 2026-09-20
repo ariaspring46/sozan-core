@@ -66,7 +66,7 @@ def login_url(*, phone: str, oauth: str = "") -> str:
         raise ValueError("فروشنده برای ورود اینستاگرام شناخته نشد. دوباره وارد پنل شو.")
     raw = (oauth or oauth_base()).strip()
     if not raw:
-        raise ValueError("لینک ورود Sendbox در سوزان تنظیم نشده.")
+        raise ValueError("لینک ورود رسمی BoxAPI در سوزان تنظیم نشده.")
     parts = urlsplit(raw)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
     if not query.get("token") and api_key():
@@ -128,7 +128,7 @@ def unused_remote_accounts(rows: list[dict], *, phone: str) -> list[dict]:
 
 async def start_instagram(*, phone: str) -> dict:
     if not configured():
-        raise ValueError("اتصال Sendbox هنوز در سوزان تنظیم نشده.")
+        raise ValueError("اتصال رسمی BoxAPI هنوز در سوزان تنظیم نشده.")
     live = ""
     existing: list[dict] = []
     try:
@@ -223,7 +223,9 @@ def _headers() -> dict[str, str]:
 
 
 def _client(*, timeout: float = 30) -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=timeout, trust_env=False)
+    from app.services.channel_http import async_client
+
+    return async_client(timeout=timeout)
 
 
 def _json(response: httpx.Response) -> dict:
@@ -283,7 +285,7 @@ def bind_instagram(*, account_id: str, phone: str, handle: str = "") -> dict:
     tenant = str(phone or "").strip()
     name = handle.lstrip("@").strip() or ident
     if not ident:
-        raise ValueError("شناسه حساب اینستاگرام Sendbox نیست.")
+        raise ValueError("شناسه حساب اینستاگرام BoxAPI نیست.")
     if not tenant:
         raise ValueError("فروشنده برای اتصال اینستاگرام شناخته نشد.")
     owner = tenant_for_sendbox_account(ident)
@@ -361,7 +363,7 @@ async def send_message(*, account_id: str, recipient_id: str, text: str) -> None
     target = str(recipient_id or "").strip()
     body = text.strip()
     if not ident:
-        raise ValueError("حساب اینستاگرام Sendbox وصل نیست.")
+        raise ValueError("حساب اینستاگرام BoxAPI وصل نیست.")
     if not target:
         raise ValueError("شناسه مشتری اینستاگرام نیست. اول پیام مشتری را همگام کن.")
     if not body:
@@ -373,7 +375,32 @@ async def send_message(*, account_id: str, recipient_id: str, text: str) -> None
             json={"account_id": ident, "recipient_id": target, "message": body[:1000]},
         )
     if response.status_code >= 400:
-        raise ValueError("اینستاگرام پیام را از Sendbox نفرستاد.")
+        raise ValueError("اینستاگرام پیام را از BoxAPI نفرستاد.")
+
+
+async def set_account_active(*, account_id: str, active: bool) -> None:
+    ident = str(account_id or "").strip()
+    if not ident or not configured():
+        return
+    async with _client(timeout=20) as client:
+        response = await client.put(
+            f"{base_url()}/service/accounts/{ident}",
+            headers=_headers(),
+            json={"is_active": bool(active)},
+        )
+    if response.status_code >= 400:
+        raise ValueError("غیرفعال‌سازی پیج اینستاگرام در BoxAPI انجام نشد.")
+
+
+async def release_local_account(account_id: str) -> dict:
+    row = channel_service.secret_for(account_id)
+    sendbox_id = channel_service.sendbox_account_id(row) if row else ""
+    if sendbox_id:
+        try:
+            await set_account_active(account_id=sendbox_id, active=False)
+        except ValueError:
+            pass
+    return channel_service.remove_account(account_id)
 
 
 async def accept_webhook(payload: dict) -> dict:

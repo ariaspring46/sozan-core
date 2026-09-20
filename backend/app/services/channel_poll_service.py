@@ -5,11 +5,8 @@ import time
 
 from app.services import (
     channel_service,
-    instagram_oauth_service,
-    instagram_service,
     plan_service,
     telegram_service,
-    unipile_service,
 )
 from app.services.observe_client import emit_later
 from app.state_store import iter_tenants, tenant_scope
@@ -72,13 +69,14 @@ async def poll_tenant() -> None:
     from app.state_store import current_tenant
 
     phone = current_tenant()
-    now = time.monotonic()
     for row in channel_service.iter_accounts():
         token = channel_service.token_for(row)
         platform = str(row.get("platform") or "")
         handle = str(row.get("handle") or "")
-        unipile_id = channel_service.unipile_account_id(row) if platform == "instagram" else ""
-        if not token and not unipile_id:
+        if platform == "instagram":
+            # دایرکت رسمی فقط وبهوک BoxAPI است؛ پول Unipile/Meta دیگر اجرا نمی‌شود.
+            continue
+        if not token:
             continue
         if platform == "telegram":
             if not plan_service.current().get("dmSync"):
@@ -95,41 +93,6 @@ async def poll_tenant() -> None:
                     kind="channel",
                     surface="inbox",
                     title="telegram-poll-error",
-                    payload={"error": str(result.get("error") or "failed")[:200], "handle": handle},
-                )
-            continue
-        if platform == "instagram":
-            if unipile_id:
-                if not plan_service.current().get("dmSync"):
-                    continue
-                key = _poll_key(phone, platform, handle or unipile_id)
-                if not _ig_due(key, now):
-                    continue
-                if _in_backoff(key):
-                    continue
-                _mark_ig_polled(key, now)
-                result = await unipile_service.pull_directs(account_id=unipile_id, handle=handle)
-            else:
-                await instagram_oauth_service.refresh_row(row)
-                row = channel_service.secret_for(str(row.get("id") or "")) or row
-                token = channel_service.token_for(row)
-                if not plan_service.current().get("dmSync"):
-                    continue
-                key = _poll_key(phone, platform, handle)
-                if not _ig_due(key, now):
-                    continue
-                if _in_backoff(key):
-                    continue
-                _mark_ig_polled(key, now)
-                result = await instagram_service.pull_directs(token=token, handle=handle)
-            ok = bool(result.get("ok"))
-            _note_poll_result(key, ok)
-            if not ok:
-                log.warning("instagram poll: %s", result.get("error") or "failed")
-                emit_later(
-                    kind="channel",
-                    surface="inbox",
-                    title="instagram-poll-error",
                     payload={"error": str(result.get("error") or "failed")[:200], "handle": handle},
                 )
 

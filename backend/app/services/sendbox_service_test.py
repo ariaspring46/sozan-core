@@ -189,7 +189,7 @@ class SendboxServiceTests(unittest.TestCase):
         ig = next(row for row in targets if row["platform"] == "instagram")
         self.assertTrue(ig["connected"])
         self.assertFalse(ig["ready"])
-        self.assertIn("یونی‌پایل", ig["hint"])
+        self.assertIn("استودیو", ig["hint"])
 
     def test_publish_targets_unipile_ready(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -202,7 +202,9 @@ class SendboxServiceTests(unittest.TestCase):
             with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
                 targets = channel_service.publish_targets()
         ig = next(row for row in targets if row["platform"] == "instagram")
-        self.assertTrue(ig["ready"])
+        self.assertTrue(ig["connected"])
+        self.assertFalse(ig["ready"])
+        self.assertIn("استودیو", ig["hint"])
 
     def test_upsert_merges_unipile_onto_sendbox_row(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -243,3 +245,125 @@ class SendboxServiceTests(unittest.TestCase):
     def test_empty_webhook_token_is_rejected(self) -> None:
         self.assertFalse(sendbox_service.valid_webhook_token(""))
         self.assertFalse(sendbox_service.valid_webhook_token("nope"))
+
+    def test_legacy_unipile_row_stays_with_reconnect(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            channels = Path(raw) / "tenants" / "09135409482" / "channels.json"
+            channels.parent.mkdir(parents=True)
+            channels.write_text(
+                '[{"id":"ig1","platform":"instagram","handle":"shop","credentials":{"unipileAccountId":"u1"}}]',
+                encoding="utf-8",
+            )
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                listed = channel_service.list_accounts()["accounts"]
+                row = channel_service.secret_for("ig1") or {}
+        self.assertEqual(len(listed), 1)
+        self.assertTrue(listed[0]["needsReconnect"])
+        self.assertFalse(listed[0]["connected"])
+        self.assertEqual(listed[0]["error"], channel_service.IG_RECONNECT)
+        self.assertEqual(channel_service.unipile_account_id(row), "u1")
+
+    def test_legacy_meta_token_row_stays_with_reconnect(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            channels = Path(raw) / "tenants" / "09135409482" / "channels.json"
+            channels.parent.mkdir(parents=True)
+            channels.write_text(
+                '[{"id":"ig1","platform":"instagram","handle":"shop","credentials":{"accessToken":"meta-tok"}}]',
+                encoding="utf-8",
+            )
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                listed = channel_service.list_accounts()["accounts"]
+        self.assertEqual(len(listed), 1)
+        self.assertTrue(listed[0]["needsReconnect"])
+        self.assertFalse(listed[0]["connected"])
+        self.assertEqual(listed[0]["error"], channel_service.IG_RECONNECT)
+
+    def test_deliver_instagram_uses_sendbox_only(self) -> None:
+        from app.services import channel_outbound_service
+
+        send = AsyncMock()
+        row = {"platform": "instagram", "credentials": {"sendboxAccountId": "acc-1", "unipileAccountId": "u1"}}
+        with patch(
+            "app.services.channel_outbound_service.channel_service.account_for_platform", return_value=row
+        ), patch("app.services.channel_outbound_service.sendbox_service.send_message", send):
+            asyncio.run(
+                channel_outbound_service.deliver(
+                    platform="instagram", sender_id="cust1", chat_id="cust1", text="سلام"
+                )
+            )
+        send.assert_awaited_once_with(account_id="acc-1", recipient_id="cust1", text="سلام")
+
+    def test_deliver_unipile_requires_reconnect(self) -> None:
+        from app.services import channel_outbound_service
+
+        row = {"platform": "instagram", "credentials": {"unipileAccountId": "u1"}}
+        with patch(
+            "app.services.channel_outbound_service.channel_service.account_for_platform", return_value=row
+        ), patch("app.services.channel_outbound_service.sendbox_service.send_message", new=AsyncMock()) as send:
+            with self.assertRaises(ValueError) as ctx:
+                asyncio.run(
+                    channel_outbound_service.deliver(
+                        platform="instagram", sender_id="cust1", chat_id="cust1", text="سلام"
+                    )
+                )
+        send.assert_not_called()
+        self.assertEqual(str(ctx.exception), channel_service.IG_RECONNECT)
+
+    def test_legacy_unipile_verify_skips_graph(self) -> None:
+        from app.services import channel_connect_service
+
+        with patch("app.services.channel_connect_service.async_client") as client:
+            result = asyncio.run(
+                channel_connect_service.verify_credentials(
+                    platform="instagram",
+                    handle="shop",
+                    credentials={"unipileAccountId": "u1", "accessToken": "meta"},
+                )
+            )
+        client.assert_not_called()
+        self.assertFalse(result["connected"])
+        self.assertEqual(result["error"], channel_service.IG_RECONNECT)
+
+    def test_set_account_active_puts_false(self) -> None:
+        from types import SimpleNamespace
+
+        fake = AsyncMock()
+        fake.__aenter__.return_value = fake
+        fake.__aexit__.return_value = False
+        fake.put = AsyncMock(return_value=SimpleNamespace(status_code=200))
+        with patch.object(settings, "sendbox_api_key", "key"), patch(
+            "app.services.sendbox_service._client", return_value=fake
+        ):
+            asyncio.run(sendbox_service.set_account_active(account_id="acc-1", active=False))
+        fake.put.assert_awaited_once()
+        url = fake.put.await_args.args[0]
+        self.assertIn("/service/accounts/acc-1", url)
+        self.assertEqual(fake.put.await_args.kwargs["json"], {"is_active": False})
+
+    def test_release_local_account_disables_sendbox(self) -> None:
+        disable = AsyncMock()
+        with tempfile.TemporaryDirectory() as raw:
+            channels = Path(raw) / "tenants" / "09135409482" / "channels.json"
+            channels.parent.mkdir(parents=True)
+            channels.write_text(
+                '[{"id":"ig1","platform":"instagram","handle":"shop","credentials":{"sendboxAccountId":"acc-1"}}]',
+                encoding="utf-8",
+            )
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"), patch(
+                "app.services.sendbox_service.set_account_active", disable
+            ):
+                listed = asyncio.run(sendbox_service.release_local_account("ig1"))
+        disable.assert_awaited_once_with(account_id="acc-1", active=False)
+        self.assertEqual(listed["accounts"], [])
+
+    def test_sendbox_client_uses_socks5h(self) -> None:
+        from app.services.channel_http import channel_proxy
+
+        with patch.object(settings, "channel_proxy", "socks5://127.0.0.1:10888"):
+            self.assertEqual(channel_proxy(), "socks5h://127.0.0.1:10888")
+        with patch.object(settings, "channel_proxy", ""):
+            client = sendbox_service._client()
+        try:
+            self.assertFalse(client.trust_env)
+        finally:
+            asyncio.run(client.aclose())

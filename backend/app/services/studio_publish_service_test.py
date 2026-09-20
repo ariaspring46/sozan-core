@@ -156,43 +156,33 @@ class StudioPublishTests(unittest.TestCase):
         self.assertTrue(result.get("skipped"))
         self.assertIn("تأیید", result.get("message") or "")
 
-    def test_instagram_uses_public_https_url(self) -> None:
-        publish_image = AsyncMock()
+    def test_instagram_sendbox_waits_for_studio_publish(self) -> None:
+        from app.services import channel_service
+
+        row = {"id": "ig", "platform": "instagram", "credentials": {"sendboxAccountId": "acc-1"}}
         with tempfile.TemporaryDirectory() as raw:
-            root = Path(raw)
-            media = root / "chat-media"
-            media.mkdir()
-            path = media / "pic-image.png"
+            path = Path(raw) / "pic-image.png"
             path.write_bytes(b"png")
-            with tenant_scope("09120000000"), patch(
-                "app.services.chat_media_service.tenant_dir", return_value=root
-            ), patch(
-                "app.services.public_media_service.current_tenant", return_value="09120000000"
-            ), patch(
+            with patch(
                 "app.services.studio_publish_service.channel_service.account_for_platform",
-                return_value={"id": "ig", "platform": "instagram"},
+                return_value=row,
             ), patch(
-                "app.services.studio_publish_service.channel_service.token_for",
-                return_value="tok",
+                "app.services.studio_publish_service.channel_service.unipile_account_id",
+                return_value="",
             ), patch(
                 "app.services.studio_publish_service.chat_media_service.resolve",
                 return_value=path,
-            ), patch(
-                "app.services.studio_publish_service.instagram_service.publish_image",
-                new=publish_image,
             ):
-                result = asyncio.run(
-                    studio_publish_service.publish(
-                        platform="instagram",
-                        caption="کپشن اینستا",
-                        media_name=path.name,
-                        media_kind="image",
+                with self.assertRaises(ValueError) as ctx:
+                    asyncio.run(
+                        studio_publish_service.publish(
+                            platform="instagram",
+                            caption="کپشن اینستا",
+                            media_name=path.name,
+                            media_kind="image",
+                        )
                     )
-                )
-        self.assertTrue(result["ok"])
-        url = publish_image.await_args.kwargs["image_url"]
-        self.assertTrue(url.startswith("https://api.sozan-core.ir/public-media/"))
-        self.assertEqual(publish_image.await_args.kwargs["caption"], "کپشن اینستا")
+        self.assertEqual(str(ctx.exception), channel_service.IG_STUDIO_WAIT)
 
     def test_public_media_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

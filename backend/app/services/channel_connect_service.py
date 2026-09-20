@@ -4,7 +4,6 @@ import httpx
 
 from app.services.channel_http import async_client
 
-GRAPH_IG = "https://graph.instagram.com/v21.0"
 GRAPH_WA = "https://graph.facebook.com/v21.0"
 
 
@@ -33,25 +32,16 @@ def _token(creds: dict, *keys: str) -> str:
 
 
 async def _instagram(creds: dict, handle: str) -> dict:
+    from app.services.channel_service import IG_RECONNECT
+
     sendbox_id = str(creds.get("sendboxAccountId") or "").strip()
-    unipile_id = str(creds.get("unipileAccountId") or "").strip()
-    if sendbox_id or unipile_id:
-        name = handle.lstrip("@").strip() or sendbox_id or unipile_id
+    if sendbox_id:
+        name = handle.lstrip("@").strip() or sendbox_id
         return _ok(name, name)
-    token = _token(creds, "accessToken")
-    if not token:
-        return _unverified(handle, "توکن حرفه‌ای اینستاگرام را بگذار.")
-    async with async_client(timeout=20) as client:
-        response = await client.get(
-            f"{GRAPH_IG}/me",
-            params={"fields": "id,username"},
-            headers={"Authorization": f"Bearer {token}"},
-        )
-    payload = _json(response)
-    if response.status_code >= 400 or not payload.get("id"):
-        return _failed("توکن اینستاگرام قبول نشد. توکن Instagram Login با مجوز پیام لازم است.")
-    username = str(payload.get("username") or "").lstrip("@")
-    return _ok(handle or username, username or handle)
+    if str(creds.get("unipileAccountId") or "").strip() or _token(creds, "accessToken"):
+        name = handle.lstrip("@").strip()
+        return _unverified(name, IG_RECONNECT)
+    return _unverified(handle, "ورود رسمی BoxAPI را بزن.")
 
 
 async def _telegram(creds: dict, handle: str) -> dict:

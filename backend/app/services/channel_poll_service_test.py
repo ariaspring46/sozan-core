@@ -26,24 +26,23 @@ class ChannelPollBackoffTests(unittest.TestCase):
         channel_poll_service._note_poll_result(key, True)
         self.assertFalse(channel_poll_service._in_backoff(key))
 
-    def test_two_instagram_accounts_poll_in_same_gap(self) -> None:
+    def test_two_instagram_accounts_are_not_polled(self) -> None:
         accounts = [
-            {"platform": "instagram", "handle": "one", "unipileAccountId": "u1", "token": "t"},
-            {"platform": "instagram", "handle": "two", "unipileAccountId": "u2", "token": "t"},
+            {"platform": "instagram", "handle": "one", "credentials": {"unipileAccountId": "u1"}},
+            {"platform": "instagram", "handle": "two", "credentials": {"sendboxAccountId": "s1"}},
+            {"platform": "telegram", "handle": "bot", "credentials": {"botToken": "t"}},
         ]
         pull = AsyncMock(return_value={"ok": True})
         with (
             tenant_scope("09123456789"),
             patch("app.services.channel_poll_service.channel_service.iter_accounts", return_value=accounts),
-            patch("app.services.channel_poll_service.channel_service.token_for", return_value="t"),
-            patch("app.services.channel_poll_service.channel_service.unipile_account_id", side_effect=lambda row: row["unipileAccountId"]),
+            patch("app.services.channel_poll_service.channel_service.token_for", side_effect=lambda row: "t" if row["platform"] == "telegram" else ""),
             patch("app.services.channel_poll_service.plan_service.current", return_value={"dmSync": True}),
-            patch("app.services.channel_poll_service.unipile_service.pull_directs", pull),
+            patch("app.services.channel_poll_service.telegram_service.pull_updates", pull),
         ):
             asyncio.run(channel_poll_service.poll_tenant())
-        self.assertEqual(pull.call_count, 2)
-        pull.assert_any_call(account_id="u1", handle="one")
-        pull.assert_any_call(account_id="u2", handle="two")
+        self.assertEqual(pull.call_count, 1)
+        pull.assert_awaited_once_with(token="t", handle="bot")
 
     def test_poll_skip_emits_once_after_two_gap_cycles(self) -> None:
         emit = []

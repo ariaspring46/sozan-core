@@ -100,7 +100,9 @@ class UnipileServiceTests(unittest.TestCase):
                 with tenant_scope("09135409482"):
                     result = asyncio.run(unipile_service.claim_account(account_id="acc1", phone="09135409482"))
                     row = channel_service.secret_for(str(result["account"]["id"])) or {}
-                self.assertTrue(result["account"]["connected"])
+                self.assertTrue(result["account"]["needsReconnect"])
+                self.assertFalse(result["account"]["connected"])
+                self.assertEqual(result["account"]["error"], channel_service.IG_RECONNECT)
                 self.assertEqual(channel_service.unipile_account_id(row), "acc1")
                 self.assertTrue((Path(raw) / "tenants" / "09135409482" / "channels.json").is_file())
                 self.assertFalse((Path(raw) / "tenants" / "ig_handle" / "channels.json").exists())
@@ -131,7 +133,8 @@ class UnipileServiceTests(unittest.TestCase):
                 )
                 row = channel_service.secret_for(str(account["id"])) or {}
         self.assertEqual(account["handle"], "joahr")
-        self.assertTrue(account["connected"])
+        self.assertTrue(account["needsReconnect"])
+        self.assertFalse(account["connected"])
         self.assertEqual(channel_service.unipile_account_id(row), "acc1")
 
     def test_accept_webhook_imports_instagram_dm(self) -> None:
@@ -274,10 +277,9 @@ class UnipileServiceTests(unittest.TestCase):
 
 
 class UnipilePublishTests(unittest.TestCase):
-    def test_studio_uses_unipile_when_account_id_present(self) -> None:
-        from app.services import studio_publish_service
+    def test_studio_instagram_does_not_use_unipile(self) -> None:
+        from app.services import channel_service, studio_publish_service
 
-        publish = AsyncMock()
         with tempfile.TemporaryDirectory() as raw:
             path = Path(raw) / "pic-image.png"
             path.write_bytes(b"png")
@@ -288,28 +290,19 @@ class UnipilePublishTests(unittest.TestCase):
                 "app.services.studio_publish_service.channel_service.is_connected",
                 return_value=True,
             ), patch(
-                "app.services.studio_publish_service.channel_service.unipile_account_id",
-                return_value="acc1",
-            ), patch(
                 "app.services.studio_publish_service.chat_media_service.resolve",
                 return_value=path,
-            ), patch(
-                "app.services.studio_publish_service.unipile_service.publish_media",
-                new=publish,
             ):
-                result = asyncio.run(
-                    studio_publish_service.publish(
-                        platform="instagram",
-                        caption="کپشن اینستا",
-                        media_name=path.name,
-                        media_kind="image",
+                with self.assertRaises(ValueError) as ctx:
+                    asyncio.run(
+                        studio_publish_service.publish(
+                            platform="instagram",
+                            caption="کپشن اینستا",
+                            media_name=path.name,
+                            media_kind="image",
+                        )
                     )
-                )
-        self.assertTrue(result["ok"])
-        kwargs = publish.await_args.kwargs
-        self.assertEqual(kwargs["account_id"], "acc1")
-        self.assertEqual(kwargs["path"], path)
-        self.assertEqual(kwargs["caption"], "کپشن اینستا")
+        self.assertEqual(str(ctx.exception), channel_service.IG_STUDIO_WAIT)
 
 
 if __name__ == "__main__":

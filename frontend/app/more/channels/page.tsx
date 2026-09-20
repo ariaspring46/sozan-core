@@ -22,8 +22,6 @@ type Platform = {
   handlePlaceholder?: string;
   fields: Field[];
   oauth?: boolean;
-  oauthConfigured?: boolean;
-  unipileConfigured?: boolean;
   sendboxConfigured?: boolean;
   hubBot?: boolean;
 };
@@ -31,7 +29,7 @@ type Voice = { summary: string; tone: string; sampleReply: string };
 
 const INSTAGRAM_OAUTH_NOTICE: Record<string, string> = {
   ok: "اینستاگرام وصل شد.",
-  exists: "این پیج از قبل در سندباکس هست. از لیست انتخابش کن یا ورود برای ارسال پست را بزن.",
+  exists: "این پیج از قبل در BoxAPI هست. از لیست انتخابش کن.",
   denied: "اجازهٔ اینستاگرام داده نشد.",
   expired: "نشست ورود اینستاگرام تمام شد. دوباره از پنل وصل کن.",
   config: "اتصال اینستاگرام در سوزان هنوز تنظیم نشده.",
@@ -47,6 +45,7 @@ type Account = {
   connected: boolean;
   verified?: boolean;
   error?: string;
+  needsReconnect?: boolean;
   voiceReady?: boolean;
 };
 
@@ -182,7 +181,7 @@ export default function ChannelsPage() {
       );
       if (data.existing?.some((item) => !item.bound)) {
         setExisting(data.existing);
-        setNotice("این پیج از قبل در سندباکس هست. انتخابش کن.");
+        setNotice("این پیج از قبل در BoxAPI هست. انتخابش کن.");
         return;
       }
       if (data.existing?.some((item) => item.bound)) {
@@ -191,38 +190,10 @@ export default function ChannelsPage() {
         return;
       }
       if (data.url) window.location.href = data.url;
-      else setError("نشانی ورود اینستاگرام نیامد.");
+      else setError("نشانی ورود رسمی BoxAPI نیامد.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function startUnipile() {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const data = await api<{ url: string }>("/channels/unipile/connect");
-      if (data.url) window.location.href = data.url;
-      else setError("نشانی ورود یونی‌پایل نیامد.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا");
-      setBusy(false);
-    }
-  }
-
-  async function startMetaInstagram() {
-    setBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const data = await api<{ url: string }>("/channels/instagram/oauth");
-      if (data.url) window.location.href = data.url;
-      else setError("نشانی ورود اینستاگرام نیامد.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "خطا");
       setBusy(false);
     }
   }
@@ -287,7 +258,7 @@ export default function ChannelsPage() {
     >
       <div className="h-full space-y-4 overflow-y-auto p-4">
         <p className="text-sm text-muted">
-          اینستاگرام را با ورود رسمی Sendbox وصل کن. اگر بات سوزان روی هاب باشد، برای تلگرام فقط مقصد کانال را بگذار. پست استودیو برای تلگرام به کانالی که بات ادمین آن است می‌رود.
+          اینستاگرام را با ورود رسمی BoxAPI وصل کن. اگر بات سوزان روی هاب باشد، برای تلگرام فقط مقصد کانال را بگذار. پست استودیو برای تلگرام به کانالی که بات ادمین آن است می‌رود.
         </p>
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         {notice ? <p className="text-sm text-signal">{notice}</p> : null}
@@ -311,14 +282,9 @@ export default function ChannelsPage() {
                 اسناد اتصال {spec.label}
               </a>
             ) : null}
-            {spec?.id === "instagram" && (spec.sendboxConfigured || spec.unipileConfigured || spec.oauthConfigured) ? (
+            {spec?.id === "instagram" && spec.sendboxConfigured ? (
               <Button type="button" disabled={busy} onClick={() => void startInstagram()}>
-                ورود با اینستاگرام
-              </Button>
-            ) : null}
-            {spec?.id === "instagram" && spec.unipileConfigured ? (
-              <Button type="button" variant="ghost" disabled={busy} onClick={() => void startUnipile()}>
-                ورود برای ارسال پست
+                ورود رسمی BoxAPI
               </Button>
             ) : null}
             {existing.filter((item) => !item.bound).map((item) => (
@@ -345,13 +311,8 @@ export default function ChannelsPage() {
                 انتخاب @{item.username || item.id}
               </Button>
             ))}
-            {spec?.id === "instagram" && spec.oauthConfigured ? (
-              <Button type="button" variant="ghost" disabled={busy} onClick={() => void startMetaInstagram()}>
-                ورود رسمی متا
-              </Button>
-            ) : null}
-            {spec?.id === "instagram" && spec.oauth && !spec.sendboxConfigured && !spec.unipileConfigured && !spec.oauthConfigured ? (
-              <p className="text-xs text-warm">ورود اینستاگرام وقتی اتصال سوزان در سرور تنظیم شود روشن می‌شود.</p>
+            {spec?.id === "instagram" && spec.oauth && !spec.sendboxConfigured ? (
+              <p className="text-xs text-warm">ورود رسمی BoxAPI وقتی اتصال سوزان در سرور تنظیم شود روشن می‌شود.</p>
             ) : null}
             <Field label={spec?.handleLabel || "شناسه حساب"}>
               <Input
@@ -401,17 +362,34 @@ export default function ChannelsPage() {
                     {account.display ? <p className="text-xs text-muted">{account.display}</p> : null}
                     <p
                       className={
-                        account.verified ? "text-xs text-signal" : account.connected ? "text-xs text-muted" : "text-xs text-warm"
+                        account.needsReconnect
+                          ? "text-xs text-warm"
+                          : account.verified
+                            ? "text-xs text-signal"
+                            : account.connected
+                              ? "text-xs text-muted"
+                              : "text-xs text-warm"
                       }
                     >
-                      {account.verified ? "اتصال تأیید شد" : account.connected ? "توکن ذخیره شد" : "بدون توکن"}
+                      {account.needsReconnect
+                        ? "باید دوباره وصل شود"
+                        : account.verified
+                          ? "اتصال تأیید شد"
+                          : account.connected
+                            ? "وصل است"
+                            : "بدون اتصال"}
                       {account.voiceReady ? " · لحن یاد گرفته شد" : ""}
                     </p>
                     {account.error ? <p className="text-xs text-danger">{account.error}</p> : null}
                     <DestEditor account={account} disabled={busy} onAccounts={setAccounts} />
                   </div>
                   <div className="flex flex-col gap-2">
-                    {account.platform === "instagram" || account.platform === "telegram" ? (
+                    {account.platform === "instagram" && account.needsReconnect ? (
+                      <Button variant="ghost" disabled={busy} onClick={() => void startInstagram()}>
+                        ورود رسمی BoxAPI
+                      </Button>
+                    ) : null}
+                    {account.platform === "telegram" ? (
                       <Button
                         variant="ghost"
                         disabled={busy}
@@ -428,7 +406,7 @@ export default function ChannelsPage() {
                             .finally(() => setBusy(false));
                         }}
                       >
-                        {account.platform === "telegram" ? "خواندن پیام‌ها" : "خواندن دایرکت"}
+                        خواندن پیام‌ها
                       </Button>
                     ) : null}
                     <Button

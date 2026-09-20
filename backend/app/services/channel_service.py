@@ -11,12 +11,10 @@ SPECS = {
         "id": "instagram",
         "label": "اینستاگرام",
         "docs": "https://boxapi.ir/docs/instagram/dm/webhook/",
-        "help": "با دکمهٔ ورود اینستاگرام، صفحه از لینک اختصاصی Sendbox به سوزان وصل می‌شود. رمز را در فرم سوزان نگذار.",
+        "help": "اینستاگرام را با ورود رسمی BoxAPI وصل کن تا دایرکت مشتری بیاید. رمز را در فرم سوزان نگذار. اسکن ویترین عمومی با نام کاربری جداست.",
         "handleLabel": "نام کاربری صفحه",
         "handlePlaceholder": "@shop",
-        "fields": [
-            {"key": "accessToken", "label": "توکن دسترسی اینستاگرام", "secret": True, "required": False},
-        ],
+        "fields": [],
     },
     "telegram": {
         "id": "telegram",
@@ -69,6 +67,8 @@ SPECS = {
 }
 
 PLATFORMS = {key: spec["label"] for key, spec in SPECS.items()}
+IG_RECONNECT = "این پیج را دوباره با ورود رسمی BoxAPI وصل کن."
+IG_STUDIO_WAIT = "انتشار پست اینستاگرام از استودیو هنوز برای این اتصال آماده نیست."
 
 
 def _rows() -> list[dict]:
@@ -130,7 +130,7 @@ def is_connected(row: dict) -> bool:
     if platform == "whatsapp":
         return bool(token_for(row) and creds.get("phoneNumberId"))
     if platform == "instagram":
-        return bool(token_for(row) or unipile_account_id(row) or sendbox_account_id(row))
+        return bool(sendbox_account_id(row) or unipile_account_id(row) or token_for(row))
     return bool(token_for(row))
 
 
@@ -155,13 +155,14 @@ def publish_targets() -> list[dict]:
             ready = False
             hint = "شماره مقصد را در کانال‌ها بگذار."
         elif platform == "instagram":
-            if not (token_for(row) or unipile_account_id(row)):
+            if not sendbox_account_id(row):
                 ready = False
-                hint = (
-                    "برای ارسال پست یک‌بار با یونی‌پایل وارد شو."
-                    if sendbox_account_id(row)
-                    else str(pub.get("error") or "این حساب وصل نیست.")
+                hint = IG_RECONNECT if (unipile_account_id(row) or token_for(row)) else str(
+                    pub.get("error") or "این حساب وصل نیست."
                 )
+            else:
+                ready = False
+                hint = IG_STUDIO_WAIT
         elif not ready:
             hint = str(pub.get("error") or "این حساب وصل نیست.")
         rows.append({**pub, "ready": ready, "hint": hint})
@@ -174,6 +175,14 @@ def public(row: dict) -> dict:
     connected = is_connected(row)
     if platform == "whatsapp":
         connected = connected and bool(creds.get("phoneNumberId"))
+    error = str(row.get("error") or "")
+    needs_reconnect = False
+    if platform == "instagram" and not sendbox_account_id(row) and (
+        unipile_account_id(row) or token_for(row)
+    ):
+        connected = False
+        needs_reconnect = True
+        error = error or IG_RECONNECT
     post_target = str(row.get("postTarget") or creds.get("postTarget") or "").strip()
     return {
         "id": row.get("id"),
@@ -184,7 +193,8 @@ def public(row: dict) -> dict:
         "postTarget": post_target,
         "connected": connected,
         "verified": bool(row.get("verified")),
-        "error": row.get("error") or "",
+        "error": error,
+        "needsReconnect": needs_reconnect,
         "voiceReady": bool(row.get("voiceReady")),
         "at": row.get("at") or 0,
     }

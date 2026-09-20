@@ -2,6 +2,13 @@
 
 هر برنچ یک بند تاریخ‌دار اینجاست. رمز، توکن و `.env` ننویس.
 
+## 2026-09-20 — C0 ورود اینستا فقط BoxAPI
+
+- دکمه فقط «ورود رسمی BoxAPI» است؛ Unipile و OAuth متا از کانال‌ها و API ورود برداشته شد
+- ردیف‌های قدیمی Unipile/Meta حذف نمی‌شوند؛ `needsReconnect` و پیام فارسی اتصال مجدد
+- `deliver()` و حلقهٔ پول دیگر Unipile/Graph را صدا نمی‌زنند؛ دایرکت از وبهوک Sendbox می‌آید
+- حذف پیج، `PUT /service/accounts/{id}` با `is_active: false` می‌زند؛ کلاینت Sendbox از `socks5h` و `trust_env=False` می‌رود
+
 ## 2026-09-20 — B9 خرده‌ها
 
 - `idpay_verify` مبلغ سفارش را می‌فرستد و با پاسخ می‌سنجد

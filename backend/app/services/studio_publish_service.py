@@ -5,17 +5,13 @@ from pathlib import Path
 from app.services import (
     channel_service,
     chat_media_service,
-    instagram_service,
-    public_media_service,
     studio_chat_service,
     telegram_service,
-    unipile_service,
     whatsapp_service,
 )
 from app.services.observe_client import emit_later
 
 PLATFORMS = {"telegram", "instagram", "whatsapp"}
-KIND_TTL = {"image": 3600, "video": 7200}
 CAPTION_LIMITS = {"instagram": 2200, "telegram": 1024, "whatsapp": 1024}
 LABELS = {"instagram": "اینستاگرام", "telegram": "تلگرام", "whatsapp": "واتساپ"}
 
@@ -73,16 +69,7 @@ async def publish(
             else:
                 await telegram_service.send_photo(token=token, chat_id=target, path=path, caption=text)
         elif key == "instagram":
-            unipile_id = channel_service.unipile_account_id(row)
-            if unipile_id:
-                await unipile_service.publish_media(account_id=unipile_id, path=path, caption=text, kind=kind)
-            else:
-                url = public_media_service.public_url(name=path.name, ttl=KIND_TTL[kind])
-                token = channel_service.token_for(row)
-                if kind == "video":
-                    await instagram_service.publish_reel(token=token, video_url=url, caption=text)
-                else:
-                    await instagram_service.publish_image(token=token, image_url=url, caption=text)
+            raise ValueError(channel_service.IG_STUDIO_WAIT)
         else:
             creds = channel_service.credentials_for(row)
             target = channel_service.post_target_for(row)
