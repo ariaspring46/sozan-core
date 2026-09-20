@@ -6,6 +6,7 @@ import { ChatThread, type ChatMsg } from "@/components/chat-thread";
 import { DomainMenu, shopPublicUrl, type ShopState } from "@/components/domain-menu";
 import { ShopLiveBuild, type BuildLive, type PreviewPatch } from "@/components/shop-live-build";
 import { api } from "@/lib/api";
+import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
 import { cn } from "@/lib/utils";
 
 type ScanState = {
@@ -46,8 +47,8 @@ export default function ShopPage() {
   const [applyPatch, setApplyPatch] = useState<PreviewPatch | null>(null);
   const [seekPath, setSeekPath] = useState("");
   const prevStatus = useRef("");
-  const chatKey = useRef("");
-  const buildKey = useRef("");
+  const chatKey = useRef(emptyIdempotencySlot());
+  const buildKey = useRef(emptyIdempotencySlot());
 
   const apply = (data: ShopPayload) => {
     setShop(data.shop);
@@ -120,23 +121,25 @@ export default function ShopPage() {
   const runBuild = useCallback(async (rebuild?: boolean, reviseOnly?: boolean) => {
     setBusy(true);
     setError("");
+    const prompt = reviseOnly ? shop?.brand || "" : rebuild ? "از نو بساز" : shop?.brand || "";
+    const stamp = `${rebuild ? "1" : "0"}:${reviseOnly ? "1" : "0"}:${prompt}`;
+    const key = takeIdempotencyKey(buildKey.current, stamp);
     try {
-      const key = buildKey.current || crypto.randomUUID();
-      buildKey.current = key;
       const data = await api<ShopPayload & { result?: { error?: string } }>("/shop/build", {
         method: "POST",
         headers: { "Idempotency-Key": key },
         body: JSON.stringify({
-          prompt: reviseOnly ? shop?.brand || "" : rebuild ? "از نو بساز" : shop?.brand || "",
+          prompt,
           rebuild: Boolean(rebuild),
           reviseOnly: Boolean(reviseOnly),
         }),
       });
       apply(data);
       setApplyPatch(null);
-      buildKey.current = "";
+      finishIdempotencyKey(buildKey.current);
       if (data.result?.error) setError(data.result.error);
     } catch (err) {
+      finishIdempotencyKey(buildKey.current, err);
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
       setBusy(false);
@@ -223,9 +226,9 @@ export default function ShopPage() {
               setBusy(true);
               setPending(payload.text || payload.file?.name || "پیوست");
               setError("");
+              const stamp = `${payload.text}\0${viewPath}\0${viewTarget}\0${payload.file?.name || ""}:${payload.file?.size || 0}`;
+              const key = takeIdempotencyKey(chatKey.current, stamp);
               try {
-                const key = chatKey.current || crypto.randomUUID();
-                chatKey.current = key;
                 const body = new FormData();
                 body.set("text", payload.text);
                 body.set("viewPath", viewPath);
@@ -237,13 +240,14 @@ export default function ShopPage() {
                   body,
                 });
                 apply(data);
-                chatKey.current = "";
+                finishIdempotencyKey(chatKey.current);
                 if (data.patched) {
                   setApplyPatch(data.preview || {});
                   if (data.preview?.viewPath) setSeekPath(data.preview.viewPath);
                   if (data.preview?.reload || data.preview?.reset) setPreviewKey((value) => value + 1);
                 }
               } catch (err) {
+                finishIdempotencyKey(chatKey.current, err);
                 setError(err instanceof Error ? err.message : "خطا");
               } finally {
                 setPending("");

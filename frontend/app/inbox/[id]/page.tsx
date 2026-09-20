@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
 import { api } from "@/lib/api";
+import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
 
 type Thread = {
   id: string;
@@ -29,7 +30,7 @@ export default function InboxThreadPage() {
   const [pendingText, setPendingText] = useState("");
   const [pausing, setPausing] = useState(false);
   const [editDraftId, setEditDraftId] = useState("");
-  const replyKey = useRef("");
+  const replyKey = useRef(emptyIdempotencySlot());
   const seq = useRef(0);
   const busyRef = useRef(false);
 
@@ -71,16 +72,21 @@ export default function InboxThreadPage() {
   }, [load]);
 
   async function sendReply(text: string, draftId = "") {
-    const key = replyKey.current || crypto.randomUUID();
-    replyKey.current = key;
-    const data = await api<InboxSnap>(`/inbox/${id}/reply`, {
-      method: "POST",
-      headers: { "Idempotency-Key": key },
-      body: JSON.stringify({ text, draftId, deliver: true }),
-    });
-    replyKey.current = "";
-    setThread(data.thread);
-    setMessages(data.messages || []);
+    const stamp = `${text}\0${draftId}`;
+    const key = takeIdempotencyKey(replyKey.current, stamp);
+    try {
+      const data = await api<InboxSnap>(`/inbox/${id}/reply`, {
+        method: "POST",
+        headers: { "Idempotency-Key": key },
+        body: JSON.stringify({ text, draftId, deliver: true }),
+      });
+      finishIdempotencyKey(replyKey.current);
+      setThread(data.thread);
+      setMessages(data.messages || []);
+    } catch (err) {
+      finishIdempotencyKey(replyKey.current, err);
+      throw err;
+    }
   }
 
   async function togglePaused() {

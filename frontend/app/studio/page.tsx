@@ -6,6 +6,7 @@ import { ChatThread, type ChatMsg } from "@/components/chat-thread";
 import { StudioNav } from "@/components/studio-nav";
 import type { PublishTarget } from "@/components/studio-publish";
 import { api } from "@/lib/api";
+import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
 
 export default function StudioPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -13,9 +14,9 @@ export default function StudioPage() {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
-  const chatKey = useRef("");
-  const publishKey = useRef("");
-  const regenKey = useRef("");
+  const chatKey = useRef(emptyIdempotencySlot());
+  const publishKey = useRef(emptyIdempotencySlot());
+  const regenKey = useRef(emptyIdempotencySlot());
 
   async function load() {
     const data = await api<{ messages: ChatMsg[]; targets?: PublishTarget[]; composing?: boolean }>("/studio");
@@ -69,8 +70,8 @@ export default function StudioPage() {
             placeholder="بگو برای اینستاگرام، تلگرام یا واتساپ چه پستی می‌خواهی. تصویر را هم می‌توانی پیوست کنی."
             publishTargets={targets}
             onPublish={async (payload) => {
-              const key = publishKey.current || crypto.randomUUID();
-              publishKey.current = key;
+              const stamp = JSON.stringify(payload);
+              const key = takeIdempotencyKey(publishKey.current, stamp);
               try {
                 const data = await api<{ ok: boolean; skipped?: boolean; message?: string; messages?: ChatMsg[] }>("/studio/publish", {
                   method: "POST",
@@ -78,7 +79,7 @@ export default function StudioPage() {
                   body: JSON.stringify(payload),
                 });
                 if (!data.ok) throw new Error(data.message || "ارسال نشد");
-                publishKey.current = "";
+                finishIdempotencyKey(publishKey.current);
                 if (data.messages) setMessages(data.messages);
                 else {
                   const snap = await api<{ messages: ChatMsg[] }>("/studio");
@@ -86,6 +87,7 @@ export default function StudioPage() {
                 }
                 return { skipped: data.skipped, message: data.message };
               } catch (err) {
+                finishIdempotencyKey(publishKey.current, err);
                 setError(err instanceof Error ? err.message : "ارسال نشد");
                 throw err;
               }
@@ -102,8 +104,8 @@ export default function StudioPage() {
               }
             }}
             onRegenerate={async ({ messageId, part, file }) => {
-              const key = regenKey.current || crypto.randomUUID();
-              regenKey.current = key;
+              const stamp = `${messageId}\0${part}\0${file?.name || ""}:${file?.size || 0}`;
+              const key = takeIdempotencyKey(regenKey.current, stamp);
               const body = new FormData();
               body.set("messageId", messageId);
               body.set("part", part);
@@ -114,9 +116,10 @@ export default function StudioPage() {
                   headers: { "Idempotency-Key": key },
                   body,
                 });
-                regenKey.current = "";
+                finishIdempotencyKey(regenKey.current);
                 setMessages(data.messages || []);
               } catch (err) {
+                finishIdempotencyKey(regenKey.current, err);
                 setError(err instanceof Error ? err.message : "ساخت دوباره نشد");
                 throw err;
               }
@@ -125,8 +128,8 @@ export default function StudioPage() {
               setBusy(true);
               setPending(payload.text || payload.file?.name || "پیوست");
               setError("");
-              const key = chatKey.current || crypto.randomUUID();
-              chatKey.current = key;
+              const stamp = `${payload.text}\0${payload.file?.name || ""}:${payload.file?.size || 0}`;
+              const key = takeIdempotencyKey(chatKey.current, stamp);
               try {
                 const body = new FormData();
                 body.set("text", payload.text);
@@ -136,9 +139,10 @@ export default function StudioPage() {
                   headers: { "Idempotency-Key": key },
                   body,
                 });
-                chatKey.current = "";
+                finishIdempotencyKey(chatKey.current);
                 setMessages(data.messages || []);
               } catch (err) {
+                finishIdempotencyKey(chatKey.current, err);
                 setError(err instanceof Error ? err.message : "خطا");
                 throw err;
               } finally {
