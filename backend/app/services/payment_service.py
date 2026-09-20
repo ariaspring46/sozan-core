@@ -141,10 +141,18 @@ async def idpay_request(
     return {"authority": pay_id, "startPayUrl": link}
 
 
-async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: bool = False) -> dict:
+async def idpay_verify(
+    *,
+    order_id: str,
+    authority: str,
+    api_key: str,
+    sandbox: bool = False,
+    amount_toman: int = 0,
+) -> dict:
     key = api_key.strip()
     if not key:
         raise ValueError("کلید آیدی‌پی را در تنظیمات بگذار.")
+    expected = to_gateway_amount(amount_toman)
     headers = {"X-API-KEY": key, "Content-Type": "application/json", "Accept": "application/json"}
     if sandbox:
         headers["X-SANDBOX"] = "1"
@@ -152,13 +160,22 @@ async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: 
         response = await client.post(
             "https://api.idpay.ir/v1.1/payment/verify",
             headers=headers,
-            json={"id": authority, "order_id": order_id},
+            json={"id": authority, "order_id": order_id, "amount": expected},
         )
     body = _json(response)
     status_code = body.get("status")
     if response.status_code >= 400 or status_code not in {100, 101, 200}:
         raise ValueError("تأیید پرداخت آیدی‌پی ناموفق بود.")
     payment = body.get("payment") if isinstance(body.get("payment"), dict) else {}
+    paid = body.get("amount")
+    if paid is None:
+        paid = payment.get("amount")
+    try:
+        paid_amount = int(paid)
+    except (TypeError, ValueError):
+        paid_amount = -1
+    if paid_amount != expected:
+        raise ValueError("مبلغ تأیید آیدی‌پی با سفارش یکی نیست.")
     return {"ok": True, "refId": str(body.get("track_id") or payment.get("track_id") or ""), "code": status_code}
 
 

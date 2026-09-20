@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from app.config import settings
-from app.state_store import read_json, shared_lock, write_json
+from app.state_store import read_json, set_tenant, shared_lock, write_json
 
 
 class StateStoreGuardTests(unittest.TestCase):
@@ -49,3 +49,9 @@ class StateStoreGuardTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertIsInstance(stored, dict)
         self.assertEqual(len(stored), workers * steps)
+
+    def test_invalid_phone_logs_and_does_not_use_none(self) -> None:
+        with self.assertLogs("sozan.state", level="WARNING") as captured:
+            with self.assertRaises(ValueError):
+                set_tenant("")
+        self.assertTrue(any("_none" in line or "invalid tenant" in line for line in captured.output))

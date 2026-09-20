@@ -314,6 +314,7 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
                     authority=key,
                     api_key=api_key,
                     sandbox=bool(row.get("sandbox")),
+                    amount_toman=int(row.get("amount") or 0),
                 )
             else:
                 verified = await payment_service.zarinpal_verify(

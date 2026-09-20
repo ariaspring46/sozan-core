@@ -283,6 +283,7 @@ def _auto_reply_too_soon(thread: dict, now: int) -> bool:
 
 
 def _match_thread(rows: list[dict], *, platform: str, sender: str, sender_id: str, chat_id: str) -> dict | None:
+    named: list[dict] = []
     for row in rows:
         if row.get("platform") != platform:
             continue
@@ -290,8 +291,10 @@ def _match_thread(rows: list[dict], *, platform: str, sender: str, sender_id: st
             return row
         if sender_id and str(row.get("senderId") or "") == sender_id:
             return row
-        if not chat_id and not sender_id and str(row.get("sender") or "") == sender:
-            return row
+        if not chat_id and not sender_id and sender and str(row.get("sender") or "") == sender:
+            named.append(row)
+    if len(named) == 1:
+        return named[0]
     return None
 
 

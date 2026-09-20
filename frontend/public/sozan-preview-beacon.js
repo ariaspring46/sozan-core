@@ -16,6 +16,18 @@
     return url.pathname + (query ? "?" + query : "") + url.hash;
   }
 
+  function parentOrigin() {
+    try {
+      if (location.ancestorOrigins && location.ancestorOrigins.length) {
+        return location.ancestorOrigins[0];
+      }
+    } catch (err) {}
+    try {
+      if (document.referrer) return new URL(document.referrer).origin;
+    } catch (err) {}
+    return "";
+  }
+
   function report(extra) {
     var payload = {
       source: "sozan-preview",
@@ -27,7 +39,9 @@
     if (extra) {
       for (var key in extra) payload[key] = extra[key];
     }
-    window.parent.postMessage(payload, "*");
+    var origin = parentOrigin();
+    if (!origin) return;
+    window.parent.postMessage(payload, origin);
   }
 
   function loadPatches() {

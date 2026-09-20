@@ -353,6 +353,17 @@ class InboxModeTests(unittest.TestCase):
         self.assertEqual(deliver.await_count, 1)
         self.assertGreaterEqual(first["thread"]["count"], 1)
 
+    def test_name_match_only_when_unique(self) -> None:
+        rows = [
+            {"platform": "telegram", "sender": "علی", "chatId": "", "senderId": ""},
+            {"platform": "telegram", "sender": "علی", "chatId": "", "senderId": ""},
+        ]
+        self.assertIsNone(
+            inbox_service._match_thread(rows, platform="telegram", sender="علی", sender_id="", chat_id="")
+        )
+        found = inbox_service._match_thread(rows[:1], platform="telegram", sender="علی", sender_id="", chat_id="")
+        self.assertIs(found, rows[0])
+
 
 class RoutingTests(unittest.TestCase):
     def test_override_local_model(self) -> None:

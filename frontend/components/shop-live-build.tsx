@@ -71,6 +71,22 @@ function frameUrl(href: string, path: string, bust: number, mode: "design" | "br
   return `${origin}${clean}?sozan=${mode}&t=${bust}`;
 }
 
+function previewOrigin(href: string): string {
+  try {
+    const url = new URL(href);
+    if (url.protocol === "http:" || url.protocol === "https:") return url.origin;
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
+function postToPreview(win: Window | null | undefined, href: string, data: object) {
+  const origin = previewOrigin(href);
+  if (!win || !origin) return;
+  win.postMessage(data, origin);
+}
+
 function readOpen() {
   try {
     return localStorage.getItem(OPEN_KEY) !== "0";
@@ -262,7 +278,7 @@ function ShopLivePreview({
     if (!applyPatch) return;
     const win = frameRef.current?.contentWindow;
     if (applyPatch.reset) {
-      win?.postMessage({ source: "sozan-panel", type: "reset" }, "*");
+      postToPreview(win, href, { source: "sozan-panel", type: "reset" });
       setReload((value) => value + 1);
       return;
     }
@@ -270,8 +286,8 @@ function ShopLivePreview({
       setReload((value) => value + 1);
       return;
     }
-    win?.postMessage({ source: "sozan-panel", type: "apply", patch: applyPatch }, "*");
-  }, [applyPatch]);
+    postToPreview(win, href, { source: "sozan-panel", type: "apply", patch: applyPatch });
+  }, [applyPatch, href]);
 
   const bar = (
     <div className="flex items-center gap-1 border-b border-line/70 px-2 py-1.5">
@@ -390,10 +406,11 @@ function ShopLivePreview({
               setFrameLoaded(true);
               setFrameStale(false);
               if (!applyPatch || applyPatch.reload || applyPatch.reset) return;
-              frameRef.current?.contentWindow?.postMessage(
-                { source: "sozan-panel", type: "apply", patch: applyPatch },
-                "*",
-              );
+              postToPreview(frameRef.current?.contentWindow, href, {
+                source: "sozan-panel",
+                type: "apply",
+                patch: applyPatch,
+              });
             }}
           />
         </div>

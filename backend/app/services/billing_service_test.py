@@ -61,3 +61,75 @@ class BillingServiceTests(unittest.TestCase):
     def test_to_gateway_amount_rial(self) -> None:
         with patch.object(payment_service.env, "zarinpal_amount_unit", "rial"):
             self.assertEqual(payment_service.to_gateway_amount(490000), 4_900_000)
+
+    def test_idpay_verify_sends_amount_and_rejects_mismatch(self) -> None:
+        sent: dict = {}
+
+        class _Resp:
+            status_code = 200
+
+            def json(self):
+                return {"status": 100, "amount": 1, "track_id": "t1"}
+
+        class _Client:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, headers=None, json=None):
+                sent.update(json or {})
+                return _Resp()
+
+        with patch.object(payment_service.env, "zarinpal_amount_unit", "rial"), patch(
+            "app.services.payment_service.httpx.AsyncClient", _Client
+        ):
+            with self.assertRaises(ValueError) as ctx:
+                asyncio.run(
+                    payment_service.idpay_verify(
+                        order_id="o1",
+                        authority="id-1",
+                        api_key="k",
+                        amount_toman=490000,
+                    )
+                )
+        self.assertEqual(sent.get("amount"), 4_900_000)
+        self.assertIn("مبلغ", str(ctx.exception))
+
+    def test_idpay_verify_accepts_matching_amount(self) -> None:
+        class _Resp:
+            status_code = 200
+
+            def json(self):
+                return {"status": 100, "amount": 4_900_000, "track_id": "t9", "payment": {"track_id": "t9"}}
+
+        class _Client:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, headers=None, json=None):
+                return _Resp()
+
+        with patch.object(payment_service.env, "zarinpal_amount_unit", "rial"), patch(
+            "app.services.payment_service.httpx.AsyncClient", _Client
+        ):
+            out = asyncio.run(
+                payment_service.idpay_verify(
+                    order_id="o1",
+                    authority="id-1",
+                    api_key="k",
+                    amount_toman=490000,
+                )
+            )
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["refId"], "t9")

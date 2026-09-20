@@ -68,6 +68,7 @@ SHOP_LIVE_HINT = """فروشگاه همین الان زنده است. مصاحب
 PRICE_MISSING = "بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام."
 BUILD_MSG_ID = "shop-build-live"
 BUILD_BUSY = frozenset({"running", "queued"})
+JOB_STALE_SECONDS = 30 * 60
 EXPLICIT_BUILD = ("بیلد کن", "دوباره بیلد", "دوباره بساز", "rebuild", "فروشگاه را بساز")
 FULL_REBUILD = ("از نو بساز", "فروشگاه را از نو بساز", "قالب را از نو")
 BUILD_WORD = re.compile(r"(?:^|[\s،,])بساز(?:ش|ید)?(?:$|[\s،.])")
@@ -532,18 +533,41 @@ def _latest_job_for_slug(slug: str) -> dict | None:
     return usable[0] if usable else None
 
 
+def _job_is_stale(job: dict | None) -> bool:
+    if not job or str(job.get("status") or "") not in BUILD_BUSY:
+        return False
+    job_id = str(job.get("id") or "")
+    path = _fastpath_root() / "jobs" / f"{job_id}.json"
+    try:
+        age = time.time() - path.stat().st_mtime
+    except OSError:
+        return False
+    return age > JOB_STALE_SECONDS
+
+
+def _fail_stale_job(shop: dict, job: dict) -> dict:
+    shop["jobId"] = str(job.get("id") or shop.get("jobId") or "")
+    shop["status"] = "failed"
+    shop["error"] = _operator_error(str(job.get("error") or "")) or "ساخت قبلی تمام نشد. دوباره بساز."
+    return shop
+
+
 def _bind_live_job(shop: dict) -> dict:
     # Detached start can mint an id before the worker writes the file. Status then
     # misses the job; bind to the real latest job for this slug instead of a phantom id.
     slug = str(shop.get("slug") or "")
     current = _read_job_file(str(shop.get("jobId") or ""))
     if current and str(current.get("status") or "") in BUILD_BUSY:
+        if _job_is_stale(current):
+            return _fail_stale_job(shop, current)
         shop["jobId"] = str(current.get("id") or shop.get("jobId") or "")
         shop["status"] = "running"
         return shop
     latest = _latest_job_for_slug(slug)
     if not latest:
         return shop
+    if _job_is_stale(latest):
+        return _fail_stale_job(shop, latest)
     shop["jobId"] = str(latest.get("id") or "")
     status = str(latest.get("status") or "")
     shop["status"] = "ready" if status == "done" else status or shop.get("status") or "idle"

@@ -71,7 +71,8 @@ def set_tenant(phone: str) -> Token:
     try:
         return _tenant.set(normalize_phone(phone))
     except ValueError:
-        return _tenant.set("")
+        log.warning("invalid tenant phone; refusing tenants/_none")
+        raise
 
 
 def reset_tenant(token: Token) -> None:

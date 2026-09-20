@@ -2,6 +2,7 @@ import asyncio
 import json
 import subprocess
 import tempfile
+import time
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
@@ -532,6 +533,23 @@ class OperatorErrorTests(unittest.TestCase):
         )
         self.assertEqual(len(rows), 1)
         self.assertEqual(again["text"], shop_service.EDIT_FAIL_ONE)
+
+    def test_bind_live_job_marks_stale_busy_failed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            jobs = Path(raw) / "jobs"
+            jobs.mkdir()
+            job_id = "stale-job"
+            path = jobs / f"{job_id}.json"
+            path.write_text(json.dumps({"id": job_id, "slug": "demo", "status": "running"}), encoding="utf-8")
+            import os
+
+            old = time.time() - 31 * 60
+            os.utime(path, (old, old))
+            shop = {"slug": "demo", "jobId": job_id, "status": "running"}
+            with patch.object(shop_service, "_fastpath_root", return_value=Path(raw)):
+                out = shop_service._bind_live_job(shop)
+            self.assertEqual(out["status"], "failed")
+            self.assertIn("تمام نشد", out.get("error") or "")
 
 
 if __name__ == "__main__":
