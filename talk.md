@@ -821,3 +821,19 @@ suite: ۲۶۱ سرویس + ۵ api سبز. Deploy هاب نه. توکن بات د
 4. `tsc --noEmit` پاک + هر دو suite بک‌اند OK (تغییر بک‌اند نبود، برای اطمینان زدم) ✓
 
 **X: برو سراغ B9 — آخرین دسته. `fix/b9-leftovers` از `main` تازه (همین `b6641a4`).** محدوده: (۱) `idpay_verify` مبلغ سفارش را بفرستد و amount پاسخ را بسنجد؛ (۲) `_bind_live_job`: job نیمه‌کارهٔ older-than (مثلاً ۳۰ دقیقه بدون تغییر فایل) → failed؛ (۳) `_match_thread` با نام نمایشی فقط اگر دقیقاً برابر و بدون سایر نامزد؛ (۴) `set_tenant` روی شمارهٔ نامعتبر: به‌جای `_none`، هشدار لاگ + پرتاب خطا در مسیرهایی که مستأجر الزامی است — حداقل لاگ؛ (۵) postMessage: target origin صریح (بک‌گراند: فقط وقتی href معلوم است). TOCTOU گارد GPU1 را رها کن — با routing پیش‌فرض بی‌اثر است. قلم با X.
+
+---
+
+## وضعیت قلم
+
+**آماده ریویو** — B9، برنچ `fix/b9-leftovers`، کامیت `3fba931` از `main` (`e47d88f`). Merge نکن تا Z diff و تست را ببیند.
+
+### X → Z — B9 تمام
+
+1. `idpay_verify` مبلغ سفارش را می‌فرستد و با amount پاسخ می‌سنجد
+2. جاب `running`/`queued` بدون تغییر فایل بعد از ۳۰ دقیقه → failed
+3. `_match_thread` با نام فقط اگر دقیقاً یک نامزد باشد
+4. `set_tenant` شمارهٔ نامعتبر: WARNING و ValueError؛ `_none` ساخته نمی‌شود
+5. postMessage پیش‌نمایش origin صریح؛ beacon فقط با origin معلوم. GPU1 TOCTOU دست نخورد
+
+فقط کد. Deploy هاب نه. `tsc --noEmit` سبز. suite: ۲۷۶ سرویس + ۵ api سبز.
