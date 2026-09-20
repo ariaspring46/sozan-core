@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from app.config import settings
-from app.services import pay_service, payment_service, storefront_service
+from app.services import pay_service, payment_service, storefront_service, wallet_service, wallet_service
 from app.state_store import read_json, tenant_scope, write_json
 
 HUB = "11111111-1111-1111-1111-111111111111"
@@ -124,7 +124,7 @@ class ShopPayB1Tests(unittest.TestCase):
         self.assertNotEqual(empty["id"], "ord-a")
         self.assertNotEqual(empty["id"], "ord-b")
 
-    def test_finish_order_keeps_pending_if_mark_paid_fails(self) -> None:
+    def test_finish_order_drops_pending_if_mark_paid_fails(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
                 write_json(
@@ -164,18 +164,59 @@ class ShopPayB1Tests(unittest.TestCase):
                         asyncio.run(pay_service.finish_order(authority="AUTH99", ok=True))
                 pending = read_json("pay-pending.json", {}, shared=True)
                 order = pay_service.get_order("ord1")
-                with patch.object(
-                    payment_service,
-                    "zarinpal_verify",
-                    new=AsyncMock(return_value={"ok": True, "refId": "77", "code": 100}),
-                ):
-                    url = asyncio.run(pay_service.finish_order(authority="AUTH99", ok=True))
-                retry = pay_service.get_order("ord1")
-        self.assertIn("AUTH99", pending)
+        self.assertNotIn("AUTH99", pending)
         self.assertEqual(order["status"], "pending")
-        self.assertIn("pay=ok", url)
-        self.assertEqual(retry["status"], "paid")
-        self.assertEqual(retry["refId"], "77")
+
+    def test_mark_paid_twice_credits_wallet_once(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                row = {
+                    "id": "ord-dup",
+                    "title": "کیف",
+                    "amount": 1000,
+                    "productId": "",
+                    "qty": 1,
+                    "customer": "علی",
+                    "channel": "دایرکت",
+                    "owner": "hub",
+                    "commissionBps": 0,
+                    "status": "pending",
+                }
+                pay_service._mark_paid(row, ref_id="r1")
+                first = wallet_service.get()["available"]
+                row["status"] = "pending"
+                pay_service._mark_paid(row, ref_id="r2")
+                kinds = [item["kind"] for item in wallet_service.ledger() if item.get("orderId") == "ord-dup"]
+                self.assertEqual(first, 1000)
+                self.assertEqual(wallet_service.get()["available"], 1000)
+                self.assertEqual(kinds.count("sale_sozan"), 1)
+
+    def test_mark_paid_stock_shortage_emits(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                row = {
+                    "id": "ord-stock",
+                    "title": "کیف",
+                    "amount": 1000,
+                    "productId": "missing-product",
+                    "qty": 1,
+                    "customer": "علی",
+                    "channel": "دایرکت",
+                    "owner": "hub",
+                    "commissionBps": 0,
+                    "status": "pending",
+                    "lines": [{"productId": "missing-product", "qty": 1}],
+                }
+                with (
+                    patch.object(pay_service, "emit_later") as emit,
+                    self.assertLogs("sozan.pay", level="WARNING") as captured,
+                ):
+                    pay_service._mark_paid(row, ref_id="r1")
+        emit.assert_called()
+        payload = emit.call_args.kwargs
+        self.assertEqual(payload["title"], "stock-shortage")
+        self.assertEqual(payload["payload"]["productId"], "missing-product")
+        self.assertTrue(any("stock-shortage" in line for line in captured.output))
 
     def test_finish_order_drops_orphan_pending_when_order_missing(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

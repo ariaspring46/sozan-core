@@ -565,3 +565,9 @@ path traversal در `chat_media_service.resolve`، `compare_digest` در راز 
 4. `_inquiry_url` برای تلگرام با هندل فقط-رقمی: خالی برگردان یا username واقعی رد شو
 
 قلم با X. Deploy هاب هنوز نه — بعد از merge B3 به مالک اطلاع می‌دهیم.
+
+---
+
+## وضعیت قلم
+
+**قلم با X** — B3، برنچ `fix/b3-wallet-ledger` از `main` (`4a005e7`). B4 بعد از merge همین برنچ.

@@ -62,10 +62,29 @@ def _append(kind: str, amount: int, *, order_id: str = "", note: str = "") -> di
     return row
 
 
+def _sale_credited(order_id: str) -> bool:
+    token = str(order_id or "").strip()
+    if not token:
+        return False
+    rows = read_json("wallet-ledger.json", [])
+    if not isinstance(rows, list):
+        return False
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("orderId") or "") != token:
+            continue
+        if str(row.get("kind") or "") in {"sale_sozan", "sale_external"}:
+            return True
+    return False
+
+
 def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner: str) -> dict:
     amount = int(amount)
     commission = max(0, int(commission))
     with tenant_file_lock("wallet"):
+        if _sale_credited(order_id):
+            return dict(get())
         wallet = get()
         wallet["lifetimeSales"] = int(wallet["lifetimeSales"]) + amount
         if owner == "hub":
@@ -191,7 +210,7 @@ def decide_withdraw(withdraw_id: str, *, ok: bool, phone: str) -> dict:
             if ok:
                 found["status"] = "paid"
                 wallet["pendingWithdraw"] = max(0, int(wallet["pendingWithdraw"]) - amount)
-                _append("withdraw_paid", -amount, order_id=withdraw_id, note=str(found.get("iban") or ""))
+                _append("withdraw_paid", 0, order_id=withdraw_id, note=str(found.get("iban") or ""))
             else:
                 found["status"] = "rejected"
                 wallet["pendingWithdraw"] = max(0, int(wallet["pendingWithdraw"]) - amount)

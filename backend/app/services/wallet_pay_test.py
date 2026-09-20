@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 from app.config import settings
 from app.services import billing_service, pay_service, payment_service, plan_service, storefront_service, wallet_service
 from app.services.shop_service import _public_shop
-from app.state_store import tenant_scope, write_json
+from app.state_store import read_json, tenant_scope, write_json
 
 HUB = "11111111-1111-1111-1111-111111111111"
 OWN = "22222222-2222-2222-2222-222222222222"
@@ -48,6 +48,51 @@ class WalletPayTests(unittest.TestCase):
         self.assertEqual(route["owner"], "own")
         self.assertEqual(route["id"], "idpay")
         self.assertEqual(route["commissionBps"], 0)
+
+    def test_credit_sale_idempotent_on_order_id(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                first = wallet_service.credit_sale(
+                    amount=1000, commission=20, order_id="o1", note="کیف", owner="hub"
+                )
+                second = wallet_service.credit_sale(
+                    amount=1000, commission=20, order_id="o1", note="کیف", owner="hub"
+                )
+                kinds = [row["kind"] for row in wallet_service.ledger() if row.get("orderId") == "o1"]
+                self.assertEqual(first["available"], 980)
+                self.assertEqual(second["available"], 980)
+                self.assertEqual(wallet_service.get()["available"], 980)
+                self.assertEqual(kinds.count("sale_sozan"), 1)
+                self.assertEqual(kinds.count("commission"), 1)
+
+    def test_withdraw_ledger_matches_available(self) -> None:
+        def balance() -> int:
+            rows = read_json("wallet-ledger.json", [])
+            return sum(int(row.get("amount") or 0) for row in rows if isinstance(row, dict))
+
+        iban = "IR120170000000111111111111"
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                wallet_service.credit_sale(amount=1000, commission=0, order_id="seed", note="", owner="hub")
+                hold = wallet_service.request_withdraw(amount=400, iban=iban, name="علی")
+                after_hold = wallet_service.get()
+                self.assertEqual(balance(), after_hold["available"])
+                self.assertEqual(after_hold["pendingWithdraw"], 400)
+                wallet_service.decide_withdraw(hold["withdraw"]["id"], ok=True, phone="09135409482")
+                after_paid = wallet_service.get()
+                self.assertEqual(balance(), after_paid["available"])
+                self.assertEqual(after_paid["pendingWithdraw"], 0)
+                wallet_service.credit_sale(amount=500, commission=0, order_id="seed2", note="", owner="hub")
+                hold2 = wallet_service.request_withdraw(amount=200, iban=iban, name="علی")
+                wallet_service.decide_withdraw(hold2["withdraw"]["id"], ok=False, phone="09135409482")
+                after_reject = wallet_service.get()
+                self.assertEqual(balance(), after_reject["available"])
+                self.assertEqual(after_reject["pendingWithdraw"], 0)
+                kinds = [row["kind"] for row in wallet_service.ledger()]
+                self.assertIn("withdraw_paid", kinds)
+                self.assertIn("withdraw_reject", kinds)
+                self.assertEqual(after_paid["available"], 600)
+                self.assertEqual(after_reject["available"], 1100)
 
     def test_credit_hub_sale_nets_commission(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

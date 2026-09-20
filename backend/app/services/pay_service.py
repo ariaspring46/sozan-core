@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import secrets
 from time import time
 from uuid import uuid4
@@ -9,8 +10,11 @@ from uuid import uuid4
 from app.config import settings as env
 from app.phone import normalize_phone
 from app.services import payment_service, storefront_service, wallet_service
+from app.services.observe_client import emit_later
 from app.services.settings_service import get_settings
 from app.state_store import current_tenant, iter_tenants, read_json, shared_lock, tenant_scope, write_json
+
+log = logging.getLogger("sozan.pay")
 
 
 def public_pay_url(order_id: str) -> str:
@@ -319,9 +323,11 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
                 )
         except ValueError:
             return panel_pay_url(order_id, "fail")
-        _mark_paid(row, ref_id=str(verified.get("refId") or ""))
-        _save_orders(orders)
-        _drop_pending(key)
+        try:
+            _mark_paid(row, ref_id=str(verified.get("refId") or ""))
+            _save_orders(orders)
+        finally:
+            _drop_pending(key)
     return panel_pay_url(order_id, "ok")
 
 
@@ -349,10 +355,18 @@ def _mark_paid(row: dict, *, ref_id: str) -> None:
         channel=str(row.get("channel") or "دایرکت"),
     )
     for line in _stock_lines(row):
+        product_id = str(line["productId"])
         try:
-            storefront_service.adjust_stock(str(line["productId"]), -int(line["qty"]))
+            storefront_service.adjust_stock(product_id, -int(line["qty"]))
         except (KeyError, ValueError):
-            pass
+            log.warning("stock-shortage productId=%s", product_id)
+            emit_later(
+                kind="shop",
+                title="stock-shortage",
+                surface="shop",
+                status="failed",
+                payload={"productId": product_id},
+            )
 
 
 def find_tenant_by_slug(slug: str) -> str | None:
