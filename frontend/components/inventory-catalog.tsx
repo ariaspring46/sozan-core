@@ -12,6 +12,15 @@ import { api, catalogImageUrl } from "@/lib/api";
 import { money, priceText } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
 
+function missingPhoto(product: Product) {
+  const thumb = product.images?.[0] || product.image || "";
+  return !thumb || thumb.includes("hero.png");
+}
+
+function missingPrice(product: Product) {
+  return !(Number(product.price) > 0) || Boolean(product.priceNote);
+}
+
 function applyCatalog(
   data: CatalogResponse,
   setProducts: (rows: Product[]) => void,
@@ -71,11 +80,16 @@ export function InventoryCatalog() {
 
   const visible = useMemo(() => {
     const needle = query.trim();
-    return products.filter((product) => {
+    const rows = products.filter((product) => {
       if (category && product.category !== category) return false;
       if (!needle) return true;
       const blob = `${product.title} ${product.category || ""} ${product.subcategory || ""} ${product.sku || ""}`;
       return blob.includes(needle);
+    });
+    return [...rows].sort((left, right) => {
+      const leftGap = Number(missingPhoto(left) || missingPrice(left));
+      const rightGap = Number(missingPhoto(right) || missingPrice(right));
+      return rightGap - leftGap;
     });
   }, [products, query, category]);
 
@@ -184,20 +198,34 @@ export function InventoryCatalog() {
             {visible.map((product) => {
               const thumb = product.images?.[0] || product.image;
               const discounted = Boolean(product.discount && product.finalPrice);
+              const noPhoto = missingPhoto(product);
+              const noPrice = missingPrice(product);
               return (
                 <li key={product.id}>
                   <Card className="flex cursor-pointer items-start gap-3" onClick={() => setEditor(product)}>
-                    {thumb ? (
+                    {thumb && !noPhoto ? (
                       <AuthImage
                         src={catalogImageUrl(thumb)}
                         alt={product.title}
                         className="h-16 w-16 shrink-0 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="h-16 w-16 shrink-0 rounded-lg bg-canvas" />
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-canvas text-[11px] text-muted">
+                        بدون عکس
+                      </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{product.title}</p>
+                      {noPhoto || noPrice ? (
+                        <p className="mt-0.5 flex flex-wrap gap-1 text-[11px]">
+                          {noPhoto ? (
+                            <span className="rounded-full bg-danger/10 px-2 py-0.5 text-danger">بی‌عکس</span>
+                          ) : null}
+                          {noPrice ? (
+                            <span className="rounded-full bg-danger/10 px-2 py-0.5 text-danger">بی‌قیمت</span>
+                          ) : null}
+                        </p>
+                      ) : null}
                       {product.category || product.subcategory ? (
                         <p className="text-xs text-muted">
                           {[product.category, product.subcategory].filter(Boolean).join(" › ")}
