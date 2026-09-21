@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Clapperboard, Inbox, MessageCircle, MoreHorizontal, ShoppingBag, Store } from "lucide-react";
+import { Clapperboard, Inbox, Menu, MessageCircle, MoreHorizontal, ShoppingBag, Store, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SozanMark } from "@/components/sozan-mark";
 import { api } from "@/lib/api";
@@ -46,6 +46,20 @@ export function AppShell({
   const pathname = usePathname();
   useAppViewport();
   const [unread, setUnread] = useState(0);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,11 +84,47 @@ export function AppShell({
     };
   }, [pathname]);
 
+  const menuLabel = unread > 0 ? `فهرست، ${unread} خوانده‌نشده` : "فهرست";
+
   return (
     <div className="sozan-app-shell flex w-full overflow-hidden bg-canvas">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0px)]">
+        <header className="relative z-20 flex shrink-0 items-center gap-3 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
+          <button
+            type="button"
+            aria-label={menuLabel}
+            aria-expanded={open}
+            aria-controls="sozan-nav"
+            onClick={() => setOpen((value) => !value)}
+            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-warm"
+          >
+            {open ? <X size={20} /> : <Menu size={20} />}
+            {!open && unread > 0 ? (
+              <span className="absolute -end-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] text-onAccent">
+                {unreadLabel(unread)}
+              </span>
+            ) : null}
+          </button>
+          <SozanMark className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
+          <div className="min-w-0 flex-1">{header}</div>
+        </header>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
+      </div>
+      {open ? (
+        <button
+          type="button"
+          aria-label="بستن فهرست"
+          className="absolute inset-0 z-40 bg-ink/40"
+          onClick={() => setOpen(false)}
+        />
+      ) : null}
       <nav
+        id="sozan-nav"
         aria-label="ناوبری"
-        className="z-40 flex w-14 shrink-0 flex-col gap-1 border-e border-line bg-canvas px-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] md:w-44 md:px-2"
+        className={cn(
+          "absolute inset-y-0 start-0 z-50 flex w-44 flex-col gap-1 border-e border-line bg-canvas px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] transition-transform",
+          open ? "translate-x-0" : "pointer-events-none translate-x-full",
+        )}
       >
         {TABS.map((tab) => {
           const active = tabActive(pathname, tab.href);
@@ -87,7 +137,7 @@ export function AppShell({
               aria-current={active ? "page" : undefined}
               aria-label={badge ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label}
               className={cn(
-                "relative flex min-h-11 items-center justify-center gap-2 rounded-xl px-1 py-2 text-sm md:justify-start md:px-3",
+                "relative flex min-h-11 items-center justify-start gap-2 rounded-xl px-3 py-2 text-sm",
                 active ? "bg-paper text-warm" : "text-muted",
               )}
             >
@@ -100,20 +150,11 @@ export function AppShell({
                   </span>
                 ) : null}
               </span>
-              <span className="hidden truncate md:inline">{tab.label}</span>
+              <span className="truncate">{tab.label}</span>
             </Link>
           );
         })}
       </nav>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0px)]">
-        {header ? (
-          <header className="relative z-20 flex shrink-0 items-center gap-3 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
-            <SozanMark className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
-            <div className="min-w-0 flex-1">{header}</div>
-          </header>
-        ) : null}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
-      </div>
     </div>
   );
 }
