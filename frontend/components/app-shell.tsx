@@ -31,6 +31,11 @@ function tabActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function unreadLabel(count: number) {
+  if (count > 9) return "۹+";
+  return count.toLocaleString("fa-IR");
+}
+
 export function AppShell({
   children,
   header,
@@ -39,7 +44,7 @@ export function AppShell({
   header?: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const keyboardOpen = useAppViewport();
+  useAppViewport();
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -64,9 +69,43 @@ export function AppShell({
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [pathname]);
+
   return (
-    <div className="sozan-app-shell flex w-full flex-col overflow-hidden bg-canvas">
-      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col">
+    <div className="sozan-app-shell flex w-full overflow-hidden bg-canvas">
+      <nav
+        aria-label="ناوبری"
+        className="z-40 flex w-14 shrink-0 flex-col gap-1 border-e border-line bg-canvas px-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] md:w-44 md:px-2"
+      >
+        {TABS.map((tab) => {
+          const active = tabActive(pathname, tab.href);
+          const Icon = tab.icon;
+          const badge = tab.href === "/inbox" && unread > 0;
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              aria-current={active ? "page" : undefined}
+              aria-label={badge ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label}
+              className={cn(
+                "relative flex min-h-11 items-center justify-center gap-2 rounded-xl px-1 py-2 text-sm md:justify-start md:px-3",
+                active ? "bg-paper text-warm" : "text-muted",
+              )}
+            >
+              {active ? <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-accent" /> : null}
+              <span className="relative">
+                <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
+                {badge ? (
+                  <span className="absolute -end-2 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] text-onAccent">
+                    {unreadLabel(unread)}
+                  </span>
+                ) : null}
+              </span>
+              <span className="hidden truncate md:inline">{tab.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0px)]">
         {header ? (
           <header className="relative z-20 flex shrink-0 items-center gap-3 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
             <SozanMark className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
@@ -75,41 +114,6 @@ export function AppShell({
         ) : null}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
       </div>
-      <nav
-        className={cn(
-          "z-40 shrink-0 border-t border-line bg-canvas pb-[env(safe-area-inset-bottom,0px)]",
-          keyboardOpen && "hidden",
-        )}
-      >
-        <div className="grid grid-cols-6">
-          {TABS.map((tab) => {
-            const active = tabActive(pathname, tab.href);
-            const Icon = tab.icon;
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                aria-label={tab.href === "/inbox" && unread ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label}
-                className={cn(
-                  "relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-[11px] leading-tight",
-                  active ? "text-warm" : "text-muted",
-                )}
-              >
-                <span className="relative">
-                  <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
-                  {tab.href === "/inbox" && unread > 0 ? (
-                    <span className="absolute -end-2 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] text-onAccent">
-                      {unread > 9 ? "۹+" : unread}
-                    </span>
-                  ) : null}
-                </span>
-                {tab.label}
-                {active ? <span className="mt-0.5 h-1 w-1 rounded-full bg-accent" /> : <span className="mt-0.5 h-1 w-1" />}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
     </div>
   );
 }
