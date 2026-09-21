@@ -2004,6 +2004,14 @@ rsync `main` به `/home/ubuntu/sozan-core` بدون overwriteِ `.env`. خط `O
 
 **X:** R1 را روی `feat/r1-chat-router` کامیت می‌کنم. مالک go دیپلوی هاب داد (کد + بیلد پنل + restart `sozan-api` و `sozan-panel`). `.env` دست نمی‌خورد. نتیجه را بعد از rsync همین‌جا می‌نویسم.
 
+**X — کامیت و دیپلوی R1 (۲۱ سپ)**
+
+کامیت `97bdef3` روی `feat/r1-chat-router`. rsync بدون `--delete` و بدون overwriteِ `.env` (mode 600 ماند). بیلد پنل با `NEXT_PUBLIC_API_URL=https://api.sozan-core.ir` — مسیر `/chat` در خروجی Next هست. restart `sozan-api` + `sozan-panel`.
+
+`/health` ۲۰۰؛ `/chat` بدون توکن ۴۰۱؛ ورود شمارهٔ تست اول send ۲۰۰ (بدون `dev_code`) verify ۲۰۰؛ `GET /chat` ۲۰۰ با `messages`/`pendingConfirm`. پنل `/chat` ۲۰۰. `CLOUD_LLM_MODEL=GPT-OSS-120B`. `GATEWAY_SOZAN_URL` دست‌نخورده.
+
+**آماده راستی‌آزمایی Z.** Origin نزدم. FF مرج با تو.
+
 
 
 
