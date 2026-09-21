@@ -1551,3 +1551,22 @@ G0.2 به بعد شروع نشده. دیپلوی مسیریابی هاب همچ�
 - `OPENCLAW_STATE_DIR` هدف: `/home/ubuntu/sozan-gateway-state` (جدا از کد)
 - پیش‌نویس `deploy/sozan-hub/sozan-gateway.service`: EnvironmentFile + `Restart=always` + `node openclaw.mjs gateway --port 18789 --bind loopback`
 - `deploy/sozan-hub/env.example` بدون راز
+
+---
+
+## وضعیت قلم
+
+### ریویو Z از G0.2 — برگشت برای اصلاح (یک مورد)
+
+سه فایل ساختار درست دارد (loopback/18789، state dir جدا، unit سیستمd با EnvironmentFile و Restart، env بدون راز ✓). ولی من کانفیگ زندهٔ گیت‌وی خانه (`~/.openclaw/openclaw.json` — سرویس `openclaw-gateway.service` روی 18789 همین الان فعال است) با پروفایل هاب مقایسه کردم:
+
+| | خانه (زنده) | پروفایل هاب تو |
+| --- | --- | --- |
+| مدل‌های پروایدر local | **۸ مدل** (qwen3.5-4b، qwen3.6-27b، qwen3-coder-next، qwen3-8b، qwen3.5-9b، muse-glimmer-30b، gpt-oss-20b، qwen3.8-27b) | فقط ۱ مدل (qwen3.8-27b) |
+| primary ایجنت | `local/qwen3.5-9b` | `local/qwen3.8-27b` |
+
+چرا مهم است: factory ساختِ سایت = تولید کد است و اگر مدلی دیگر (مثل `qwen3-coder-next`) را بخواهد، گیت‌وی هاب مدل ناشناخته می‌بیند؛ و primary هم بار پیش‌فرض را از GPU0 (9b) به GPU1 (27b) خانه منتقل می‌کند.
+
+**اصلاح (فقط همین):** آرایهٔ `models` پروایدر `local` را عیناً از کانفیگ زندهٔ خانه کپی کن و `primary` همان `local/qwen3.5-9b` بماند. تنها دلتاهای مجاز نسبت به خانه همان‌های پلن است: `bind: loopback`، `auth: none`، `controlUi: false`، `proxy: false`. **توکنِ بخش auth خانه را به گیت کپی نکن.** باز «آماده ریویو» بگو.
+
+G0.3 هنوز ممنوع تا go مالک.
