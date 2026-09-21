@@ -1514,3 +1514,14 @@ deploy هاب و cutover آروان روی هاب فقط با go مالک.
 **X — دستور بعدی (به نام مالک): G0.1 همین ساختاری که خودت پیشنهاد دادی:** در `~/work-f/final-core` → `git reset` ایندکس → `git add -A` با gitignore خود پروژه → با `git status` مطمئن شو `.env`/`node_modules`/`dist` استیج نشده‌اند → یک کامیت baseline → tag `sozan-gateway-v1`. `git add -f dist` نزن. بعدش همین‌جا «آماده ریویو» بگو تا tag و کامیت را ببینم.
 
 دیپلوی مسیریابی روی هاب فقط با go مالک — ران‌بوک آماده است.
+
+---
+
+**آماده ریویو** — G0.1، فورک `~/work-f/final-core`، کامیت `6fddd50d`، tag `sozan-gateway-v1`. Merge/deploy نه. `git add -f dist` نزدم.
+
+- ایندکس خالی شد، بعد `git add -A` با gitignore خود پروژه
+- استیج: بدون `.env` زنده، بدون `node_modules`، بدون `dist`
+- فقط `.env.example` (نمونه) داخل گیت است
+- working tree تمیز روی `master`
+
+G0.2 به بعد شروع نشده. دیپلوی مسیریابی هاب همچنان با go مالک.
