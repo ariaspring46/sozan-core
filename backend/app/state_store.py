@@ -34,6 +34,7 @@ TENANT_JSON = (
     "router-messages.json",
     "router-pending.json",
     "router-usage.json",
+    "router-threads.json",
     "ig-seen.json",
     "unipile-seen.json",
     "sendbox-seen.json",

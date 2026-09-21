@@ -21,7 +21,7 @@ def _upload(value: object) -> UploadFile | None:
     return None
 
 
-async def read_chat_payload(request: Request) -> tuple[str, dict | None, str, str, str, str]:
+async def read_chat_payload(request: Request) -> tuple[str, dict | None, str, str, str, str, str]:
     ctype = request.headers.get("content-type") or ""
     if ctype.startswith("multipart/form-data"):
         form = await request.form()
@@ -39,10 +39,12 @@ async def read_chat_payload(request: Request) -> tuple[str, dict | None, str, st
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن یا فایل لازم است.")
         if len(text) > 4000:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن خیلی بلند است.")
-        return text, media, view_path, view_target, confirm_id, cancel_id
+        thread_id = str(form.get("threadId") or "").strip()[:32]
+        return text, media, view_path, view_target, confirm_id, cancel_id, thread_id
     try:
         payload = await request.json()
     except Exception as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "بدنه نامعتبر است.") from exc
     body = ChatIn.model_validate(payload)
-    return body.text.strip(), None, body.viewPath.strip(), body.viewTarget.strip(), "", ""
+    thread_id = str(payload.get("threadId") or "").strip()[:32] if isinstance(payload, dict) else ""
+    return body.text.strip(), None, body.viewPath.strip(), body.viewTarget.strip(), "", "", thread_id

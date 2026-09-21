@@ -6,11 +6,15 @@ import { ChatThread, type ChatMsg } from "@/components/chat-thread";
 import { api } from "@/lib/api";
 import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
 
+type ThreadRow = { id: string; title: string; at?: number };
+
 type ChatPayload = {
   messages: ChatMsg[];
   pendingConfirm?: { id: string; tool?: string; summary?: string } | null;
   brand?: string;
   notice?: string;
+  threadId?: string;
+  threads?: ThreadRow[];
 };
 
 function welcomeLines(brand: string) {
@@ -26,6 +30,8 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [pendingConfirm, setPendingConfirm] = useState<ChatPayload["pendingConfirm"]>(null);
   const [brand, setBrand] = useState("");
+  const [threadId, setThreadId] = useState("");
+  const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
@@ -33,16 +39,24 @@ export default function ChatPage() {
   const chatKey = useRef(emptyIdempotencySlot());
   const epoch = useRef(0);
   const busyRef = useRef(false);
+  const threadRef = useRef("");
 
   const apply = (data: ChatPayload) => {
     setMessages(data.messages || []);
     setPendingConfirm(data.pendingConfirm || null);
     setBrand(data.brand || "");
+    if (data.threadId) {
+      setThreadId(data.threadId);
+      threadRef.current = data.threadId;
+    }
+    if (data.threads) setThreads(data.threads);
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (id?: string) => {
     const seen = epoch.current;
-    const data = await api<ChatPayload>("/chat");
+    const wanted = id || threadRef.current;
+    const path = wanted ? `/chat?threadId=${encodeURIComponent(wanted)}` : "/chat";
+    const data = await api<ChatPayload>(path);
     if (seen !== epoch.current) return;
     apply(data);
   }, []);
@@ -68,7 +82,8 @@ export default function ChatPage() {
     setPending(confirmId || cancelId ? "" : text || file?.name || "پیوست");
     setError("");
     setNotice("");
-    const stamp = `${text}\0${file?.name || ""}:${file?.size || 0}\0${confirmId || ""}\0${cancelId || ""}`;
+    const current = threadRef.current;
+    const stamp = `${current}\0${text}\0${file?.name || ""}:${file?.size || 0}\0${confirmId || ""}\0${cancelId || ""}`;
     const key = takeIdempotencyKey(chatKey.current, stamp);
     try {
       let data: ChatPayload;
@@ -78,6 +93,7 @@ export default function ChatPage() {
         body.set("file", file);
         if (confirmId) body.set("confirmId", confirmId);
         if (cancelId) body.set("cancelId", cancelId);
+        if (current) body.set("threadId", current);
         data = await api<ChatPayload>("/chat", {
           method: "POST",
           headers: { "Idempotency-Key": key },
@@ -87,7 +103,12 @@ export default function ChatPage() {
         data = await api<ChatPayload>("/chat", {
           method: "POST",
           headers: { "Idempotency-Key": key },
-          body: JSON.stringify({ text, confirmId: confirmId || "", cancelId: cancelId || "" }),
+          body: JSON.stringify({
+            text,
+            confirmId: confirmId || "",
+            cancelId: cancelId || "",
+            threadId: current,
+          }),
         });
       }
       finishIdempotencyKey(chatKey.current);
@@ -107,12 +128,59 @@ export default function ChatPage() {
     }
   }
 
+  async function openThread(id: string) {
+    epoch.current += 1;
+    chatKey.current = emptyIdempotencySlot();
+    threadRef.current = id;
+    setThreadId(id);
+    setNotice("");
+    setError("");
+    await load(id);
+  }
+
+  async function startThread() {
+    epoch.current += 1;
+    chatKey.current = emptyIdempotencySlot();
+    setNotice("");
+    setError("");
+    const data = await api<ChatPayload>("/chat/threads", { method: "POST" });
+    apply(data);
+  }
+
   return (
     <AppShell
       header={
-        <div>
-          <p className="text-sm text-muted">گفتگو</p>
-          <h1 className="text-lg font-bold">سوزان</h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-muted">گفتگو</p>
+            <h1 className="text-lg font-bold">سوزان</h1>
+          </div>
+          {threads.length ? (
+            <label className="sr-only" htmlFor="sozan-thread">
+              گفتگوها
+            </label>
+          ) : null}
+          {threads.length ? (
+            <select
+              id="sozan-thread"
+              className="max-w-[9rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink"
+              value={threadId}
+              onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
+            >
+              {threads.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {row.title}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <button
+            type="button"
+            className="shrink-0 rounded-xl border border-line px-2 py-1 text-xs text-warm"
+            onClick={() => void startThread().catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
+          >
+            گفتگوی تازه
+          </button>
         </div>
       }
     >

@@ -56,6 +56,15 @@ class RouterChatApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["messages"], [])
 
+    def test_get_passes_thread_id(self) -> None:
+        with tenant_scope("09129900001"), patch(
+            "app.services.router_service.snapshot",
+            return_value={"messages": [], "threadId": "t9"},
+        ) as snap:
+            res = self.client.get("/chat", params={"threadId": "t9"})
+        self.assertEqual(res.status_code, 200)
+        snap.assert_called_once_with("t9")
+
     def test_post_idempotent(self) -> None:
         payload = {"messages": [{"role": "assistant", "text": "انجام شد"}], "pendingConfirm": None}
         with tenant_scope("09129900001"), patch(
@@ -88,6 +97,16 @@ class RouterChatApiTests(unittest.TestCase):
             res = self.client.post("/chat", json={"cancelId": "abc"})
         self.assertEqual(res.status_code, 200)
         self.assertEqual(turn.await_args.kwargs.get("cancel_id"), "abc")
+
+    def test_post_new_thread(self) -> None:
+        payload = {"messages": [], "pendingConfirm": None, "threadId": "n1", "threads": [{"id": "n1", "title": "گفتگوی تازه"}]}
+        with tenant_scope("09129900001"), patch(
+            "app.services.router_service.new_thread",
+            return_value=payload,
+        ):
+            res = self.client.post("/chat/threads")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["threadId"], "n1")
 
     def test_post_multipart_carries_confirm(self) -> None:
         payload = {"messages": [], "pendingConfirm": None}

@@ -22,7 +22,7 @@ def _idempotency_key(request: Request) -> str:
     return (request.headers.get("Idempotency-Key") or request.headers.get("X-Idempotency-Key") or "").strip()
 
 
-async def _read_payload(request: Request) -> tuple[str, dict | None, str, str, str, str]:
+async def _read_payload(request: Request) -> tuple[str, dict | None, str, str, str, str, str]:
     ctype = request.headers.get("content-type") or ""
     if ctype.startswith("multipart/form-data"):
         return await read_chat_payload(request)
@@ -37,30 +37,48 @@ async def _read_payload(request: Request) -> tuple[str, dict | None, str, str, s
     cancel_id = str(payload.get("cancelId") or "").strip()
     view_path = str(payload.get("viewPath") or "").strip()[:200]
     view_target = str(payload.get("viewTarget") or "").strip()[:80]
+    thread_id = str(payload.get("threadId") or "").strip()[:32]
     if not text and not confirm_id and not cancel_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن یا تأیید لازم است.")
     if len(text) > 4000:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن خیلی بلند است.")
-    return text, None, view_path, view_target, confirm_id, cancel_id
+    return text, None, view_path, view_target, confirm_id, cancel_id, thread_id
 
 
 @router.get("")
-async def get_chat(_user=Depends(require_permission("campaigns:read"))):
-    return router_service.snapshot()
+async def get_chat(threadId: str = "", _user=Depends(require_permission("campaigns:read"))):
+    return router_service.snapshot(threadId)
 
 
-async def _wait_cached(key: str):
+def _scope(thread_id: str) -> str:
+    return f"router-chat:{thread_id}" if thread_id else "router-chat"
+
+
+async def _wait_cached(scope: str, key: str, thread_id: str):
     for _ in range(40):
         await asyncio.sleep(0.5)
-        cached = idempotency_service.get("router-chat", key)
+        cached = idempotency_service.get(scope, key)
         if cached is not None:
             return cached
+        router_service._bind_thread(thread_id)
         if router_service.inflight_key() != key:
             return None
     return None
 
 
-async def _finish_turn(key: str, text: str, media, view_path: str, view_target: str, confirm_id: str, cancel_id: str):
+async def _finish_turn(
+    key: str,
+    text: str,
+    media,
+    view_path: str,
+    view_target: str,
+    confirm_id: str,
+    cancel_id: str,
+    thread_id: str,
+):
+    router_service._bind_thread(thread_id)
+    tid = router_service._THREAD.get()
+    scope = _scope(tid)
     try:
         out = await router_service.turn(
             text,
@@ -71,16 +89,18 @@ async def _finish_turn(key: str, text: str, media, view_path: str, view_target: 
             view_path=view_path,
             view_target=view_target,
             idempotency_key=key,
+            thread_id=tid,
         )
     except router_service.RouterBusy:
+        router_service._bind_thread(tid)
         if key and router_service.inflight_key() == key:
-            cached = await _wait_cached(key)
+            cached = await _wait_cached(scope, key, tid)
             if cached is not None:
                 return cached
-        snap = router_service.snapshot()
+        snap = router_service.snapshot(tid)
         snap["notice"] = router_service.STILL_WRITING
         return snap
-    idempotency_service.put("router-chat", key, out)
+    idempotency_service.put(scope, key, out)
     return out
 
 
@@ -90,8 +110,18 @@ async def post_chat(
     _user=Depends(require_permission("campaigns:write")),
 ):
     key = _idempotency_key(request)
-    text, media, view_path, view_target, confirm_id, cancel_id = await _read_payload(request)
-    cached = idempotency_service.get("router-chat", key)
+    text, media, view_path, view_target, confirm_id, cancel_id, thread_id = await _read_payload(request)
+    router_service._bind_thread(thread_id)
+    tid = router_service._THREAD.get()
+    cached = idempotency_service.get(_scope(tid), key)
     if cached is not None:
         return cached
-    return await _finish_turn(key, text, media, view_path, view_target, confirm_id, cancel_id)
+    return await _finish_turn(key, text, media, view_path, view_target, confirm_id, cancel_id, tid)
+
+
+@router.post("/threads")
+async def post_thread(_user=Depends(require_permission("campaigns:write"))):
+    try:
+        return router_service.new_thread()
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

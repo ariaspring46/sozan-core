@@ -23,8 +23,9 @@ class RouterServiceTests(unittest.TestCase):
         for item in self.patches:
             item.stop()
         self.tmp.cleanup()
+        router_service._THREAD.set("")
 
-    def _turn(self, text: str, complete, confirm_id: str = "", cancel_id: str = "", campaigns=None, media=None):
+    def _turn(self, text: str, complete, confirm_id: str = "", cancel_id: str = "", campaigns=None, media=None, thread_id: str = ""):
         with tenant_scope("09129900001"):
             return asyncio.run(
                 router_service.turn(
@@ -34,6 +35,7 @@ class RouterServiceTests(unittest.TestCase):
                     complete=complete,
                     campaigns=campaigns,
                     media=media,
+                    thread_id=thread_id,
                 )
             )
 
@@ -322,6 +324,7 @@ class RouterServiceTests(unittest.TestCase):
             return {"text": "سلام", "tool_calls": []}
 
         with tenant_scope("09129900001"):
+            router_service._bind_thread()
             token = router_service._claim_turn()
             self.assertTrue(token)
             try:
@@ -335,8 +338,9 @@ class RouterServiceTests(unittest.TestCase):
             return {"text": "سلام", "tool_calls": []}
 
         with tenant_scope("09129900001"):
+            tid = router_service._bind_thread()
             write_json(
-                "router-busy.json",
+                router_service._busy_name(tid),
                 {"token": "stale", "pid": 999999999, "until": time.time() + 200, "key": "old"},
             )
             out = asyncio.run(router_service.turn("سلام", complete=complete))
@@ -396,6 +400,47 @@ class RouterServiceTests(unittest.TestCase):
         self.assertNotIn('"k"', blob)
         self.assertNotIn("100001", blob)
         self.assertEqual(captured[0]["payload"]["tool"], "status")
+
+    def test_migrates_legacy_messages(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "خب", "tool_calls": []}
+
+        with tenant_scope("09129900001"):
+            write_json(
+                "router-messages.json",
+                [{"id": "m1", "role": "user", "text": "سلام قدیم", "at": 1}],
+            )
+        out = self._turn("ادامه", complete)
+        self.assertTrue(out["threadId"])
+        self.assertGreaterEqual(len(out["threads"]), 1)
+        texts = [row["text"] for row in out["messages"] if row["role"] == "user"]
+        self.assertIn("سلام قدیم", texts)
+        self.assertEqual(out["threads"][0]["title"], "سلام قدیم")
+
+    def test_two_threads_keep_separate_pending(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        first = self._turn("پیش‌نویس", complete)
+        tid1 = first["threadId"]
+        with tenant_scope("09129900001"):
+            second_meta = router_service.new_thread()
+        tid2 = second_meta["threadId"]
+        self.assertNotEqual(tid1, tid2)
+        other = self._turn("سلام", lambda *_: {"text": "جدا", "tool_calls": []}, thread_id=tid2)
+        self.assertEqual(other["threadId"], tid2)
+        self.assertIsNone(other.get("pendingConfirm"))
+        with tenant_scope("09129900001"):
+            held = router_service.snapshot(tid1)
+        self.assertEqual(held["pendingConfirm"]["tool"], "set_auto_reply")
+
+    def test_thread_cap(self) -> None:
+        with tenant_scope("09129900001"):
+            router_service.snapshot()
+            for _ in range(9):
+                router_service.new_thread()
+            with self.assertRaises(ValueError):
+                router_service.new_thread()
 
 
 if __name__ == "__main__":
