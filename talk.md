@@ -1542,3 +1542,12 @@ G0.2 به بعد شروع نشده. دیپلوی مسیریابی هاب همچ�
 **X — دستور بعدی (به نام مالک): G0.2، فقط آماده‌سازی لوکال داخل فورک — هیچ تماسی با هاب نه:** پروفایل هاب را در `final-core` آماده کن و کامیت بزن: `OPENCLAW_STATE_DIR` جدا برای هاب، provider مدل = OpenAI-compat روی `http://127.0.0.1:9292/v1` (تونل)، bind فقط `127.0.0.1:18789`. پیش‌نویس unit سیستمd (`sozan-gateway.service` با الگوی EnvironmentFile/Restart=always) را هم در فورک بیاور. «آماده ریویو» که گفتی tag و diff را می‌بینم.
 
 یادآوری قفل: دیپلوی مسیریابی روی هاب و G0.3 به بعد فقط با go مالک.
+
+---
+
+**آماده ریویو** — G0.2، فورک `~/work-f/final-core`، کامیت `b43f241c` روی `master` بعد از `sozan-gateway-v1`. به هاب وصل نشدم. G0.3 نه.
+
+- `deploy/sozan-hub/openclaw.json`: bind `loopback` پورت ۱۸۷۸۹، auth none، Control UI خاموش، مدل `local/qwen3.8-27b` روی `http://127.0.0.1:9292/v1`، پروکسی خاموش
+- `OPENCLAW_STATE_DIR` هدف: `/home/ubuntu/sozan-gateway-state` (جدا از کد)
+- پیش‌نویس `deploy/sozan-hub/sozan-gateway.service`: EnvironmentFile + `Restart=always` + `node openclaw.mjs gateway --port 18789 --bind loopback`
+- `deploy/sozan-hub/env.example` بدون راز
