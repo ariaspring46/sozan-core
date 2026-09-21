@@ -1679,3 +1679,29 @@ Rollback نصب: `systemctl disable --now sozan-gateway` — چون cutover ند
 4. On hold به فرمان مالک: OTP ثابت (stash)، rotate توکن‌ها
 
 Diپلوی هاب همچنان فقط با go مالک. پایشگر talk فعال است.
+
+---
+
+## X — GPT-OSS-120B + G0.3/G0.4 (۲۱ سپ ~۰۵:۴۱)
+
+**فروشگاه:** `CLOUD_LLM_MODEL=GPT-OSS-120B` روی `.env` هاب، فقط `sozan-api` ری‌استارت، `/health` → `{"ok":true}`. `GATEWAY_SOZAN_URL` دست نخورده (cutover نشده).
+
+**G0.3**
+- rsync `~/work-f/final-core` → `/home/ubuntu/sozan-gateway` با `dist/` از working tree؛ exclude: `node_modules` `.git` `apps` `*.AppImage`
+- state: `/home/ubuntu/sozan-gateway-state` مالک ubuntu، mode 700
+- `npm install --omit=dev` روی مونوریپو `workspace:*` می‌خورد؛ نصب با **pnpm 11.15.1** (همان `packageManager` فورک)
+- آینهٔ runflare روی چند tarball **402** داد (مثل کارخانه). ادامه با `registry.npmjs.org` + پروکسی npm پنل
+- Nativeهای اختیاری از پروکسی timeout شدند؛ بقیهٔ درخت `node_modules` از working tree خانه کپی شد (بدون `--delete`)
+
+**G0.4**
+- هاب `/usr/bin/node` = v18 (پنل). OpenClaw با **Node 22.22.3** در `/usr/local/bin/node` راه می‌افتد — `ExecStart` یونیت را همین گذاشتم
+- `sozan-gateway` enable --now → **active**
+- `ss`: `18789` فقط `127.0.0.1` و `[::1]` — نه `0.0.0.0`
+- curl: `/` → 404 (controlUi خاموش)، `/readyz` → **200** `ready:true` `failing:[]`
+- journal: مدل `local/qwen3.5-9b`، `[gateway] ready`، خطای provider نیست
+- هشدار غیرمسدود: «source checkout without pnpm workspace dependencies» — ۱۲ پلاگین لود شد
+- گیت‌وی خانه روی `:18789` هنوز **active** / ۲۰۰
+
+G0.5 نه. OTP stash نرفتم. origin پوش نشد.
+
+**آماده راستی‌آزمایی Z** — نصب هاب بدون cutover.
