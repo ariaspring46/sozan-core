@@ -79,6 +79,16 @@ class RouterChatApiTests(unittest.TestCase):
         turn.assert_awaited_once()
         self.assertEqual(turn.await_args.kwargs.get("confirm_id"), "abc")
 
+    def test_post_cancel_without_text(self) -> None:
+        payload = {"messages": [{"role": "assistant", "text": "باشه، انجامش نمی‌دهم."}], "pendingConfirm": None, "brand": ""}
+        with tenant_scope("09129900001"), patch(
+            "app.services.router_service.turn",
+            new=AsyncMock(return_value=payload),
+        ) as turn:
+            res = self.client.post("/chat", json={"cancelId": "abc"})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(turn.await_args.kwargs.get("cancel_id"), "abc")
+
 
 if __name__ == "__main__":
     unittest.main()

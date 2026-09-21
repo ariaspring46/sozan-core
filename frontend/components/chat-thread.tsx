@@ -6,6 +6,7 @@ import { Mic, Paperclip, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChatAttach } from "@/components/chat-attach";
+import { SozanMark } from "@/components/sozan-mark";
 import { StudioPublishCard, type PublishPayload, type PublishTarget, type StudioAttachment, type StudioCaptions } from "@/components/studio-publish";
 import { formatWhen } from "@/lib/digits";
 
@@ -84,6 +85,8 @@ export function ChatThread({
   welcomeLines,
   confirmId = "",
   onConfirm,
+  onCancel,
+  persona = "",
 }: {
   messages: ChatMsg[];
   busy: boolean;
@@ -105,6 +108,8 @@ export function ChatThread({
   welcomeLines?: string[];
   confirmId?: string;
   onConfirm?: (confirmId: string) => void;
+  onCancel?: (confirmId: string) => void;
+  persona?: string;
   showTime?: boolean;
 }) {
   const [draft, setDraft] = useState("");
@@ -224,18 +229,23 @@ export function ChatThread({
               <p className="pt-10 text-center text-sm leading-7 text-muted">پیام را پایین بنویس.</p>
             )
           ) : (
-            messages.map((msg) => (
+            messages.map((msg) => {
+              const assistantPersona = Boolean(persona) && msg.role === "assistant";
+              const bubble = (
               <article
-                key={msg.id}
+                key={assistantPersona ? undefined : msg.id}
                 className={cn(
-                  "max-w-[85%] px-3.5 py-2.5 text-sm leading-7",
-                  msg.kind === "build"
-                    ? "ms-auto rounded-2xl border border-line/70 bg-canvas text-warm"
+                  "px-3.5 py-2.5 text-sm leading-7",
+                  msg.kind === "confirm"
+                    ? "w-fit max-w-full rounded-2xl border border-warm/60 bg-canvas text-ink"
+                    : msg.kind === "build"
+                    ? "ms-auto w-fit max-w-[85%] rounded-2xl border border-line/70 bg-canvas text-warm"
                     : msg.role === "user"
-                      ? "ms-0 rounded-2xl bg-accent text-onAccent"
-                      : "ms-auto rounded-2xl border border-line/60 bg-paper text-ink",
+                      ? "ms-0 w-fit max-w-[85%] rounded-2xl bg-accent text-onAccent"
+                      : "ms-auto w-fit max-w-[85%] rounded-2xl border border-line/60 bg-paper text-ink",
                 )}
               >
+                {assistantPersona ? <p className="mb-1 text-[11px] text-warm">{persona}</p> : null}
                 {msg.platformLabel || msg.platform || msg.sender ? (
                   <p className="mb-1 text-[11px] text-warm">
                     {[msg.platformLabel || msg.platform, msg.sender].filter(Boolean).join(" · ")}
@@ -243,29 +253,40 @@ export function ChatThread({
                 ) : null}
                 {msg.text ? <p className="whitespace-pre-wrap">{sanitizeShopText(msg.text, sanitize)}</p> : null}
                 {msg.kind === "confirm" && msg.confirmId && onConfirm ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="mt-2 h-auto py-1 text-xs"
-                    disabled={busy || confirmId !== msg.confirmId}
-                    onClick={() => onConfirm(msg.confirmId || "")}
-                  >
-                    تأیید
-                  </Button>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      className="h-auto py-1 text-xs"
+                      disabled={busy || confirmId !== msg.confirmId}
+                      onClick={() => onConfirm(msg.confirmId || "")}
+                    >
+                      تأیید
+                    </Button>
+                    {onCancel ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-auto py-1 text-xs"
+                        disabled={busy || confirmId !== msg.confirmId}
+                        onClick={() => onCancel(msg.confirmId || "")}
+                      >
+                        انصراف
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : null}
                 {msg.kind === "ask" && msg.options?.length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {msg.options.map((option) => (
-                      <Button
+                      <button
                         key={option}
                         type="button"
-                        variant="ghost"
-                        className="h-auto py-1 text-xs"
+                        className="rounded-full border border-warm/40 bg-paper px-3 py-1 text-xs text-ink disabled:opacity-50"
                         disabled={busy}
                         onClick={() => void onSend({ text: option })}
                       >
                         {option}
-                      </Button>
+                      </button>
                     ))}
                   </div>
                 ) : null}
@@ -396,7 +417,15 @@ export function ChatThread({
                   </Link>
                 ) : null}
               </article>
-            ))
+              );
+              if (!assistantPersona) return bubble;
+              return (
+                <div key={msg.id} className="ms-auto flex w-fit max-w-[85%] items-end gap-2">
+                  {bubble}
+                  <SozanMark className="mb-1 h-8 w-8 shrink-0" glow={false} />
+                </div>
+              );
+            })
           )}
           {pendingText ? (
             <article className="ms-0 max-w-[85%] rounded-2xl bg-accent px-3.5 py-2.5 text-sm leading-7 text-onAccent opacity-80">

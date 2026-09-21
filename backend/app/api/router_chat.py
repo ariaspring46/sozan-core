@@ -19,11 +19,11 @@ def _idempotency_key(request: Request) -> str:
     return (request.headers.get("Idempotency-Key") or request.headers.get("X-Idempotency-Key") or "").strip()
 
 
-async def _read_payload(request: Request) -> tuple[str, dict | None, str, str, str]:
+async def _read_payload(request: Request) -> tuple[str, dict | None, str, str, str, str]:
     ctype = request.headers.get("content-type") or ""
     if ctype.startswith("multipart/form-data"):
         text, media, view_path, view_target = await read_chat_payload(request)
-        return text, media, view_path, view_target, ""
+        return text, media, view_path, view_target, "", ""
     try:
         payload = await request.json()
     except Exception as exc:
@@ -32,13 +32,14 @@ async def _read_payload(request: Request) -> tuple[str, dict | None, str, str, s
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "بدنه نامعتبر است.")
     text = str(payload.get("text") or "").strip()
     confirm_id = str(payload.get("confirmId") or "").strip()
+    cancel_id = str(payload.get("cancelId") or "").strip()
     view_path = str(payload.get("viewPath") or "").strip()[:200]
     view_target = str(payload.get("viewTarget") or "").strip()[:80]
-    if not text and not confirm_id:
+    if not text and not confirm_id and not cancel_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن یا تأیید لازم است.")
     if len(text) > 4000:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن خیلی بلند است.")
-    return text, None, view_path, view_target, confirm_id
+    return text, None, view_path, view_target, confirm_id, cancel_id
 
 
 @router.get("")
@@ -56,10 +57,11 @@ async def post_chat(
     cached = idempotency_service.get("router-chat", key)
     if cached is not None:
         return cached
-    text, media, view_path, view_target, confirm_id = await _read_payload(request)
+    text, media, view_path, view_target, confirm_id, cancel_id = await _read_payload(request)
     out = await router_service.turn(
         text,
         confirm_id=confirm_id,
+        cancel_id=cancel_id,
         campaigns=service,
         media=media,
         view_path=view_path,

@@ -107,7 +107,7 @@ TOOLS = [
     },
 ]
 
-SYSTEM = "تو روتر سوزان هستی. فارسی کوتاه، بدون مقدمه. تنظیمات با ابزار. فروشگاه=shop_chat، محتوا=studio_chat. دایرکت را جواب نده. مبهم=ask_user. کلید و JSON خام نشان نده."
+SYSTEM = "تو سوزان هستی. فارسی کوتاه، بدون مقدمه. تنظیمات با ابزار. فروشگاه=shop_chat، محتوا=studio_chat. دایرکت را جواب نده. مبهم=ask_user. کلید و JSON خام نشان نده."
 
 
 def _messages() -> list[dict]:
@@ -129,9 +129,14 @@ def _save_pending(row: dict | None) -> None:
 
 
 def snapshot() -> dict:
+    shop = read_json("shop.json", {})
+    brand = ""
+    if isinstance(shop, dict):
+        brand = str(shop.get("brand") or "").strip()[:40]
     return {
         "messages": _messages(),
         "pendingConfirm": _public_pending(_pending()),
+        "brand": brand,
     }
 
 
@@ -153,12 +158,16 @@ def _append(role: str, text: str, **extra) -> dict:
     return row
 
 
+_TONE_FA = {"warm": "گرم", "formal": "رسمی", "street": "کوچه", "luxury": "لوکس"}
+
+
 def _summary_for(name: str, args: dict) -> str:
     if name == "set_auto_reply":
         labels = {"": "خاموش", "draft": "پیش‌نویس", "send": "ارسال خودکار"}
         return f"پاسخ خودکار دایرکت بشود {labels.get(str(args.get('mode') or ''), '؟')}؟"
     if name == "set_voice_tone":
-        return f"لحن دایرکت بشود {args.get('toneId') or '؟'}؟"
+        tone = _TONE_FA.get(str(args.get("toneId") or ""), "؟")
+        return f"لحن دایرکت بشود {tone}؟"
     return "این تغییر اعمال شود؟"
 
 
@@ -248,7 +257,7 @@ async def _run_tool(
     if name == "shop_chat":
         from app.services import shop_service
 
-        text = str(args.get("text") or source_text or "").strip()
+        text = str(args.get("text") or source_text or "").strip()[:4000]
         out = await shop_service.chat(text, media, view_path, view_target)
         msgs = out.get("messages") or []
         last = next((m for m in reversed(msgs) if m.get("role") == "assistant"), None)
@@ -258,7 +267,7 @@ async def _run_tool(
             return "استودیو الان در دسترس نیست."
         from app.services import studio_chat_service
 
-        text = str(args.get("text") or source_text or "").strip()
+        text = str(args.get("text") or source_text or "").strip()[:4000]
         out = await studio_chat_service.chat(text, campaigns, media)
         msgs = out.get("messages") or []
         last = next((m for m in reversed(msgs) if m.get("role") == "assistant"), None)
@@ -321,10 +330,21 @@ def _ask_message(args: dict) -> tuple[str, list[str]]:
     return question, options
 
 
+def _tool_error(name: str, exc: Exception) -> str:
+    if isinstance(exc, ValueError):
+        text = str(exc).strip()
+        if text:
+            _emit("router-tool-error", {"tool": name, "error": text[:200]}, status="error")
+            return text
+    _emit("router-tool-error", {"tool": name, "error": type(exc).__name__}, status="error")
+    return "این کار انجام نشد. یک بار دیگر بگو."
+
+
 async def turn(
     text: str,
     *,
     confirm_id: str = "",
+    cancel_id: str = "",
     campaigns=None,
     complete=None,
     media=None,
@@ -333,6 +353,12 @@ async def turn(
 ) -> dict:
     spoken = (text or "").strip()
     pending = _pending()
+    if cancel_id and pending.get("id") == cancel_id:
+        tool = str(pending.get("tool") or "")
+        _save_pending(None)
+        _append("assistant", "باشه، انجامش نمی‌دهم.")
+        _emit("router-cancel", {"tool": tool})
+        return snapshot()
     if confirm_id and pending.get("id") == confirm_id:
         _save_pending(None)
         name = str(pending.get("tool") or "")
@@ -347,9 +373,8 @@ async def turn(
                 view_path=str(pending.get("viewPath") or ""),
                 view_target=str(pending.get("viewTarget") or ""),
             )
-        except ValueError as exc:
-            _append("assistant", str(exc))
-            _emit("router-tool-error", {"tool": name, "error": str(exc)[:200]}, status="error")
+        except Exception as exc:
+            _append("assistant", _tool_error(name, exc))
             return snapshot()
         _append("assistant", reply)
         _emit("router-tool", {"tool": name, "confirmed": True})
@@ -433,9 +458,8 @@ async def turn(
             view_path=view_path,
             view_target=view_target,
         )
-    except ValueError as exc:
-        _append("assistant", str(exc))
-        _emit("router-tool-error", {"tool": name, "error": str(exc)[:200]}, status="error")
+    except Exception as exc:
+        _append("assistant", _tool_error(name, exc))
         return snapshot()
     _append("assistant", reply)
     _emit("router-tool", {"tool": name})

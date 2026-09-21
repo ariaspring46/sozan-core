@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { ChatNav } from "@/components/chat-nav";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
 import { api } from "@/lib/api";
 import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
@@ -10,17 +9,22 @@ import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "
 type ChatPayload = {
   messages: ChatMsg[];
   pendingConfirm?: { id: string; tool?: string; summary?: string } | null;
+  brand?: string;
 };
 
-const WELCOME = [
-  "فروشگاه، محتوا یا دایرکت — همین‌جا بگو.",
-  "تغییر تنظیمات را با دکمه تأیید می‌کنی.",
-  "پیش‌نمایش فروشگاه در تب فروشگاه است.",
-];
+function welcomeLines(brand: string) {
+  const name = brand.trim();
+  return [
+    name ? `سلام، من سوزانم — برای ${name}.` : "سلام، من سوزانم.",
+    "فروشگاه، محتوا یا دایرکت را همین‌جا بگو.",
+    "تغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.",
+  ];
+}
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [pendingConfirm, setPendingConfirm] = useState<ChatPayload["pendingConfirm"]>(null);
+  const [brand, setBrand] = useState("");
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
@@ -29,6 +33,7 @@ export default function ChatPage() {
   const apply = (data: ChatPayload) => {
     setMessages(data.messages || []);
     setPendingConfirm(data.pendingConfirm || null);
+    setBrand(data.brand || "");
   };
 
   const load = useCallback(async () => {
@@ -40,11 +45,11 @@ export default function ChatPage() {
     void load().catch((err) => setError(err instanceof Error ? err.message : "خطا"));
   }, [load]);
 
-  async function send(text: string, file?: File, confirmId?: string) {
+  async function send(text: string, file?: File, confirmId?: string, cancelId?: string) {
     setBusy(true);
-    setPending(confirmId ? "" : text || file?.name || "پیوست");
+    setPending(confirmId || cancelId ? "" : text || file?.name || "پیوست");
     setError("");
-    const stamp = `${text}\0${file?.name || ""}:${file?.size || 0}\0${confirmId || ""}`;
+    const stamp = `${text}\0${file?.name || ""}:${file?.size || 0}\0${confirmId || ""}\0${cancelId || ""}`;
     const key = takeIdempotencyKey(chatKey.current, stamp);
     try {
       let data: ChatPayload;
@@ -52,7 +57,6 @@ export default function ChatPage() {
         const body = new FormData();
         body.set("text", text);
         body.set("file", file);
-        if (confirmId) body.set("confirmId", confirmId);
         data = await api<ChatPayload>("/chat", {
           method: "POST",
           headers: { "Idempotency-Key": key },
@@ -62,7 +66,7 @@ export default function ChatPage() {
         data = await api<ChatPayload>("/chat", {
           method: "POST",
           headers: { "Idempotency-Key": key },
-          body: JSON.stringify({ text, confirmId: confirmId || "" }),
+          body: JSON.stringify({ text, confirmId: confirmId || "", cancelId: cancelId || "" }),
         });
       }
       apply(data);
@@ -80,15 +84,12 @@ export default function ChatPage() {
     <AppShell
       header={
         <div>
-          <p className="text-sm text-muted">سوزان</p>
-          <h1 className="text-lg font-bold">چت</h1>
+          <p className="text-sm text-muted">گفتگو</p>
+          <h1 className="text-lg font-bold">سوزان</h1>
         </div>
       }
     >
       <div className="sozan-chat flex h-full flex-col">
-        <div className="px-4 pt-3">
-          <ChatNav current="chat" />
-        </div>
         {error ? (
           <p className="px-4 pt-3 text-sm text-danger" role="alert">
             {error}
@@ -100,10 +101,13 @@ export default function ChatPage() {
             busy={busy}
             pendingText={pending}
             welcome
-            welcomeLines={WELCOME}
-            placeholder="بگو فروشگاه، محتوا یا صندوق…"
+            welcomeLines={welcomeLines(brand)}
+            placeholder="به سوزان بگو…"
+            persona="سوزان"
+            showTime
             confirmId={pendingConfirm?.id || ""}
             onConfirm={(id) => void send("", undefined, id)}
+            onCancel={(id) => void send("", undefined, undefined, id)}
             onSend={async (payload) => {
               await send(payload.text, payload.file);
             }}

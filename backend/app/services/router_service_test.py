@@ -24,12 +24,13 @@ class RouterServiceTests(unittest.TestCase):
             item.stop()
         self.tmp.cleanup()
 
-    def _turn(self, text: str, complete, confirm_id: str = "", campaigns=None, media=None):
+    def _turn(self, text: str, complete, confirm_id: str = "", cancel_id: str = "", campaigns=None, media=None):
         with tenant_scope("09129900001"):
             return asyncio.run(
                 router_service.turn(
                     text,
                     confirm_id=confirm_id,
+                    cancel_id=cancel_id,
                     complete=complete,
                     campaigns=campaigns,
                     media=media,
@@ -165,6 +166,34 @@ class RouterServiceTests(unittest.TestCase):
             )
         out = self._turn("سلام", complete)
         self.assertIn("برای امروز کافی", out["messages"][-1]["text"])
+
+    def test_cancel_drops_pending(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_voice_tone", "arguments": {"toneId": "formal"}}]}
+
+        first = self._turn("لحن رسمی", complete)
+        self.assertIn("رسمی", first["messages"][-1]["text"])
+        self.assertNotIn("formal", first["messages"][-1]["text"])
+        cid = first["pendingConfirm"]["id"]
+        with patch("app.services.voice_service.apply_tone") as apply:
+            out = self._turn("", complete, cancel_id=cid)
+        apply.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("انجامش نمی‌دهم", out["messages"][-1]["text"])
+
+    def test_passthrough_exception_stays_persian(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {"text": "دکمه"}}]}
+
+        with patch(
+            "app.services.shop_service.chat",
+            new=AsyncMock(side_effect=RuntimeError("/tmp/secret-trace")),
+        ):
+            out = self._turn("دکمه", complete)
+        text = out["messages"][-1]["text"]
+        self.assertIn("انجام نشد", text)
+        self.assertNotIn("secret-trace", text)
+        self.assertNotIn("RuntimeError", text)
 
     def test_observe_strips_secrets(self) -> None:
         captured = []
