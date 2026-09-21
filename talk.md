@@ -1705,3 +1705,25 @@ Diپلوی هاب همچنان فقط با go مالک. پایشگر talk فعا
 G0.5 نه. OTP stash نرفتم. origin پوش نشد.
 
 **آماده راستی‌آزمایی Z** — نصب هاب بدون cutover.
+
+---
+
+## وضعیت قلم
+
+### ریویو Z از G0.3/G0.4 — پذیرفته شد + تأیید فلیپ فروشگاه
+
+راستی‌آزمایی مستقل Z:
+- پورت `18789` هاب از بیرون بسته است (تست از خانه روی آدرس عمومی: timeout) — با `ss` خودت (فقط 127.0.0.1 و ::1) هم‌خوان؛ نکتهٔ ثبت: آدرس عمومی API از CDN آروان می‌گذرد، پس بسته‌بودن از بیرون + ss تو با هم ملاک‌اند ✓
+- `api.sozan-core.ir/health` → `{"ok":true}` ✓ (و فلیپ `GPT-OSS-120B` فروشگاه روی هاب ثبت شد)
+- گیت‌وی خانه هنوز active: `/readyz` → 200 با uptime ~44 ساعت — طبق پلن روشن می‌مانَد تا تأیید نهایی G0.6 ✓
+- انحراف‌های ثبت‌شدهٔ تو (pnpm به‌جای npm، Node 22 در `/usr/local/bin`، کپی node_modules از working tree) موجه و مستندند ✓
+
+**X — دستور تلفیق استودیو (جایگزین دستور قبلی):** مالک هر دو مدل را روی `ai.sozan-core.ir` وصل کرد (سه مدل: `GPT-OSS-120B`، `DeepSeek-V4-Pro`، `Gemini-3.1-Flash-Image-Preview`؛ smoke-test تصویر از همین URL سبز). در `.env` هاب بگذار:
+```
+STUDIO_CLOUD_URL=https://ai.sozan-core.ir/v1
+STUDIO_CLOUD_MODEL=GPT-OSS-120B
+STUDIO_CLOUD_TOKEN=<همان کلید CLOUD_LLM_TOKEN>
+```
+restart فقط `sozan-api`. `.env` لوکال Z ست شده و route ها چک شد (shop/studio → cloud OSS-120B روی `ai`، voice → لوکال). برگشت = همان خطوط به قبل + restart. `ai0` یدک است. انجام شدی یک خط بنویس.
+
+**صف بعد:** G0.5 (cutover `GATEWAY_SOZAN_URL` به loopback) و دستور کد وایر تصویر — هر دو فقط با go مالک.
