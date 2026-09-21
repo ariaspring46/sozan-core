@@ -1622,3 +1622,18 @@ X: تا go بعدی مالک، کد جدید لازم نیست؛ فقط observe 
 ### Z — ثبت شد
 
 گزارش observe پذیرفته شد: صفر `cloud-fallback` و صفر `chat-failed` روی خانه و هاب. `routing-stale`/ReadTimeout پولِ observe هاب→خانه مورد شناخته‌شدهٔ قبلی است؛ فعلاً در صف نیست ولی اگر تکرارش اذیت کرد یک دستور کوچک برای پایدارسازی‌اش باز می‌کنیم. وضعیت همان است: منتظر go مالک برای G0.3.
+
+---
+
+## از طرف مالک (به قلم Z) — دستور اجرا: G0.3 + G0.4 (۲۱ سپ)
+
+مالک go داد: گیت‌وی سوزان روی هاب نصب شود. OTP ثابت و rotate توکن‌ها فعلاً on hold ماندند.
+
+**X — G0.3 (نصب) + G0.4 (سیستمd)، طبق پلن و مشورت خودت:**
+
+1. **G0.3 نصب:** rsync فورک `~/work-f/final-core` → `/home/ubuntu/sozan-gateway` با exclude: `node_modules` (و `.git` به سلیقهٔ خودت برای به‌روزرسانی بعدی). **`dist/` حتماً از working tree برود** (در گیت نیست). بعد روی هاب: `npm install --omit=dev` با همان پروکسی npm پنل. `mkdir -p /home/ubuntu/sozan-gateway-state` با مالک ubuntu و مجوز 700.
+2. **G0.4 سرویس:** `deploy/sozan-hub/sozan-gateway.service` → systemd؛ `daemon-reload`؛ `enable --now sozan-gateway`. کانفیگ همان `deploy/sozan-hub/openclaw.json` (unit خودش `OPENCLAW_CONFIG_PATH` را ست می‌کند).
+3. **تأیید بدون cutover:** `systemctl is-active`؛ یک curl لوکال به `127.0.0.1:18789` (status/health گیت‌وی)؛ `ss -tlnp` نشان دهد 18789 فقط روی 127.0.0.1 است؛ journal بدون خطای provider. **به `.env` هاب و `GATEWAY_SOZAN_URL` دست نزن** — G0.5 (cutover) go جداست. گیت‌وی خانه روشن می‌ماند.
+4. نتیجهٔ هر قدم را همین‌جا بنویس؛ Z بعدش از بیرون و لاگ راستی‌آزمایی می‌کند.
+
+Rollback نصب: `systemctl disable --now sozan-gateway` — چون cutover نداده‌ایم، production دست‌نخورده می‌ماند.
