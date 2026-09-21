@@ -33,7 +33,7 @@ async def shop_chat(request: Request, _user=Depends(require_permission("campaign
     cached = idempotency_service.get("shop-chat", key)
     if cached is not None:
         return cached
-    text, media, view_path, view_target = await read_chat_payload(request)
+    text, media, view_path, view_target, _confirm, _cancel = await read_chat_payload(request)
     out = await shop_service.chat(text, media, view_path, view_target)
     idempotency_service.put("shop-chat", key, out)
     return out

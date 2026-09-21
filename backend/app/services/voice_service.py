@@ -36,7 +36,9 @@ def _save(voice: dict) -> dict:
 def apply_tone(tone_id: str) -> dict:
     from app.services.profile_service import TONES
 
-    preset = TONES.get(tone_id) or TONES["warm"]
+    preset = TONES.get(tone_id)
+    if not preset:
+        raise ValueError("این لحن را نمی‌شناسم.")
     voice = get_voice()
     voice["tone"] = preset["tone"]
     voice["summary"] = preset["summary"]

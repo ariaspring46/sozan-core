@@ -231,6 +231,21 @@ export function ChatThread({
           ) : (
             messages.map((msg) => {
               const assistantPersona = Boolean(persona) && msg.role === "assistant";
+              const wide = Boolean(
+                msg.kind === "build" ||
+                  msg.campaignId ||
+                  msg.compose ||
+                  msg.captions ||
+                  msg.attachments?.length ||
+                  (msg.mediaKind && msg.mediaName),
+              );
+              const tone =
+                msg.kind === "build"
+                  ? "ms-auto rounded-2xl border border-line/70 bg-canvas text-warm"
+                  : msg.role === "user"
+                    ? "ms-0 rounded-2xl bg-accent text-onAccent"
+                    : "ms-auto rounded-2xl border border-line/60 bg-paper text-ink";
+              const width = assistantPersona && wide ? "min-w-0 flex-1" : wide ? "w-full max-w-[85%]" : "w-fit max-w-[85%]";
               const bubble = (
               <article
                 key={assistantPersona ? undefined : msg.id}
@@ -238,11 +253,7 @@ export function ChatThread({
                   "px-3.5 py-2.5 text-sm leading-7",
                   msg.kind === "confirm"
                     ? "w-fit max-w-full rounded-2xl border border-warm/60 bg-canvas text-ink"
-                    : msg.kind === "build"
-                    ? "ms-auto w-fit max-w-[85%] rounded-2xl border border-line/70 bg-canvas text-warm"
-                    : msg.role === "user"
-                      ? "ms-0 w-fit max-w-[85%] rounded-2xl bg-accent text-onAccent"
-                      : "ms-auto w-fit max-w-[85%] rounded-2xl border border-line/60 bg-paper text-ink",
+                    : cn(width, tone),
                 )}
               >
                 {assistantPersona ? <p className="mb-1 text-[11px] text-warm">{persona}</p> : null}
@@ -252,6 +263,13 @@ export function ChatThread({
                   </p>
                 ) : null}
                 {msg.text ? <p className="whitespace-pre-wrap">{sanitizeShopText(msg.text, sanitize)}</p> : null}
+                {msg.captions && !onPublish ? (
+                  <div className="mt-2 space-y-1 text-[11px] leading-6 text-muted">
+                    {msg.captions.instagram ? <p className="whitespace-pre-wrap">اینستاگرام: {msg.captions.instagram}</p> : null}
+                    {msg.captions.telegram ? <p className="whitespace-pre-wrap">تلگرام: {msg.captions.telegram}</p> : null}
+                    {msg.captions.whatsapp ? <p className="whitespace-pre-wrap">واتساپ: {msg.captions.whatsapp}</p> : null}
+                  </div>
+                ) : null}
                 {msg.kind === "confirm" && msg.confirmId && onConfirm ? (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button
@@ -420,7 +438,7 @@ export function ChatThread({
               );
               if (!assistantPersona) return bubble;
               return (
-                <div key={msg.id} className="ms-auto flex w-fit max-w-[85%] items-end gap-2">
+                <div key={msg.id} className={cn("ms-auto flex items-end gap-2", wide ? "w-full max-w-[85%]" : "w-fit max-w-[85%]")}>
                   {bubble}
                   <SozanMark className="mb-1 h-8 w-8 shrink-0" glow={false} />
                 </div>

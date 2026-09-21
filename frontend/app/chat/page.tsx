@@ -29,6 +29,8 @@ export default function ChatPage() {
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
   const chatKey = useRef(emptyIdempotencySlot());
+  const epoch = useRef(0);
+  const busyRef = useRef(false);
 
   const apply = (data: ChatPayload) => {
     setMessages(data.messages || []);
@@ -37,7 +39,9 @@ export default function ChatPage() {
   };
 
   const load = useCallback(async () => {
+    const seen = epoch.current;
     const data = await api<ChatPayload>("/chat");
+    if (seen !== epoch.current) return;
     apply(data);
   }, []);
 
@@ -45,7 +49,19 @@ export default function ChatPage() {
     void load().catch((err) => setError(err instanceof Error ? err.message : "خطا"));
   }, [load]);
 
+  useEffect(() => {
+    const composing = messages.some((msg) => msg.compose?.status === "running");
+    if (!composing) return;
+    const timer = window.setInterval(() => {
+      if (busyRef.current) return;
+      void load().catch(() => undefined);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [messages, load]);
+
   async function send(text: string, file?: File, confirmId?: string, cancelId?: string) {
+    const seen = ++epoch.current;
+    busyRef.current = true;
     setBusy(true);
     setPending(confirmId || cancelId ? "" : text || file?.name || "پیوست");
     setError("");
@@ -57,6 +73,8 @@ export default function ChatPage() {
         const body = new FormData();
         body.set("text", text);
         body.set("file", file);
+        if (confirmId) body.set("confirmId", confirmId);
+        if (cancelId) body.set("cancelId", cancelId);
         data = await api<ChatPayload>("/chat", {
           method: "POST",
           headers: { "Idempotency-Key": key },
@@ -69,12 +87,15 @@ export default function ChatPage() {
           body: JSON.stringify({ text, confirmId: confirmId || "", cancelId: cancelId || "" }),
         });
       }
-      apply(data);
       finishIdempotencyKey(chatKey.current);
+      if (seen === epoch.current) apply(data);
     } catch (err) {
+      if (seen !== epoch.current) return;
       finishIdempotencyKey(chatKey.current, err);
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
+      if (seen !== epoch.current) return;
+      busyRef.current = false;
       setPending("");
       setBusy(false);
     }
@@ -105,6 +126,7 @@ export default function ChatPage() {
             placeholder="به سوزان بگو…"
             persona="سوزان"
             showTime
+            sanitize
             confirmId={pendingConfirm?.id || ""}
             onConfirm={(id) => void send("", undefined, id)}
             onCancel={(id) => void send("", undefined, undefined, id)}

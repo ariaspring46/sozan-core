@@ -98,6 +98,13 @@ class ChatHistoryTests(unittest.TestCase):
         )
         self.assertEqual([row["content"] for row in rows], ["خب"])
 
+    def test_router_keeps_user_links(self) -> None:
+        rows = visible_chat_turns(
+            [{"role": "user", "text": "اسکن https://instagram.com/shop"}],
+            keep_links=True,
+        )
+        self.assertIn("instagram.com", rows[0]["content"])
+
 
 def _route_settings(**extra) -> dict:
     values = {

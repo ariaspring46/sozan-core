@@ -581,14 +581,22 @@ async def complete_json(system: str, user: str, *, surface: str = "llm", max_tok
     return data
 
 
-def visible_chat_turns(turns: list[dict], *, limit: int = 12) -> list[dict]:
+def _skip_user_turn(text: str, *, keep_links: bool) -> bool:
+    has_url = bool(re.search(r"https?://", text))
+    has_secret = bool(re.search(r"[A-Fa-f0-9]{24,}", text))
+    if keep_links and has_url:
+        return False
+    return has_url or has_secret
+
+
+def visible_chat_turns(turns: list[dict], *, limit: int = 12, keep_links: bool = False) -> list[dict]:
     messages: list[dict] = []
     for turn in turns[-limit:]:
         role = "assistant" if turn.get("role") == "assistant" else "user"
         text = str(turn.get("text") or "").strip()
         if not text:
             continue
-        if role == "user" and re.search(r"https?://|[A-Fa-f0-9]{24,}", text):
+        if role == "user" and _skip_user_turn(text, keep_links=keep_links):
             continue
         if role == "assistant" and (
             any(token in text for token in STALE_ASSISTANT)
@@ -624,6 +632,7 @@ async def complete_tools(
     tools: list[dict],
     temperature: float = 0.2,
     max_tokens: int = ROUTER_MAX_TOKENS,
+    timeout: float | None = None,
 ) -> dict:
     """One cloud tool-call round for the product router. No local fallback."""
     route = route_for_surface("router")
@@ -641,8 +650,8 @@ async def complete_tools(
     scheme = _auth_scheme(route.get("auth"))
     headers["Authorization"] = f"{scheme} {route['token']}"
     headers["User-Agent"] = CLOUD_UA
-    timeout = CLOUD_PRIMARY_TIMEOUT
-    async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route["proxy"]) as client:
+    client_timeout = CLOUD_PRIMARY_TIMEOUT if timeout is None else timeout
+    async with httpx.AsyncClient(timeout=client_timeout, trust_env=False, proxy=route["proxy"]) as client:
         res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
         res.raise_for_status()
         payload = res.json()

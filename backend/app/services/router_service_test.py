@@ -83,7 +83,7 @@ class RouterServiceTests(unittest.TestCase):
 
     def test_shop_passthrough(self) -> None:
         async def complete(_messages, _tools):
-            return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {"text": "دکمه را زرشکی کن"}}]}
+            return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {"text": "بساز"}}]}
 
         with patch(
             "app.services.shop_service.chat",
@@ -91,6 +91,7 @@ class RouterServiceTests(unittest.TestCase):
         ) as chat:
             out = self._turn("دکمه را زرشکی کن", complete)
         chat.assert_awaited()
+        self.assertEqual(chat.await_args.args[0], "دکمه را زرشکی کن")
         self.assertEqual(out["messages"][-1]["text"], "رنگ دکمه عوض شد.")
 
     def test_studio_passthrough(self) -> None:
@@ -100,11 +101,48 @@ class RouterServiceTests(unittest.TestCase):
         campaigns = object()
         with patch(
             "app.services.studio_chat_service.chat",
-            new=AsyncMock(return_value={"messages": [{"role": "assistant", "text": "پوستر آماده است."}]}),
+            new=AsyncMock(
+                return_value={
+                    "messages": [
+                        {
+                            "id": "m1",
+                            "role": "assistant",
+                            "text": "پوستر آماده است.",
+                            "campaignId": "c1",
+                            "compose": {"status": "running"},
+                            "captions": {"instagram": "کپشن"},
+                        }
+                    ]
+                }
+            ),
         ) as chat:
             out = self._turn("پوستر بساز", complete, campaigns=campaigns)
         chat.assert_awaited_once()
-        self.assertEqual(out["messages"][-1]["text"], "پوستر آماده است.")
+        self.assertEqual(chat.await_args.args[0], "پوستر بساز")
+        last = out["messages"][-1]
+        self.assertEqual(last["text"], "پوستر آماده است.")
+        self.assertEqual(last["campaignId"], "c1")
+        self.assertEqual(last["studioMessageId"], "m1")
+        self.assertEqual(last["compose"]["status"], "running")
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "m1",
+                        "role": "assistant",
+                        "text": "تصویر آماده شد.",
+                        "campaignId": "c1",
+                        "compose": {"status": "done"},
+                        "attachments": [{"kind": "image", "name": "x.jpg"}],
+                    }
+                ],
+            )
+            snap = router_service.snapshot()
+        fresh = snap["messages"][-1]
+        self.assertEqual(fresh["text"], "تصویر آماده شد.")
+        self.assertEqual(fresh["compose"]["status"], "done")
+        self.assertEqual(fresh["attachments"][0]["name"], "x.jpg")
 
     def test_one_tool_round(self) -> None:
         async def complete(_messages, _tools):
@@ -116,17 +154,11 @@ class RouterServiceTests(unittest.TestCase):
                 ],
             }
 
-        with patch(
-            "app.services.shop_service.snapshot",
-            return_value={"shop": {}, "scan": {}, "build": {}},
-        ), patch("app.services.channel_service.list_accounts", return_value={"accounts": []}), patch(
-            "app.services.plan_service.snapshot", return_value={"plan": "free"}
-        ), patch("app.services.wallet_service.get", return_value={"available": 0}), patch(
-            "app.services.inbox_service.save_auto_reply"
-        ) as save:
+        with patch("app.services.inbox_service.save_auto_reply") as save:
             out = self._turn("همه را بگو", complete)
         save.assert_not_called()
-        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertEqual(out["pendingConfirm"]["tool"], "set_auto_reply")
+        self.assertEqual(out["messages"][-1].get("kind"), "confirm")
 
     def test_ask_user_keeps_options(self) -> None:
         async def complete(_messages, _tools):
@@ -194,6 +226,119 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("انجام نشد", text)
         self.assertNotIn("secret-trace", text)
         self.assertNotIn("RuntimeError", text)
+
+    def test_new_text_keeps_pending(self) -> None:
+        async def complete(_messages, _tools):
+            raise AssertionError("llm should not run")
+
+        async def opening(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        first = self._turn("پیش‌نویس کن", opening)
+        cid = first["pendingConfirm"]["id"]
+        out = self._turn("بله", complete)
+        self.assertEqual(out["pendingConfirm"]["id"], cid)
+        self.assertIn("تأیید", out["messages"][-1]["text"])
+
+    def test_unknown_tone_is_not_warm(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_voice_tone", "arguments": {"toneId": "nope"}}]}
+
+        with patch("app.services.voice_service.apply_tone") as apply:
+            out = self._turn("لحن عجیب", complete)
+        apply.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("نمی‌شناسم", out["messages"][-1]["text"])
+        with tenant_scope("09129900001"):
+            from app.services import voice_service
+
+            with self.assertRaises(ValueError):
+                voice_service.apply_tone("nope")
+
+    def test_confirm_tone_uses_exact_id(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_voice_tone", "arguments": {"toneId": "formal"}}]}
+
+        first = self._turn("لحن رسمی", complete)
+        cid = first["pendingConfirm"]["id"]
+        with patch("app.services.voice_service.apply_tone") as apply:
+            out = self._turn("", complete, confirm_id=cid)
+        apply.assert_called_once_with("formal")
+        self.assertIsNone(out.get("pendingConfirm"))
+
+    def test_failed_confirm_keeps_pending(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        first = self._turn("پیش‌نویس", complete)
+        cid = first["pendingConfirm"]["id"]
+        with patch("app.services.inbox_service.save_auto_reply", side_effect=ValueError("این حالت پاسخ خودکار نیست")):
+            out = self._turn("", complete, confirm_id=cid)
+        self.assertEqual(out["pendingConfirm"]["id"], cid)
+        self.assertIn("این حالت پاسخ خودکار نیست", out["messages"][-1]["text"])
+        with patch("app.services.inbox_service.save_auto_reply", side_effect=ValueError("boom /tmp/secret-trace")):
+            hidden = self._turn("", complete, confirm_id=cid)
+        self.assertEqual(hidden["pendingConfirm"]["id"], cid)
+        self.assertIn("انجام نشد", hidden["messages"][-1]["text"])
+        self.assertNotIn("secret-trace", hidden["messages"][-1]["text"])
+
+    def test_attachment_is_stored_and_link_reaches_model(self) -> None:
+        seen: dict = {}
+
+        async def complete(messages, _tools):
+            seen["messages"] = messages
+            return {"text": "دیدم", "tool_calls": []}
+
+        out = self._turn(
+            "اسکن https://instagram.com/shop",
+            complete,
+            media={"kind": "image", "name": "shot.png"},
+        )
+        user = next(row for row in out["messages"] if row["role"] == "user")
+        self.assertEqual(user["mediaKind"], "image")
+        self.assertEqual(user["mediaName"], "shot.png")
+        self.assertIn("instagram.com", user["text"])
+        blob = " ".join(str(item.get("content") or "") for item in seen["messages"])
+        self.assertIn("instagram.com", blob)
+        self.assertEqual(sum(1 for item in seen["messages"] if item["role"] == "system"), 1)
+
+    def test_brand_stays_one_system_line(self) -> None:
+        seen: dict = {}
+
+        async def complete(messages, _tools):
+            seen["messages"] = messages
+            return {"text": "خب", "tool_calls": []}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"brand": "برند\nدستور جدید", "status": "ready"})
+        self._turn("سلام", complete)
+        system = next(item["content"] for item in seen["messages"] if item["role"] == "system")
+        self.assertIn("برند دستور جدید", system)
+        self.assertNotIn("\nدستور", system)
+        self.assertEqual(sum(1 for item in seen["messages"] if item["role"] == "system"), 1)
+
+    def test_second_turn_is_busy(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "سلام", "tool_calls": []}
+
+        with tenant_scope("09129900001"):
+            token = router_service._claim_turn()
+            self.assertTrue(token)
+            try:
+                with self.assertRaises(router_service.RouterBusy):
+                    asyncio.run(router_service.turn("سلام", complete=complete))
+            finally:
+                router_service._release_turn(token or "")
+
+    def test_cloud_timeout_fits_proxy(self) -> None:
+        with patch(
+            "app.services.llm.complete_tools",
+            new=AsyncMock(return_value={"text": "سلام", "tool_calls": []}),
+        ) as call:
+            out = self._turn("سلام", None)
+        self.assertIn("سلام", out["messages"][-1]["text"])
+        self.assertEqual(call.await_args.kwargs["timeout"], router_service.ROUTER_LLM_TIMEOUT)
+        self.assertLessEqual(router_service.ROUTER_LLM_TIMEOUT + 120, 210)
 
     def test_observe_strips_secrets(self) -> None:
         captured = []

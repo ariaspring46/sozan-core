@@ -21,26 +21,28 @@ def _upload(value: object) -> UploadFile | None:
     return None
 
 
-async def read_chat_payload(request: Request) -> tuple[str, dict | None, str, str]:
+async def read_chat_payload(request: Request) -> tuple[str, dict | None, str, str, str, str]:
     ctype = request.headers.get("content-type") or ""
     if ctype.startswith("multipart/form-data"):
         form = await request.form()
         text = str(form.get("text") or "").strip()
         view_path = str(form.get("viewPath") or "").strip()[:200]
         view_target = str(form.get("viewTarget") or "").strip()[:80]
+        confirm_id = str(form.get("confirmId") or "").strip()[:80]
+        cancel_id = str(form.get("cancelId") or "").strip()[:80]
         upload = _upload(form.get("file"))
         media = None
         if upload is not None:
             data = await upload.read()
             media = chat_media_service.save(upload.filename, data, upload.content_type or "")
-        if not text and not media:
+        if not text and not media and not confirm_id and not cancel_id:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن یا فایل لازم است.")
         if len(text) > 4000:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن خیلی بلند است.")
-        return text, media, view_path, view_target
+        return text, media, view_path, view_target, confirm_id, cancel_id
     try:
         payload = await request.json()
     except Exception as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "بدنه نامعتبر است.") from exc
     body = ChatIn.model_validate(payload)
-    return body.text.strip(), None, body.viewPath.strip(), body.viewTarget.strip()
+    return body.text.strip(), None, body.viewPath.strip(), body.viewTarget.strip(), "", ""

@@ -61,7 +61,7 @@ async def studio_chat(
     cached = idempotency_service.get("studio-chat", key)
     if cached is not None:
         return cached
-    text, media, _view_path, _view_target = await read_chat_payload(request)
+    text, media, _view_path, _view_target, _confirm, _cancel = await read_chat_payload(request)
     out = await studio_chat_service.chat(text, service, media)
     idempotency_service.put("studio-chat", key, out)
     return out

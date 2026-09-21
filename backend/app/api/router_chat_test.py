@@ -89,6 +89,24 @@ class RouterChatApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(turn.await_args.kwargs.get("cancel_id"), "abc")
 
+    def test_post_multipart_carries_confirm(self) -> None:
+        payload = {"messages": [], "pendingConfirm": None}
+        with tenant_scope("09129900001"), patch(
+            "app.services.router_service.turn",
+            new=AsyncMock(return_value=payload),
+        ) as turn, patch(
+            "app.services.chat_media_service.save",
+            return_value={"kind": "image", "name": "a.png"},
+        ):
+            res = self.client.post(
+                "/chat",
+                data={"text": "عکس", "confirmId": "abc"},
+                files={"file": ("a.png", b"\x89PNG\r\n", "image/png")},
+            )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(turn.await_args.kwargs.get("confirm_id"), "abc")
+        self.assertEqual(turn.await_args.kwargs.get("media"), {"kind": "image", "name": "a.png"})
+
 
 if __name__ == "__main__":
     unittest.main()

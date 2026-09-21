@@ -76,6 +76,20 @@ def _messages() -> list[dict]:
     return rows if isinstance(rows, list) else []
 
 
+def messages_by_id(ids: set[str]) -> dict[str, dict]:
+    wanted = {str(item) for item in ids if str(item)}
+    if not wanted:
+        return {}
+    found: dict[str, dict] = {}
+    for row in _messages():
+        if not isinstance(row, dict):
+            continue
+        ident = str(row.get("id") or "")
+        if ident in wanted:
+            found[ident] = row
+    return found
+
+
 def _save(rows: list[dict]) -> None:
     running = [
         row

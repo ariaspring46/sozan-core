@@ -20,6 +20,8 @@ export function finishIdempotencyKey(slot: IdempotencySlot, err?: unknown): void
 export function isUncertainNetworkError(err: unknown): boolean {
   if (!(err instanceof Error)) return true;
   if (err.name === "AbortError" || err.name === "TypeError") return true;
+  const status = "status" in err ? Number((err as { status?: number }).status) : 0;
+  if (status === 408 || status === 409 || status === 502 || status === 503 || status === 504) return true;
   const msg = err.message.toLowerCase();
   return msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed");
 }

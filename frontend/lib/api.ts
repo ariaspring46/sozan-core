@@ -34,6 +34,16 @@ export function clearToken() {
   localStorage.removeItem("sozan_onboarded");
 }
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   const token = getToken();
@@ -54,7 +64,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       detail = res.statusText;
     }
-    throw new Error(typeof detail === "string" ? detail : "خطا");
+    throw new ApiError(typeof detail === "string" ? detail : "خطا", res.status);
   }
   const ctype = res.headers.get("content-type") || "";
   if (ctype.includes("application/json")) return res.json() as Promise<T>;

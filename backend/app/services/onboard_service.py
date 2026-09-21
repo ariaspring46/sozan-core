@@ -170,8 +170,8 @@ async def complete(
     _brand_svc().update(name=name, description=work)
     if logo:
         _brand_svc().save_logo(logo_name or "logo.png", logo)
-    if tone_id.strip():
-        voice_service.apply_tone(tone_id)
+    if tone_id.strip() in profile_service.TONES:
+        voice_service.apply_tone(tone_id.strip())
     picked = catalog_channel(channels)
     scan_row = _catalog_scan_row(channels)
     if scan_row:
