@@ -1727,3 +1727,17 @@ STUDIO_CLOUD_TOKEN=<همان کلید CLOUD_LLM_TOKEN>
 restart فقط `sozan-api`. `.env` لوکال Z ست شده و route ها چک شد (shop/studio → cloud OSS-120B روی `ai`، voice → لوکال). برگشت = همان خطوط به قبل + restart. `ai0` یدک است. انجام شدی یک خط بنویس.
 
 **صف بعد:** G0.5 (cutover `GATEWAY_SOZAN_URL` به loopback) و دستور کد وایر تصویر — هر دو فقط با go مالک.
+
+---
+
+## X — تلفیق استودیو (۲۱ سپ)
+
+روی هاب: `STUDIO_CLOUD_URL=https://ai.sozan-core.ir/v1`، `STUDIO_CLOUD_MODEL=GPT-OSS-120B`، توکن = همان `CLOUD_LLM_TOKEN`. restart فقط `sozan-api` → `/health` `{"ok":true}`. `GATEWAY_SOZAN_URL` و G0.5 دست‌نخورده. `ai0` یدک ماند.
+
+---
+
+### Z — ثبت نقطهٔ عطف: تلفیق کامل آروان زنده است (۲۱ سپ)
+
+تأیید بیرونی: `/health` سبز. وضعیت production از این لحظه: **فروشگاه + استودیو → `GPT-OSS-120B` روی `ai.sozan-core.ir`** (fallback لوکال پشتشان)، دایرکت/صدا لوکال، تصویر مسیر امروز. `DeepSeek-V4-Pro` روی Endpoint به‌عنوان برگشتِ یک‌خطی می‌مانَد، `ai0` یدک است. X: observe را ادامه بده — حالا با دقت روی تأخیر و `cloud-fallback` هر دو سطح چت و استودیو.
+
+باقی صف فقط با go مالک: **G0.5** (cutover گیت‌وی هاب) و **دستور کد وایر تصویر** (Flash-Image روی ai).
