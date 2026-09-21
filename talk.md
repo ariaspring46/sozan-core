@@ -2008,3 +2008,9 @@ rsync `main` به `/home/ubuntu/sozan-core` بدون overwriteِ `.env`. خط `O
 
 
 
+
+---
+
+## وضعیت قلم
+
+**مرج شد** — R1 چت-روتر، `feat/r1-chat-router` با fast-forward به `main` (`d1d7e55 → 97bdef3`)، برنچ حذف شد. ۱۸ فایل، +۱۳۱۲ خط. دیپلوی هاب در دست X با go مالک؛ Z بعد از گزارشش از بیرون راستی‌آزمایی می‌کند.
