@@ -22,6 +22,10 @@ OTP_VERIFY_LIMIT = 5
 OTP_VERIFY_WINDOW = 300
 
 
+def fixed_otp_for(phone: str) -> str | None:
+    return settings.otp_fixed_map.get(phone)
+
+
 class AuthService:
     def __init__(self, users: UserRepository) -> None:
         self.users = users
@@ -45,6 +49,13 @@ class AuthService:
         if hits > OTP_SEND_LIMIT:
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست بیش از حد است")
         ttl = int(overlay.get("otpTtlSeconds") or settings.otp_ttl_seconds)
+        fixed = fixed_otp_for(phone)
+        if fixed:
+            await redis_client.setex(f"otp:{phone}", ttl, fixed)
+            payload = {"ok": True}
+            if mock_sms:
+                payload["dev_code"] = fixed
+            return payload
         code, reused = await self._current_or_new_code(phone, ttl)
         if not reused:
             await redis_client.setex(f"otp:{phone}", ttl, code)
@@ -117,7 +128,11 @@ class AuthService:
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد تلاش بیش از حد است")
         stored = await redis_client.get(f"otp:{phone}")
         given = re.sub(r"\D", "", normalize_digits(code))
-        if stored is None or not given or stored != given:
+        fixed = fixed_otp_for(phone)
+        matched = bool(given) and (
+            (fixed is not None and given == fixed) or (stored is not None and stored == given)
+        )
+        if not matched:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "کد یک‌بارمصرف نادرست است")
         await redis_client.delete(f"otp:{phone}")
         await redis_client.delete(vl_key)

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     admin_phone: str = "09120000000"
     otp_ttl_seconds: int = 300
     otp_dev: bool = True
+    otp_fixed_accounts: str = ""
     sms_provider: str = "smsir"
     sms_ir_api_key: str = ""
     sms_ir_template_id: str = ""
@@ -75,6 +76,26 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [x.strip() for x in self.cors_origins.split(",") if x.strip()]
+
+    @property
+    def otp_fixed_map(self) -> dict[str, str]:
+        from app.phone import normalize_phone
+
+        out: dict[str, str] = {}
+        for part in self.otp_fixed_accounts.split(","):
+            part = part.strip()
+            if not part or ":" not in part:
+                continue
+            phone_raw, code_raw = part.split(":", 1)
+            try:
+                phone = normalize_phone(phone_raw)
+            except ValueError:
+                continue
+            code = "".join(ch for ch in code_raw if ch.isdigit())
+            if len(code) != 6:
+                continue
+            out[phone] = code
+        return out
 
     @property
     def campaigns_path(self) -> Path:

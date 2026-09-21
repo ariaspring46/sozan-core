@@ -151,5 +151,68 @@ class OtpResendTests(unittest.TestCase):
         self.assertNotIn("otp:09111234567", self.redis.store)
 
 
+class FixedOtpTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.redis = _FakeRedis()
+        self.svc = AuthService(_Users())
+        self.patches = [
+            patch.object(auth_service, "redis_client", self.redis),
+            patch.object(auth_service, "get_settings", return_value={"mockSms": False, "otpTtlSeconds": 300}),
+            patch.object(auth_service, "fixed_otp_for", side_effect=lambda phone: "100001" if phone == "09129900001" else None),
+        ]
+        for item in self.patches:
+            item.start()
+
+    def tearDown(self) -> None:
+        for item in self.patches:
+            item.stop()
+
+    def test_send_uses_fixed_code_and_skips_sms(self) -> None:
+        with patch.object(auth_service.sms_service, "send_otp", new=AsyncMock()) as send:
+            out = asyncio.run(self.svc.send_otp("09129900001"))
+        send.assert_not_called()
+        self.assertEqual(out, {"ok": True})
+        self.assertEqual(self.redis.store["otp:09129900001"], "100001")
+
+    def test_send_then_verify_uses_redis_like_normal(self) -> None:
+        asyncio.run(self.svc.send_otp("09129900001"))
+        self.assertEqual(self.redis.store["otp:09129900001"], "100001")
+        with patch("app.services.profile_service.touch", return_value={}), patch.object(
+            auth_service, "encode_token", return_value="jwt"
+        ):
+            out = asyncio.run(self.svc.verify_otp("09129900001", "100001"))
+        self.assertEqual(out["access_token"], "jwt")
+        self.assertNotIn("otp:09129900001", self.redis.store)
+
+    def test_send_does_not_charge_wallet(self) -> None:
+        with patch("app.services.wallet_service.consume_sms") as consume:
+            asyncio.run(self.svc.send_otp("09129900001"))
+        consume.assert_not_called()
+
+    def test_verify_accepts_fixed_code_without_send(self) -> None:
+        with patch("app.services.profile_service.touch", return_value={}), patch.object(
+            auth_service, "encode_token", return_value="jwt"
+        ):
+            out = asyncio.run(self.svc.verify_otp("09129900001", "100001"))
+        self.assertEqual(out["access_token"], "jwt")
+
+    def test_verify_rejects_wrong_fixed_code(self) -> None:
+        with self.assertRaises(HTTPException) as ctx:
+            asyncio.run(self.svc.verify_otp("09129900001", "000000"))
+        self.assertEqual(ctx.exception.status_code, 400)
+
+    def test_other_numbers_are_not_fixed(self) -> None:
+        with patch.object(auth_service.sms_service, "send_otp", new=AsyncMock()), patch(
+            "app.services.wallet_service.consume_sms", return_value={"charged": 0}
+        ), patch.object(
+            auth_service.sms_service,
+            "resolve_sms",
+            return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "code"},
+        ):
+            out = asyncio.run(self.svc.send_otp("09111234567"))
+        self.assertTrue(out.get("ok"))
+        self.assertNotEqual(self.redis.store.get("otp:09111234567"), "100001")
+
+
 if __name__ == "__main__":
     unittest.main()
