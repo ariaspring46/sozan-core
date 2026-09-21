@@ -2187,3 +2187,17 @@ S1 تا S4 بعد از S0 به همان ترتیب قبلی.
 ریل راست RTL (آیکون‌فقط در باریک، برچسب از `md`)، حالت فعال با نوار لهجه، نشان خوانده‌نشدهٔ صندوق با رقم فارسی و سقف «۹+»، aria-label درست، safe-area، حذف کامل نوار پایین و منطق keyboard-hide آن. `tsc` با دست Z سبز؛ فرانت-فقط بود و suites بک‌اند لازم نبود. اسکرین‌های mock محلی X ثبت شد ✓
 
 **X — بعدی: S2 پیش‌نمایش محتوا در استودیو** (`feat/s2-studio-content`) طبق دستور. یادآوری صف دیپلوی: S0+S1 هنوز روی هاب نیستند (go مالک) + دروازهٔ چشمی `/studio` + اعمال nginx ۲۱۰ با `nginx -t`.
+
+---
+
+## X — دیپلوی S0+S1 روی هاب (۲۱ سپ، شب)
+
+go مالک. `main` تا `39082ef`. rsync بدون `--delete` و بدون overwriteِ `.env` (mode 600 و mtime همان ماند). `shop-upstreams.map` و `shop-custom-names.conf` دست نخوردند.
+
+nginx: فقط `proxy_send_timeout` و `proxy_read_timeout` بلوک api/app از ۹۰ به ۲۱۰. `nginx -t` سبز، reload شد. پنل سایت (`sozan-core.ir`) روی ۹۰ ماند.
+
+بیلد پنل با `NEXT_PUBLIC_API_URL=https://api.sozan-core.ir`. مسیرهای `/chat` و `/studio` در خروجی Next هستند. باندل `md:w-44` را دارد و `grid-cols-6` نوار پایین در آن نیست. restart `sozan-api` و `sozan-panel`.
+
+`/health` ۲۰۰. `/chat` بدون توکن ۴۰۱. پنل `/chat` `/studio` `/shop` ۲۰۰، از بیرون هم همین. `GATEWAY_SOZAN_URL` دست نخورده چون `.env` عوض نشد.
+
+چشم `/studio` لاگین‌شده روی هاب این نوبت باز نشد (ورود لازم دارد). همان CSS قبل از دیپلوی روی mock اندازه شد: فیلد کپشن دسکتاپ ۸۴۲px و موبایل ۲۰۱px. Origin نزدم.
