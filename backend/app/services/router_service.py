@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import os
 import re
 import time
 from uuid import uuid4
@@ -22,7 +24,8 @@ DAILY_TURNS = 80
 DAILY_COMPLETION = 12000
 REPLY_TOKENS = 150
 ROUTER_LLM_TIMEOUT = 45
-BUSY_SECS = 200
+HEARTBEAT_SECS = 20
+STILL_WRITING = "هنوز جواب قبلی را می‌نویسم."
 _AUTO_MODES = {"", "draft", "send"}
 _STUDIO_FIELDS = ("campaignId", "captions", "attachments", "compose", "mediaKind", "mediaName", "published")
 _TOOL_RANK = {
@@ -461,16 +464,47 @@ def _add_usage(usage: dict | None) -> None:
         write_json(USAGE_FILE, row)
 
 
-def _claim_turn() -> str | None:
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError as exc:
+        return exc.errno != errno.ESRCH
+    return True
+
+
+def _busy_live(row: dict, now: float | None = None) -> bool:
+    if not isinstance(row, dict) or not row.get("token"):
+        return False
+    pid = int(row.get("pid") or 0)
+    if not pid or not _pid_alive(pid):
+        return False
+    until = float(row.get("until") or 0)
+    return until > (time.time() if now is None else now)
+
+
+def _claim_turn(key: str = "") -> str | None:
     with tenant_file_lock("router"):
         row = read_json(BUSY_FILE, {})
         now = time.time()
-        until = float(row.get("until") or 0) if isinstance(row, dict) else 0
-        if until > now and row.get("token"):
+        if _busy_live(row if isinstance(row, dict) else {}, now):
             return None
         token = uuid4().hex
-        write_json(BUSY_FILE, {"token": token, "until": now + BUSY_SECS})
+        write_json(
+            BUSY_FILE,
+            {"token": token, "pid": os.getpid(), "until": now + HEARTBEAT_SECS, "key": str(key or "")},
+        )
         return token
+
+
+def _touch_turn(token: str) -> None:
+    with tenant_file_lock("router"):
+        row = read_json(BUSY_FILE, {})
+        if isinstance(row, dict) and row.get("token") == token:
+            row["until"] = time.time() + HEARTBEAT_SECS
+            row["pid"] = os.getpid()
+            write_json(BUSY_FILE, row)
 
 
 def _release_turn(token: str) -> None:
@@ -482,9 +516,37 @@ def _release_turn(token: str) -> None:
 
 def turn_busy() -> bool:
     row = read_json(BUSY_FILE, {})
-    if not isinstance(row, dict) or not row.get("token"):
-        return False
-    return float(row.get("until") or 0) > time.time()
+    return _busy_live(row if isinstance(row, dict) else {})
+
+
+def inflight_key() -> str:
+    row = read_json(BUSY_FILE, {})
+    if not _busy_live(row if isinstance(row, dict) else {}):
+        return ""
+    return str(row.get("key") or "")
+
+
+def clear_dead_busy() -> None:
+    from app.state_store import iter_tenants, tenant_scope
+
+    for phone in iter_tenants():
+        with tenant_scope(phone):
+            with tenant_file_lock("router"):
+                row = read_json(BUSY_FILE, {})
+                if not isinstance(row, dict) or not row.get("token"):
+                    continue
+                if _busy_live(row):
+                    continue
+                write_json(BUSY_FILE, {})
+
+
+async def _heartbeat(token: str) -> None:
+    try:
+        while True:
+            await asyncio.sleep(8)
+            _touch_turn(token)
+    except asyncio.CancelledError:
+        return
 
 
 def _choose_call(calls: list[dict]) -> tuple[dict | None, list[str]]:
@@ -519,10 +581,12 @@ async def turn(
     media=None,
     view_path: str = "",
     view_target: str = "",
+    idempotency_key: str = "",
 ) -> dict:
-    token = _claim_turn()
+    token = _claim_turn(idempotency_key)
     if not token:
         raise RouterBusy()
+    beater = asyncio.create_task(_heartbeat(token))
     try:
         return await _execute(
             text,
@@ -536,6 +600,11 @@ async def turn(
             view_target=view_target,
         )
     finally:
+        beater.cancel()
+        try:
+            await beater
+        except asyncio.CancelledError:
+            pass
         _release_turn(token)
 
 

@@ -330,6 +330,46 @@ class RouterServiceTests(unittest.TestCase):
             finally:
                 router_service._release_turn(token or "")
 
+    def test_dead_pid_frees_lock(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "سلام", "tool_calls": []}
+
+        with tenant_scope("09129900001"):
+            write_json(
+                "router-busy.json",
+                {"token": "stale", "pid": 999999999, "until": time.time() + 200, "key": "old"},
+            )
+            out = asyncio.run(router_service.turn("سلام", complete=complete))
+        self.assertEqual(out["messages"][-1]["text"], "سلام")
+        with tenant_scope("09129900001"):
+            self.assertFalse(router_service.turn_busy())
+
+    def test_concurrent_turn_runs_tool_once(self) -> None:
+        calls = {"n": 0}
+
+        async def complete(_messages, _tools):
+            calls["n"] += 1
+            await asyncio.sleep(0.05)
+            return {"text": "", "tool_calls": [{"name": "status", "arguments": {}}]}
+
+        async def both():
+            with patch(
+                "app.services.shop_service.snapshot",
+                return_value={"shop": {}, "scan": {}, "build": {}},
+            ), patch("app.services.channel_service.list_accounts", return_value={"accounts": []}), patch(
+                "app.services.plan_service.snapshot", return_value={"plan": "free"}
+            ), patch("app.services.wallet_service.get", return_value={"available": 0}):
+                first = asyncio.create_task(router_service.turn("یک", complete=complete))
+                await asyncio.sleep(0.01)
+                second = asyncio.create_task(router_service.turn("دو", complete=complete))
+                return await asyncio.gather(first, second, return_exceptions=True)
+
+        with tenant_scope("09129900001"):
+            results = asyncio.run(both())
+        self.assertEqual(calls["n"], 1)
+        self.assertTrue(any(isinstance(item, router_service.RouterBusy) for item in results))
+        self.assertTrue(any(isinstance(item, dict) for item in results))
+
     def test_cloud_timeout_fits_proxy(self) -> None:
         with patch(
             "app.services.llm.complete_tools",

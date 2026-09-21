@@ -70,6 +70,9 @@ async def lifespan(_app: FastAPI):
 
     migrate_files()
     await migrate_campaign_ids()
+    from app.services import router_service
+
+    router_service.clear_dead_busy()
     poller = asyncio.create_task(_channel_poll_loop())
     housekeeper = asyncio.create_task(_housekeeping_loop())
     from app.services import image_provider_service, llm_routing_service

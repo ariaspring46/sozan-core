@@ -107,6 +107,21 @@ class RouterChatApiTests(unittest.TestCase):
         self.assertEqual(turn.await_args.kwargs.get("confirm_id"), "abc")
         self.assertEqual(turn.await_args.kwargs.get("media"), {"kind": "image", "name": "a.png"})
 
+    def test_post_busy_stays_200_with_notice(self) -> None:
+        snap = {"messages": [{"role": "assistant", "text": "قبلی"}], "pendingConfirm": None, "brand": ""}
+        with tenant_scope("09129900001"), patch(
+            "app.services.router_service.turn",
+            new=AsyncMock(side_effect=chat_api.router_service.RouterBusy()),
+        ), patch("app.services.router_service.inflight_key", return_value="other"), patch(
+            "app.services.router_service.snapshot",
+            return_value=snap,
+        ):
+            res = self.client.post("/chat", json={"text": "دومی"}, headers={"Idempotency-Key": "r2"})
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["notice"], "هنوز جواب قبلی را می‌نویسم.")
+        self.assertEqual(body["messages"], snap["messages"])
+
 
 if __name__ == "__main__":
     unittest.main()

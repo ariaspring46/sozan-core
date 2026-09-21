@@ -50,36 +50,38 @@ async def get_chat(_user=Depends(require_permission("campaigns:read"))):
 
 
 async def _wait_cached(key: str):
-    for _ in range(80):
+    for _ in range(40):
         await asyncio.sleep(0.5)
         cached = idempotency_service.get("router-chat", key)
         if cached is not None:
             return cached
-        if not router_service.turn_busy():
+        if router_service.inflight_key() != key:
             return None
     return None
 
 
 async def _finish_turn(key: str, text: str, media, view_path: str, view_target: str, confirm_id: str, cancel_id: str):
-    for _ in range(3):
-        try:
-            out = await router_service.turn(
-                text,
-                confirm_id=confirm_id,
-                cancel_id=cancel_id,
-                campaigns_factory=_campaigns,
-                media=media,
-                view_path=view_path,
-                view_target=view_target,
-            )
-        except router_service.RouterBusy:
+    try:
+        out = await router_service.turn(
+            text,
+            confirm_id=confirm_id,
+            cancel_id=cancel_id,
+            campaigns_factory=_campaigns,
+            media=media,
+            view_path=view_path,
+            view_target=view_target,
+            idempotency_key=key,
+        )
+    except router_service.RouterBusy:
+        if key and router_service.inflight_key() == key:
             cached = await _wait_cached(key)
             if cached is not None:
                 return cached
-            continue
-        idempotency_service.put("router-chat", key, out)
-        return out
-    raise HTTPException(status.HTTP_409_CONFLICT, "هنوز جواب قبلی تمام نشده. چند ثانیه بعد دوباره بفرست.")
+        snap = router_service.snapshot()
+        snap["notice"] = router_service.STILL_WRITING
+        return snap
+    idempotency_service.put("router-chat", key, out)
+    return out
 
 
 @router.post("")
@@ -89,8 +91,7 @@ async def post_chat(
 ):
     key = _idempotency_key(request)
     text, media, view_path, view_target, confirm_id, cancel_id = await _read_payload(request)
-    async with router_service.turn_lock():
-        cached = idempotency_service.get("router-chat", key)
-        if cached is not None:
-            return cached
-        return await _finish_turn(key, text, media, view_path, view_target, confirm_id, cancel_id)
+    cached = idempotency_service.get("router-chat", key)
+    if cached is not None:
+        return cached
+    return await _finish_turn(key, text, media, view_path, view_target, confirm_id, cancel_id)

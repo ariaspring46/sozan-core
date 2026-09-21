@@ -10,6 +10,7 @@ type ChatPayload = {
   messages: ChatMsg[];
   pendingConfirm?: { id: string; tool?: string; summary?: string } | null;
   brand?: string;
+  notice?: string;
 };
 
 function welcomeLines(brand: string) {
@@ -28,6 +29,7 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const chatKey = useRef(emptyIdempotencySlot());
   const epoch = useRef(0);
   const busyRef = useRef(false);
@@ -65,6 +67,7 @@ export default function ChatPage() {
     setBusy(true);
     setPending(confirmId || cancelId ? "" : text || file?.name || "پیوست");
     setError("");
+    setNotice("");
     const stamp = `${text}\0${file?.name || ""}:${file?.size || 0}\0${confirmId || ""}\0${cancelId || ""}`;
     const key = takeIdempotencyKey(chatKey.current, stamp);
     try {
@@ -88,7 +91,10 @@ export default function ChatPage() {
         });
       }
       finishIdempotencyKey(chatKey.current);
-      if (seen === epoch.current) apply(data);
+      if (seen === epoch.current) {
+        apply(data);
+        if (data.notice) setNotice(data.notice);
+      }
     } catch (err) {
       if (seen !== epoch.current) return;
       finishIdempotencyKey(chatKey.current, err);
@@ -114,6 +120,11 @@ export default function ChatPage() {
         {error ? (
           <p className="px-4 pt-3 text-sm text-danger" role="alert">
             {error}
+          </p>
+        ) : null}
+        {notice ? (
+          <p className="px-4 pt-3 text-sm text-warm" role="status">
+            {notice}
           </p>
         ) : null}
         <div className="min-h-0 flex-1">
