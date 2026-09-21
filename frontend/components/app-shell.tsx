@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Clapperboard, MessageCircle, MoreHorizontal, ShoppingBag, Store } from "lucide-react";
+import { Clapperboard, Inbox, MessageCircle, MoreHorizontal, ShoppingBag, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SozanMark } from "@/components/sozan-mark";
 import { api } from "@/lib/api";
 import { useAppViewport } from "@/lib/use-app-viewport";
 
 const TABS = [
+  { href: "/chat", label: "چت", icon: MessageCircle },
   { href: "/shop", label: "فروشگاه", icon: Store },
   { href: "/studio", label: "استودیو", icon: Clapperboard },
-  { href: "/inbox", label: "چت", icon: MessageCircle },
+  { href: "/inbox", label: "صندوق", icon: Inbox },
   { href: "/sales", label: "فروش", icon: ShoppingBag },
   { href: "/more", label: "بیشتر", icon: MoreHorizontal },
 ] as const;
@@ -80,7 +81,7 @@ export function AppShell({
           keyboardOpen && "hidden",
         )}
       >
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {TABS.map((tab) => {
             const active = tabActive(pathname, tab.href);
             const Icon = tab.icon;

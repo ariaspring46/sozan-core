@@ -12,7 +12,7 @@ export function PanelHome() {
       return;
     }
     void api<{ onboarded?: boolean }>("/auth/me")
-      .then((data) => router.replace(data.onboarded ? "/shop" : "/onboard"))
+      .then((data) => router.replace(data.onboarded ? "/chat" : "/onboard"))
       .catch(() => router.replace("/login"));
   }, [router]);
   return <p className="p-8 text-muted">در حال انتقال…</p>;

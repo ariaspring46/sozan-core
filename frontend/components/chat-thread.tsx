@@ -15,6 +15,8 @@ export type ChatMsg = {
   text: string;
   at: number;
   kind?: string;
+  confirmId?: string;
+  options?: string[];
   campaignId?: string;
   platform?: string;
   platformLabel?: string;
@@ -79,6 +81,9 @@ export function ChatThread({
   showTime = false,
   sanitize = false,
   welcome = false,
+  welcomeLines,
+  confirmId = "",
+  onConfirm,
 }: {
   messages: ChatMsg[];
   busy: boolean;
@@ -97,6 +102,9 @@ export function ChatThread({
   onEditDraft?: (payload: { messageId: string; text: string }) => void;
   sanitize?: boolean;
   welcome?: boolean;
+  welcomeLines?: string[];
+  confirmId?: string;
+  onConfirm?: (confirmId: string) => void;
   showTime?: boolean;
 }) {
   const [draft, setDraft] = useState("");
@@ -206,9 +214,9 @@ export function ChatThread({
       >
         <div className="space-y-3 px-4 py-5">
           {messages.length === 0 && !pendingText ? (
-            welcome ? (
+            welcome || welcomeLines ? (
               <div className="space-y-2 pt-8 text-center text-sm leading-7 text-muted">
-                {SHOP_WELCOME.map((line) => (
+                {(welcomeLines || SHOP_WELCOME).map((line) => (
                   <p key={line}>{line}</p>
                 ))}
               </div>
@@ -234,6 +242,33 @@ export function ChatThread({
                   </p>
                 ) : null}
                 {msg.text ? <p className="whitespace-pre-wrap">{sanitizeShopText(msg.text, sanitize)}</p> : null}
+                {msg.kind === "confirm" && msg.confirmId && onConfirm ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="mt-2 h-auto py-1 text-xs"
+                    disabled={busy || confirmId !== msg.confirmId}
+                    onClick={() => onConfirm(msg.confirmId || "")}
+                  >
+                    تأیید
+                  </Button>
+                ) : null}
+                {msg.kind === "ask" && msg.options?.length ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {msg.options.map((option) => (
+                      <Button
+                        key={option}
+                        type="button"
+                        variant="ghost"
+                        className="h-auto py-1 text-xs"
+                        disabled={busy}
+                        onClick={() => void onSend({ text: option })}
+                      >
+                        {option}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
                 {showTime && msg.at ? (
                   <p className="mt-1 text-[11px] opacity-70">
                     {formatWhen(msg.at)}

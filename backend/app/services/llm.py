@@ -23,8 +23,8 @@ CLOUD_UA = "curl/8.5.0"
 VOICE_SURFACES = frozenset({"voice", "inbox"})
 PINNED_SURFACES = frozenset({"studio"})
 CLOUD_SURFACES = frozenset({"factory"})
-SHOP_CLOUD_SURFACES = frozenset({"shop", "shop-edit"})
-CLOUD_PRIMARY_SURFACES = frozenset({"shop", "shop-edit", "studio"})
+SHOP_CLOUD_SURFACES = frozenset({"shop", "shop-edit", "router"})
+CLOUD_PRIMARY_SURFACES = frozenset({"shop", "shop-edit", "studio", "router"})
 ARVAN_HOST_SUFFIX = "arvancloudai.ir"
 CLOUD_PRIMARY_TIMEOUT = 120
 DEFAULT_SHOP_CLOUD_MODEL = "DeepSeek-V4-Pro"
@@ -48,6 +48,7 @@ LLM_BAD_JSON = {
     "reply": "مدل پاسخ خوانا نداد. پیام را کوتاه‌تر دوباره بفرست.",
     "error": "llm_bad_json",
 }
+ROUTER_MAX_TOKENS = 150
 
 
 def parse_json_object(text: str) -> dict:
@@ -426,6 +427,33 @@ def report_llm_fail(
     )
 
 
+def _usage_counts(payload: dict) -> dict[str, int]:
+    usage = payload.get("usage") if isinstance(payload, dict) else {}
+    if not isinstance(usage, dict):
+        return {"promptTokens": 0, "completionTokens": 0}
+    try:
+        prompt = int(usage.get("prompt_tokens") or 0)
+    except (TypeError, ValueError):
+        prompt = 0
+    try:
+        completion = int(usage.get("completion_tokens") or 0)
+    except (TypeError, ValueError):
+        completion = 0
+    return {"promptTokens": max(0, prompt), "completionTokens": max(0, completion)}
+
+
+def _emit_usage(*, surface: str, model: str, payload: dict) -> dict[str, int]:
+    counts = _usage_counts(payload)
+    emit_later(
+        kind="llm",
+        title="llm-usage",
+        surface=surface,
+        status="ok",
+        payload={"promptTokens": counts["promptTokens"], "completionTokens": counts["completionTokens"], "model": model or ""},
+    )
+    return counts
+
+
 async def _complete_with_route(
     route: dict,
     *,
@@ -445,7 +473,8 @@ async def _complete_with_route(
         headers["X-Sozan-Route"] = str(route["source"])
     request_id = str(headers.get("X-Sozan-Request") or "")
     timeout = 180 if max_tokens > 700 else 120
-    body["think"] = False
+    if route["kind"] != "cloud":
+        body["think"] = False
     if route["kind"] == "cloud":
         scheme = _auth_scheme(route.get("auth"))
         headers["Authorization"] = f"{scheme} {route['token']}"
@@ -466,7 +495,9 @@ async def _complete_with_route(
             async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route["proxy"]) as client:
                 res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
                 res.raise_for_status()
-                return _choice_text(res.json())
+                data = res.json()
+                _emit_usage(surface=surface, model=str(route.get("model") or ""), payload=data if isinstance(data, dict) else {})
+                return _choice_text(data)
         except Exception as exc:
             last_exc = exc
             klass = _classify_llm_error(exc)
@@ -499,6 +530,8 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
             surface=surface,
         )
     except Exception as cloud_exc:
+        if surface == "router":
+            raise
         if route.get("kind") != "cloud" or surface not in CLOUD_PRIMARY_SURFACES:
             raise
         local = _local_default_route(surface)
@@ -583,3 +616,54 @@ async def complete_chat(*, system: str, turns: list[dict], surface: str = "shop"
             prompt=_last_user_prompt(messages),
         )
     return reply
+
+
+async def complete_tools(
+    *,
+    messages: list[dict],
+    tools: list[dict],
+    temperature: float = 0.2,
+    max_tokens: int = ROUTER_MAX_TOKENS,
+) -> dict:
+    """One cloud tool-call round for the product router. No local fallback."""
+    route = route_for_surface("router")
+    if route.get("kind") != "cloud":
+        raise RuntimeError("router_requires_cloud")
+    body = {
+        "model": route["model"],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "messages": messages,
+        "tools": tools,
+        "tool_choice": "auto",
+    }
+    headers = {"Content-Type": "application/json", **llm_headers(surface="router")}
+    scheme = _auth_scheme(route.get("auth"))
+    headers["Authorization"] = f"{scheme} {route['token']}"
+    headers["User-Agent"] = CLOUD_UA
+    timeout = CLOUD_PRIMARY_TIMEOUT
+    async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route["proxy"]) as client:
+        res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
+        res.raise_for_status()
+        payload = res.json()
+    counts = _emit_usage(surface="router", model=str(route.get("model") or ""), payload=payload if isinstance(payload, dict) else {})
+    msg = ((payload.get("choices") or [{}])[0].get("message") or {})
+    calls = []
+    for raw in msg.get("tool_calls") or []:
+        if not isinstance(raw, dict):
+            continue
+        fn = raw.get("function") or {}
+        name = str(fn.get("name") or "").strip()
+        if not name:
+            continue
+        args_raw = fn.get("arguments") or "{}"
+        if isinstance(args_raw, dict):
+            args = args_raw
+        else:
+            try:
+                parsed = json.loads(str(args_raw))
+            except json.JSONDecodeError:
+                parsed = {}
+            args = parsed if isinstance(parsed, dict) else {}
+        calls.append({"id": str(raw.get("id") or ""), "name": name, "arguments": args})
+    return {"text": str(msg.get("content") or "").strip(), "tool_calls": calls, "usage": counts}

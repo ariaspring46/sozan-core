@@ -43,7 +43,7 @@ export default function LoginPage() {
       });
       setToken(data.access_token);
       setOnboarded(Boolean(data.onboarded));
-      router.push(data.onboarded ? "/shop" : "/onboard");
+      router.push(data.onboarded ? "/chat" : "/onboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     }

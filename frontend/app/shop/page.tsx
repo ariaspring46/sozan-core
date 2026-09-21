@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
-import { ChatThread, type ChatMsg } from "@/components/chat-thread";
+import { ChatNav } from "@/components/chat-nav";
 import { DomainMenu, shopPublicUrl, type ShopState } from "@/components/domain-menu";
 import { ShopLiveBuild, type BuildLive, type PreviewPatch } from "@/components/shop-live-build";
 import { api } from "@/lib/api";
@@ -22,40 +23,24 @@ type ScanState = {
   noPrice?: number;
   rejected?: number;
 };
-type TurnOutcome = {
-  route?: string;
-  actions?: string[];
-  verified?: boolean;
-  rolledBack?: boolean;
-  needsRebuild?: boolean;
-  state?: string;
-};
-type ShopPayload = { shop: ShopState; messages: ChatMsg[]; scan?: ScanState; build?: BuildLive; turn?: TurnOutcome; patched?: boolean };
+type ShopPayload = { shop: ShopState; scan?: ScanState; build?: BuildLive };
 
 export default function ShopPage() {
   const [shop, setShop] = useState<ShopState | null>(null);
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [scan, setScan] = useState<ScanState | null>(null);
   const [build, setBuild] = useState<BuildLive | null>(null);
-  const [turn, setTurn] = useState<TurnOutcome | null>(null);
   const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState("");
   const [error, setError] = useState("");
-  const [viewPath, setViewPath] = useState("/");
   const [viewTarget, setViewTarget] = useState("");
   const [previewKey, setPreviewKey] = useState(0);
   const [applyPatch, setApplyPatch] = useState<PreviewPatch | null>(null);
-  const [seekPath, setSeekPath] = useState("");
   const prevStatus = useRef("");
-  const chatKey = useRef(emptyIdempotencySlot());
   const buildKey = useRef(emptyIdempotencySlot());
 
   const apply = (data: ShopPayload) => {
     setShop(data.shop);
-    setMessages(data.messages || []);
     if (data.scan) setScan(data.scan);
     if (data.build) setBuild(data.build);
-    if (data.turn) setTurn(data.turn);
   };
 
   const load = useCallback(async () => {
@@ -95,28 +80,25 @@ export default function ShopPage() {
       : scan?.status === "error"
         ? (scan.error || "اسکن کانال کامل نشد.") +
           (importedCount ? ` ${importedCount} کالای قبلی سر جایش است.` : "") +
-          " برای تلاش دوباره، همان آدرس را دوباره بفرست."
-      : scan?.needsReview && importedCount
-        ? `${importedCount} کالا وارد شد؛ عکس کم است، بعداً عکس بگذار.`
-        : scan?.needsReview
-          ? scan.kept
-            ? `چیزی تازه از این صفحه خوانده نشد؛ ${scan.kept} کالای قبلی سر جایش است.`
-            : "چیزی از این صفحه خوانده نشد؛ دوباره اسکن کن یا کالا را دستی اضافه کن."
-        : scan?.status === "done" && importedCount
-          ? `${importedCount} کالا وارد شد` +
-            (scan.rejected ? `، ${scan.rejected} رد` : "") +
-            (scan.noImage ? `، ${scan.noImage} بدون عکس` : "") +
-            (scan.noPrice ? `، ${scan.noPrice} بدون قیمت — قبل از ساخت سایت قیمت بگذار یا بگو قیمت‌ها را مخفی کن` : "") +
-            "."
-          : "";
-  const turnNote =
-    turn && turn.verified && !turn.route && !(turn.actions || []).length ? "انجام شد؛ روی پیش‌نمایش ببین." : "";
+          " برای تلاش دوباره، همان آدرس را در چت بفرست."
+        : scan?.needsReview && importedCount
+          ? `${importedCount} کالا وارد شد؛ عکس کم است، بعداً عکس بگذار.`
+          : scan?.needsReview
+            ? scan.kept
+              ? `چیزی تازه از این صفحه خوانده نشد؛ ${scan.kept} کالای قبلی سر جایش است.`
+              : "چیزی از این صفحه خوانده نشد؛ دوباره اسکن کن یا کالا را دستی اضافه کن."
+            : scan?.status === "done" && importedCount
+              ? `${importedCount} کالا وارد شد` +
+                (scan.rejected ? `، ${scan.rejected} رد` : "") +
+                (scan.noImage ? `، ${scan.noImage} بدون عکس` : "") +
+                (scan.noPrice ? `، ${scan.noPrice} بدون قیمت — قبل از ساخت سایت قیمت بگذار یا بگو قیمت‌ها را مخفی کن` : "") +
+                "."
+              : "";
   const priceBlocked = Boolean(shop?.priceBlocked && !shop?.hidePrices);
   const shopPublic = shopPublicUrl(shop, build?.url);
   const live = Boolean(
     shop && (shop.status === "ready" || (shop.slug && (shop.url || shop.publicHost || shop.port))),
   );
-  const thread = messages.filter((msg) => msg.kind !== "build");
 
   const runBuild = useCallback(async (rebuild?: boolean, reviseOnly?: boolean) => {
     setBusy(true);
@@ -172,9 +154,11 @@ export default function ShopPage() {
         </div>
       }
     >
-      <div className={cn("relative flex h-full flex-col", building ? "sozan-aurora" : "sozan-chat")}>
+      <div className={cn("relative flex h-full flex-col", building ? "sozan-aurora" : "")}>
+        <div className="px-4 pt-3">
+          <ChatNav current="shop" />
+        </div>
         {error ? <p className="relative px-4 pt-3 text-sm text-danger">{error}</p> : null}
-        {turnNote ? <p className="relative px-4 pt-3 text-sm text-warm">{turnNote}</p> : null}
         {priceBlocked ? (
           <div className="relative mx-4 mt-3 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3">
             <p className="text-sm font-bold text-danger">بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام.</p>
@@ -188,72 +172,29 @@ export default function ShopPage() {
             {scanNote}
           </p>
         ) : null}
+        <p className="relative px-4 pt-3 text-sm text-warm">
+          {viewTarget ? (
+            <Link href="/chat">برای عوض کردن «{viewTarget}» در چت بگو</Link>
+          ) : (
+            <Link href="/chat">{live ? "ادیت و ساخت در چت" : "در چت بگو چه فروشگاهی می‌خواهی"}</Link>
+          )}
+        </p>
         {live && shopPublic ? (
-          <a href={shopPublic} target="_blank" rel="noreferrer" className="relative px-4 pt-3 text-sm text-warm underline">
+          <a href={shopPublic} target="_blank" rel="noreferrer" className="relative px-4 pt-2 text-sm text-warm underline">
             باز کردن ویترین
           </a>
         ) : null}
-        <div className="relative min-h-0 flex-1">
-          <ChatThread
-            messages={thread}
-            busy={busy}
-            pendingText={pending}
-            sanitize
-            welcome
-            livePanel={
-              <ShopLiveBuild
-                build={build}
-                href={shopPublic}
-                previewKey={previewKey}
-                pendingBuild={Number(shop?.pendingBuild || 0)}
-                buildBusy={busy || building}
-                applyPatch={applyPatch}
-                seekPath={seekPath}
-                onBuild={() => void runBuild(true, true)}
-                onRetry={() => void runBuild(true, true)}
-                onViewPath={setViewPath}
-                onViewTarget={setViewTarget}
-              />
-            }
-            placeholder={
-              live
-                ? viewTarget
-                  ? `درباره «${viewTarget}» بگو چه عوض شود.`
-                  : "روی همین صفحه بگو چه عوض شود. چند تغییر را در کادر ببین، بعد بیلد بزن."
-                : "بگو چه فروشگاهی می‌خواهی؛ وقتی آماده بودی بنویس بساز."
-            }
-            onSend={async (payload) => {
-              setBusy(true);
-              setPending(payload.text || payload.file?.name || "پیوست");
-              setError("");
-              const stamp = `${payload.text}\0${viewPath}\0${viewTarget}\0${payload.file?.name || ""}:${payload.file?.size || 0}`;
-              const key = takeIdempotencyKey(chatKey.current, stamp);
-              try {
-                const body = new FormData();
-                body.set("text", payload.text);
-                body.set("viewPath", viewPath);
-                if (viewTarget) body.set("viewTarget", viewTarget);
-                if (payload.file) body.set("file", payload.file);
-                const data = await api<ShopPayload & { patched?: boolean; preview?: PreviewPatch }>("/shop/chat", {
-                  method: "POST",
-                  headers: { "Idempotency-Key": key },
-                  body,
-                });
-                apply(data);
-                finishIdempotencyKey(chatKey.current);
-                if (data.patched) {
-                  setApplyPatch(data.preview || {});
-                  if (data.preview?.viewPath) setSeekPath(data.preview.viewPath);
-                  if (data.preview?.reload || data.preview?.reset) setPreviewKey((value) => value + 1);
-                }
-              } catch (err) {
-                finishIdempotencyKey(chatKey.current, err);
-                setError(err instanceof Error ? err.message : "خطا");
-              } finally {
-                setPending("");
-                setBusy(false);
-              }
-            }}
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <ShopLiveBuild
+            build={build}
+            href={shopPublic}
+            previewKey={previewKey}
+            pendingBuild={Number(shop?.pendingBuild || 0)}
+            buildBusy={busy || building}
+            applyPatch={applyPatch}
+            onBuild={() => void runBuild(true, true)}
+            onRetry={() => void runBuild(true, true)}
+            onViewTarget={setViewTarget}
           />
         </div>
       </div>

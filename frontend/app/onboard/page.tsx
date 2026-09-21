@@ -112,7 +112,7 @@ export default function OnboardPage() {
         const local = readLocalDraft();
         const data = await api<{ profile: Profile }>("/onboard");
         if (data.profile?.onboarded) {
-          router.replace("/shop");
+          router.replace("/chat");
           return;
         }
         setTones(data.profile?.tones || []);
@@ -158,7 +158,7 @@ export default function OnboardPage() {
       await api("/onboard/complete", { method: "POST", body });
       sessionStorage.removeItem(DRAFT_KEY);
       setOnboarded(true);
-      router.replace("/shop");
+      router.replace("/chat");
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {

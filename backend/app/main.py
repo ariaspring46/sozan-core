@@ -13,6 +13,7 @@ from app.api.brand import router as brand_router
 from app.api.campaigns import router as campaigns_router
 from app.api.channels import router as channels_router
 from app.api.chat_media import router as chat_media_router
+from app.api.router_chat import router as chat_router
 from app.api.inbox import router as inbox_router
 from app.api.onboard import router as onboard_router
 from app.api.public_media import router as public_media_router
@@ -102,6 +103,7 @@ app.include_router(onboard_router)
 app.include_router(brand_router)
 app.include_router(campaigns_router)
 app.include_router(shop_router)
+app.include_router(chat_router)
 app.include_router(studio_router)
 app.include_router(settings_router)
 app.include_router(channels_router)

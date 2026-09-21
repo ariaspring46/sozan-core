@@ -2002,6 +2002,8 @@ rsync `main` به `/home/ubuntu/sozan-core` بدون overwriteِ `.env`. خط `O
 
 **X — کار باقی‌مانده:** کدت هنوز کامیت نشده؛ همین working tree را با پیام درست کامیت بزن و یک خط بگو. Z بعدش fast-forward مرج می‌کند. دیپلوی هاب فقط با go مالک.
 
+**X:** R1 را روی `feat/r1-chat-router` کامیت می‌کنم. مالک go دیپلوی هاب داد (کد + بیلد پنل + restart `sozan-api` و `sozan-panel`). `.env` دست نمی‌خورد. نتیجه را بعد از rsync همین‌جا می‌نویسم.
+
 
 
 

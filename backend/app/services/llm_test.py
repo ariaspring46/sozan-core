@@ -14,6 +14,7 @@ from app.services.llm import (
     _choice_text,
     _classify_llm_error,
     _ensure_gpu1,
+    complete_tools,
     factory_holds_gpu1,
     parse_json_object,
     report_llm_fail,
@@ -162,9 +163,10 @@ class RouteSurfaceTests(unittest.TestCase):
         edit = self._route("shop-edit", **extra)
         studio = self._route("studio", **extra)
         factory = self._route("factory", **extra)
+        router = self._route("router", **extra)
         voice = self._route("voice", **extra)
         inbox = self._route("inbox", **extra)
-        for route in (shop, edit, factory):
+        for route in (shop, edit, factory, router):
             self.assertEqual(route["kind"], "cloud")
             self.assertEqual(route["model"], "DeepSeek-V4-Pro")
             self.assertEqual(route["url"], "https://api.arvancloudai.ir/v1")
@@ -279,11 +281,18 @@ class CloudFallbackTests(unittest.TestCase):
 
         FakeClient.seen = []
 
+        titles: list[str] = []
+
+        def fake_emit(**kw):
+            titles.append(str(kw.get("title") or ""))
+            captured.update(kw)
+            captured["titles"] = titles
+
         with patch("app.services.llm.settings") as settings, patch(
             "app.services.llm_routing_service.get", return_value=None
         ), patch("app.services.llm.httpx.AsyncClient", FakeClient), patch(
             "app.services.llm._ensure_gpu1", new=AsyncMock(side_effect=lambda model: model)
-        ), patch("app.services.llm.emit_later", new=lambda **kw: captured.update(kw)), patch(
+        ), patch("app.services.llm.emit_later", new=fake_emit), patch(
             "asyncio.sleep", new=AsyncMock()
         ):
             _apply_settings(settings, _route_settings(**extra))
@@ -326,7 +335,7 @@ class CloudFallbackTests(unittest.TestCase):
         self.assertIn("رنگ دکمه عوض شد", text)
         self.assertTrue(any("arvancloudai.ir" in url for url in calls))
         self.assertTrue(any("127.0.0.1:9292" in url for url in calls))
-        self.assertEqual(captured.get("title"), "cloud-fallback")
+        self.assertIn("cloud-fallback", captured.get("titles") or [])
         self.assertTrue(all(item.trust_env is False for item in seen))
         self.assertTrue(all(item.timeout == 120 or item.proxy is None for item in seen))
 
@@ -348,14 +357,17 @@ class CloudFallbackTests(unittest.TestCase):
         self.assertIn("پوستر آماده است", text)
         self.assertTrue(any("studio.arvancloudai.ir" in url for url in calls))
         self.assertTrue(any("127.0.0.1:9292" in url for url in calls))
-        self.assertEqual(captured.get("title"), "cloud-fallback")
+        self.assertIn("cloud-fallback", captured.get("titles") or [])
 
     def test_shop_cloud_uses_apikey_scheme_and_no_proxy(self) -> None:
         seen_headers = {}
+        seen_body = {}
         proxies = []
 
         def handler(url, body, headers):
             seen_headers.update(headers)
+            if isinstance(body, dict):
+                seen_body.update(body)
             return self._json_ok(url, {"choices": [{"message": {"content": '{"reply":"انجام شد."}'}}]})
 
         text, seen, _ = self._run(
@@ -371,6 +383,92 @@ class CloudFallbackTests(unittest.TestCase):
         self.assertTrue(all(item.proxy is None for item in seen))
         self.assertTrue(all(item.timeout == 120 for item in seen))
         self.assertNotIn("shop-secret", str(proxies))
+        self.assertNotIn("think", seen_body)
+
+    def test_router_cloud_failure_does_not_fall_back(self) -> None:
+        calls: list[str] = []
+
+        def handler(url, body, headers):
+            calls.append(url)
+            raise self._http_error(url, 503)
+
+        with self.assertRaises(httpx.HTTPStatusError):
+            self._run(
+                "router",
+                handler,
+                cloud_llm_url="https://api.arvancloudai.ir/v1",
+                cloud_llm_token="shop-secret",
+            )
+        self.assertTrue(any("arvancloudai.ir" in url for url in calls))
+        self.assertFalse(any("127.0.0.1:9292" in url for url in calls))
+
+
+class RouterToolsTests(unittest.TestCase):
+    def test_requires_cloud(self) -> None:
+        with patch("app.services.llm.settings") as settings, patch(
+            "app.services.llm_routing_service.get", return_value=None
+        ):
+            _apply_settings(settings, _route_settings())
+            with self.assertRaises(RuntimeError) as ctx:
+                asyncio.run(complete_tools(messages=[{"role": "user", "content": "hi"}], tools=[]))
+        self.assertIn("router_requires_cloud", str(ctx.exception))
+
+    def test_parses_tool_calls(self) -> None:
+        seen_body: dict = {}
+
+        class FakeClient:
+            def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+                self.timeout = timeout
+                self.proxy = proxy
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                seen_body.update(json or {})
+                request = httpx.Request("POST", url)
+                return httpx.Response(
+                    200,
+                    json={
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": "",
+                                    "tool_calls": [
+                                        {
+                                            "id": "c1",
+                                            "function": {"name": "status", "arguments": "{}"},
+                                        }
+                                    ],
+                                }
+                            }
+                        ]
+                    },
+                    request=request,
+                )
+
+        with patch("app.services.llm.settings") as settings, patch(
+            "app.services.llm_routing_service.get", return_value=None
+        ), patch("app.services.llm.httpx.AsyncClient", FakeClient):
+            _apply_settings(
+                settings,
+                _route_settings(
+                    cloud_llm_url="https://api.arvancloudai.ir/v1",
+                    cloud_llm_token="shop-secret",
+                ),
+            )
+            out = asyncio.run(
+                complete_tools(messages=[{"role": "user", "content": "hi"}], tools=[{"type": "function"}])
+            )
+        self.assertEqual(out["tool_calls"][0]["name"], "status")
+        self.assertEqual(seen_body.get("tool_choice"), "auto")
+        self.assertEqual(seen_body.get("max_tokens"), 150)
+        self.assertNotIn("think", seen_body)
+        self.assertTrue(seen_body.get("tools"))
+        self.assertEqual(seen_body.get("model"), "DeepSeek-V4-Pro")
 
 
 class ChatFailReportTests(unittest.TestCase):
