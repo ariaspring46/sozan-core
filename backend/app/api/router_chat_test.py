@@ -7,14 +7,18 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api import router_chat as chat_api
+from app.config import settings
 from app.database import get_session
 from app.security import get_current_user
+from app.services import router_service
 from app.state_store import tenant_scope
 
 
 class RouterChatApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.dir = tempfile.TemporaryDirectory()
+        self.state = patch.object(settings, "state_dir", self.dir.name)
+        self.state.start()
         app = FastAPI()
         app.include_router(chat_api.router)
 
@@ -45,6 +49,8 @@ class RouterChatApiTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.idem_read.stop()
         self.idem_write.stop()
+        self.state.stop()
+        router_service._THREAD.set("")
         self.dir.cleanup()
 
     def test_get_snapshot(self) -> None:
@@ -125,6 +131,35 @@ class RouterChatApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(turn.await_args.kwargs.get("confirm_id"), "abc")
         self.assertEqual(turn.await_args.kwargs.get("media"), {"kind": "image", "name": "a.png"})
+
+    def test_post_carries_view_and_thread(self) -> None:
+        payload = {"messages": [], "pendingConfirm": None, "threadId": "t1"}
+
+        def bind(tid=""):
+            chosen = tid or "t1"
+            router_service._THREAD.set(chosen)
+            return chosen
+
+        with tenant_scope("09129900001"), patch(
+            "app.services.router_service._bind_thread",
+            side_effect=bind,
+        ), patch(
+            "app.services.router_service.turn",
+            new=AsyncMock(return_value=payload),
+        ) as turn:
+            res = self.client.post(
+                "/chat",
+                json={
+                    "text": "این را عوض کن: خرید",
+                    "viewPath": "/products",
+                    "viewTarget": "خرید",
+                    "threadId": "t1",
+                },
+            )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(turn.await_args.kwargs.get("view_path"), "/products")
+        self.assertEqual(turn.await_args.kwargs.get("view_target"), "خرید")
+        self.assertEqual(turn.await_args.kwargs.get("thread_id"), "t1")
 
     def test_post_busy_stays_200_with_notice(self) -> None:
         snap = {"messages": [{"role": "assistant", "text": "قبلی"}], "pendingConfirm": None, "brand": ""}

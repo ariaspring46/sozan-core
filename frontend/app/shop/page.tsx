@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { ChatNav } from "@/components/chat-nav";
 import { DomainMenu, shopPublicUrl, type ShopState } from "@/components/domain-menu";
 import { ShopLiveBuild, type BuildLive, type PreviewPatch } from "@/components/shop-live-build";
 import { api } from "@/lib/api";
@@ -24,18 +23,31 @@ type ScanState = {
   rejected?: number;
 };
 type ShopPayload = { shop: ShopState; scan?: ScanState; build?: BuildLive };
+type ThreadRow = { id: string; title: string; at?: number };
+type ChatPayload = {
+  notice?: string;
+  threadId?: string;
+  threads?: ThreadRow[];
+};
 
 export default function ShopPage() {
+  const router = useRouter();
   const [shop, setShop] = useState<ShopState | null>(null);
   const [scan, setScan] = useState<ScanState | null>(null);
   const [build, setBuild] = useState<BuildLive | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [viewTarget, setViewTarget] = useState("");
+  const [viewPath, setViewPath] = useState("/");
+  const [threadId, setThreadId] = useState("");
+  const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [previewKey, setPreviewKey] = useState(0);
   const [applyPatch, setApplyPatch] = useState<PreviewPatch | null>(null);
   const prevStatus = useRef("");
   const buildKey = useRef(emptyIdempotencySlot());
+  const sendKey = useRef(emptyIdempotencySlot());
 
   const apply = (data: ShopPayload) => {
     setShop(data.shop);
@@ -51,6 +63,15 @@ export default function ShopPage() {
   useEffect(() => {
     void load().catch((err) => setError(err.message));
   }, [load]);
+
+  useEffect(() => {
+    void api<ChatPayload>("/chat")
+      .then((data) => {
+        setThreads(data.threads || []);
+        if (data.threadId) setThreadId(data.threadId);
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const status = shop?.status || build?.status || "";
@@ -76,24 +97,17 @@ export default function ShopPage() {
   const importedCount = scan?.imported || scan?.productCount || 0;
   const scanNote =
     scan?.status === "running"
-      ? `در حال خواندن اینستاگرام ${scan.handles?.join("، ") || ""}… کالاها به فروش می‌آیند.`
+      ? `در حال خواندن اینستاگرام ${scan.handles?.join("، ") || ""}…`
       : scan?.status === "error"
         ? (scan.error || "اسکن کانال کامل نشد.") +
-          (importedCount ? ` ${importedCount} کالای قبلی سر جایش است.` : "") +
-          " برای تلاش دوباره، همان آدرس را در چت بفرست."
-        : scan?.needsReview && importedCount
-          ? `${importedCount} کالا وارد شد؛ عکس کم است، بعداً عکس بگذار.`
-          : scan?.needsReview
-            ? scan.kept
-              ? `چیزی تازه از این صفحه خوانده نشد؛ ${scan.kept} کالای قبلی سر جایش است.`
-              : "چیزی از این صفحه خوانده نشد؛ دوباره اسکن کن یا کالا را دستی اضافه کن."
-            : scan?.status === "done" && importedCount
-              ? `${importedCount} کالا وارد شد` +
-                (scan.rejected ? `، ${scan.rejected} رد` : "") +
-                (scan.noImage ? `، ${scan.noImage} بدون عکس` : "") +
-                (scan.noPrice ? `، ${scan.noPrice} بدون قیمت — قبل از ساخت سایت قیمت بگذار یا بگو قیمت‌ها را مخفی کن` : "") +
-                "."
-              : "";
+          (importedCount ? ` ${importedCount} کالای قبلی سر جایش است.` : "")
+        : scan?.needsReview
+          ? importedCount
+            ? `${importedCount} کالا وارد شد؛ عکس کم است.`
+            : scan.kept
+              ? `چیزی تازه خوانده نشد؛ ${scan.kept} کالای قبلی سر جایش است.`
+              : "چیزی از این صفحه خوانده نشد."
+          : "";
   const priceBlocked = Boolean(shop?.priceBlocked && !shop?.hidePrices);
   const shopPublic = shopPublicUrl(shop, build?.url);
   const live = Boolean(
@@ -128,6 +142,42 @@ export default function ShopPage() {
     }
   }, [shop?.brand]);
 
+  async function sendToChat() {
+    const target = viewTarget.trim();
+    if (!target || sending) return;
+    setSending(true);
+    setError("");
+    setNotice("");
+    const text = `این را عوض کن: ${target}`;
+    const stamp = `${threadId}\0${viewPath}\0${target}`;
+    const key = takeIdempotencyKey(sendKey.current, stamp);
+    try {
+      const data = await api<ChatPayload>("/chat", {
+        method: "POST",
+        headers: { "Idempotency-Key": key },
+        body: JSON.stringify({
+          text,
+          viewPath,
+          viewTarget: target,
+          threadId,
+        }),
+      });
+      finishIdempotencyKey(sendKey.current);
+      if (data.threads) setThreads(data.threads);
+      if (data.threadId) setThreadId(data.threadId);
+      if (data.notice) {
+        setNotice(data.notice);
+        return;
+      }
+      router.push("/chat");
+    } catch (err) {
+      finishIdempotencyKey(sendKey.current, err);
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <AppShell
       header={
@@ -155,30 +205,52 @@ export default function ShopPage() {
       }
     >
       <div className={cn("relative flex h-full flex-col", building ? "sozan-aurora" : "")}>
-        <div className="px-4 pt-3">
-          <ChatNav current="shop" />
-        </div>
         {error ? <p className="relative px-4 pt-3 text-sm text-danger">{error}</p> : null}
+        {notice ? (
+          <p className="relative px-4 pt-3 text-sm text-warm" role="status">
+            {notice}
+          </p>
+        ) : null}
         {priceBlocked ? (
-          <div className="relative mx-4 mt-3 rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3">
-            <p className="text-sm font-bold text-danger">بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام.</p>
-            <a href="/more/inventory?focus=price" className="mt-2 inline-flex text-sm text-warm underline">
+          <p className="relative px-4 pt-3 text-sm text-danger">
+            بدون قیمت تومان ویترین فروش نمی‌شود.{" "}
+            <a href="/more/inventory?focus=price" className="text-warm underline">
               ثبت قیمت
             </a>
-          </div>
+          </p>
         ) : null}
         {scanNote ? (
           <p className={`relative px-4 pt-3 text-sm ${scan?.status === "error" ? "text-danger" : "text-warm"}`}>
             {scanNote}
           </p>
         ) : null}
-        <p className="relative px-4 pt-3 text-sm text-warm">
-          {viewTarget ? (
-            <Link href="/chat">برای عوض کردن «{viewTarget}» در چت بگو</Link>
-          ) : (
-            <Link href="/chat">{live ? "ادیت و ساخت در چت" : "در چت بگو چه فروشگاهی می‌خواهی"}</Link>
-          )}
-        </p>
+        {viewTarget ? (
+          <div className="relative flex flex-wrap items-center gap-2 px-4 pt-3">
+            <p className="min-w-0 flex-1 truncate text-sm text-ink">{viewTarget}</p>
+            {threads.length ? (
+              <select
+                className="max-w-[9rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink"
+                value={threadId}
+                onChange={(event) => setThreadId(event.target.value)}
+                aria-label="گفتگو"
+              >
+                {threads.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.title}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <button
+              type="button"
+              className="shrink-0 rounded-xl border border-line px-2 py-1 text-xs text-warm disabled:opacity-50"
+              disabled={sending}
+              onClick={() => void sendToChat()}
+            >
+              فرستادن به چت
+            </button>
+          </div>
+        ) : null}
         {live && shopPublic ? (
           <a href={shopPublic} target="_blank" rel="noreferrer" className="relative px-4 pt-2 text-sm text-warm underline">
             باز کردن ویترین
@@ -194,6 +266,7 @@ export default function ShopPage() {
             applyPatch={applyPatch}
             onBuild={() => void runBuild(true, true)}
             onRetry={() => void runBuild(true, true)}
+            onViewPath={setViewPath}
             onViewTarget={setViewTarget}
           />
         </div>
