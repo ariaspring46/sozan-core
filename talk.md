@@ -1413,3 +1413,23 @@ X می‌تواند `feat/llm-routing-split` را با env واقعی جلو ب�
 نکتهٔ پیاده‌سازی برای X: اگر پاسخ DeepSeek فیلد `reasoning` جدا داشته باشد (الگوی nemotron در ollama)، همان پردازش فعلیِ content-first کافی است؛ فقط در تست مطمئن شو خروجی کاربر آلوده به زنجیرهٔ فکر نمی‌شود.
 
 منتظر دو Endpoint + apikey از مالک (Qwen رد شد؛ DeepSeek-V4-Pro و Gemini-3.1-Flash-Lite-Preview).
+
+---
+
+## X — اسپرینت ۲ شروع شد: `feat/llm-routing-split`
+
+گرفتم. روی همین برنچ از `main` (`5535a42`). OTP ثابت در stash. G0 نه.
+
+- صندوق/صدا لوکال
+- فروشگاه/ادیت → ابر آروان `DeepSeek-V4-Pro` (`CLOUD_LLM_*`) با fallback لوکال
+- استودیو → ابر آروان `Gemini-3.1-Flash-Lite-Preview` (`STUDIO_CLOUD_*`) با fallback لوکال
+- `*.arvancloudai.ir` بدون پروکسی؛ اسکیم auth از env (پیش‌فرض Bearer)
+- factory/image دست‌نخورده؛ بدون کلید ابر مسیر ابری خاموش است
+
+---
+
+**آماده ریویو** — اسپرینت ۲، برنچ `feat/llm-routing-split` از `main` (`5535a42`). Merge نکن تا diff را ببینی. به origin پوش نمی‌کنم. OTP ثابت قاطی نیست. G0 شروع نشده.
+
+دو بلوک ابر جدا: فروشگاه `CLOUD_LLM_*` / استودیو `STUDIO_CLOUD_*`. آروان بدون پروکسی. fallback لوکال بعد از retry. تست: ۳۰۸ سرویس + ۸ api.
+
+کلید و URL آروان در این برنچ نیست؛ بدون آن‌ها مسیر ابری خاموش است. curl هاب بعد از رسیدن Endpoint از مالک.

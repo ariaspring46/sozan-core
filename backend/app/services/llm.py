@@ -23,6 +23,12 @@ CLOUD_UA = "curl/8.5.0"
 VOICE_SURFACES = frozenset({"voice", "inbox"})
 PINNED_SURFACES = frozenset({"studio"})
 CLOUD_SURFACES = frozenset({"factory"})
+SHOP_CLOUD_SURFACES = frozenset({"shop", "shop-edit"})
+CLOUD_PRIMARY_SURFACES = frozenset({"shop", "shop-edit", "studio"})
+ARVAN_HOST_SUFFIX = "arvancloudai.ir"
+CLOUD_PRIMARY_TIMEOUT = 120
+DEFAULT_SHOP_CLOUD_MODEL = "DeepSeek-V4-Pro"
+DEFAULT_STUDIO_CLOUD_MODEL = "Gemini-3.1-Flash-Lite-Preview"
 GPU1_LOCAL = frozenset(
     {"qwen3.8-27b", "ornith-1.5-35b", "muse-glimmer-30b", "gpt-oss-20b", "qwen3-coder-next"}
 )
@@ -90,45 +96,121 @@ def _swap_base() -> str:
     return url
 
 
+def _str_setting(value: object, default: str = "") -> str:
+    if isinstance(value, str):
+        return value.strip() or default
+    return default
+
+
 def _cloud_token() -> str:
-    return (settings.cloud_llm_token or "").strip()
+    return _str_setting(settings.cloud_llm_token)
+
+
+def _studio_cloud_token() -> str:
+    return _str_setting(getattr(settings, "studio_cloud_token", ""))
 
 
 def _cloud_proxy() -> str | None:
-    raw = (settings.cloud_llm_proxy or settings.channel_proxy or "").strip()
+    raw = _str_setting(settings.cloud_llm_proxy) or _str_setting(settings.channel_proxy)
     return raw or None
+
+
+def _host_of(url: str) -> str:
+    from urllib.parse import urlparse
+
+    try:
+        return (urlparse(url).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _is_arvan_url(url: str) -> bool:
+    host = _host_of(url)
+    return host == ARVAN_HOST_SUFFIX or host.endswith(f".{ARVAN_HOST_SUFFIX}")
+
+
+def _proxy_for_url(url: str) -> str | None:
+    if _is_arvan_url(url):
+        return None
+    return _cloud_proxy()
+
+
+def _auth_scheme(value: object) -> str:
+    return _str_setting(value, "Bearer") or "Bearer"
+
+
+def _shop_cloud_route(*, source: str = "default") -> dict | None:
+    url = _str_setting(settings.cloud_llm_url).rstrip("/")
+    token = _cloud_token()
+    if not url or not token:
+        return None
+    return {
+        "kind": "cloud",
+        "url": url,
+        "model": _str_setting(settings.cloud_llm_model, DEFAULT_SHOP_CLOUD_MODEL) or DEFAULT_SHOP_CLOUD_MODEL,
+        "token": token,
+        "proxy": _proxy_for_url(url),
+        "auth": _auth_scheme(getattr(settings, "cloud_llm_auth", "Bearer")),
+        "source": source,
+        "cloud": "shop",
+    }
+
+
+def _studio_cloud_route(*, source: str = "default") -> dict | None:
+    url = _str_setting(getattr(settings, "studio_cloud_url", "")).rstrip("/")
+    token = _studio_cloud_token()
+    if not url or not token:
+        return None
+    return {
+        "kind": "cloud",
+        "url": url,
+        "model": _str_setting(getattr(settings, "studio_cloud_model", ""), DEFAULT_STUDIO_CLOUD_MODEL)
+        or DEFAULT_STUDIO_CLOUD_MODEL,
+        "token": token,
+        "proxy": _proxy_for_url(url),
+        "auth": _auth_scheme(getattr(settings, "studio_cloud_auth", "Bearer")),
+        "source": source,
+        "cloud": "studio",
+    }
+
+
+def _local_default_route(surface: str) -> dict:
+    return {
+        "kind": "local",
+        "url": _str_setting(settings.local_llm_url, "http://127.0.0.1:9292/v1").rstrip("/"),
+        "model": _default_local_model(surface),
+        "token": _str_setting(settings.local_llm_token),
+        "proxy": None,
+        "auth": "Bearer",
+        "source": "default",
+    }
 
 
 def route_for_surface(surface: str) -> dict:
     override = _routing_override(surface)
     if override and not _rejects_pinned_gpu1(surface, override):
         return override
-    if surface in CLOUD_SURFACES and settings.cloud_llm_url and _cloud_token():
-        return {
-            "kind": "cloud",
-            "url": settings.cloud_llm_url.rstrip("/"),
-            "model": settings.cloud_llm_model,
-            "token": _cloud_token(),
-            "proxy": _cloud_proxy(),
-            "source": "default",
-        }
-    model = _default_local_model(surface)
-    return {
-        "kind": "local",
-        "url": settings.local_llm_url.rstrip("/"),
-        "model": model,
-        "token": settings.local_llm_token,
-        "proxy": None,
-        "source": "default",
-    }
+    if surface in CLOUD_SURFACES:
+        cloud = _shop_cloud_route()
+        if cloud:
+            return cloud
+    if surface in SHOP_CLOUD_SURFACES:
+        cloud = _shop_cloud_route()
+        if cloud:
+            return cloud
+    if surface in PINNED_SURFACES:
+        cloud = _studio_cloud_route()
+        if cloud:
+            return cloud
+    return _local_default_route(surface)
 
 
 def _default_local_model(surface: str) -> str:
     if surface in PINNED_SURFACES:
-        return (settings.studio_llm_model or "qwen3.5-9b").strip() or "qwen3.5-9b"
+        return _str_setting(settings.studio_llm_model, "qwen3.5-9b") or "qwen3.5-9b"
     if surface in VOICE_SURFACES:
-        return settings.local_llm_model
-    return settings.chat_llm_model
+        return _str_setting(settings.local_llm_model) or "qwen3.8-27b"
+    return _str_setting(settings.chat_llm_model) or "qwen3.8-27b"
 
 
 def _rejects_pinned_gpu1(surface: str, override: dict) -> bool:
@@ -170,15 +252,17 @@ def _routing_override(surface: str) -> dict | None:
             "url": base,
             "model": model,
             "token": token,
-            "proxy": _cloud_proxy(),
+            "proxy": _proxy_for_url(base),
+            "auth": _auth_scheme(getattr(settings, "cloud_llm_auth", "Bearer")),
             "source": "override",
         }
     return {
         "kind": "local",
-        "url": settings.local_llm_url.rstrip("/"),
+        "url": _str_setting(settings.local_llm_url, "http://127.0.0.1:9292/v1").rstrip("/"),
         "model": model,
-        "token": settings.local_llm_token,
+        "token": _str_setting(settings.local_llm_token),
         "proxy": None,
+        "auth": "Bearer",
         "source": "override",
     }
 
@@ -342,8 +426,14 @@ def report_llm_fail(
     )
 
 
-async def _chat_completion(*, messages: list[dict], temperature: float, max_tokens: int, surface: str) -> str:
-    route = route_for_surface(surface)
+async def _complete_with_route(
+    route: dict,
+    *,
+    messages: list[dict],
+    temperature: float,
+    max_tokens: int,
+    surface: str,
+) -> str:
     body = {
         "model": route["model"],
         "temperature": temperature,
@@ -357,9 +447,13 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
     timeout = 180 if max_tokens > 700 else 120
     body["think"] = False
     if route["kind"] == "cloud":
-        headers["Authorization"] = f"Bearer {route['token']}"
+        scheme = _auth_scheme(route.get("auth"))
+        headers["Authorization"] = f"{scheme} {route['token']}"
         headers["User-Agent"] = CLOUD_UA
-        timeout = max(timeout, 90)
+        if surface in CLOUD_PRIMARY_SURFACES:
+            timeout = CLOUD_PRIMARY_TIMEOUT
+        else:
+            timeout = max(timeout, 90)
     else:
         body["chat_template_kwargs"] = {"enable_thinking": False, "thinking": False}
         body["reasoning_format"] = "none"
@@ -392,6 +486,41 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
             )
             raise
     raise last_exc or RuntimeError("llm")
+
+
+async def _chat_completion(*, messages: list[dict], temperature: float, max_tokens: int, surface: str) -> str:
+    route = route_for_surface(surface)
+    try:
+        return await _complete_with_route(
+            route,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            surface=surface,
+        )
+    except Exception as cloud_exc:
+        if route.get("kind") != "cloud" or surface not in CLOUD_PRIMARY_SURFACES:
+            raise
+        local = _local_default_route(surface)
+        log.warning("llm %s cloud failed; fallback local %s", surface, local.get("model"))
+        emit_later(
+            kind="llm",
+            title="cloud-fallback",
+            surface=surface,
+            status="fallback",
+            stage="cloud-fallback",
+            payload={"requested": route.get("model") or "", "used": local.get("model") or ""},
+        )
+        try:
+            return await _complete_with_route(
+                local,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                surface=surface,
+            )
+        except Exception:
+            raise cloud_exc
 
 
 async def complete_json(system: str, user: str, *, surface: str = "llm", max_tokens: int = 700) -> dict:

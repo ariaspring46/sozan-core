@@ -45,9 +45,14 @@ class Settings(BaseSettings):
     chat_llm_model: str = "qwen3.8-27b"
     studio_llm_model: str = "qwen3.5-9b"
     cloud_llm_url: str = ""
-    cloud_llm_model: str = "deepseek-v4.1-flash:cloud"
+    cloud_llm_model: str = "DeepSeek-V4-Pro"
     cloud_llm_token: str = Field(default="", validation_alias=AliasChoices("CLOUD_LLM_TOKEN", "OLLAMA_API_KEY"))
+    cloud_llm_auth: str = "Bearer"
     cloud_llm_proxy: str = ""
+    studio_cloud_url: str = ""
+    studio_cloud_model: str = "Gemini-3.1-Flash-Lite-Preview"
+    studio_cloud_token: str = Field(default="", validation_alias=AliasChoices("STUDIO_CLOUD_TOKEN", "GEMINI_API_KEY"))
+    studio_cloud_auth: str = "Bearer"
     arvan_api_key: str = ""
     arvan_zone: str = "sozan-core.ir"
     arvan_origin_ip: str = ""
