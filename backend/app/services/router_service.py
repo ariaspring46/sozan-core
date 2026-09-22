@@ -8,6 +8,7 @@ import time
 from contextvars import ContextVar
 from uuid import uuid4
 
+from app.services import router_embed
 from app.services.observe_client import emit_later
 from app.services.tenant_lock import tenant_file_lock
 from app.state_store import current_tenant, read_json, write_json
@@ -51,7 +52,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "status",
-            "description": "وضعیت فروشگاه، اسکن، پلن، مانده کیف و دامنه",
+            "description": "پرسش وضعیت، اسکن، بیلد، پلن، کیف یا دامنه. حتی با کلمهٔ فروشگاه. سؤال حس فروشگاه نپرس.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -59,7 +60,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "inbox_status",
-            "description": "خوانده‌نشده‌ها و حالت پاسخ خودکار صندوق",
+            "description": "صندوق، خوانده‌نشده و پاسخ خودکار. پرسش وضعیت فروشگاه نیست.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -108,7 +109,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "shop_chat",
-            "description": "ادامهٔ گفتگوی فروشگاه با همان جملهٔ کاربر. متن را خودت ننویس.",
+            "description": "ساخت یا تغییر ویترین. پرسش وضعیت را به status بده. متن را خودت ننویس.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -116,7 +117,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "studio_chat",
-            "description": "ادامهٔ گفتگوی استودیو با همان جملهٔ کاربر. متن را خودت ننویس.",
+            "description": "کپشن، کپی، شعار، پست یا استوری. متن تبلیغ را خودت ننویس؛ فقط این ابزار.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -124,7 +125,10 @@ TOOLS = [
 
 SYSTEM = (
     "تو سوزان هستی. فارسی کوتاه، بدون مقدمه. تنظیمات با ابزار. "
-    "فروشگاه=shop_chat، محتوا=studio_chat. دایرکت را جواب نده. مبهم=ask_user. "
+    "پرسش وضعیت، پلن، کیف، اسکن یا «چطور است» حتی با کلمهٔ فروشگاه = status، نه سؤال. "
+    "ساخت و تغییر ویترین = shop_chat. "
+    "کپشن، کپی، شعار، پست و استوری = studio_chat و خودت متن تبلیغ ننویس. "
+    "دایرکت را جواب نده. مبهم=ask_user. "
     "پیوست را با همان ابزار بفرست. متن ابزار را خودت ننویس. کلید و JSON خام نشان نده."
 )
 
@@ -716,6 +720,7 @@ async def turn(
     view_target: str = "",
     idempotency_key: str = "",
     thread_id: str = "",
+    embed=None,
 ) -> dict:
     _bind_thread(thread_id)
     token = _claim_turn(idempotency_key)
@@ -733,6 +738,7 @@ async def turn(
             media=media,
             view_path=view_path,
             view_target=view_target,
+            embed=embed,
         )
     finally:
         beater.cancel()
@@ -754,6 +760,7 @@ async def _execute(
     media=None,
     view_path: str = "",
     view_target: str = "",
+    embed=None,
 ) -> dict:
     spoken = (text or "").strip()
     pending = _pending()
@@ -824,9 +831,13 @@ async def _execute(
 
     calls = result.get("tool_calls") if isinstance(result, dict) else None
     if not calls:
-        reply = str((result or {}).get("text") or "").strip() or "بگو فروشگاه، محتوا یا صندوق — از همان‌جا کمکت می‌کنم."
-        _append("assistant", reply)
-        return snapshot()
+        rescued = await router_embed.rescue_tool(spoken, embed=embed)
+        if rescued:
+            calls = [{"name": rescued, "arguments": {}}]
+        else:
+            reply = str((result or {}).get("text") or "").strip() or "بگو فروشگاه، محتوا یا صندوق — از همان‌جا کمکت می‌کنم."
+            _append("assistant", reply)
+            return snapshot()
 
     call, dropped = _choose_call(calls)
     if call is None:

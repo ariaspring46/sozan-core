@@ -15,7 +15,8 @@ from app.state_store import tenant_scope, write_json
 class RouterServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
-        self.patches = [patch.object(settings, "state_dir", self.tmp.name)]
+        self.embed_off = patch("app.services.router_embed.rescue_tool", new=AsyncMock(return_value=""))
+        self.patches = [patch.object(settings, "state_dir", self.tmp.name), self.embed_off]
         for item in self.patches:
             item.start()
 
@@ -25,7 +26,17 @@ class RouterServiceTests(unittest.TestCase):
         self.tmp.cleanup()
         router_service._THREAD.set("")
 
-    def _turn(self, text: str, complete, confirm_id: str = "", cancel_id: str = "", campaigns=None, media=None, thread_id: str = ""):
+    def _turn(
+        self,
+        text: str,
+        complete,
+        confirm_id: str = "",
+        cancel_id: str = "",
+        campaigns=None,
+        media=None,
+        thread_id: str = "",
+        embed=None,
+    ):
         with tenant_scope("09129900001"):
             return asyncio.run(
                 router_service.turn(
@@ -36,6 +47,7 @@ class RouterServiceTests(unittest.TestCase):
                     campaigns=campaigns,
                     media=media,
                     thread_id=thread_id,
+                    embed=embed,
                 )
             )
 
@@ -441,6 +453,112 @@ class RouterServiceTests(unittest.TestCase):
                 router_service.new_thread()
             with self.assertRaises(ValueError):
                 router_service.new_thread()
+
+    def _use_real_rescue(self, bank: dict):
+        self.embed_off.stop()
+        self.patches.remove(self.embed_off)
+        started = patch("app.services.router_embed.load_vectors", return_value=bank)
+        started.start()
+        self.patches.append(started)
+
+    def test_prompt_sends_status_and_caption_to_tools(self) -> None:
+        self.assertIn("status", router_service.SYSTEM)
+        self.assertIn("متن تبلیغ ننویس", router_service.SYSTEM)
+        descriptions = {
+            item["function"]["name"]: item["function"]["description"] for item in router_service.TOOLS
+        }
+        self.assertIn("status", descriptions["shop_chat"])
+        self.assertIn("متن تبلیغ", descriptions["studio_chat"])
+
+    def test_status_prose_uses_status_not_shop_question(self) -> None:
+        bank = {
+            "status": {"mean": [1.0, 0.0, 0.0], "samples": [[1.0, 0.0, 0.0]]},
+            "content": {"mean": [0.0, 1.0, 0.0], "samples": [[0.0, 1.0, 0.0]]},
+        }
+        self._use_real_rescue(bank)
+
+        async def complete(_messages, _tools):
+            return {"text": "حس فروشگاه را بگو: لوکس و خلوت", "tool_calls": []}
+
+        async def embed(_text):
+            return [1.0, 0.0, 0.0]
+
+        with patch(
+            "app.services.shop_service.snapshot",
+            return_value={
+                "shop": {"status": "ready", "slug": "demo", "cnameOk": True},
+                "scan": {"status": "done"},
+                "build": {"status": "ready"},
+            },
+        ), patch("app.services.channel_service.list_accounts", return_value={"accounts": []}), patch(
+            "app.services.plan_service.snapshot", return_value={"plan": "free"}
+        ), patch("app.services.wallet_service.get", return_value={"available": 12000}):
+            out = self._turn("وضعیت فروشگاهم را کوتاه بگو", complete, embed=embed)
+        text = out["messages"][-1]["text"]
+        self.assertIn("پلن", text)
+        self.assertNotIn("حس فروشگاه", text)
+
+    def test_caption_prose_goes_to_studio(self) -> None:
+        bank = {
+            "content": {"mean": [0.0, 1.0, 0.0], "samples": [[0.0, 1.0, 0.0]]},
+            "status": {"mean": [1.0, 0.0, 0.0], "samples": [[1.0, 0.0, 0.0]]},
+        }
+        self._use_real_rescue(bank)
+        spoken = "برای اینستاگرام یک کپشن کوتاه کفش بنویس، تصویر نساز"
+
+        async def complete(_messages, _tools):
+            return {"text": "کفش‌های جدید، قدم‌های متفاوت", "tool_calls": []}
+
+        async def embed(_text):
+            return [0.0, 1.0, 0.0]
+
+        with patch(
+            "app.services.studio_chat_service.chat",
+            new=AsyncMock(return_value={"messages": [{"role": "assistant", "text": "کپشن استودیو آماده است."}]}),
+        ) as chat:
+            out = self._turn(spoken, complete, campaigns=object(), embed=embed)
+        chat.assert_awaited_once()
+        self.assertEqual(chat.await_args.args[0], spoken)
+        self.assertEqual(out["messages"][-1]["text"], "کپشن استودیو آماده است.")
+        self.assertNotIn("قدم‌های متفاوت", out["messages"][-1]["text"])
+
+    def test_low_score_keeps_model_prose(self) -> None:
+        bank = {
+            "status": {"mean": [1.0, 0.0, 0.0], "samples": [[1.0, 0.0, 0.0]]},
+            "content": {"mean": [0.0, 1.0, 0.0], "samples": [[0.0, 1.0, 0.0]]},
+            "shop": {"mean": [0.0, 0.0, 1.0], "samples": [[0.0, 0.0, 1.0]]},
+        }
+        self._use_real_rescue(bank)
+
+        async def complete(_messages, _tools):
+            return {"text": "سلام، بگو از کجا شروع کنیم.", "tool_calls": []}
+
+        async def embed(_text):
+            return [1.0, 1.0, 1.0]
+
+        out = self._turn("سلام", complete, embed=embed)
+        self.assertEqual(out["messages"][-1]["text"], "سلام، بگو از کجا شروع کنیم.")
+
+    def test_called_tool_is_not_rewritten(self) -> None:
+        bank = {"status": {"mean": [1.0, 0.0], "samples": [[1.0, 0.0]]}}
+        self._use_real_rescue(bank)
+        seen = {"embed": 0}
+
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {}}]}
+
+        async def embed(_text):
+            seen["embed"] += 1
+            return [1.0, 0.0]
+
+        with patch(
+            "app.services.shop_service.chat",
+            new=AsyncMock(return_value={"messages": [{"role": "assistant", "text": "حس فروشگاه را بگو"}]}),
+        ) as chat:
+            out = self._turn("وضعیت فروشگاهم را کوتاه بگو", complete, embed=embed)
+        self.assertEqual(seen["embed"], 0)
+        chat.assert_awaited()
+        self.assertEqual(out["messages"][-1]["text"], "حس فروشگاه را بگو")
 
 
 if __name__ == "__main__":
