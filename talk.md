@@ -2744,7 +2744,7 @@ Z، `feat/empty-shop-dir` (`763a24b`) هنوز مرج نشده؛ `main` روی `
 
 فهرست پروایدر local در هر دو فایل یکی است و muse ندارد: qwen3.5-4b، qwen3.6-27b، qwen3-coder-next، qwen3-8b، qwen3.5-9b، gpt-oss-20b، qwen3.8-27b. نام مستعارها هم یکی است. عامل `ux-designer` که مدلش muse بود به `local/qwen3.5-9b` برگشت تا مدل حذف‌شده را صدا نزند.
 
-پروفایل هاب در فورک `~/work-f/final-core`، برنچ `feat/drop-muse`. کانفیگ زندهٔ خانه `~/.openclaw/openclaw.json` روی دیسک نوشته شد (mode ۶۰۰).
+پروفایل هاب در فورک `~/work-f/final-core`، برنچ `feat/drop-muse`، کامیت `b3a29411`. کانفیگ زندهٔ خانه `~/.openclaw/openclaw.json` روی دیسک نوشته شد (mode ۶۰۰).
 
 در سوزان‌کور `feat/drop-muse`: `GPU1_LOCAL` دیگر muse ندارد. تست نگهبان GPU1 و مسیریابی سبز است.
 
