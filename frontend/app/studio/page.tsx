@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
+import { StudioLibrary } from "@/components/studio-library";
 import { StudioNav } from "@/components/studio-nav";
 import type { PublishTarget } from "@/components/studio-publish";
 import { api } from "@/lib/api";
@@ -17,6 +18,7 @@ export default function StudioPage() {
   const chatKey = useRef(emptyIdempotencySlot());
   const publishKey = useRef(emptyIdempotencySlot());
   const regenKey = useRef(emptyIdempotencySlot());
+  const [view, setView] = useState<"chat" | "library">("chat");
 
   async function load() {
     const data = await api<{ messages: ChatMsg[]; targets?: PublishTarget[]; composing?: boolean }>("/studio");
@@ -54,8 +56,26 @@ export default function StudioPage() {
       }
     >
       <div className="sozan-chat flex h-full flex-col">
-        <div className="px-4 pt-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-3">
           <StudioNav current="studio" />
+          <div className="flex items-center gap-3 text-sm">
+            <button
+              type="button"
+              className={view === "chat" ? "font-bold text-ink" : "text-muted"}
+              aria-pressed={view === "chat"}
+              onClick={() => setView("chat")}
+            >
+              چت
+            </button>
+            <button
+              type="button"
+              className={view === "library" ? "font-bold text-ink" : "text-muted"}
+              aria-pressed={view === "library"}
+              onClick={() => setView("library")}
+            >
+              محتوای من
+            </button>
+          </div>
         </div>
         {error ? (
           <p className="px-4 pt-3 text-sm text-danger" role="alert">
@@ -63,6 +83,9 @@ export default function StudioPage() {
           </p>
         ) : null}
         <div className="min-h-0 flex-1">
+          {view === "library" ? (
+            <StudioLibrary />
+          ) : (
           <ChatThread
             messages={messages}
             busy={busy}
@@ -151,6 +174,7 @@ export default function StudioPage() {
               }
             }}
           />
+          )}
         </div>
       </div>
     </AppShell>

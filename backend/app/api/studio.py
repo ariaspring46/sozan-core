@@ -42,6 +42,14 @@ async def get_studio(_user=Depends(require_permission("campaigns:read"))):
     return {**snap, "targets": channel_service.publish_targets()}
 
 
+@router.get("/content")
+async def studio_content(
+    _user=Depends(require_permission("campaigns:read")),
+    service: CampaignService = Depends(_svc),
+):
+    return studio_chat_service.content_library(await service.list_campaigns())
+
+
 @router.get("/audience")
 async def studio_audience(
     q: str = "",

@@ -168,6 +168,116 @@ def snapshot() -> dict:
     return {"messages": _messages(), "composing": any_composing()}
 
 
+def _attr(row: object, name: str, default: object = "") -> object:
+    if isinstance(row, dict):
+        return row.get(name, default)
+    return getattr(row, name, default)
+
+
+def _compose_status(row: dict) -> str:
+    compose = row.get("compose") if isinstance(row.get("compose"), dict) else {}
+    return str(compose.get("status") or "")
+
+
+def _copy_rows(copies: object) -> list[dict]:
+    out = []
+    for copy in copies or []:
+        body = str(_attr(copy, "body") or "")
+        if not body.strip():
+            continue
+        out.append({"channel": str(_attr(copy, "channel") or ""), "body": body})
+    return out
+
+
+def _asset_rows(assets: object) -> list[dict]:
+    out = []
+    for asset in assets or []:
+        rel = str(_attr(asset, "rel_path") or "")
+        name = Path(rel).name
+        if not name:
+            continue
+        out.append(
+            {
+                "kind": str(_attr(asset, "kind") or ""),
+                "channel": str(_attr(asset, "channel") or ""),
+                "format": str(_attr(asset, "format") or ""),
+                "name": name,
+                "relPath": rel,
+            }
+        )
+    return out
+
+
+def _draft_item(row: dict) -> dict | None:
+    captions = row.get("captions") if isinstance(row.get("captions"), dict) else {}
+    copies = _copy_rows(
+        [{"channel": key, "body": captions.get(key)} for key in ("instagram", "telegram", "whatsapp")]
+    )
+    assets = []
+    for item in row.get("attachments") or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name:
+            continue
+        assets.append(
+            {
+                "kind": str(item.get("kind") or ""),
+                "channel": "",
+                "format": "",
+                "name": name,
+                "relPath": "",
+            }
+        )
+    status = _compose_status(row)
+    if not copies and not assets and not status:
+        return None
+    return {
+        "id": str(row.get("id") or ""),
+        "title": "پیش‌نویس",
+        "copies": copies,
+        "assets": assets,
+        "compose": status,
+    }
+
+
+def content_library(campaigns: list) -> dict:
+    expire_stale_compose(600)
+    compose_by: dict[str, str] = {}
+    drafts: list[dict] = []
+    for row in _messages():
+        if not isinstance(row, dict) or row.get("role") == "user":
+            continue
+        cid = str(row.get("campaignId") or "")
+        status = _compose_status(row)
+        if cid and status:
+            if status == "running" or compose_by.get(cid) != "running":
+                compose_by[cid] = status
+        if not cid:
+            draft = _draft_item(row)
+            if draft:
+                drafts.append(draft)
+    items = []
+    for campaign in campaigns or []:
+        cid = str(_attr(campaign, "id") or "")
+        copies = _copy_rows(_attr(campaign, "copies", []))
+        assets = _asset_rows(_attr(campaign, "assets", []))
+        status = compose_by.get(cid, "")
+        if not copies and not assets and not status:
+            continue
+        title = str(_attr(campaign, "title") or "").strip() or "بدون عنوان"
+        items.append(
+            {
+                "id": cid,
+                "title": title,
+                "copies": copies,
+                "assets": assets,
+                "compose": status,
+            }
+        )
+    return {"items": items, "drafts": drafts}
+
+
 def any_composing() -> bool:
     for row in _messages():
         compose = row.get("compose") if isinstance(row.get("compose"), dict) else {}

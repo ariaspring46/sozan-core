@@ -95,6 +95,19 @@ class StudioApiTests(unittest.TestCase):
         self.assertEqual(len(captions["instagram"]), 2200)
         self.assertEqual(captions["telegram"], "تل")
 
+    def test_get_content_library(self) -> None:
+        payload = {"items": [{"id": "c1", "title": "ویترین", "copies": [], "assets": [], "compose": ""}], "drafts": []}
+        with patch(
+            "app.services.studio_chat_service.content_library",
+            return_value=payload,
+        ), patch(
+            "app.services.campaign_service.CampaignService.list_campaigns",
+            new=AsyncMock(return_value=[]),
+        ):
+            res = self.client.get("/studio/content")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["items"][0]["title"], "ویترین")
+
 
 if __name__ == "__main__":
     unittest.main()

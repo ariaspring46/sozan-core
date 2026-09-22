@@ -301,6 +301,39 @@ class StudioChatTests(unittest.TestCase):
                 self.assertIn("instagram", published)
                 self.assertIn("telegram", published)
 
+    def test_content_library_keeps_full_copy_and_asset_name(self) -> None:
+        body = "کپشن کامل " * 40
+        campaign = SimpleNamespace(
+            id="c1",
+            title="ویترین شب",
+            copies=[SimpleNamespace(channel="instagram", body=body)],
+            assets=[
+                SimpleNamespace(kind="overlay", channel="instagram", format="feed", rel_path="c1/out/ig-feed.png")
+            ],
+        )
+        rows = [
+            {"id": "m1", "role": "assistant", "campaignId": "c1", "compose": {"status": "ready"}},
+            {"id": "m2", "role": "assistant", "captions": {"telegram": "پیش‌نویس تلگرام"}},
+        ]
+        with patch("app.services.studio_chat_service.expire_stale_compose"), patch(
+            "app.services.studio_chat_service.read_json",
+            return_value=rows,
+        ):
+            out = studio_chat_service.content_library([campaign])
+        self.assertEqual(out["items"][0]["copies"][0]["body"], body)
+        self.assertEqual(out["items"][0]["assets"][0]["name"], "ig-feed.png")
+        self.assertEqual(out["items"][0]["compose"], "ready")
+        self.assertEqual(out["drafts"][0]["title"], "پیش‌نویس")
+        self.assertEqual(out["drafts"][0]["copies"][0]["body"], "پیش‌نویس تلگرام")
+
+    def test_content_library_empty(self) -> None:
+        with patch("app.services.studio_chat_service.expire_stale_compose"), patch(
+            "app.services.studio_chat_service.read_json",
+            return_value=[],
+        ):
+            out = studio_chat_service.content_library([])
+        self.assertEqual(out, {"items": [], "drafts": []})
+
 
 if __name__ == "__main__":
     unittest.main()
