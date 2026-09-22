@@ -375,7 +375,7 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
         for _round in range(MAX_ROUNDS):
             text, calls = await _complete(messages)
             if not calls:
-                if not nudged:
+                if not nudged and not used:
                     hinted = await intent_hint(sentence)
                     if hinted:
                         nudged = hinted
