@@ -572,7 +572,7 @@ class Gpu1GuardTests(unittest.TestCase):
     def test_busy_factory_falls_back_to_9b(self) -> None:
         self._phase("TRANSITION")
         unload = AsyncMock()
-        with patch("app.services.llm._running_models", new=AsyncMock(return_value={"muse-glimmer-30b", "qwen3.5-9b"})), patch(
+        with patch("app.services.llm._running_models", new=AsyncMock(return_value={"gpt-oss-20b", "qwen3.5-9b"})), patch(
             "app.services.llm._unload_model", new=unload
         ), patch("app.services.llm.emit_later", new=lambda **kw: None):
             used = asyncio.run(_ensure_gpu1("qwen3.8-27b"))

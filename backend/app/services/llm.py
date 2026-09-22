@@ -30,7 +30,7 @@ CLOUD_PRIMARY_TIMEOUT = 120
 DEFAULT_SHOP_CLOUD_MODEL = "DeepSeek-V4-Pro"
 DEFAULT_STUDIO_CLOUD_MODEL = "Gemini-3.1-Flash-Lite-Preview"
 GPU1_LOCAL = frozenset(
-    {"qwen3.8-27b", "ornith-1.5-35b", "muse-glimmer-30b", "gpt-oss-20b", "qwen3-coder-next"}
+    {"qwen3.8-27b", "ornith-1.5-35b", "gpt-oss-20b", "qwen3-coder-next"}
 )
 # While the site-builder holds GPU1 (ACTIVE build lock or a GPU1 phase in
 # queue/phase.json) the hub must not evict its worker; it shares 27B when that

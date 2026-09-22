@@ -21,7 +21,7 @@ class RoutingServiceTests(unittest.TestCase):
     def test_apply_payload_keeps_surface_and_provider_model(self) -> None:
         llm_routing_service.apply_payload(
             {
-                "routes": {"studio": {"kind": "local", "model": "muse-glimmer-30b"}},
+                "routes": {"studio": {"kind": "local", "model": "qwen3.8-27b"}},
                 "providers": [
                     {
                         "id": "ollama-cloud",
@@ -35,7 +35,7 @@ class RoutingServiceTests(unittest.TestCase):
             }
         )
         row = llm_routing_service.get("studio")
-        self.assertEqual(row["model"], "muse-glimmer-30b")
+        self.assertEqual(row["model"], "qwen3.8-27b")
         self.assertEqual(llm_routing_service.provider("ollama-cloud")["model"], "deepseek-v4.1-flash:cloud")
 
     def test_refresh_failure_keeps_disk_and_emits_once(self) -> None:
