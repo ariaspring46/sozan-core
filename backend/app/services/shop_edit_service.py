@@ -315,6 +315,8 @@ def build_dir_for(shop: dict) -> Path | None:
         slug = str(shop.get("slug") or "").strip()
         if slug:
             raw = str(settings.factory_script.resolve().parent.parent / "builds" / slug)
+    if not str(raw or "").strip():
+        return None
     path = Path(raw)
     return path if path.is_dir() else None
 

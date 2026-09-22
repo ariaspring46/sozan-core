@@ -11,6 +11,7 @@ from app.config import settings
 from app.services import shop_service, storefront_service, shop_workspace_service
 from app.services.shop_edit_service import (
     apply_live_edit,
+    build_dir_for,
     has_runtime_chrome,
     looks_like_foreign_payload,
     named_color_updates,
@@ -471,6 +472,9 @@ class ShopEditFlowTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertTrue(has_runtime_chrome(root))
+
+    def test_empty_shop_is_not_the_process_folder(self) -> None:
+        self.assertIsNone(build_dir_for({"slug": "", "jobId": ""}))
 
 
 if __name__ == "__main__":
