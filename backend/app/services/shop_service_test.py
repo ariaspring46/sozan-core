@@ -566,5 +566,43 @@ class OperatorErrorTests(unittest.TestCase):
         self.assertIn("تمام نشد", out.get("error") or "")
 
 
+class CatalogBeforeStorefrontTests(unittest.TestCase):
+    def _chat(self, text: str):
+        from app.services import storefront_service
+
+        answer = AsyncMock(return_value="«کفش» اضافه شد")
+        with tempfile.TemporaryDirectory() as raw:
+            with (
+                patch.object(settings, "state_dir", raw),
+                tenant_scope("09120001111"),
+                patch.object(shop_service, "_shop", return_value={"status": "idle", "slug": ""}),
+                patch.object(shop_service, "_refresh_job", side_effect=lambda shop: shop),
+                patch("app.services.shop_service.emit_later"),
+                patch("app.services.shop_service.complete_chat", new=answer),
+                patch("app.services.channel_scan_service.scan_status", return_value={}),
+            ):
+                result = asyncio.run(shop_service.chat(text))
+                products = storefront_service.list_products().get("products") or []
+        return result, products, answer
+
+    def test_persian_price_is_stored_and_quoted(self) -> None:
+        result, products, answer = self._chat("کفش چرم مشکی را اضافه کن، قیمت ۴٬۸۰۰٬۰۰۰ تومان")
+        answer.assert_not_called()
+        self.assertEqual(len(products), 1)
+        self.assertEqual(int(products[0]["price"]), 4800000)
+        reply = result["assistant"]["text"]
+        self.assertIn("4800000", reply)
+        self.assertIn(str(products[0]["title"]), reply)
+        self.assertNotIn("اضافه شد", reply)
+
+    def test_missing_price_does_not_insert_or_claim_success(self) -> None:
+        result, products, answer = self._chat("کفش چرم مشکی را اضافه کن")
+        answer.assert_not_called()
+        self.assertEqual(products, [])
+        reply = result["assistant"]["text"]
+        self.assertIn("قیمت", reply)
+        self.assertNotIn("اضافه شد", reply)
+
+
 if __name__ == "__main__":
     unittest.main()

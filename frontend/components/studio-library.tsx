@@ -72,6 +72,7 @@ export function StudioLibrary() {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [drafts, setDrafts] = useState<LibraryItem[]>([]);
   const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     void api<{ items: LibraryItem[]; drafts: LibraryItem[] }>("/studio/content")
@@ -79,10 +80,11 @@ export function StudioLibrary() {
         setItems(data.items || []);
         setDrafts(data.drafts || []);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "خطا"));
+      .catch((err) => setError(err instanceof Error ? err.message : "خطا"))
+      .finally(() => setReady(true));
   }, []);
 
-  const empty = !items.length && !drafts.length;
+  const empty = ready && !items.length && !drafts.length;
   return (
     <div className="h-full space-y-3 overflow-y-auto px-4 py-3">
       {error ? (
@@ -90,6 +92,7 @@ export function StudioLibrary() {
           {error}
         </p>
       ) : null}
+      {!ready && !error ? <p className="text-sm text-muted">در حال خواندن…</p> : null}
       {empty && !error ? (
         <EmptyState title="هنوز محتوایی نساخته‌ای" detail="از چت استودیو بگو چه پستی می‌خواهی." />
       ) : null}

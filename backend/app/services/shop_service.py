@@ -1474,6 +1474,39 @@ def _catalog_from_page_reply() -> str:
     return f"{len(products)} مدل از پیج {handle} در کاتالوگ است: {titles}. روی سایت نمی‌آیند تا بیلد بزنی."
 
 
+def _catalog_add_reply(text: str) -> str | None:
+    from app.services import storefront_service
+    from app.services.shop_intent_service import catalog_add
+
+    parsed = catalog_add(text)
+    if parsed is None:
+        return None
+    title = str(parsed.get("title") or "").strip()
+    price = int(parsed.get("price") or 0)
+    if len(title) < 2:
+        return "نام کالا چیست؟"
+    if price <= 0:
+        return "قیمت تومان را هم بگو تا در کاتالوگ بنویسم."
+    saved = storefront_service.add_product(
+        title=title,
+        price=price,
+        stock=1,
+        sku="chat",
+        source="chat",
+        category="کالا",
+    )
+    product = saved.get("product") if isinstance(saved, dict) else {}
+    stored_title = str((product or {}).get("title") or "")
+    stored_price = int((product or {}).get("price") or 0)
+    found = any(
+        str(row.get("title") or "") == stored_title and int(row.get("price") or 0) == stored_price
+        for row in (storefront_service.list_products().get("products") or [])
+    )
+    if not found or stored_price != price:
+        return "کالا در کاتالوگ نوشته نشد. یک بار دیگر بگو."
+    return f"«{stored_title}» با قیمت {stored_price} تومان در کاتالوگ است."
+
+
 def _add_media_product(text: str, media: dict) -> str:
     from app.services import channel_scan_service, chat_media_service, storefront_service
 
@@ -1683,6 +1716,16 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
         return _pack(shop, rows, assistant)
     live = _shop_is_live(shop)
     if not media_only and not live:
+        catalog_reply = _catalog_add_reply(raw)
+        if catalog_reply is not None:
+            assistant = {
+                "id": str(uuid4()),
+                "role": "assistant",
+                "text": catalog_reply,
+                "at": int(time.time()),
+            }
+            _append_assistant(rows, assistant)
+            return _pack(shop, rows, assistant)
         guided = _interview_turn(raw, brief)
         if guided is not None:
             assistant = {

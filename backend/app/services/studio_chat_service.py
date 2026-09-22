@@ -241,11 +241,27 @@ def _draft_item(row: dict) -> dict | None:
     }
 
 
+STUDIO_JSON_TOKENS = 1600
+
+
+async def _studio_json(prompt: str) -> dict:
+    parsed = await complete_json(STUDIO_SYSTEM, prompt, surface="studio", max_tokens=STUDIO_JSON_TOKENS)
+    if parsed.get("error") != "llm_bad_json":
+        return parsed
+    return await complete_json(
+        STUDIO_SYSTEM,
+        f"{prompt}\nفقط یک شیء JSON برگردان، بدون توضیح.",
+        surface="studio",
+        max_tokens=STUDIO_JSON_TOKENS + 600,
+    )
+
+
 def content_library(campaigns: list) -> dict:
     expire_stale_compose(600)
     compose_by: dict[str, str] = {}
     drafts: list[dict] = []
-    for row in _messages():
+    rows = [row for row in _messages() if isinstance(row, dict)]
+    for row in rows:
         if not isinstance(row, dict) or row.get("role") == "user":
             continue
         cid = str(row.get("campaignId") or "")
@@ -275,6 +291,20 @@ def content_library(campaigns: list) -> dict:
                 "compose": status,
             }
         )
+    seen = {str(item.get("id") or "") for item in items}
+    for row in rows:
+        if not isinstance(row, dict) or row.get("role") == "user":
+            continue
+        cid = str(row.get("campaignId") or "")
+        if not cid or cid in seen:
+            continue
+        item = _draft_item(row)
+        if not item:
+            continue
+        item["id"] = cid
+        item["title"] = "کمپین"
+        items.append(item)
+        seen.add(cid)
     return {"items": items, "drafts": drafts}
 
 
@@ -475,7 +505,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
         )
         return {"messages": rows, "campaignId": ""}
     prompt = _studio_prompt(spoken, media=media)
-    parsed = await complete_json(STUDIO_SYSTEM, prompt, surface="studio", max_tokens=900)
+    parsed = await _studio_json(prompt)
     if parsed.get("error"):
         reply = str(parsed.get("reply") or "مدل پاسخ نداد. پیام را دوباره بفرست.").strip()
         assistant = {

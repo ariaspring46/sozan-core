@@ -14,14 +14,19 @@ export default function CampaignsPage() {
   const [items, setItems] = useState<Campaign[]>([]);
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
 
   async function load() {
     const data = await api<Campaign[]>("/campaigns");
     setItems(data);
+    setReady(true);
   }
 
   useEffect(() => {
-    void load().catch((err) => setError(err.message));
+    void load().catch((err) => {
+      setError(err.message);
+      setReady(true);
+    });
   }, []);
 
   async function importSlug() {
@@ -60,7 +65,8 @@ export default function CampaignsPage() {
         </div>
       </details>
       {error ? <p className="text-sm text-danger">{error}</p> : null}
-      {items.length === 0 ? (
+      {!ready && !error ? <p className="text-sm text-muted">در حال خواندن…</p> : null}
+      {ready && items.length === 0 && !error ? (
         <EmptyState
           title="کمپینی نیست"
           detail="از چت استودیو پست بساز، یا اگر پوشه روی دیسک داری شناسه را بالا بگذار."
@@ -73,7 +79,8 @@ export default function CampaignsPage() {
             </Link>
           }
         />
-      ) : (
+      ) : null}
+      {items.length > 0 ? (
       <ul className="space-y-3">
         {items.map((c) => (
           <li key={c.id}>
@@ -87,7 +94,7 @@ export default function CampaignsPage() {
           </li>
         ))}
       </ul>
-      )}
+      ) : null}
     </main>
     </AppShell>
   );

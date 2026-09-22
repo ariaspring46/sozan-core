@@ -957,7 +957,13 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
         text = str(action.get("reply") or "")
     elif kind == "add_product":
         title = action.get("title") or "کالا"
-        text = f"«{title}» به کاتالوگ اضافه شد." if ok else "کالا به کاتالوگ اضافه نشد."
+        price = int(action.get("price") or 0)
+        if not ok:
+            text = "کالا به کاتالوگ اضافه نشد."
+        elif price > 0:
+            text = f"«{title}» با قیمت {price} تومان در کاتالوگ است."
+        else:
+            text = f"«{title}» به کاتالوگ اضافه شد."
     elif kind == "remove_product":
         title = action.get("title") or "کالا"
         text = f"«{title}» از کاتالوگ حذف شد." if ok else "کالا از کاتالوگ حذف نشد."

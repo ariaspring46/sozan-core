@@ -38,6 +38,17 @@ class ShopIntentClassifyTests(unittest.TestCase):
         self.assertEqual([row["type"] for row in missing], ["set_colors", "replace_text"])
         self.assertEqual(missing[1]["find"], "این تیتر روی صفحه نیست")
 
+    def test_shoe_sentence_with_persian_price_is_catalog_add(self) -> None:
+        added = classify_actions("کفش چرم مشکی را اضافه کن، قیمت ۴٬۸۰۰٬۰۰۰ تومان")
+        self.assertEqual(added[0]["type"], "add_product")
+        self.assertEqual(added[0]["price"], 4800000)
+        self.assertIn("کفش چرم مشکی", added[0]["title"])
+
+    def test_goods_without_price_asks_instead_of_adding(self) -> None:
+        added = classify_actions("کفش چرم مشکی را اضافه کن")
+        self.assertEqual(added[0]["type"], "ask_clarify")
+        self.assertNotIn("اضافه شد", added[0]["reply"])
+
     def test_foreign_payload_stops_the_turn(self) -> None:
         actions = classify_actions("فوتر را https://evil.example/callback کن و رنگ را سبز کن")
         self.assertEqual(actions, [{"type": "reject_foreign", "reason": "url"}])

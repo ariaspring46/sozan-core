@@ -326,6 +326,57 @@ class StudioChatTests(unittest.TestCase):
         self.assertEqual(out["drafts"][0]["title"], "پیش‌نویس")
         self.assertEqual(out["drafts"][0]["copies"][0]["body"], "پیش‌نویس تلگرام")
 
+    def test_bad_json_retries_once_and_keeps_the_campaign(self) -> None:
+        campaigns = FakeCampaigns()
+        long_ask = "برای کفش چرم مشکی لوکس یک پست بلند اینستاگرام و تلگرام و واتساپ بنویس " * 8
+        first = {"error": "llm_bad_json", "reply": "مدل پاسخ خوانا نداد. پیام را کوتاه‌تر دوباره بفرست."}
+        second = {
+            "reply": "کپشن‌ها آماده شد.",
+            "title": "چرم شب",
+            "instagram": "کپشن اینستاگرام برای ویترین چرم",
+            "telegram": "کپشن تلگرام",
+            "whatsapp": "پیام واتساپ",
+            "compose": False,
+        }
+        completer = AsyncMock(side_effect=[first, second])
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw))
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=completer,
+            ):
+                result = asyncio.run(studio_chat_service.chat(long_ask, campaigns))
+        self.assertEqual(completer.await_count, 2)
+        self.assertGreaterEqual(completer.await_args_list[0].kwargs["max_tokens"], 1600)
+        self.assertGreater(completer.await_args_list[1].kwargs["max_tokens"], completer.await_args_list[0].kwargs["max_tokens"])
+        self.assertEqual(campaigns.created, 1)
+        self.assertNotIn("خوانا نداد", result["messages"][-1]["text"])
+        self.assertEqual(result["messages"][-1]["captions"]["instagram"], "کپشن اینستاگرام برای ویترین چرم")
+
+    def test_content_library_shows_message_missing_from_campaign_list(self) -> None:
+        rows = [
+            {
+                "id": "m1",
+                "role": "assistant",
+                "campaignId": "gone",
+                "text": "کپشن آماده شد.",
+                "captions": {"instagram": "کپشن اینستاگرام", "telegram": "تلگرام", "whatsapp": "واتساپ"},
+                "attachments": [{"kind": "image", "name": "still-image.png"}],
+                "compose": {"status": "ready"},
+            }
+        ]
+        with patch("app.services.studio_chat_service.expire_stale_compose"), patch(
+            "app.services.studio_chat_service.read_json",
+            return_value=rows,
+        ):
+            out = studio_chat_service.content_library([])
+        self.assertEqual(len(out["items"]), 1)
+        self.assertEqual(out["items"][0]["id"], "gone")
+        self.assertEqual(out["items"][0]["compose"], "ready")
+        self.assertEqual(out["items"][0]["copies"][0]["body"], "کپشن اینستاگرام")
+        self.assertEqual(out["items"][0]["assets"][0]["name"], "still-image.png")
+        self.assertEqual(out["drafts"], [])
+
     def test_content_library_empty(self) -> None:
         with patch("app.services.studio_chat_service.expire_stale_compose"), patch(
             "app.services.studio_chat_service.read_json",

@@ -29,6 +29,9 @@ CREATE_PAGE_RE = re.compile(r"صفحه.{0,24}(?:بساز|درست کن|اضاف�
 ADD_PRODUCT_RE = re.compile(
     r"(?:کالا|محصول).{0,48}(?:اضافه|بگذار|بذار)|(?:اضافه|بگذار|بذار).{0,48}(?:کالا|محصول)"
 )
+ADD_VERB_RE = re.compile(r"اضافه\s*کن")
+GOODS_WORDS = ("کفش", "کیف", "کلاه", "لباس", "شال", "ساعت", "عینک", "عطر")
+FA_DIGIT = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 REMOVE_PRODUCT_RE = re.compile(r"(?:کالا|محصول).{0,48}(?:حذف|بردار|پاک)")
 HEADER_RE = re.compile(r"هدر|منوی بالا|لوگوی هدر")
 QUOTED = re.compile(r"[«\"']([^»\"']{1,80})[»\"']")
@@ -52,6 +55,50 @@ GREET = frozenset(
 CONTINUE = frozenset({"خب", "باشه", "باشه خب", "اوکی", "ok", "okay", "ادامه", "ادامه بده", "بیشتر بگو", "بعدی"})
 ADVICE = ("پیشنهاد", "توضیح", "چطور", "چگونه", "به چه شکل")
 CLARIFY_PAGE = "کدام صفحه را بسازم: درباره ما، تماس، داستان برند، یا پرسش‌های متداول؟"
+
+
+def _price_toman(text: str) -> int:
+    raw = (text or "").translate(FA_DIGIT).replace("٬", "")
+    grouped = re.search(r"(\d{1,3}(?:[,.]\d{3})+)", raw)
+    if grouped:
+        digits = re.sub(r"\D", "", grouped.group(1))
+        if len(digits) >= 4:
+            return int(digits)
+    plain = re.search(r"(\d{4,})", raw)
+    return int(plain.group(1)) if plain else 0
+
+
+def _product_title(text: str) -> str:
+    quoted = _quoted(text)
+    if quoted:
+        return quoted
+    cleaned = re.sub(r"قیمت.*", "", text or "")
+    cleaned = re.sub(
+        r"(?:یک|یه|را|کالا|محصول|اضافه کن|اضافه کنید|اضافه|بگذار|بذار|با عنوان|تومان)",
+        " ",
+        cleaned,
+    )
+    cleaned = re.sub(r"[\d۰-۹٬،,./]+", " ", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip(" ،.")[:36]
+
+
+def _is_product_add(text: str) -> bool:
+    blob = text or ""
+    if CREATE_PAGE_RE.search(blob):
+        return False
+    if ADD_PRODUCT_RE.search(blob):
+        return True
+    if not ADD_VERB_RE.search(blob):
+        return False
+    if _price_toman(blob) > 0:
+        return True
+    return any(word in blob for word in GOODS_WORDS)
+
+
+def catalog_add(text: str) -> dict | None:
+    if not _is_product_add(text):
+        return None
+    return {"title": _product_title(text), "price": _price_toman(text)}
 
 
 def _quoted(text: str) -> str:
@@ -119,23 +166,21 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
             )
         else:
             actions.append({"type": "ask_clarify", "reply": CLARIFY_PAGE})
-    if ADD_PRODUCT_RE.search(text):
-        title = _quoted(text)
-        if not title:
-            cleaned = re.sub(r"قیمت.*", "", text)
-            cleaned = re.sub(r"(?:کالا|محصول|اضافه کن|اضافه|بگذار|بذار|با عنوان)", " ", cleaned)
-            title = re.sub(r"\s+", " ", cleaned).strip()[:36]
-        if title and len(title) >= 2:
-            price_match = re.search(r"(\d[\d,]{2,})", text)
-            price = int(price_match.group(1).replace(",", "")) if price_match else 0
-            actions.append({"type": "add_product", "title": title, "price": price})
-        else:
+    added = catalog_add(text)
+    if added is not None:
+        title = str(added.get("title") or "")
+        price = int(added.get("price") or 0)
+        if len(title) < 2:
             actions.append({"type": "ask_clarify", "reply": "نام کالا چیست؟"})
+        elif price <= 0:
+            actions.append({"type": "ask_clarify", "reply": "قیمت تومان را هم بگو تا در کاتالوگ بنویسم."})
+        else:
+            actions.append({"type": "add_product", "title": title, "price": price})
     if REMOVE_PRODUCT_RE.search(text):
         title = _quoted(text) or target
         if title:
             actions.append({"type": "remove_product", "title": title})
-        elif not ADD_PRODUCT_RE.search(text):
+        elif catalog_add(text) is None:
             actions.append({"type": "ask_clarify", "reply": "کدام کالا حذف شود؟"})
     if HEADER_RE.search(text) and not CREATE_PAGE_RE.search(text):
         logo = _quoted(text)
