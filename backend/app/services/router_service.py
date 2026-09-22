@@ -18,10 +18,32 @@ PENDING_FILE = "router-pending.json"
 USAGE_FILE = "router-usage.json"
 BUSY_FILE = "router-busy.json"
 INDEX_FILE = "router-threads.json"
-WRITE_TOOLS = frozenset({"set_auto_reply", "set_voice_tone"})
-PASSTHROUGH = frozenset({"shop_chat", "studio_chat"})
+WRITE_TOOLS = frozenset(
+    {"set_auto_reply", "set_voice_tone", "edit_shop", "add_product", "studio_chat", "publish_post"}
+)
+PASSTHROUGH = frozenset({"shop_chat"})
 READ_TOOLS = frozenset({"status", "ask_user", "inbox_status"})
 ALLOWED = WRITE_TOOLS | PASSTHROUGH | READ_TOOLS
+_MUTATIONS = frozenset(
+    {
+        "set_colors",
+        "hide_prices",
+        "show_prices",
+        "add_product",
+        "remove_product",
+        "set_header",
+        "add_nav_link",
+        "create_page",
+        "replace_text",
+        "delete_text",
+        "set_brand",
+        "hero_image",
+        "revert",
+        "catalog_from_page",
+    }
+)
+_PUBLISH_FA = {"telegram": "تلگرام", "whatsapp": "واتساپ", "instagram": "دایرکت اینستاگرام"}
+_NEVER_RE = re.compile(r"secret|jwt|api[_-]?key|otp|read_env|\bsql\b|token", re.I)
 MAX_MESSAGES = 80
 MAX_THREADS = 10
 DAILY_TURNS = 80
@@ -35,8 +57,11 @@ _STUDIO_FIELDS = ("campaignId", "captions", "attachments", "compose", "mediaKind
 _TOOL_RANK = {
     "set_auto_reply": 0,
     "set_voice_tone": 0,
+    "edit_shop": 0,
+    "add_product": 0,
+    "publish_post": 0,
+    "studio_chat": 0,
     "shop_chat": 1,
-    "studio_chat": 1,
     "ask_user": 2,
     "status": 3,
     "inbox_status": 3,
@@ -109,7 +134,23 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "shop_chat",
-            "description": "ساخت یا تغییر ویترین. پرسش وضعیت را به status بده. متن را خودت ننویس.",
+            "description": "ساخت ویترین از صفر. تغییر صفحهٔ زنده را به edit_shop بده. پرسش وضعیت را به status بده.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit_shop",
+            "description": "تغییر صفحهٔ زنده: رنگ، متن، هدر، پنهان کردن قیمت. متن تازه را خودت ننویس.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_product",
+            "description": "افزودن کالا وقتی کاربر نام و قیمت تومان گفته. قیمت را از جملهٔ کاربر بردار.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -121,13 +162,30 @@ TOOLS = [
             "parameters": {"type": "object", "properties": {}},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "publish_post",
+            "description": "فرستادن آخرین پست آماده. اینستاگرام دایرکت است و مخاطب می‌خواهد.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "platform": {"type": "string", "enum": ["telegram", "whatsapp", "instagram"]},
+                    "recipientId": {"type": "string"},
+                },
+                "required": ["platform"],
+            },
+        },
+    },
 ]
 
 SYSTEM = (
     "تو سوزان هستی. فارسی کوتاه، بدون مقدمه. تنظیمات با ابزار. "
     "پرسش وضعیت، پلن، کیف، اسکن یا «چطور است» حتی با کلمهٔ فروشگاه = status، نه سؤال. "
-    "ساخت و تغییر ویترین = shop_chat. "
+    "ساخت ویترین از صفر = shop_chat. "
+    "تغییر صفحهٔ زنده = edit_shop. کالای با قیمت تومان = add_product. "
     "کپشن، کپی، شعار، پست و استوری = studio_chat و خودت متن تبلیغ ننویس. "
+    "فرستادن پست آماده = publish_post. "
     "دایرکت را جواب نده. مبهم=ask_user. "
     "پیوست را با همان ابزار بفرست. متن ابزار را خودت ننویس. کلید و JSON خام نشان نده."
 )
@@ -369,13 +427,148 @@ def _append_user(spoken: str, media: dict | None) -> None:
 _TONE_FA = {"warm": "گرم", "formal": "رسمی", "street": "کوچه", "luxury": "لوکس"}
 
 
-def _summary_for(name: str, args: dict) -> str:
+def _tool_level(name: str) -> str:
+    if name in WRITE_TOOLS:
+        return "write"
+    if name in READ_TOOLS or name in PASSTHROUGH:
+        return "read"
+    return "never"
+
+
+def _never_tool(name: str) -> bool:
+    return bool(_NEVER_RE.search(name or ""))
+
+
+def _shop_actions(text: str, view_path: str, view_target: str) -> list[dict]:
+    from app.services.shop_edit_service import safe_view_path, safe_view_target
+    from app.services.shop_intent_service import classify_actions
+
+    return classify_actions(text, safe_view_target(view_target), safe_view_path(view_path))
+
+
+def _mutation(actions: list[dict]) -> dict | None:
+    for item in actions:
+        if str(item.get("type") or "") in _MUTATIONS:
+            return item
+    return None
+
+
+def _live_root():
+    from app.services.shop_edit_service import build_dir_for
+    from app.services.shop_service import _shop
+
+    return build_dir_for(_shop())
+
+
+def _route_shop(name: str, spoken: str, view_path: str, view_target: str) -> tuple[str, str]:
+    from app.services.shop_intent_service import catalog_add
+    from app.services.shop_service import _explicit_build
+
+    actions = _shop_actions(spoken, view_path, view_target)
+    if any(str(item.get("type") or "") == "reject_foreign" for item in actions):
+        return name, "این پیام ویرایش فروشگاه نیست."
+    parsed = catalog_add(spoken)
+    if parsed is not None:
+        if int(parsed.get("price") or 0) > 0:
+            return "add_product", ""
+        return "add_product", "قیمت تومان را هم بگو تا در کاتالوگ بنویسم."
+    mut = _mutation(actions)
+    if mut and str(mut.get("type") or "") == "add_product":
+        return "add_product", ""
+    if mut:
+        if _live_root() is None:
+            return "edit_shop", "ویترین هنوز نیست. اول بگو بساز؛ تغییر صفحه بعد از ساخت اعمال می‌شود."
+        return "edit_shop", ""
+    clar = next((str(item.get("reply") or "") for item in actions if item.get("type") == "ask_clarify"), "")
+    if _explicit_build(spoken):
+        return "shop_chat", ""
+    if name in {"edit_shop", "add_product"}:
+        return name, clar or "این را ویرایش صفحه نشناختم. دقیق‌تر بگو چه عوض شود."
+    if clar:
+        return name, clar
+    return "shop_chat", ""
+
+
+def _latest_post() -> dict | None:
+    from app.services.studio_chat_service import snapshot
+
+    rows = snapshot().get("messages") or []
+    for row in reversed(rows):
+        if not isinstance(row, dict) or row.get("role") == "user":
+            continue
+        attachments = row.get("attachments") if isinstance(row.get("attachments"), list) else []
+        file = next(
+            (
+                item
+                for item in attachments
+                if isinstance(item, dict) and item.get("kind") in {"image", "video"} and item.get("name")
+            ),
+            None,
+        )
+        if not file:
+            continue
+        captions = row.get("captions") if isinstance(row.get("captions"), dict) else {}
+        return {
+            "messageId": str(row.get("id") or ""),
+            "campaignId": str(row.get("campaignId") or ""),
+            "name": str(file.get("name") or ""),
+            "kind": str(file.get("kind") or ""),
+            "captions": captions,
+            "text": str(row.get("text") or ""),
+        }
+    return None
+
+
+def _publish_block(args: dict) -> str:
+    platform = str(args.get("platform") or "")
+    if platform not in _PUBLISH_FA:
+        return "انتشار فقط برای تلگرام، واتساپ یا دایرکت اینستاگرام است."
+    if platform == "instagram" and not str(args.get("recipientId") or "").strip():
+        return "برای دایرکت اینستاگرام مخاطب را هم بگو."
+    if _latest_post() is None:
+        return "هنوز فایل آماده‌ای برای ارسال نیست."
+    return ""
+
+
+def _authority_route(name: str, args: dict, spoken: str, view_path: str, view_target: str) -> tuple[str, str]:
+    if name in {"shop_chat", "edit_shop", "add_product"}:
+        return _route_shop(name, spoken, view_path, view_target)
+    if name == "publish_post":
+        return name, _publish_block(args)
+    return name, ""
+
+
+def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = "", view_target: str = "") -> str:
     if name == "set_auto_reply":
         labels = {"": "خاموش", "draft": "پیش‌نویس", "send": "ارسال خودکار"}
         return f"پاسخ خودکار دایرکت بشود {labels.get(str(args.get('mode') or ''), '؟')}؟"
     if name == "set_voice_tone":
         tone = _TONE_FA.get(str(args.get("toneId") or ""), "؟")
         return f"لحن دایرکت بشود {tone}؟"
+    if name == "add_product":
+        mut = _mutation(_shop_actions(spoken, view_path, view_target))
+        if mut and str(mut.get("type") or "") == "add_product":
+            return f"«{mut.get('title')}» با قیمت {mut.get('price')} تومان به کاتالوگ اضافه شود؟"
+        return "این کالا به کاتالوگ اضافه شود؟"
+    if name == "edit_shop":
+        mut = _mutation(_shop_actions(spoken, view_path, view_target))
+        kind = str((mut or {}).get("type") or "")
+        if kind == "set_colors":
+            return "رنگ فروشگاه عوض شود؟"
+        if kind == "hide_prices":
+            return "قیمت روی سایت پنهان شود؟"
+        if kind == "show_prices":
+            return "قیمت روی سایت نشان داده شود؟"
+        if kind == "remove_product":
+            return f"«{mut.get('title')}» از کاتالوگ حذف شود؟"
+        if kind == "replace_text":
+            return f"متن به «{mut.get('replace')}» عوض شود؟"
+        return "این تغییر روی صفحهٔ زنده اعمال شود؟"
+    if name == "studio_chat":
+        return "این پست ساخته شود؟"
+    if name == "publish_post":
+        label = _PUBLISH_FA.get(str(args.get("platform") or ""), "کانال")
+        return f"این پست در {label} فرستاده شود؟"
     return "این تغییر اعمال شود؟"
 
 
@@ -515,6 +708,47 @@ async def _run_tool(
         voice_service.apply_tone(str(args.get("toneId") or ""))
         return "لحن دایرکت به‌روز شد.", {}
     spoken = (source_text or "").strip()[:4000]
+    if name == "edit_shop":
+        from app.services.shop_edit_service import apply_live_edit
+        from app.services.shop_service import _shop
+
+        actions = [item for item in _shop_actions(spoken, view_path, view_target) if str(item.get("type") or "") in _MUTATIONS]
+        if not actions or _live_root() is None:
+            return "این تغییر روی صفحه اعمال نشد.", {}
+        out = await apply_live_edit(_shop(), spoken, view_path, view_target, classified={"actions": actions})
+        return str(out.get("reply") or "این تغییر روی صفحه اعمال نشد."), {}
+    if name == "add_product":
+        from app.services.shop_edit_service import apply_live_edit
+        from app.services.shop_service import _catalog_add_reply, _shop
+
+        actions = [item for item in _shop_actions(spoken, view_path, view_target) if str(item.get("type") or "") == "add_product"]
+        if not actions:
+            return "قیمت تومان را هم بگو تا در کاتالوگ بنویسم.", {}
+        if _live_root() is not None:
+            out = await apply_live_edit(_shop(), spoken, view_path, view_target, classified={"actions": actions})
+            return str(out.get("reply") or "کالا به کاتالوگ اضافه نشد."), {}
+        reply = _catalog_add_reply(spoken)
+        return reply or "کالا در کاتالوگ نوشته نشد.", {}
+    if name == "publish_post":
+        from app.services.studio_publish_service import publish
+
+        blocked = _publish_block(args)
+        if blocked:
+            return blocked, {}
+        post = _latest_post() or {}
+        platform = str(args.get("platform") or "")
+        captions = post.get("captions") if isinstance(post.get("captions"), dict) else {}
+        caption = str(captions.get(platform) or captions.get("instagram") or post.get("text") or "")
+        out = await publish(
+            platform=platform,
+            caption=caption,
+            media_name=str(post.get("name") or ""),
+            media_kind=str(post.get("kind") or ""),
+            message_id=str(post.get("messageId") or ""),
+            campaign_id=str(post.get("campaignId") or ""),
+            recipient_id=str(args.get("recipientId") or ""),
+        )
+        return str(out.get("message") or "پست فرستاده شد."), {}
     if name == "shop_chat":
         from app.services import shop_service
 
@@ -791,7 +1025,7 @@ async def _execute(
             _append("assistant", _tool_error(name, exc))
             return snapshot()
         _commit("assistant", reply, clear_pending=True, **extra)
-        _emit("router-tool", {"tool": name, "confirmed": True})
+        _emit("router-tool", {"tool": name, "confirmed": True, "level": "write"})
         return snapshot()
     if not spoken and not media:
         return snapshot()
@@ -847,18 +1081,27 @@ async def _execute(
     args = call.get("arguments") if isinstance(call.get("arguments"), dict) else {}
     if dropped:
         _emit("router-extra-tools", {"kept": name, "dropped": dropped[:6]})
+    if _never_tool(name):
+        _append("assistant", "این کار از چت انجام نمی‌شود.")
+        _emit("router-denied", {"tool": name[:80], "level": "never"}, status="error")
+        return snapshot()
     if name not in ALLOWED:
         _append("assistant", "این کار را از چت نمی‌توانم انجام دهم.")
-        _emit("router-unknown-tool", {"tool": name[:80]}, status="error")
+        _emit("router-unknown-tool", {"tool": name[:80], "level": "never"}, status="error")
         return snapshot()
     rejected = _reject_write(name, args)
     if rejected:
         _append("assistant", rejected)
-        _emit("router-unknown-tool", {"tool": name[:80]}, status="error")
+        _emit("router-unknown-tool", {"tool": name[:80], "level": _tool_level(name)}, status="error")
+        return snapshot()
+    name, direct = _authority_route(name, args, spoken, view_path, view_target)
+    if direct:
+        _append("assistant", direct)
+        _emit("router-tool", {"tool": name, "level": _tool_level(name), "applied": False})
         return snapshot()
     if name in WRITE_TOOLS:
         pending_id = str(uuid4())
-        summary = _summary_for(name, args)
+        summary = _summary_for(name, args, spoken=spoken, view_path=view_path, view_target=view_target)
         stored = {
             "id": pending_id,
             "tool": name,
@@ -871,13 +1114,13 @@ async def _execute(
         if isinstance(media, dict):
             stored["media"] = {"kind": media.get("kind"), "name": media.get("name")}
         _commit("assistant", summary, set_pending=stored, kind="confirm", confirmId=pending_id)
-        _emit("router-confirm", {"tool": name})
+        _emit("router-confirm", {"tool": name, "level": "write"})
         return snapshot()
     if name == "ask_user":
         question, options = _ask_message(args)
         extra = {"kind": "ask", "options": options} if options else {"kind": "ask"}
         _append("assistant", question, **extra)
-        _emit("router-tool", {"tool": "ask_user"})
+        _emit("router-tool", {"tool": "ask_user", "level": "read"})
         return snapshot()
     try:
         reply, extra = await _run_tool(
@@ -894,5 +1137,5 @@ async def _execute(
         _append("assistant", _tool_error(name, exc))
         return snapshot()
     _append("assistant", reply, **extra)
-    _emit("router-tool", {"tool": name})
+    _emit("router-tool", {"tool": name, "level": _tool_level(name)})
     return snapshot()

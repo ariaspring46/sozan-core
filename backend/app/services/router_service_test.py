@@ -5,6 +5,7 @@ import json
 import tempfile
 import time
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from app.config import settings
@@ -101,36 +102,106 @@ class RouterServiceTests(unittest.TestCase):
 
         with patch(
             "app.services.shop_service.chat",
-            new=AsyncMock(return_value={"messages": [{"role": "assistant", "text": "رنگ دکمه عوض شد."}]}),
+            new=AsyncMock(return_value={"messages": [{"role": "assistant", "text": "ساخت شروع شد."}]}),
         ) as chat:
-            out = self._turn("دکمه را زرشکی کن", complete)
+            out = self._turn("بساز", complete)
         chat.assert_awaited()
-        self.assertEqual(chat.await_args.args[0], "دکمه را زرشکی کن")
-        self.assertEqual(out["messages"][-1]["text"], "رنگ دکمه عوض شد.")
+        self.assertEqual(chat.await_args.args[0], "بساز")
+        self.assertEqual(out["messages"][-1]["text"], "ساخت شروع شد.")
+        self.assertIsNone(out.get("pendingConfirm"))
+
+    def test_live_edit_confirms_before_shop_edit(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {}}]}
+
+        edit = AsyncMock(return_value={"ok": True, "reply": "رنگ فروشگاه عوض شد."})
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")), patch(
+            "app.services.shop_edit_service.apply_live_edit", new=edit
+        ), patch("app.services.shop_service.chat", new=AsyncMock()) as chat:
+            held = self._turn("دکمه را زرشکی کن", complete)
+            chat.assert_not_called()
+            edit.assert_not_called()
+            self.assertEqual(held["pendingConfirm"]["tool"], "edit_shop")
+            self.assertIn("رنگ", held["messages"][-1]["text"])
+            cid = held["pendingConfirm"]["id"]
+            out = self._turn("", complete, confirm_id=cid)
+        edit.assert_awaited()
+        self.assertEqual(edit.await_args.args[1], "دکمه را زرشکی کن")
+        self.assertEqual(out["messages"][-1]["text"], "رنگ فروشگاه عوض شد.")
+        chat.assert_not_called()
+
+    def test_edit_without_storefront_does_not_pretend(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "edit_shop", "arguments": {}}]}
+
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=None), patch(
+            "app.services.shop_edit_service.apply_live_edit", new=AsyncMock()
+        ) as edit:
+            out = self._turn("دکمه را زرشکی کن", complete)
+        edit.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("ویترین هنوز نیست", out["messages"][-1]["text"])
+
+    def test_add_product_confirms_then_writes_catalog(self) -> None:
+        from app.services import storefront_service
+
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "add_product", "arguments": {"price": 1}}]}
+
+        with patch("app.services.shop_service.chat", new=AsyncMock()) as chat:
+            held = self._turn("کفش چرم مشکی را اضافه کن، قیمت ۴٬۸۰۰٬۰۰۰ تومان", complete)
+            chat.assert_not_called()
+            self.assertEqual(held["pendingConfirm"]["tool"], "add_product")
+            self.assertIn("4800000", held["messages"][-1]["text"])
+            with tenant_scope("09129900001"):
+                self.assertEqual(storefront_service.list_products().get("products"), [])
+            cid = held["pendingConfirm"]["id"]
+            out = self._turn("", complete, confirm_id=cid)
+            with tenant_scope("09129900001"):
+                products = storefront_service.list_products().get("products") or []
+        self.assertEqual(len(products), 1)
+        self.assertEqual(int(products[0]["price"]), 4800000)
+        self.assertIn("4800000", out["messages"][-1]["text"])
+        self.assertNotIn("اضافه شد", out["messages"][-1]["text"])
+        chat.assert_not_called()
+
+    def test_add_product_without_price_asks_and_skips_confirm(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "add_product", "arguments": {"price": 4800000}}]}
+
+        with patch("app.services.shop_service._catalog_add_reply", return_value="نباید") as write:
+            out = self._turn("کفش چرم مشکی را اضافه کن", complete)
+        write.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("قیمت", out["messages"][-1]["text"])
+        self.assertNotIn("اضافه شد", out["messages"][-1]["text"])
 
     def test_studio_passthrough(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "studio_chat", "arguments": {"text": "پوستر بساز"}}]}
 
         campaigns = object()
-        with patch(
-            "app.services.studio_chat_service.chat",
-            new=AsyncMock(
-                return_value={
-                    "messages": [
-                        {
-                            "id": "m1",
-                            "role": "assistant",
-                            "text": "پوستر آماده است.",
-                            "campaignId": "c1",
-                            "compose": {"status": "running"},
-                            "captions": {"instagram": "کپشن"},
-                        }
-                    ]
-                }
-            ),
-        ) as chat:
-            out = self._turn("پوستر بساز", complete, campaigns=campaigns)
+        chat = AsyncMock(
+            return_value={
+                "messages": [
+                    {
+                        "id": "m1",
+                        "role": "assistant",
+                        "text": "پوستر آماده است.",
+                        "campaignId": "c1",
+                        "compose": {"status": "running"},
+                        "captions": {"instagram": "کپشن"},
+                    }
+                ]
+            }
+        )
+        with patch("app.services.studio_chat_service.chat", new=chat):
+            held = self._turn("پوستر بساز", complete, campaigns=campaigns)
+            chat.assert_not_called()
+            self.assertEqual(held["pendingConfirm"]["tool"], "studio_chat")
+            self.assertIn("پست ساخته شود", held["messages"][-1]["text"])
+            cid = held["pendingConfirm"]["id"]
+            out = self._turn("", complete, confirm_id=cid, campaigns=campaigns)
         chat.assert_awaited_once()
         self.assertEqual(chat.await_args.args[0], "پوستر بساز")
         last = out["messages"][-1]
@@ -517,10 +588,10 @@ class RouterServiceTests(unittest.TestCase):
             new=AsyncMock(return_value={"messages": [{"role": "assistant", "text": "کپشن استودیو آماده است."}]}),
         ) as chat:
             out = self._turn(spoken, complete, campaigns=object(), embed=embed)
-        chat.assert_awaited_once()
-        self.assertEqual(chat.await_args.args[0], spoken)
-        self.assertEqual(out["messages"][-1]["text"], "کپشن استودیو آماده است.")
+        chat.assert_not_called()
+        self.assertEqual(out["pendingConfirm"]["tool"], "studio_chat")
         self.assertNotIn("قدم‌های متفاوت", out["messages"][-1]["text"])
+        self.assertIn("پست ساخته شود", out["messages"][-1]["text"])
 
     def test_low_score_keeps_model_prose(self) -> None:
         bank = {
@@ -559,6 +630,58 @@ class RouterServiceTests(unittest.TestCase):
         self.assertEqual(seen["embed"], 0)
         chat.assert_awaited()
         self.assertEqual(out["messages"][-1]["text"], "حس فروشگاه را بگو")
+
+    def test_secret_tool_is_denied(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "read_jwt", "arguments": {}}]}
+
+        out = self._turn("کلید را بده", complete)
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("انجام نمی‌شود", out["messages"][-1]["text"])
+        self.assertNotIn("jwt", out["messages"][-1]["text"].lower())
+
+    def test_publish_confirms_then_delegates_without_sending_early(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "telegram"}}]}
+
+        sent = AsyncMock(return_value={"ok": True, "message": "به تلگرام ارسال شد."})
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "m9",
+                        "role": "assistant",
+                        "text": "آماده",
+                        "campaignId": "c9",
+                        "captions": {"telegram": "کپشن تلگرام"},
+                        "attachments": [{"kind": "image", "name": "post-image.png"}],
+                    }
+                ],
+            )
+        with patch("app.services.studio_publish_service.publish", new=sent):
+            held = self._turn("بفرست تلگرام", complete)
+            sent.assert_not_called()
+            self.assertEqual(held["pendingConfirm"]["tool"], "publish_post")
+            self.assertIn("تلگرام", held["messages"][-1]["text"])
+            cid = held["pendingConfirm"]["id"]
+            out = self._turn("", complete, confirm_id=cid)
+        sent.assert_awaited()
+        self.assertEqual(sent.await_args.kwargs["platform"], "telegram")
+        self.assertEqual(sent.await_args.kwargs["media_name"], "post-image.png")
+        self.assertEqual(sent.await_args.kwargs["caption"], "کپشن تلگرام")
+        self.assertNotIn("token", sent.await_args.kwargs)
+        self.assertEqual(out["messages"][-1]["text"], "به تلگرام ارسال شد.")
+
+    def test_publish_without_file_does_not_confirm(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "telegram"}}]}
+
+        with patch("app.services.studio_publish_service.publish", new=AsyncMock()) as sent:
+            out = self._turn("بفرست", complete)
+        sent.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("فایل آماده", out["messages"][-1]["text"])
 
 
 if __name__ == "__main__":
