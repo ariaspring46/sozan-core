@@ -26,7 +26,7 @@ class BrandService:
         suffix = Path(filename).suffix.lower()
         if suffix not in {".png", ".jpg", ".jpeg", ".webp"}:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "لوگو باید تصویر باشد")
-        if len(data) > 8_000_000:
+        if len(data) > 5 * 1024 * 1024:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "حجم لوگو زیاد است")
         self.brands.save_logo(data)
         return self.brands.get()

@@ -1,6 +1,6 @@
 import unittest
 
-from app.services.shop_intent_service import classify_actions, page_kind_from_text
+from app.services.shop_intent_service import catalog_add, classify_actions, page_kind_from_text
 
 
 class ShopIntentClassifyTests(unittest.TestCase):
@@ -52,6 +52,26 @@ class ShopIntentClassifyTests(unittest.TestCase):
     def test_foreign_payload_stops_the_turn(self) -> None:
         actions = classify_actions("فوتر را https://evil.example/callback کن و رنگ را سبز کن")
         self.assertEqual(actions, [{"type": "reject_foreign", "reason": "url"}])
+
+    def test_title_keeps_whole_words(self) -> None:
+        nike = catalog_add("کفش رانینگ نایک را با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")
+        adidas = catalog_add("کتانی آدیداس اولترا بوست را با قیمت ۳۲۰۰۰۰۰ تومان اضافه کن")
+        shirt = catalog_add("پیراهن نخی آبی را با قیمت ۸۹۰۰۰۰ تومان اضافه کن")
+        pima = catalog_add("کفش پیما را اضافه کن")
+        self.assertEqual(nike["title"], "کفش رانینگ نایک")
+        self.assertEqual(adidas["title"], "کتانی آدیداس اولترا بوست")
+        self.assertEqual(shirt["title"], "پیراهن نخی آبی")
+        self.assertEqual(pima["title"], "کفش پیما")
+        self.assertNotIn("با", nike["title"].split())
+
+    def test_title_strips_markup(self) -> None:
+        row = catalog_add("کالای <script>alert(1)</script> را با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")
+        marked = catalog_add("کفش `نایک`\u202e را با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")
+        self.assertIsNotNone(row)
+        self.assertNotIn("<", row["title"])
+        self.assertNotIn(">", row["title"])
+        self.assertNotIn("`", marked["title"])
+        self.assertNotIn("\u202e", marked["title"])
 
     def test_greet_and_continue_are_canned(self) -> None:
         self.assertEqual(classify_actions("سلام")[0]["type"], "greet")

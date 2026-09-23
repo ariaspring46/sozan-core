@@ -68,18 +68,45 @@ def _price_toman(text: str) -> int:
     return int(plain.group(1)) if plain else 0
 
 
+_TITLE_DROP = frozenset(
+    {"یک", "یه", "را", "کالا", "محصول", "اضافه", "کن", "کنید", "بگذار", "بذار", "عنوان", "تومان"}
+)
+_TITLE_PUNCT = " ،.,:;؛!؟«»\"'`"
+_TAG = re.compile(r"<[^>]*>")
+_CTRL = re.compile(r"[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]")
+
+
+def _bare_token(token: str) -> str:
+    return (token or "").strip(_TITLE_PUNCT)
+
+
+def _sanitize_title(title: str) -> str:
+    text = _TAG.sub("", title or "")
+    text = text.replace("`", "")
+    text = _CTRL.sub("", text)
+    return re.sub(r"\s+", " ", text).strip(_TITLE_PUNCT)[:36]
+
+
 def _product_title(text: str) -> str:
     quoted = _quoted(text)
     if quoted:
         return quoted
-    cleaned = re.sub(r"قیمت.*", "", text or "")
-    cleaned = re.sub(
-        r"(?:یک|یه|را|کالا|محصول|اضافه کن|اضافه کنید|اضافه|بگذار|بذار|با عنوان|تومان)",
-        " ",
-        cleaned,
-    )
-    cleaned = re.sub(r"[\d۰-۹٬،,./]+", " ", cleaned)
-    return re.sub(r"\s+", " ", cleaned).strip(" ،.")[:36]
+    cleaned = re.sub(r"(?:با\s+|به\s+)?قیمت.*", "", text or "")
+    kept: list[str] = []
+    tokens = cleaned.split()
+    index = 0
+    while index < len(tokens):
+        bare = _bare_token(tokens[index])
+        nxt = _bare_token(tokens[index + 1]) if index + 1 < len(tokens) else ""
+        if bare == "با" and nxt == "عنوان":
+            index += 2
+            continue
+        if not bare or bare in _TITLE_DROP or re.fullmatch(r"[\d۰-۹]+", bare):
+            index += 1
+            continue
+        kept.append(bare)
+        index += 1
+    return " ".join(kept)[:36]
 
 
 def _is_product_add(text: str) -> bool:
@@ -98,7 +125,10 @@ def _is_product_add(text: str) -> bool:
 def catalog_add(text: str) -> dict | None:
     if not _is_product_add(text):
         return None
-    return {"title": _product_title(text), "price": _price_toman(text)}
+    title = _sanitize_title(_product_title(text))
+    if not title:
+        return None
+    return {"title": title, "price": _price_toman(text)}
 
 
 def _quoted(text: str) -> str:

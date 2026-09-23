@@ -453,6 +453,10 @@ def _mutation(actions: list[dict]) -> dict | None:
     return None
 
 
+_BUILD_SIGNAL = re.compile(r"فروشگاه|ویترین|سبک|رنگ|حس|بساز")
+_NOT_A_BUILD = ("وضعیت", "صندوق", "خوانده")
+
+
 def _live_root():
     from app.services.shop_edit_service import build_dir_for
     from app.services.shop_service import _shop
@@ -460,10 +464,26 @@ def _live_root():
     return build_dir_for(_shop())
 
 
+def _force_shop_build(spoken: str) -> bool:
+    text = spoken or ""
+    if any(mark in text for mark in _NOT_A_BUILD):
+        return False
+    if _BUILD_SIGNAL.search(text) is None:
+        return False
+    from app.services.shop_service import _shop
+
+    shop = _shop()
+    if not isinstance(shop, dict):
+        return True
+    return not str(shop.get("slug") or "").strip()
+
+
 def _route_shop(name: str, spoken: str, view_path: str, view_target: str) -> tuple[str, str]:
     from app.services.shop_intent_service import catalog_add
     from app.services.shop_service import _explicit_build
 
+    if _force_shop_build(spoken):
+        return "shop_chat", ""
     actions = _shop_actions(spoken, view_path, view_target)
     if any(str(item.get("type") or "") == "reject_foreign" for item in actions):
         return name, "این پیام ویرایش فروشگاه نیست."
@@ -1064,7 +1084,9 @@ async def _execute(
     _add_usage(result.get("usage") if isinstance(result, dict) else None)
 
     calls = result.get("tool_calls") if isinstance(result, dict) else None
-    if not calls:
+    if not calls and _force_shop_build(spoken):
+        calls = [{"name": "shop_chat", "arguments": {}}]
+    elif not calls:
         rescued = await router_embed.rescue_tool(spoken, embed=embed)
         if rescued:
             calls = [{"name": rescued, "arguments": {}}]
@@ -1079,6 +1101,9 @@ async def _execute(
         return snapshot()
     name = str(call.get("name") or "")
     args = call.get("arguments") if isinstance(call.get("arguments"), dict) else {}
+    if _force_shop_build(spoken) and name != "shop_chat":
+        name = "shop_chat"
+        args = {}
     if dropped:
         _emit("router-extra-tools", {"kept": name, "dropped": dropped[:6]})
     if _never_tool(name):

@@ -54,10 +54,10 @@ def _scope(thread_id: str) -> str:
     return f"router-chat:{thread_id}" if thread_id else "router-chat"
 
 
-async def _wait_cached(scope: str, key: str, thread_id: str):
+async def _wait_cached(scope: str, key: str, thread_id: str, stamp: str):
     for _ in range(40):
         await asyncio.sleep(0.5)
-        cached = idempotency_service.get(scope, key)
+        cached = idempotency_service.recall(scope, key, stamp)
         if cached is not None:
             return cached
         router_service._bind_thread(thread_id)
@@ -75,6 +75,7 @@ async def _finish_turn(
     confirm_id: str,
     cancel_id: str,
     thread_id: str,
+    stamp: str,
 ):
     router_service._bind_thread(thread_id)
     tid = router_service._THREAD.get()
@@ -94,13 +95,13 @@ async def _finish_turn(
     except router_service.RouterBusy:
         router_service._bind_thread(tid)
         if key and router_service.inflight_key() == key:
-            cached = await _wait_cached(scope, key, tid)
+            cached = await _wait_cached(scope, key, tid, stamp)
             if cached is not None:
                 return cached
         snap = router_service.snapshot(tid)
         snap["notice"] = router_service.STILL_WRITING
         return snap
-    idempotency_service.put(scope, key, out)
+    idempotency_service.put(scope, key, out, stamp)
     return out
 
 
@@ -110,13 +111,15 @@ async def post_chat(
     _user=Depends(require_permission("campaigns:write")),
 ):
     key = _idempotency_key(request)
+    raw = await request.body()
+    stamp = idempotency_service.body_stamp(raw)
     text, media, view_path, view_target, confirm_id, cancel_id, thread_id = await _read_payload(request)
     router_service._bind_thread(thread_id)
     tid = router_service._THREAD.get()
-    cached = idempotency_service.get(_scope(tid), key)
+    cached = idempotency_service.recall(_scope(tid), key, stamp)
     if cached is not None:
         return cached
-    return await _finish_turn(key, text, media, view_path, view_target, confirm_id, cancel_id, tid)
+    return await _finish_turn(key, text, media, view_path, view_target, confirm_id, cancel_id, tid, stamp)
 
 
 @router.post("/threads")

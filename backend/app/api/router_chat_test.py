@@ -78,9 +78,12 @@ class RouterChatApiTests(unittest.TestCase):
             new=AsyncMock(return_value=payload),
         ) as turn:
             first = self.client.post("/chat", json={"text": "سلام"}, headers={"Idempotency-Key": "r1"})
+            replay = self.client.post("/chat", json={"text": "سلام"}, headers={"Idempotency-Key": "r1"})
             second = self.client.post("/chat", json={"text": "سلام دوباره"}, headers={"Idempotency-Key": "r1"})
         self.assertEqual(first.status_code, 200)
-        self.assertEqual(second.json(), first.json())
+        self.assertEqual(replay.json(), first.json())
+        self.assertEqual(second.status_code, 422)
+        self.assertNotEqual(second.json(), first.json())
         self.assertEqual(turn.await_count, 1)
 
     def test_post_confirm_without_text(self) -> None:

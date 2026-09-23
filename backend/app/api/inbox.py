@@ -107,7 +107,9 @@ async def inbox_inbound(body: InboundIn, _user=Depends(require_permission("campa
 @router.post("/{thread_id}/reply")
 async def inbox_reply(thread_id: str, request: Request, body: ReplyIn, _user=Depends(require_permission("campaigns:write"))):
     key = (request.headers.get("Idempotency-Key") or request.headers.get("X-Idempotency-Key") or "").strip()
-    cached = idempotency_service.get("inbox-reply", key)
+    raw = await request.body()
+    stamp = idempotency_service.body_stamp(raw)
+    cached = idempotency_service.recall("inbox-reply", key, stamp)
     if cached is not None:
         return cached
     try:
@@ -121,5 +123,5 @@ async def inbox_reply(thread_id: str, request: Request, body: ReplyIn, _user=Dep
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    idempotency_service.put("inbox-reply", key, out)
+    idempotency_service.put("inbox-reply", key, out, stamp)
     return out

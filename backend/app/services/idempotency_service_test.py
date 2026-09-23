@@ -15,8 +15,10 @@ class IdempotencyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
                 self.assertIsNone(idempotency_service.get("shop-chat", "k1"))
-                idempotency_service.put("shop-chat", "k1", {"ok": True})
-                self.assertEqual(idempotency_service.get("shop-chat", "k1"), {"ok": True})
+                idempotency_service.put("shop-chat", "k1", {"ok": True}, stamp="status")
+                self.assertEqual(idempotency_service.get("shop-chat", "k1", "status"), {"ok": True})
+                with self.assertRaises(idempotency_service.Mismatch):
+                    idempotency_service.get("shop-chat", "k1", "hello")
                 self.assertIsNone(idempotency_service.get("shop-chat", ""))
 
     def test_concurrent_puts_keep_both_keys(self) -> None:

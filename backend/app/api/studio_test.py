@@ -55,9 +55,12 @@ class StudioApiTests(unittest.TestCase):
             new=AsyncMock(return_value={"messages": [{"id": "a", "text": "سلام"}], "campaignId": ""}),
         ) as chat:
             first = self.client.post("/studio/chat", json={"text": "سلام"}, headers={"Idempotency-Key": "k1"})
+            replay = self.client.post("/studio/chat", json={"text": "سلام"}, headers={"Idempotency-Key": "k1"})
             second = self.client.post("/studio/chat", json={"text": "سلام دوباره"}, headers={"Idempotency-Key": "k1"})
         self.assertEqual(first.status_code, 200)
-        self.assertEqual(second.json(), first.json())
+        self.assertEqual(replay.json(), first.json())
+        self.assertEqual(second.status_code, 422)
+        self.assertNotEqual(second.json(), first.json())
         self.assertEqual(chat.await_count, 1)
 
     def test_publish_idempotent_replay(self) -> None:

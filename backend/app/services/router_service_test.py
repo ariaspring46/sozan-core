@@ -195,6 +195,8 @@ class RouterServiceTests(unittest.TestCase):
                 ]
             }
         )
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "ready"})
         with patch("app.services.studio_chat_service.chat", new=chat):
             held = self._turn("پوستر بساز", complete, campaigns=campaigns)
             chat.assert_not_called()
@@ -682,6 +684,47 @@ class RouterServiceTests(unittest.TestCase):
         sent.assert_not_called()
         self.assertIsNone(out.get("pendingConfirm"))
         self.assertIn("فایل آماده", out["messages"][-1]["text"])
+
+    def test_idle_build_sentence_is_shop_chat(self) -> None:
+        async def studio(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "studio_chat", "arguments": {"text": "بساز"}}]}
+
+        async def edit(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "edit_shop", "arguments": {}}]}
+
+        async def prose(_messages, _tools):
+            return {"text": "بگو فروشگاه، محتوا یا صندوق", "tool_calls": []}
+
+        shop = AsyncMock(return_value={"messages": [{"role": "assistant", "text": "ساخت شروع شد."}]})
+        with patch("app.services.shop_service.chat", new=shop), patch(
+            "app.services.studio_chat_service.chat", new=AsyncMock()
+        ) as studio_chat:
+            alone = self._turn("بساز", studio)
+            brief = self._turn("فروشگاه ورزشی پرانرژی با ویترین ۳ کالا و قیمت بساز", edit)
+            mood = self._turn("حس فروشگاه: پرانرژی / رنگ: آبی / سبک: مدرن", prose)
+        studio_chat.assert_not_called()
+        self.assertEqual(shop.await_count, 3)
+        self.assertEqual(alone["messages"][-1]["text"], "ساخت شروع شد.")
+        self.assertEqual(brief["messages"][-1]["text"], "ساخت شروع شد.")
+        self.assertEqual(mood["messages"][-1]["text"], "ساخت شروع شد.")
+        self.assertIsNone(alone.get("pendingConfirm"))
+        self.assertNotIn("ویترین هنوز نیست", brief["messages"][-1]["text"])
+        self.assertNotIn("محتوا یا صندوق", mood["messages"][-1]["text"])
+
+    def test_ready_shop_edit_stays_edit_shop(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "edit_shop", "arguments": {}}]}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "ready"})
+        edit = AsyncMock(return_value={"ok": True, "reply": "رنگ فروشگاه عوض شد."})
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")), patch(
+            "app.services.shop_service.chat", new=AsyncMock()
+        ) as chat, patch("app.services.shop_edit_service.apply_live_edit", new=edit):
+            held = self._turn("رنگ فروشگاه را صورتی کن", complete)
+        chat.assert_not_called()
+        edit.assert_not_called()
+        self.assertEqual(held["pendingConfirm"]["tool"], "edit_shop")
 
 
 if __name__ == "__main__":

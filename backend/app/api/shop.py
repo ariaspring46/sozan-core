@@ -30,12 +30,14 @@ def _idempotency_key(request: Request) -> str:
 @router.post("/chat")
 async def shop_chat(request: Request, _user=Depends(require_permission("campaigns:write"))):
     key = _idempotency_key(request)
-    cached = idempotency_service.get("shop-chat", key)
+    raw = await request.body()
+    stamp = idempotency_service.body_stamp(raw)
+    cached = idempotency_service.recall("shop-chat", key, stamp)
     if cached is not None:
         return cached
     text, media, view_path, view_target, _confirm, _cancel, _thread = await read_chat_payload(request)
     out = await shop_service.chat(text, media, view_path, view_target)
-    idempotency_service.put("shop-chat", key, out)
+    idempotency_service.put("shop-chat", key, out, stamp)
     return out
 
 
@@ -47,7 +49,9 @@ async def shop_domain(body: DomainIn, _user=Depends(require_permission("campaign
 @router.post("/build")
 async def shop_build(request: Request, body: BuildIn, _user=Depends(require_permission("campaigns:write"))):
     key = _idempotency_key(request)
-    cached = idempotency_service.get("shop-build", key)
+    raw = await request.body()
+    stamp = idempotency_service.body_stamp(raw)
+    cached = idempotency_service.recall("shop-build", key, stamp)
     if cached is not None:
         return cached
     shop = shop_service.snapshot()["shop"]
@@ -62,5 +66,5 @@ async def shop_build(request: Request, body: BuildIn, _user=Depends(require_perm
         revise_only=True if body.reviseOnly else (False if body.rebuild else None),
     )
     out = {"result": result, **shop_service.snapshot()}
-    idempotency_service.put("shop-build", key, out)
+    idempotency_service.put("shop-build", key, out, stamp)
     return out

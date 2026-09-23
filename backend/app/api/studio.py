@@ -66,19 +66,23 @@ async def studio_chat(
     service: CampaignService = Depends(_svc),
 ):
     key = _idempotency_key(request)
-    cached = idempotency_service.get("studio-chat", key)
+    raw = await request.body()
+    stamp = idempotency_service.body_stamp(raw)
+    cached = idempotency_service.recall("studio-chat", key, stamp)
     if cached is not None:
         return cached
     text, media, _view_path, _view_target, _confirm, _cancel, _thread = await read_chat_payload(request)
     out = await studio_chat_service.chat(text, service, media)
-    idempotency_service.put("studio-chat", key, out)
+    idempotency_service.put("studio-chat", key, out, stamp)
     return out
 
 
 @router.post("/publish")
 async def studio_publish(request: Request, body: PublishIn, _user=Depends(require_permission("campaigns:write"))):
     key = _idempotency_key(request)
-    cached = idempotency_service.get("studio-publish", key)
+    raw = await request.body()
+    stamp = idempotency_service.body_stamp(raw)
+    cached = idempotency_service.recall("studio-publish", key, stamp)
     if cached is not None:
         return cached
     try:
@@ -96,7 +100,7 @@ async def studio_publish(request: Request, body: PublishIn, _user=Depends(requir
         raise
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    idempotency_service.put("studio-publish", key, out)
+    idempotency_service.put("studio-publish", key, out, stamp)
     return out
 
 
@@ -134,7 +138,9 @@ async def studio_regenerate(
     service: CampaignService = Depends(_svc),
 ):
     key = _idempotency_key(request)
-    cached = idempotency_service.get("studio-regenerate", key)
+    raw = await request.body()
+    stamp = idempotency_service.body_stamp(raw)
+    cached = idempotency_service.recall("studio-regenerate", key, stamp)
     if cached is not None:
         return cached
     message_id = ""
@@ -168,5 +174,5 @@ async def studio_regenerate(
         raise
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    idempotency_service.put("studio-regenerate", key, out)
+    idempotency_service.put("studio-regenerate", key, out, stamp)
     return out
