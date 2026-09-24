@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from app.services import router_embed
 from app.services.observe_client import emit_later
+from app.services.persian_text import guard_output
 from app.services.tenant_lock import tenant_file_lock
 from app.state_store import current_tenant, read_json, write_json
 
@@ -601,16 +602,7 @@ def _last_content_line() -> str:
 
 
 def _polish_model_text(spoken: str, reply: str, finish: str) -> str:
-    text = (reply or "").strip()
-    if finish == "length" and len(text) < 8:
-        return "جواب برید. کوتاه‌تر بگو."
-    letters = re.findall(r"[A-Za-z]", text)
-    persian = _PERSIAN.findall(text)
-    if text and len(letters) > len(persian):
-        return "فارسی جواب می‌دهم. بگو فروشگاه، محتوا، یا صندوق."
-    if not text:
-        return "این را بلد نیستم؛ از فروشگاه یا محتوا بگو."
-    return _guard_reply(spoken, text)
+    return _guard_reply(spoken, guard_output(reply, finish=finish))
 
 
 def _system_prompt() -> str:
@@ -664,6 +656,8 @@ def _public_pending(row: dict) -> dict | None:
 
 
 def _append(role: str, text: str, **extra) -> dict:
+    if role == "assistant":
+        text = guard_output(text)
     return _commit(role, text, **extra)
 
 

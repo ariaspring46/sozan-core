@@ -15,6 +15,7 @@ import httpx
 from app.config import settings
 from app.services.llm import ARVAN_HOST_SUFFIX, LLM_BAD_JSON, _emit_usage, _persian_enough, spoken_model_reply
 from app.services.observe_client import emit_later
+from app.services.persian_text import guard_output
 from app.services.router_embed import cosine
 
 log = logging.getLogger("sozan.inbox.agent")
@@ -386,9 +387,7 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                             }
                         )
                         continue
-                reply = text.strip()
-                if not _persian_enough(reply):
-                    reply = ""
+                reply = guard_output(text)
                 for url in pay_urls:
                     if url and url not in reply:
                         reply = f"{reply}\n{url}".strip()

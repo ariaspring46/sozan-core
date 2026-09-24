@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 from app.config import settings
 from app.services.llm import complete_json
+from app.services.persian_text import sanitize_persian
 
 BRAND_KEYS = (
     "name",
@@ -1009,13 +1010,18 @@ def _execute_action(shop: dict, root: Path, action: dict, view_path: str) -> dic
         preview = _preview_payload(colors=_color_preview(colors), reload=True)
     elif kind == "set_brand":
         fields = action.get("fields") if isinstance(action.get("fields"), dict) else {}
+        fields = {
+            key: sanitize_persian(str(value), limit=40) if key not in COLOR_KEYS else value
+            for key, value in fields.items()
+        }
+        action["fields"] = fields
         patch_brand_file(root / "lib" / "brand.ts", fields)
         files = ["lib/brand.ts"]
         if "name" in fields:
             preview = _preview_payload(find=str(shop.get("brand") or ""), replace=str(fields.get("name") or ""))
     elif kind == "replace_text":
         find = str(action.get("find") or "")
-        replace = str(action.get("replace") or "")
+        replace = sanitize_persian(str(action.get("replace") or ""), limit=80)
         if action.get("heading"):
             patched = patch_page_heading(root, view_path or "/products", replace)
             files = [f"app{(view_path or '/products').rstrip('/')}/page.tsx"]
@@ -1075,7 +1081,7 @@ def _execute_action(shop: dict, root: Path, action: dict, view_path: str) -> dic
         preview = _preview_payload(reload=True)
     elif kind == "set_header":
         nav = read_nav_file(root)
-        nav["logoFa"] = str(action.get("logoFa") or "")
+        nav["logoFa"] = sanitize_persian(str(action.get("logoFa") or ""), limit=40)
         write_nav_file(root, nav)
         write_storefront_flags(root, logo_fa=str(nav["logoFa"]))
         files = ["lib/nav.ts", "components/layout/Header.tsx", "public/storefront-flags.json"]

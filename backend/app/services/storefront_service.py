@@ -6,6 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.state_store import read_json, write_json
+from app.services.persian_text import sanitize_persian
 
 log = logging.getLogger("sozan.storefront")
 
@@ -196,7 +197,7 @@ def add_product(
     priceNote: str = "",
     discount: int = 0,
 ) -> dict:
-    title = title.strip()
+    title = sanitize_persian(title, limit=36)
     if not title:
         raise ValueError("نام محصول را بنویس")
     if price < 0 or stock < 0:

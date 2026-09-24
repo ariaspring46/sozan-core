@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from app.services.campaign_service import CampaignService
 from app.services.llm import complete_json
 from app.services.observe_client import emit_later
+from app.services.persian_text import guard_output, sanitize_persian
 from app.services.tenant_lock import tenant_file_lock
 from app.state_store import read_json, write_json
 
@@ -111,7 +112,7 @@ def _save(rows: list[dict]) -> None:
 def _clip_captions(captions: dict) -> dict:
     out = {}
     for key, limit in CAPTION_LIMITS.items():
-        out[key] = _real_copy(captions.get(key), limit=limit)
+        out[key] = sanitize_persian(_real_copy(captions.get(key), limit=limit), limit=limit)
     return out
 
 
@@ -542,6 +543,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
     reply = _real_copy(parsed.get("reply"), limit=400)
     if not reply:
         reply = captions["instagram"][:180] or captions["telegram"][:180] or captions["whatsapp"][:180]
+    reply = guard_output(reply)
     image_prompt = str(parsed.get("imagePrompt") or "").strip()
     slug = f"c{uuid4().hex[:12]}"
     campaign_id = ""

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from app.services.persian_text import sanitize_persian
 from app.services.shop_edit_service import (
     looks_like_foreign_payload,
     named_color_updates,
@@ -72,19 +73,10 @@ _TITLE_DROP = frozenset(
     {"یک", "یه", "را", "کالا", "محصول", "اضافه", "کن", "کنید", "بگذار", "بذار", "عنوان", "تومان"}
 )
 _TITLE_PUNCT = " ،.,:;؛!؟«»\"'`"
-_TAG = re.compile(r"<[^>]*>")
-_CTRL = re.compile(r"[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]")
 
 
 def _bare_token(token: str) -> str:
     return (token or "").strip(_TITLE_PUNCT)
-
-
-def _sanitize_title(title: str) -> str:
-    text = _TAG.sub("", title or "")
-    text = text.replace("`", "")
-    text = _CTRL.sub("", text)
-    return re.sub(r"\s+", " ", text).strip(_TITLE_PUNCT)[:36]
 
 
 def _product_title(text: str) -> str:
@@ -106,8 +98,6 @@ def _product_title(text: str) -> str:
             continue
         kept.append(bare)
         index += 1
-    while kept and kept[-1] in {"رو", "هر"}:
-        kept.pop()
     return " ".join(kept)[:36]
 
 
@@ -127,7 +117,7 @@ def _is_product_add(text: str) -> bool:
 def catalog_add(text: str) -> dict | None:
     if not _is_product_add(text):
         return None
-    title = _sanitize_title(_product_title(text))
+    title = sanitize_persian(_product_title(text), limit=36)
     if not title:
         return None
     return {"title": title, "price": _price_toman(text)}
