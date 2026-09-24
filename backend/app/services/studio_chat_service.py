@@ -111,11 +111,21 @@ def _save(rows: list[dict]) -> None:
     write_json("studio-messages.json", kept)
 
 
-def _clip_captions(captions: dict) -> dict:
+def _clip_captions(captions: dict, *, spoken: str = "", drop_unclaimed: bool = False) -> dict:
+    allow_handmade = (not drop_unclaimed) or bool(re.search(r"دست[\s\u200c-]*ساز", spoken or ""))
     out = {}
     for key, limit in CAPTION_LIMITS.items():
-        out[key] = sanitize_persian(_strip_latin_tags(_real_copy(captions.get(key), limit=limit)), limit=limit)
+        text = sanitize_persian(_strip_latin_tags(_real_copy(captions.get(key), limit=limit)), limit=limit)
+        if not allow_handmade:
+            text = re.sub(r"دست[\s\u200c-]*ساز", "", text)
+            text = re.sub(r"\s{2,}", " ", text).strip(" ،")
+        out[key] = text
     return out
+
+
+def _no_overlay_text(spoken: str) -> bool:
+    text = spoken or ""
+    return any(mark in text for mark in ("بدون متن", "هیچ نوشته", "روی عکس ننویس", "نوشته‌ای نباشد", "نوشته ای نباشد"))
 
 
 def _strip_latin_tags(text: str) -> str:
@@ -570,12 +580,18 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
     title = _real_copy(parsed.get("title"), limit=80) or _title_from_spoken(spoken)
     subtitle = _real_copy(parsed.get("subtitle"), limit=120)
     cta = _real_copy(parsed.get("cta"), limit=40)
+    if _no_overlay_text(spoken):
+        title = ""
+        subtitle = ""
+        cta = ""
     captions = _clip_captions(
         {
             "instagram": parsed.get("instagram"),
             "telegram": parsed.get("telegram"),
             "whatsapp": parsed.get("whatsapp") or parsed.get("telegram") or parsed.get("instagram"),
-        }
+        },
+        spoken=spoken,
+        drop_unclaimed=True,
     )
     reply = _real_copy(parsed.get("reply"), limit=400)
     if not reply:

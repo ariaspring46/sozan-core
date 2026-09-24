@@ -974,6 +974,27 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("تنظیمات", telegram["messages"][-1]["text"])
         self.assertNotIn("بلد نیستم", telegram["messages"][-1]["text"])
 
+    def test_photo_and_prior_caption_open_studio(self) -> None:
+        async def complete(_messages, _tools):
+            raise AssertionError("chooser must not run")
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "sozan", "status": "ready"})
+            write_json(
+                "studio-messages.json",
+                [{"id": "s1", "role": "assistant", "text": "آویز", "campaignId": "camp-1", "captions": {"instagram": "آویز"}}],
+            )
+        photo = self._turn("عکس انگشتر فیروزه بساز؛ روی عکس هیچ نوشته‌ای نباشد", complete)
+        self.assertEqual(
+            (photo.get("pendingConfirm") or {}).get("tool"),
+            "studio_chat",
+            photo["messages"][-1]["text"],
+        )
+        self._turn("", complete, cancel_id=photo["pendingConfirm"]["id"])
+        prior = self._turn("کپشن قبلی را رسمی‌تر کن", complete)
+        self.assertEqual(prior["pendingConfirm"]["tool"], "studio_chat")
+        self.assertNotIn("ندارم", prior["messages"][-1]["text"])
+
     def test_chooser_does_not_see_prior_prose(self) -> None:
         seen: list[list] = []
 

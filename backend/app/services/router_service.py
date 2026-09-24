@@ -610,9 +610,24 @@ def _remember_content(extra: dict) -> None:
 
 def _last_content_line() -> str:
     row = read_json("router-last-ref.json", {})
-    if not isinstance(row, dict) or not row.get("campaignId"):
-        return ""
-    return f"آخرین محتوا: کمپین {row.get('campaignId')}"
+    if isinstance(row, dict) and row.get("campaignId"):
+        return f"آخرین محتوا: کمپین {row.get('campaignId')}"
+    from app.services.studio_chat_service import snapshot as studio_snapshot
+
+    for item in reversed(studio_snapshot().get("messages") or []):
+        if isinstance(item, dict) and item.get("role") != "user" and str(item.get("campaignId") or "").strip():
+            return f"آخرین محتوا: کمپین {item.get('campaignId')}"
+    return ""
+
+
+def _wants_studio(spoken: str) -> bool:
+    text = spoken or ""
+    if any(mark in text for mark in ("همین پست", "کپشن قبلی", "پست قبلی")):
+        return bool(_last_content_line())
+    if any(mark in text for mark in ("کپشن", "هشتگ", "استوری")):
+        return True
+    photo = ("عکس" in text or "تصویر" in text) and any(mark in text for mark in ("بساز", "بسازی", "طراحی"))
+    return photo
 
 
 def _polish_model_text(spoken: str, reply: str, finish: str) -> str:
@@ -1408,6 +1423,7 @@ async def _execute(
             _append("assistant", _tool_error(name, exc))
             return snapshot()
         _commit("assistant", reply, clear_pending=True, **extra)
+        _remember_content(extra)
         _emit("router-tool", {"tool": name, "confirmed": True, "level": "write"})
         return snapshot()
     if not spoken and not media:
@@ -1452,7 +1468,7 @@ async def _execute(
         prefetch = "edit_shop"
     elif _wants_advice(spoken):
         prefetch = "shop_chat"
-    elif any(mark in spoken for mark in ("کپشن", "هشتگ", "استوری")) and "قبلی" not in spoken:
+    elif _wants_studio(spoken):
         prefetch = "studio_chat"
     if prefetch:
         result = {"text": "", "tool_calls": [{"name": prefetch, "arguments": {}}], "usage": {}}
