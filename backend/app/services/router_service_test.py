@@ -802,6 +802,39 @@ class RouterServiceTests(unittest.TestCase):
         self.assertNotIn("token", sent.await_args.kwargs)
         self.assertEqual(out["messages"][-1]["text"], "به تلگرام ارسال شد.")
 
+    def test_instagram_name_on_inbox_becomes_confirm(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "instagram"}}]}
+
+        sent = AsyncMock(return_value={"ok": True, "message": "فرستاده شد."})
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "m9",
+                        "role": "assistant",
+                        "text": "آماده",
+                        "campaignId": "c9",
+                        "captions": {"instagram": "کپشن"},
+                        "attachments": [{"kind": "image", "name": "post-image.png"}],
+                    }
+                ],
+            )
+        audience = [{"sender": "سارا", "recipientId": "ig-sara", "id": "t1"}]
+        with patch("app.services.inbox_service.list_publish_audience", return_value=audience), patch(
+            "app.services.studio_publish_service.publish", new=sent
+        ):
+            held = self._turn("این پست را برای سارا در اینستاگرام بفرست", complete)
+            sent.assert_not_called()
+            self.assertEqual(held["pendingConfirm"]["tool"], "publish_post")
+            self.assertIn("سارا", held["messages"][-1]["text"])
+            cid = held["pendingConfirm"]["id"]
+            out = self._turn("", complete, confirm_id=cid)
+        sent.assert_awaited()
+        self.assertEqual(sent.await_args.kwargs["recipient_id"], "ig-sara")
+        self.assertNotIn("مخاطب را هم بگو", out["messages"][-1]["text"])
+
     def test_publish_without_file_does_not_confirm(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "telegram"}}]}

@@ -846,12 +846,34 @@ def _latest_post() -> dict | None:
     return None
 
 
-def _publish_block(args: dict) -> str:
+def _bind_recipient(args: dict, spoken: str) -> str:
+    platform = str(args.get("platform") or "")
+    if platform != "instagram" or str(args.get("recipientId") or "").strip():
+        return ""
+    from app.services.inbox_service import list_publish_audience
+
+    rows = list_publish_audience(platform=platform, limit=50)
+    hits = [
+        row
+        for row in rows
+        if len(str(row.get("sender") or "").strip()) >= 2 and str(row.get("sender") or "").strip() in (spoken or "")
+    ]
+    if len(hits) == 1:
+        args["recipientId"] = str(hits[0].get("recipientId") or "")
+        args["recipientName"] = str(hits[0].get("sender") or "")
+        return ""
+    if len(hits) > 1:
+        return "چند گفتگو با این نام هست. نام را دقیق‌تر بگو."
+    return "برای دایرکت اینستاگرام مخاطب را هم بگو."
+
+
+def _publish_block(args: dict, spoken: str = "") -> str:
     platform = str(args.get("platform") or "")
     if platform not in _PUBLISH_FA:
         return "انتشار فقط برای تلگرام، واتساپ یا دایرکت اینستاگرام است."
-    if platform == "instagram" and not str(args.get("recipientId") or "").strip():
-        return "برای دایرکت اینستاگرام مخاطب را هم بگو."
+    named = _bind_recipient(args, spoken)
+    if named:
+        return named
     if _latest_post() is None:
         return "هنوز فایل آماده‌ای برای ارسال نیست."
     return ""
@@ -861,7 +883,7 @@ def _authority_route(name: str, args: dict, spoken: str, view_path: str, view_ta
     if name in {"shop_chat", "edit_shop", "add_product"}:
         return _route_shop(name, spoken, view_path, view_target)
     if name == "publish_post":
-        return name, _publish_block(args)
+        return name, _publish_block(args, spoken)
     return name, ""
 
 
@@ -895,6 +917,9 @@ def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = ""
         return "این پست ساخته شود؟"
     if name == "publish_post":
         label = _PUBLISH_FA.get(str(args.get("platform") or ""), "کانال")
+        who = str(args.get("recipientName") or "").strip()
+        if who:
+            return f"این پیام برای {who} در {label} فرستاده شود؟"
         return f"این پست در {label} فرستاده شود؟"
     return "این تغییر اعمال شود؟"
 
@@ -1090,7 +1115,7 @@ async def _run_tool(
     if name == "publish_post":
         from app.services.studio_publish_service import publish
 
-        blocked = _publish_block(args)
+        blocked = _publish_block(args, spoken)
         if blocked:
             return blocked, {}
         post = _latest_post() or {}
