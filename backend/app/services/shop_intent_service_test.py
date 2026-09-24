@@ -10,6 +10,8 @@ class ShopIntentClassifyTests(unittest.TestCase):
         kinds = [row["type"] for row in classify_actions("صفحه بلاگ بساز")]
         self.assertEqual(kinds, ["ask_clarify"])
         self.assertIn("کدام صفحه", classify_actions("صفحه بلاگ بساز")[0]["reply"])
+        vague = classify_actions("یک صفحه ی جدید میخوام برای فروشگاه")
+        self.assertEqual(vague[0]["type"], "ask_clarify")
 
     def test_create_about_emits_nav_dependency(self) -> None:
         actions = classify_actions("صفحه درباره ما را بساز")
@@ -63,6 +65,10 @@ class ShopIntentClassifyTests(unittest.TestCase):
         self.assertEqual(shirt["title"], "پیراهن نخی آبی")
         self.assertEqual(pima["title"], "کفش پیما")
         self.assertNotIn("با", nike["title"].split())
+        hoodie = catalog_add("هودی مشکی سایز لارج رو با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")
+        self.assertEqual(hoodie["title"], "هودی مشکی سایز لارج")
+        inner = catalog_add("هر کفش قرمز را با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")
+        self.assertIn("هر", inner["title"].split())
 
     def test_title_strips_markup(self) -> None:
         row = catalog_add("کالای <script>alert(1)</script> را با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")

@@ -22,7 +22,7 @@ PAGE_HINTS = (
     ("contact", ("تماس با ما", "تماس", "ارتباط", "contact")),
     ("story", ("داستان برند", "قصه ما", "داستان", "قصه", "story")),
 )
-SHOW_PRICE_RE = re.compile(r"قیمت\s*(?:را\s*)?(?:نشان|بذار|بگذار|بزن)|با\s*قیمت")
+SHOW_PRICE_RE = re.compile(r"قیمت‌?ها?\s*(?:را\s*)?(?:نشان|بذار|بگذار|بزن)|با\s*قیمت")
 HIDE_PRICE_RE = re.compile(r"قیمت\s*نزن|بدون قیمت|قیمت\s*نذار|قیمت\s*نگذار|پنهان.{0,12}قیمت|قیمت.{0,12}پنهان")
 FROM_PAGE = ("از پیج", "از داخل پیج", "از کانال", "از اینستا")
 CREATE_PAGE_RE = re.compile(r"صفحه.{0,24}(?:بساز|درست کن|اضافه)|(?:بساز|درست کن).{0,24}صفحه")
@@ -106,6 +106,8 @@ def _product_title(text: str) -> str:
             continue
         kept.append(bare)
         index += 1
+    while kept and kept[-1] in {"رو", "هر"}:
+        kept.pop()
     return " ".join(kept)[:36]
 
 
@@ -272,6 +274,8 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
         return actions
     if _is_question(text) and not target:
         return [{"type": "answer"}]
+    if "صفحه" in text and not page_kind_from_text(text):
+        return [{"type": "ask_clarify", "reply": CLARIFY_PAGE}]
     if compact.lower() in CONTINUE:
         return [{"type": "answer"}]
     return [{"type": "edit_llm"}]

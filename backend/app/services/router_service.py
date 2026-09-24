@@ -373,7 +373,8 @@ def _fact_reply(spoken: str) -> str:
     text = spoken or ""
     if "وضعیت" in text:
         return ""
-    if any(mark in text.lower() for mark in ("otp", "توکن", "رمز")):
+    folded = text.lower().replace("’", "'")
+    if any(mark in folded for mark in ("otp", "توکن", "رمز", "کد ورود", "کد یکبار", "api key", "کلید api")):
         return "این را در چت نمی‌گویم."
     if "شبا" in text:
         return "شبا را اینجا نمی‌گویم. از صفحهٔ کیف می‌توانی ببینی."
@@ -423,7 +424,16 @@ def _fact_reply(spoken: str) -> str:
         from app.services.storefront_service import list_products
 
         rows = list_products().get("products") or []
-        hit = next((row for row in rows if str(row.get("title") or "") and str(row.get("title")) in text), None)
+        ask = text.replace("موجودی", "").replace("؟", "").replace("?", "").strip()
+        hit = next(
+            (
+                row
+                for row in rows
+                if str(row.get("title") or "")
+                and (str(row.get("title")) in text or (len(ask) >= 2 and ask in str(row.get("title"))))
+            ),
+            None,
+        )
         if hit is None:
             return "این کالا را در کاتالوگ پیدا نکردم."
         return f"موجودی «{hit.get('title')}» {int(hit.get('stock') or 0)} است."
@@ -442,6 +452,19 @@ def _fact_reply(spoken: str) -> str:
     if "قیمت" in text and any(mark in text for mark in ("هست", "هست یا نه", "نشان داده", "پنهان")) and "کن" not in text and "بده" not in text:
         hidden = bool(_shop_row().get("hidePrices"))
         return "قیمت روی سایت پنهان است." if hidden else "قیمت روی سایت نشان داده می‌شود."
+    if "قیمت" in text and "کن" not in text and "بده" not in text and "نشان" not in text and "پنهان" not in text and "بساز" not in text:
+        from app.services.storefront_service import list_products
+
+        needle = text
+        for drop in ("قیمت", "چنده", "چقدر است", "چقدر", "؟", "?"):
+            needle = needle.replace(drop, "")
+        needle = needle.strip()
+        if len(needle) >= 2:
+            rows = list_products().get("products") or []
+            hit = next((row for row in rows if needle in str(row.get("title") or "")), None)
+            if hit is None:
+                return "این کالا را در کاتالوگ پیدا نکردم."
+            return f"قیمت «{hit.get('title')}» {int(hit.get('price') or 0)} تومان است."
     if any(mark in text for mark in ("بالا است", "بالاست", "آماده است")):
         return f"بله. فروشگاه روی {host} باز است." if host else "هنوز ویترینی ساخته نشده."
     if any(mark in text for mark in ("صندوق", "خوانده")):
@@ -456,12 +479,41 @@ def _shop_public() -> str:
     return str(shop.get("url") or shop.get("publicHost") or shop.get("domain") or "").strip()
 
 
+def _chooser_history(spoken: str) -> list[dict]:
+    return [
+        {"role": "system", "content": _system_prompt()},
+        {"role": "user", "content": spoken[:800]},
+    ]
+
+
+def _wants_advice(spoken: str) -> bool:
+    text = spoken or ""
+    if _force_shop_build(text):
+        return False
+    if any(mark in text for mark in ("پیشنهاد", "بهبود", "چطور", "چگونه", "به چه شکل")):
+        return True
+    return False
+
+
+def _language_refusal(spoken: str) -> str:
+    text = (spoken or "").replace("’", "'").replace("‘", "'")
+    folded = text.lower()
+    if any(mark in text for mark in ("فقط انگلیسی", "به انگلیسی", "انگلیسی جواب")):
+        return "فارسی جواب می‌دهم. بگو فروشگاه، محتوا، یا صندوق."
+    if any(mark in folded for mark in ("ignore previous", "print the system", "system prompt")):
+        return "این را در چت جواب نمی‌دهم."
+    return ""
+
+
 def _direct_reply(spoken: str) -> str:
     fact = _fact_reply(spoken)
     if fact:
         return fact
     text = (spoken or "").strip()
     compact = text.replace("؟", "").replace("?", "").strip()
+    lang = _language_refusal(text)
+    if lang:
+        return lang
     if any(mark in text for mark in ("چه کار", "چکار", "چه می‌توانی", "چه میتونی", "قابلیت")):
         return _CAPABILITY
     if compact in {"فروشگاه", "فروشگاهم", "سایت", "ویترین"} or (
@@ -469,7 +521,20 @@ def _direct_reply(spoken: str) -> str:
     ):
         host = _shop_public()
         return f"بله. فروشگاه روی {host} باز است." if host else "هنوز ویترینی ساخته نشده. بگو بساز."
-    if "صفحه" in text:
+    if any(mark in text for mark in ("همین پست", "کپشن قبلی", "پست قبلی", "کپشن قبلی")):
+        if not _last_content_line():
+            return "پست قبلی در این گفتگو ندارم. بگو کپشن چه باشد."
+        return ""
+    if "بدون https" in text or ("بدون" in text and "https" in text):
+        prior = " ".join(str(row.get("text") or "") for row in _messages()[-6:] if isinstance(row, dict))
+        if "دامنه" in prior or "http" in prior:
+            host = _shop_public()
+            shown = host.replace("https://", "").replace("http://", "")
+            return f"دامنهٔ فروشگاه {shown} است." if shown else "هنوز دامنه‌ای برای فروشگاه ثبت نشده."
+    refusal = _refusal_reply(text)
+    if refusal:
+        return refusal
+    if "صفحه" in text and not any(mark in text for mark in ("پیشنهاد", "بهبود", "ببین")):
         from app.services.shop_intent_service import CLARIFY_PAGE, page_kind_from_text
 
         if not page_kind_from_text(text):
@@ -489,7 +554,8 @@ def _direct_reply(spoken: str) -> str:
 
 def _guard_reply(spoken: str, reply: str) -> str:
     text = (reply or "").strip()
-    if "<|" in text or "I'm sorry" in text or "I can't" in text:
+    folded = text.replace("’", "'").replace("‘", "'").lower()
+    if "<|" in text or "i'm sorry" in folded or "i can't" in folded or "i cannot" in folded:
         return _fact_reply(spoken) or "این را در چت جواب نمی‌دهم."
     leaked = (not text) or any(mark in text for mark in _BANNED_REPLY) or bool(_TOOL_LEAK.search(text))
     if leaked or (("عکس" in spoken or "تصویر" in spoken) and "نمی‌تونم" in text):
@@ -649,7 +715,7 @@ def _append_user(spoken: str, media: dict | None) -> None:
     _append("user", spoken or _attachment_label(media), **extra)
 
 
-_TONE_FA = {"warm": "گرم", "formal": "رسمی", "street": "کوچه", "luxury": "لوکس"}
+_TONE_FA = {"warm": "گرم", "formal": "رسمی", "street": "جوان و خیابانی", "luxury": "لوکس"}
 
 
 def _tool_level(name: str) -> str:
@@ -827,7 +893,7 @@ def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = ""
 
 def _reject_write(name: str, args: dict) -> str:
     if name == "set_voice_tone" and str(args.get("toneId") or "") not in _TONE_FA:
-        return "این لحن را نمی‌شناسم. گرم، رسمی، کوچه یا لوکس."
+        return "این لحن را نمی‌شناسم. گرم، رسمی، جوان و خیابانی، یا لوکس."
     if name == "set_auto_reply" and str(args.get("mode") or "") not in _AUTO_MODES:
         return "این حالت پاسخ خودکار نیست."
     return ""
@@ -1332,10 +1398,7 @@ async def _execute(
         _append("assistant", HOLD_PENDING)
         return snapshot()
 
-    from app.services.llm import visible_chat_turns
-
-    history = [{"role": "system", "content": _system_prompt()}]
-    history.extend(visible_chat_turns(_messages(), keep_links=True))
+    history = _chooser_history(spoken)
     completer = complete
     if completer is None:
         from app.services.llm import complete_tools
@@ -1348,12 +1411,23 @@ async def _execute(
                 timeout=ROUTER_LLM_TIMEOUT,
             )
 
-    try:
-        result = await completer(history, TOOLS)
-    except Exception:
-        _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-        _emit("router-llm-fail", {"error": "unreachable"}, status="error")
-        return snapshot()
+    prefetch = ""
+    kinds = {str(item.get("type") or "") for item in _shop_actions(spoken, view_path, view_target)}
+    if _force_shop_build(spoken):
+        prefetch = "shop_chat"
+    elif kinds & {"create_page", "set_colors", "show_prices", "hide_prices"}:
+        prefetch = "edit_shop"
+    elif _wants_advice(spoken):
+        prefetch = "shop_chat"
+    if prefetch:
+        result = {"text": "", "tool_calls": [{"name": prefetch, "arguments": {}}], "usage": {}}
+    else:
+        try:
+            result = await completer(history, TOOLS)
+        except Exception:
+            _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
+            _emit("router-llm-fail", {"error": "unreachable"}, status="error")
+            return snapshot()
     _add_usage(result.get("usage") if isinstance(result, dict) else None)
 
     calls = result.get("tool_calls") if isinstance(result, dict) else None
