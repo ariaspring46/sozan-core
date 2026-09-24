@@ -867,11 +867,12 @@ def _bind_recipient(args: dict, spoken: str) -> str:
         return ""
     from app.services.inbox_service import list_publish_audience
 
+    text = spoken or ""
     rows = list_publish_audience(platform=platform, limit=50)
     hits = [
         row
         for row in rows
-        if len(str(row.get("sender") or "").strip()) >= 2 and str(row.get("sender") or "").strip() in (spoken or "")
+        if len(str(row.get("sender") or "").strip()) >= 2 and str(row.get("sender") or "").strip() in text
     ]
     if len(hits) == 1:
         args["recipientId"] = str(hits[0].get("recipientId") or "")
@@ -879,7 +880,9 @@ def _bind_recipient(args: dict, spoken: str) -> str:
         return ""
     if len(hits) > 1:
         return "چند گفتگو با این نام هست. نام را دقیق‌تر بگو."
-    return "برای دایرکت اینستاگرام مخاطب را هم بگو."
+    if "دایرکت" in text:
+        return "برای دایرکت اینستاگرام مخاطب را هم بگو."
+    return ""
 
 
 def _publish_block(args: dict, spoken: str = "") -> str:
@@ -931,10 +934,13 @@ def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = ""
     if name == "studio_chat":
         return "این پست ساخته شود؟"
     if name == "publish_post":
-        label = _PUBLISH_FA.get(str(args.get("platform") or ""), "کانال")
+        platform = str(args.get("platform") or "")
         who = str(args.get("recipientName") or "").strip()
-        if who:
-            return f"این پیام برای {who} در {label} فرستاده شود؟"
+        if platform == "instagram" and who:
+            return f"این پیام برای {who} در دایرکت اینستاگرام فرستاده شود؟"
+        if platform == "instagram":
+            return "این پست در اینستاگرام منتشر شود؟"
+        label = _PUBLISH_FA.get(platform, "کانال")
         return f"این پست در {label} فرستاده شود؟"
     return "این تغییر اعمال شود؟"
 

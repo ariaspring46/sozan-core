@@ -147,20 +147,84 @@ def _catalog_title(title: str) -> str:
     return value
 
 
+_FORMAT_WORDS = ("اینستاگرام", "تلگرام", "واتساپ", "استوری", "ریلز", "کپشن", "پست", "کمپین", "عکس", "تصویر")
+
+
 def _title_from_spoken(spoken: str) -> str:
-    text = sanitize_persian(spoken or "", limit=48)
-    for drop in ("بساز", "درست کن", "یک پست", "پست", "اینستاگرام", "تلگرام", "واتساپ", "استوری", "کپشن", "برای", "یک"):
+    text = sanitize_persian(spoken or "", limit=80)
+    for drop in (
+        "بساز",
+        "درست کن",
+        "یک پست",
+        "هیچ نوشته",
+        "نوشته‌ای نباشد",
+        "نوشته ای نباشد",
+        "روی عکس",
+        "هشتگ",
+        "انگلیسی",
+        "لاتین",
+        "رسمی‌تر",
+        "رسمی تر",
+        *_FORMAT_WORDS,
+        "برای",
+        "یک",
+        "قبلی",
+        "کن",
+    ):
         text = text.replace(drop, " ")
-    text = re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip(" ،؛.")
     return text[:36]
+
+
+def _overlay_title(raw: str, spoken: str) -> str:
+    title = _real_copy(raw, limit=80) or _title_from_spoken(spoken)
+    for word in _FORMAT_WORDS:
+        title = title.replace(word, " ")
+    title = re.sub(r"\s+", " ", title).strip(" ،")
+    if not title:
+        title = _title_from_spoken(spoken)
+    return title[:36]
+
+
+def _revises_caption(spoken: str) -> bool:
+    text = spoken or ""
+    if not any(mark in text for mark in ("کپشن قبلی", "پست قبلی", "همین پست", "رسمی‌تر", "رسمی تر")):
+        return False
+    return "عکس" not in text and "تصویر" not in text
+
+
+def _latest_campaign_message() -> dict | None:
+    for row in reversed(_messages()):
+        if isinstance(row, dict) and row.get("role") != "user" and str(row.get("campaignId") or "").strip():
+            return row
+    return None
+
+
+def _local_post(spoken: str) -> dict:
+    subject = _title_from_spoken(spoken) or "کالا"
+    caption = f"{subject}."
+    return {
+        "reply": f"پست {subject} آماده شد.",
+        "title": "" if _no_overlay_text(spoken) else subject,
+        "subtitle": "",
+        "cta": "",
+        "instagram": caption,
+        "telegram": caption,
+        "whatsapp": caption,
+        "compose": True,
+        "imagePrompt": f"product photo of {subject}, studio light, no text, no logos, no people",
+    }
 
 
 def _image_prompt(parsed: dict, spoken: str) -> str:
     prompt = str(parsed.get("imagePrompt") or "").strip()
-    if prompt:
-        return prompt[:800]
     subject = _title_from_spoken(spoken) or "product"
-    return f"product photo of {subject}, studio light, no text, no logos, no people"
+    if not prompt:
+        prompt = f"product photo of {subject}, studio light"
+    prompt = prompt[:720]
+    if "no people" not in prompt.lower():
+        prompt = f"{prompt}, no text, no logos, no people"
+    return prompt[:800]
 
 
 def _real_copy(text: object, *, limit: int = 400) -> str:
@@ -554,7 +618,8 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
         return {"messages": rows, "campaignId": ""}
     prompt = _studio_prompt(spoken, media=media)
     parsed = await _studio_json(prompt)
-    if parsed.get("error"):
+    named = any(mark in spoken for mark in ("انگشتر", "گردنبند", "گوشواره", "آویز", "فیروزه", "کفش", "پیراهن"))
+    if parsed.get("error") and (_revises_caption(spoken) or not named):
         reply = str(parsed.get("reply") or "مدل پاسخ نداد. پیام را دوباره بفرست.").strip()
         assistant = {
             "id": str(uuid4()),
@@ -577,7 +642,9 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
             payload={"role": "assistant", "text": reply, "id": assistant["id"], "error": True},
         )
         return {"messages": rows, "campaignId": ""}
-    title = _real_copy(parsed.get("title"), limit=80) or _title_from_spoken(spoken)
+    if parsed.get("error"):
+        parsed = _local_post(spoken)
+    title = _overlay_title(str(parsed.get("title") or ""), spoken)
     subtitle = _real_copy(parsed.get("subtitle"), limit=120)
     cta = _real_copy(parsed.get("cta"), limit=40)
     if _no_overlay_text(spoken):
@@ -607,6 +674,33 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
         want_compose = True
     if parsed.get("compose") is False and not (media and media.get("kind") == "image"):
         want_compose = False
+    prior = _latest_campaign_message() if _revises_caption(spoken) else None
+    if prior:
+        want_compose = False
+        campaign_id = str(prior.get("campaignId") or "")
+        reply = reply or "کپشن همان پست عوض شد."
+
+        def apply(row: dict) -> None:
+            row["captions"] = captions
+            row["text"] = reply
+
+        with tenant_file_lock("studio"):
+            _update_message(str(prior.get("id") or ""), apply)
+        try:
+            await campaigns.update_copy(
+                UUID(campaign_id),
+                title=None,
+                subtitle=None,
+                cta=None,
+                instagram_caption=captions["instagram"],
+                telegram_caption=captions["telegram"],
+                whatsapp_caption=captions["whatsapp"],
+            )
+        except Exception:
+            campaign_id = ""
+        with tenant_file_lock("studio"):
+            rows = _messages()
+        return {"messages": rows, "campaignId": campaign_id}
     if not has_copy and not want_compose:
         assistant = {
             "id": str(uuid4()),

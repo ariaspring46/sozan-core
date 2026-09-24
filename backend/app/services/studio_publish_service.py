@@ -25,7 +25,7 @@ def _row(platform: str) -> dict:
     if platform == "instagram":
         if row is None:
             raise ValueError("این کانال وصل نیست. از بیشتر → کانال‌ها حساب را ثبت کن.")
-        if not channel_service.sendbox_account_id(row):
+        if not channel_service.sendbox_account_id(row) and not channel_service.token_for(row):
             raise ValueError(channel_service.IG_RECONNECT)
         return row
     if row is None or not channel_service.is_connected(row):
@@ -85,17 +85,26 @@ async def publish(
                 await telegram_service.send_photo(token=token, chat_id=target, path=path, caption=text)
         elif key == "instagram":
             recipient = str(recipient_id or "").strip()
-            if not recipient:
-                raise ValueError("مخاطب دایرکت را انتخاب کن.")
-            sendbox_id = channel_service.sendbox_account_id(row)
             media_url = public_media_service.public_url(name=path.name, ttl=6 * 3600)
-            await sendbox_service.send_message(
-                account_id=sendbox_id,
-                recipient_id=recipient,
-                text=text,
-                media_url=media_url,
-                media_kind=kind,
-            )
+            if recipient:
+                sendbox_id = channel_service.sendbox_account_id(row)
+                await sendbox_service.send_message(
+                    account_id=sendbox_id,
+                    recipient_id=recipient,
+                    text=text,
+                    media_url=media_url,
+                    media_kind=kind,
+                )
+            else:
+                from app.services import instagram_service
+
+                token = channel_service.token_for(row)
+                if not token:
+                    raise ValueError("توکن اینستاگرام برای انتشار پست نیست. حساب را دوباره وصل کن.")
+                if kind == "video":
+                    await instagram_service.publish_reel(token=token, video_url=media_url, caption=text)
+                else:
+                    await instagram_service.publish_image(token=token, image_url=media_url, caption=text)
         else:
             creds = channel_service.credentials_for(row)
             target = channel_service.post_target_for(row)
@@ -142,7 +151,8 @@ async def publish(
         operation_id=campaign_id,
         payload={"platform": key, "kind": kind},
     )
-    return {"ok": True, "platform": key, "message": f"به {LABELS[key] if key != 'instagram' else 'دایرکت اینستاگرام'} ارسال شد.", **extra}
+    where = "دایرکت اینستاگرام" if key == "instagram" and str(recipient_id or "").strip() else LABELS[key]
+    return {"ok": True, "platform": key, "message": f"به {where} ارسال شد.", **extra}
 
 
 def list_audience(*, platform: str = "instagram", q: str = "") -> dict:

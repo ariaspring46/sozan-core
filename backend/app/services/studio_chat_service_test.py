@@ -402,6 +402,12 @@ class StudioChatTests(unittest.TestCase):
         self.assertEqual(studio_chat_service._catalog_title("سلام! 👋 این یک پست آزمایشی"), "")
         self.assertEqual(studio_chat_service._catalog_title("آویز فیروزه"), "آویز فیروزه")
         self.assertEqual(studio_chat_service._title_from_spoken("برای انگشتر فیروزه یک پست اینستاگرام بساز"), "انگشتر فیروزه")
+        self.assertEqual(
+            studio_chat_service._overlay_title("پست اینستاگرام گردنبند فیروزه", "برای گردنبند فیروزه یک پست بساز"),
+            "گردنبند فیروزه",
+        )
+        self.assertTrue(studio_chat_service._revises_caption("کپشن قبلی را رسمی‌تر کن"))
+        self.assertFalse(studio_chat_service._revises_caption("عکس انگشتر فیروزه بساز"))
 
     def test_unclaimed_handmade_is_removed(self) -> None:
         kept = studio_chat_service._clip_captions(
@@ -415,7 +421,7 @@ class StudioChatTests(unittest.TestCase):
             spoken="بنویس دست‌ساز است",
             drop_unclaimed=True,
         )
-        self.assertIn("دستساز", claimed["instagram"])
+        self.assertIn("دست‌ساز", claimed["instagram"])
 
     def test_no_text_on_photo_clears_overlay(self) -> None:
         self.assertTrue(studio_chat_service._no_overlay_text("عکس انگشتر بساز؛ روی عکس هیچ نوشته‌ای نباشد"))

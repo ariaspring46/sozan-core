@@ -8,6 +8,7 @@ class PersianTextTests(unittest.TestCase):
         self.assertEqual(sanitize_persian("کفش `نایک` رو"), "کفش نایک")
         self.assertNotIn("<", sanitize_persian("کالای <script>x</script>"))
         self.assertEqual(sanitize_persian("۱۲۳"), "123")
+        self.assertEqual(sanitize_persian("نقره‌ای"), "نقره‌ای")
 
     def test_guard_blocks_english_and_empty(self) -> None:
         self.assertIn("جواب نمی‌دهم", guard_output("I'm sorry, but I can't comply with that."))

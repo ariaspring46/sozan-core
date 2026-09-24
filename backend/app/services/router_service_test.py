@@ -835,6 +835,32 @@ class RouterServiceTests(unittest.TestCase):
         self.assertEqual(sent.await_args.kwargs["recipient_id"], "ig-sara")
         self.assertNotIn("مخاطب را هم بگو", out["messages"][-1]["text"])
 
+    def test_instagram_publish_without_name_is_feed(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "instagram"}}]}
+
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "m9",
+                        "role": "assistant",
+                        "text": "آماده",
+                        "campaignId": "c9",
+                        "captions": {"instagram": "کپشن"},
+                        "attachments": [{"kind": "image", "name": "post-image.png"}],
+                    }
+                ],
+            )
+        with patch("app.services.inbox_service.list_publish_audience", return_value=[]), patch(
+            "app.services.studio_publish_service.publish", new=AsyncMock()
+        ):
+            held = self._turn("همین را روی اینستاگرام منتشر کن", complete)
+        self.assertEqual(held["pendingConfirm"]["tool"], "publish_post")
+        self.assertIn("منتشر شود", held["messages"][-1]["text"])
+        self.assertNotIn("مخاطب", held["messages"][-1]["text"])
+
     def test_publish_without_file_does_not_confirm(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "telegram"}}]}

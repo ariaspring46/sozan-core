@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 
 _TAG = re.compile(r"<[^>]*>")
-_CTRL = re.compile(r"[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]")
+_CTRL = re.compile(r"[\x00-\x1f\x7f\u200b\u200d-\u200f\u202a-\u202e\u2066-\u2069\ufeff]")
 _PERSIAN = re.compile(r"[\u0600-\u06FF]")
 _PUNCT = " ،.,:;؛!؟«»\"'`"
 FA_DIGIT = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
