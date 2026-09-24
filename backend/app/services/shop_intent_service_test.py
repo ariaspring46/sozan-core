@@ -30,6 +30,9 @@ class ShopIntentClassifyTests(unittest.TestCase):
         self.assertEqual(header[0]["type"], "set_header")
         self.assertEqual(header[0]["logoFa"], "زعفران قائنات")
         self.assertEqual(classify_actions("قیمت را پنهان کن")[0]["type"], "hide_prices")
+        self.assertEqual(classify_actions("قیمت‌ها را مخفی کن")[0]["type"], "hide_prices")
+        self.assertEqual(classify_actions("درباره ما اضافه کن")[0]["type"], "create_page")
+        self.assertEqual(classify_actions("درباره ما اضافه کن")[0]["kind"], "about")
         self.assertEqual(classify_actions("قیمت نزن")[0]["type"], "hide_prices")
         colors = classify_actions("رنگ را زرشکی کن و تیتر را «منتخب مزرعه» کن")
         types = [row["type"] for row in colors]

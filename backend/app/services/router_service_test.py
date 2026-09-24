@@ -922,6 +922,25 @@ class RouterServiceTests(unittest.TestCase):
         self.assertEqual(out["messages"][-1]["text"], "تیتر را کوتاه کن.")
         self.assertNotIn("بلد نیستم", out["messages"][-1]["text"])
 
+    def test_round3_misses_stay_on_the_right_tool(self) -> None:
+        async def complete(_messages, _tools):
+            raise AssertionError("chooser must not run")
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "sozan", "status": "ready", "url": "https://sozan.sozan-core.ir"})
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")):
+            hidden = self._turn("قیمت‌ها را مخفی کن", complete)
+            self.assertEqual(hidden["pendingConfirm"]["tool"], "edit_shop")
+            self._turn("", complete, cancel_id=hidden["pendingConfirm"]["id"])
+            about = self._turn("درباره ما اضافه کن", complete)
+            self.assertEqual(about["pendingConfirm"]["tool"], "edit_shop")
+            self._turn("", complete, cancel_id=about["pendingConfirm"]["id"])
+            tags = self._turn("هشتگ برای انگشتر بساز", complete)
+            self.assertEqual(tags["pendingConfirm"]["tool"], "studio_chat")
+        telegram = self._turn("تلگرام را وصل کن", complete)
+        self.assertIn("تنظیمات", telegram["messages"][-1]["text"])
+        self.assertNotIn("بلد نیستم", telegram["messages"][-1]["text"])
+
     def test_chooser_does_not_see_prior_prose(self) -> None:
         seen: list[list] = []
 

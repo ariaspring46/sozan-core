@@ -24,7 +24,9 @@ PAGE_HINTS = (
     ("story", ("داستان برند", "قصه ما", "داستان", "قصه", "story")),
 )
 SHOW_PRICE_RE = re.compile(r"قیمت‌?ها?\s*(?:را\s*)?(?:نشان|بذار|بگذار|بزن)|با\s*قیمت")
-HIDE_PRICE_RE = re.compile(r"قیمت\s*نزن|بدون قیمت|قیمت\s*نذار|قیمت\s*نگذار|پنهان.{0,12}قیمت|قیمت.{0,12}پنهان")
+HIDE_PRICE_RE = re.compile(
+    r"قیمت\s*نزن|بدون قیمت|قیمت\s*نذار|قیمت\s*نگذار|پنهان.{0,12}قیمت|قیمت.{0,12}پنهان|مخفی.{0,16}قیمت|قیمت.{0,16}مخفی"
+)
 FROM_PAGE = ("از پیج", "از داخل پیج", "از کانال", "از اینستا")
 CREATE_PAGE_RE = re.compile(r"صفحه.{0,24}(?:بساز|درست کن|اضافه)|(?:بساز|درست کن).{0,24}صفحه")
 ADD_PRODUCT_RE = re.compile(
@@ -66,7 +68,10 @@ def _price_toman(text: str) -> int:
         if len(digits) >= 4:
             return int(digits)
     plain = re.search(r"(\d{4,})", raw)
-    return int(plain.group(1)) if plain else 0
+    if plain:
+        return int(plain.group(1))
+    near = re.search(r"(\d{1,9})\s*تومان", raw)
+    return int(near.group(1)) if near else 0
 
 
 _TITLE_DROP = frozenset(
@@ -174,8 +179,9 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
         actions.append({"type": "show_prices"})
     if any(token in text for token in FROM_PAGE):
         actions.append({"type": "catalog_from_page"})
-    if CREATE_PAGE_RE.search(text):
-        kind = page_kind_from_text(text)
+    page_kind = page_kind_from_text(text)
+    if CREATE_PAGE_RE.search(text) or (page_kind and any(mark in text for mark in ("بساز", "اضافه"))):
+        kind = page_kind
         if kind:
             actions.append({"type": "create_page", "kind": kind, "label": PAGE_LABELS[kind]})
             actions.append(

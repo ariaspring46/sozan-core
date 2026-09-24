@@ -416,6 +416,9 @@ def _fact_reply(spoken: str) -> str:
         if not hit:
             return f"{label} وصل نیست."
         return f"{label} {'وصل است' if hit.get('connected') else 'قطع است'}."
+    if any(mark in text for mark in ("اینستاگرام", "تلگرام", "روبیکا", "واتساپ")) and "وصل" in text and "کن" in text:
+        label = "اینستاگرام" if "اینستا" in text else "تلگرام" if "تلگرام" in text else "واتساپ" if "واتساپ" in text else "روبیکا"
+        return f"{label} از تنظیمات وصل می‌شود، نه از چت."
     if "کالا" in text and any(mark in text for mark in ("چند", "تعداد")):
         from app.services.storefront_service import list_products
 
@@ -453,7 +456,18 @@ def _fact_reply(spoken: str) -> str:
     if "قیمت" in text and any(mark in text for mark in ("هست", "هست یا نه", "نشان داده", "پنهان")) and "کن" not in text and "بده" not in text:
         hidden = bool(_shop_row().get("hidePrices"))
         return "قیمت روی سایت پنهان است." if hidden else "قیمت روی سایت نشان داده می‌شود."
-    if "قیمت" in text and "کن" not in text and "بده" not in text and "نشان" not in text and "پنهان" not in text and "بساز" not in text:
+    if (
+        "قیمت" in text
+        and "کن" not in text
+        and "بده" not in text
+        and "نشان" not in text
+        and "پنهان" not in text
+        and "مخفی" not in text
+        and "بساز" not in text
+        and "بگذار" not in text
+        and "بذار" not in text
+        and "اضافه" not in text
+    ):
         from app.services.storefront_service import list_products
 
         needle = text
@@ -1413,6 +1427,8 @@ async def _execute(
         prefetch = "edit_shop"
     elif _wants_advice(spoken):
         prefetch = "shop_chat"
+    elif any(mark in spoken for mark in ("کپشن", "هشتگ", "استوری")) and "قبلی" not in spoken:
+        prefetch = "studio_chat"
     if prefetch:
         result = {"text": "", "tool_calls": [{"name": prefetch, "arguments": {}}], "usage": {}}
     else:
