@@ -46,7 +46,7 @@ SPECS = {
         "id": "bale",
         "label": "بله",
         "docs": "https://docs.bale.ai/",
-        "help": "بازو را از BotFather بله بساز. درخواست‌ها به https://tapi.bale.ai/bot<TOKEN>/METHOD می‌روند.",
+        "help": "بازو را در بله بساز و توکن را همین‌جا بگذار.",
         "handleLabel": "نام کاربری بازو",
         "handlePlaceholder": "@shop_bot",
         "fields": [
@@ -57,7 +57,7 @@ SPECS = {
         "id": "rubika",
         "label": "روبیکا",
         "docs": "https://rubika.ir/botapi",
-        "help": "بات را از BotFather روبیکا بساز. آدرس رسمی: https://botapi.rubika.ir/v3/{token}/{method}",
+        "help": "بات را در روبیکا بساز و توکن را همین‌جا بگذار.",
         "handleLabel": "نام کاربری بات",
         "handlePlaceholder": "@shop_bot",
         "fields": [

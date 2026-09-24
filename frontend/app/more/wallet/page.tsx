@@ -86,6 +86,10 @@ export default function WalletPage() {
       setError("مبلغ را با عدد بنویس.");
       return;
     }
+    if (!/^IR\d{24}$/i.test(iban.replace(/\s/g, ""))) {
+      setError("شماره شبا ۲۶ رقم است");
+      return;
+    }
     setBusy(true);
     setError("");
     setNotice("");

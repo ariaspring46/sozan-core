@@ -34,6 +34,21 @@ export function clearToken() {
   localStorage.removeItem("sozan_onboarded");
 }
 
+function formatApiDetail(detail: unknown): string {
+  if (typeof detail === "string") return detail;
+  if (!Array.isArray(detail)) return "";
+  const iban = detail.find(
+    (row) => row && typeof row === "object" && Array.isArray((row as { loc?: unknown }).loc) && (row as { loc: unknown[] }).loc.includes("iban"),
+  );
+  if (iban) return "شماره شبا ۲۶ رقم است";
+  for (const row of detail) {
+    if (row && typeof row === "object" && typeof (row as { msg?: unknown }).msg === "string") {
+      return (row as { msg: string }).msg;
+    }
+  }
+  return "";
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -60,7 +75,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     let detail = "خطا";
     try {
       const data = await res.json();
-      detail = data.detail || detail;
+      detail = formatApiDetail(data.detail) || detail;
     } catch {
       detail = res.statusText;
     }

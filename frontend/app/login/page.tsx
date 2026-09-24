@@ -69,12 +69,13 @@ export default function LoginPage() {
                   dir="ltr"
                   inputMode="numeric"
                   autoComplete="tel"
+                  maxLength={11}
                   placeholder="0912…"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                 />
               </Field>
-              <Button type="submit" className="w-full" disabled={!phone.trim()}>
+              <Button type="submit" className="w-full" disabled={!/^09\d{9}$/.test(phone.trim())}>
                 ارسال کد
               </Button>
             </form>

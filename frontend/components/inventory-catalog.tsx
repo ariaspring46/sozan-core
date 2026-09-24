@@ -159,7 +159,7 @@ export function InventoryCatalog() {
               <button
                 key={item.title}
                 type="button"
-                className={`rounded-full border px-3 py-1 text-sm ${
+                className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm ${
                   category === item.title ? "border-accent bg-accent text-onAccent" : "border-line"
                 }`}
                 onClick={() => setCategory(item.title)}
@@ -177,8 +177,8 @@ export function InventoryCatalog() {
           </ul>
         ) : visible.length === 0 ? (
           <EmptyState
-            title="هنوز کالایی نیست"
-            detail="کانال را وصل کن یا کالا را دستی اضافه کن."
+            title={products.length ? "چیزی مطابق جستجو پیدا نشد" : "هنوز کالایی نیست"}
+            detail={products.length ? "عبارت دیگری را امتحان کن." : "کانال را وصل کن یا کالا را دستی اضافه کن."}
             action={
               <div className="flex flex-wrap justify-center gap-2">
                 <Link
