@@ -656,7 +656,9 @@ async def complete_tools(
         res.raise_for_status()
         payload = res.json()
     counts = _emit_usage(surface="router", model=str(route.get("model") or ""), payload=payload if isinstance(payload, dict) else {})
-    msg = ((payload.get("choices") or [{}])[0].get("message") or {})
+    choice = (payload.get("choices") or [{}])[0] if isinstance(payload, dict) else {}
+    msg = (choice.get("message") or {}) if isinstance(choice, dict) else {}
+    finish = str(choice.get("finish_reason") or "") if isinstance(choice, dict) else ""
     calls = []
     for raw in msg.get("tool_calls") or []:
         if not isinstance(raw, dict):
@@ -675,4 +677,4 @@ async def complete_tools(
                 parsed = {}
             args = parsed if isinstance(parsed, dict) else {}
         calls.append({"id": str(raw.get("id") or ""), "name": name, "arguments": args})
-    return {"text": str(msg.get("content") or "").strip(), "tool_calls": calls, "usage": counts}
+    return {"text": str(msg.get("content") or "").strip(), "tool_calls": calls, "usage": counts, "finish_reason": finish}

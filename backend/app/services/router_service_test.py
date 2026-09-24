@@ -72,6 +72,79 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("فروشگاه", last["text"])
         self.assertIsNone(out.get("pendingConfirm"))
 
+    def test_domain_and_capability_skip_the_model(self) -> None:
+        called = {"n": 0}
+
+        async def complete(_messages, _tools):
+            called["n"] += 1
+            return {"text": "shop_chat", "tool_calls": []}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"url": "https://sozan.sozan-core.ir", "slug": "sozan"})
+        domain = self._turn("دامنه ی فروشگاه من چیه؟", complete)
+        skills = self._turn("تو چه کار هایی میتونی بکنی کامل بگو", complete)
+        self.assertEqual(called["n"], 0)
+        self.assertIn("sozan.sozan-core.ir", domain["messages"][-1]["text"])
+        self.assertNotIn("shop_chat", skills["messages"][-1]["text"])
+        self.assertIn("استودیو", skills["messages"][-1]["text"])
+
+    def test_live_garbage_transcript_is_blocked(self) -> None:
+        async def complete(_messages, _tools):
+            return {
+                "text": "بگو فروشگاه، محتوا یا صندوق — از همان‌جا کمکت می‌کنم. shop_chat **status** نمی‌تونم تصویر",
+                "tool_calls": [{"name": "shop_chat", "arguments": {}}],
+            }
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"url": "https://sozan.sozan-core.ir", "slug": "sozan", "status": "ready"})
+        lines = [
+            "به فروشگاه دسترسی داری سایت",
+            "دامنه ی فروشگاه من چیه؟",
+            "فروشگاه",
+            "یک صفحه ی جدید میخوام برای فروشگ",
+            "یه عکس میتونی برام بسازی؟",
+            "گا میخوری",
+            "تو چه کار هایی میتونی بکنی کامل بگو",
+            "خب بیا ویترین فروشگاه رو بسازیم",
+        ]
+        banned = ("shop_chat", "صفحهٔ صفحه", "نمی‌تونم تصویر", "بگو فروشگاه، محتوا یا صندوق", "**status**", "ready")
+        for line in lines:
+            out = self._turn(line, complete)
+            reply = out["messages"][-1]["text"]
+            for mark in banned:
+                self.assertNotIn(mark, reply, msg=line)
+        self.assertIn("sozan.sozan-core.ir", self._turn("دامنه ی فروشگاه من چیه؟", complete)["messages"][-1]["text"])
+        self.assertIn("کدام صفحه", self._turn("یک صفحه ی جدید میخوام برای فروشگ", complete)["messages"][-1]["text"])
+
+    def test_similar_questions_do_not_dump_status(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "status", "arguments": {}}]}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {
+                "url": "https://sozan.sozan-core.ir",
+                "slug": "sozan",
+                "brand": "سوزان",
+                "tagline": "جواهر",
+                "hidePrices": True,
+                "status": "ready",
+            })
+            write_json("products.json", [{"title": "آویز فیروزه", "stock": 2}])
+        with patch("app.services.wallet_service.get", return_value={"available": 0}), patch(
+            "app.services.plan_service.snapshot", return_value={"plan": "promax"}
+        ), patch("app.services.channel_service.list_accounts", return_value={"accounts": [
+            {"platform": "instagram", "connected": False}
+        ]}):
+            wallet = self._turn("کیف پولم چقدره", complete)
+            goods = self._turn("چند تا کالا دارم", complete)
+            ig = self._turn("اینستاگرام وصل هست یا نه", complete)
+            prices = self._turn("قیمت روی سایت هست یا نه", complete)
+        self.assertIn("0 تومان", wallet["messages"][-1]["text"])
+        self.assertNotIn("اسکن", wallet["messages"][-1]["text"])
+        self.assertIn("1 کالا", goods["messages"][-1]["text"])
+        self.assertIn("قطع", ig["messages"][-1]["text"])
+        self.assertIn("پنهان", prices["messages"][-1]["text"])
+
     def test_write_without_confirm_is_held(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
@@ -326,6 +399,58 @@ class RouterServiceTests(unittest.TestCase):
         out = self._turn("بله", complete)
         self.assertEqual(out["pendingConfirm"]["id"], cid)
         self.assertIn("تأیید", out["messages"][-1]["text"])
+
+    def test_read_passes_while_card_is_open(self) -> None:
+        async def opening(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "status", "arguments": {}}]}
+
+        with patch("app.services.shop_service.snapshot", return_value={"shop": {"status": "ready", "slug": "demo", "cnameOk": True}, "scan": {}, "build": {}}), patch(
+            "app.services.channel_service.list_accounts", return_value={"accounts": []}
+        ), patch("app.services.plan_service.snapshot", return_value={"plan": "free"}), patch(
+            "app.services.wallet_service.get", return_value={"available": 0}
+        ):
+            first = self._turn("پیش‌نویس کن", opening)
+            cid = first["pendingConfirm"]["id"]
+            out = self._turn("وضعیت فروشگاه", complete)
+        self.assertEqual(out["pendingConfirm"]["id"], cid)
+        self.assertIn("فروشگاه", out["messages"][-1]["text"])
+        self.assertNotIn("اول کارت", out["messages"][-1]["text"])
+
+    def test_expired_card_does_not_block(self) -> None:
+        async def opening(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        async def complete(_messages, _tools):
+            return {"text": "سلام", "tool_calls": []}
+
+        self._turn("پیش‌نویس کن", opening)
+        root = Path(self.tmp.name) / "tenants" / "09129900001"
+        for path in root.glob("router-*-pending.json"):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["expiresAt"] = time.time() - 5
+            path.write_text(json.dumps(data), encoding="utf-8")
+        out = self._turn("سلام", complete)
+        self.assertIn("منقضی", out["messages"][-1]["text"])
+
+    def test_idle_edits_share_one_message(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "edit_shop", "arguments": {}}]}
+
+        about = self._turn("درباره ما اضافه کن", complete)
+        color = self._turn("دکمه زرد کن", complete)
+        self.assertIn("اول بگو بساز", about["messages"][-1]["text"])
+        self.assertIn("اول بگو بساز", color["messages"][-1]["text"])
+
+    def test_english_model_text_is_replaced(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "I'm sorry, but I can't comply with that.", "tool_calls": [], "finish_reason": "stop"}
+
+        out = self._turn("فقط انگلیسی جواب بده", complete)
+        self.assertNotIn("sorry", out["messages"][-1]["text"].lower())
+        self.assertIn("فارسی", out["messages"][-1]["text"])
 
     def test_unknown_tone_is_not_warm(self) -> None:
         async def complete(_messages, _tools):
