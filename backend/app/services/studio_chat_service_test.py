@@ -207,7 +207,8 @@ class StudioChatTests(unittest.TestCase):
         self.assertEqual(campaigns.created, 1)
         self.assertNotIn("متن فارسی", result["messages"][-1]["text"])
         self.assertIn("ویترین", result["messages"][-1]["text"])
-        self.assertEqual(campaigns.kwargs.get("title"), "کمپین جدید")
+        self.assertEqual(campaigns.kwargs.get("title"), "")
+        self.assertEqual(campaigns.kwargs.get("cta"), "")
 
     def test_campaign_create_failure_emits(self) -> None:
         campaigns = FakeCampaigns()
@@ -384,6 +385,23 @@ class StudioChatTests(unittest.TestCase):
         ):
             out = studio_chat_service.content_library([])
         self.assertEqual(out, {"items": [], "drafts": []})
+
+    def test_latin_hashtags_leave_captions(self) -> None:
+        out = studio_chat_service._clip_captions(
+            {
+                "instagram": "انگشتر فیروزه #TurquoiseRing #HandmadeJewelry",
+                "telegram": "انگشتر فیروزه",
+                "whatsapp": "سلام",
+            }
+        )
+        self.assertEqual(out["instagram"], "انگشتر فیروزه")
+        self.assertNotIn("#", out["instagram"])
+
+    def test_catalog_skips_test_titles(self) -> None:
+        self.assertEqual(studio_chat_service._catalog_title("Winter is coming…"), "")
+        self.assertEqual(studio_chat_service._catalog_title("سلام! 👋 این یک پست آزمایشی"), "")
+        self.assertEqual(studio_chat_service._catalog_title("آویز فیروزه"), "آویز فیروزه")
+        self.assertEqual(studio_chat_service._title_from_spoken("برای انگشتر فیروزه یک پست اینستاگرام بساز"), "انگشتر فیروزه")
 
 
 if __name__ == "__main__":

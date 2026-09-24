@@ -87,9 +87,6 @@ class OverlayService:
 
         if logo_path and logo_path.is_file():
             self._paste_logo(img, logo_path, margin=margin, format_name=format_name)
-        else:
-            mark_font = self._font(True, 36 if format_name != "wide" else 32)
-            draw.text((w - margin, int(h * 0.06)), wordmark, font=mark_font, fill=ACCENT, anchor="rt", **RTL)
 
         title_size = 64 if format_name == "feed" else (56 if format_name == "wide" else 72)
         title_font = self._font(True, title_size)
@@ -97,9 +94,10 @@ class OverlayService:
         cta_font = self._font(True, 28)
 
         y = int(h * 0.68) if format_name != "wide" else int(h * 0.58)
-        for line in self._wrap(draw, title, title_font, max_w):
-            draw.text((w - margin, y), line, font=title_font, fill=INK, anchor="rt", **RTL)
-            y += title_font.size + 10
+        if title:
+            for line in self._wrap(draw, title, title_font, max_w):
+                draw.text((w - margin, y), line, font=title_font, fill=INK, anchor="rt", **RTL)
+                y += title_font.size + 10
         if subtitle:
             y += 8
             for line in self._wrap(draw, subtitle, sub_font, max_w):

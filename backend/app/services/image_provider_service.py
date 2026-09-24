@@ -21,13 +21,16 @@ DEFAULT_STILL = (
 def generate_still(prompt: str, *, width: int = 1080, height: int = 1080) -> bytes:
     from app.services import llm_routing_service
 
-    text = (prompt or "").strip() or DEFAULT_STILL
+    text = (prompt or "").strip()
+    if not text:
+        return b""
     route = llm_routing_service.get("image") or {}
     if str(route.get("kind") or "") == "cloud":
         png = _openai_images(text, width=width, height=height, route=route)
         if png:
             return png
-        log.warning("cloud image provider failed; falling back to local observe")
+        log.warning("cloud image provider failed; not falling back to local")
+        return b""
     return _observe_local(text, width=width, height=height)
 
 

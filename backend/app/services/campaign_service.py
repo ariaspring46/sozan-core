@@ -222,6 +222,7 @@ class CampaignService:
         items: list[dict] = []
         for name, kind in (
             ("ig-feed.png", "image"),
+            ("ig-story.png", "image"),
             ("ig-reel.mp4", "video"),
             ("tg-wide.png", "image"),
             ("tg-video.mp4", "video"),

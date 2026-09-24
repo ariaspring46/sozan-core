@@ -15,14 +15,16 @@ from app.state_store import read_json, write_json
 STUDIO_SYSTEM = """تو استودیوی محتوای سوزان هستی. فقط یک شیء JSON برگردان؛ متن بیرون JSON ننویس.
 کلیدها: reply, title, subtitle, cta, instagram, telegram, whatsapp, compose, imagePrompt.
 reply خلاصهٔ فارسی همان پست است که به کاربر نشان می‌دهیم؛ نام فیلد یا «متن فارسی» ننویس.
-سؤال نپرس و جزئیات نخواه. اگر چیزی کم است از نام فروشگاه و کالاها کپشن واقعی بساز.
+سؤال نپرس و جزئیات نخواه. اگر چیزی کم است از نام فروشگاه و کالاهای واقعی کپشن بساز.
+ادعای دست‌ساز، جنس، یا موجودی را فقط اگر کاربر یا کاتالوگ گفته بنویس.
 اگر احوال‌پرسی است title و کپشن را خالی بگذار، compose را false کن، reply را یک جملهٔ کوتاه بگذار.
 اگر کاربر پست، استوری، ریلز، ویدیو یا کپشن خواست هر سه کپشن را پر کن و compose را true کن:
-- instagram: کپشن فید، هشتگ کم، حدود ۲۵۰ تا ۴۰۰ کاراکتر
-- telegram: متن کانال بدون هشتگ زیاد، حداکثر ۴۰۰ کاراکتر
-- whatsapp: پیام کوتاه دوستانه، بدون هشتگ اینستاگرامی، حداکثر ۲۸۰ کاراکتر
-imagePrompt را انگلیسی بنویس: product photo, no text, no logos, no people."""
-STUB_COPY = frozenset({"متن فارسی", "تیتر کوتاه", "title", "reply", "cta", "subtitle"})
+- instagram: کپشن فید فارسی، بدون هشتگ لاتین، حدود ۲۵۰ تا ۴۰۰ کاراکتر
+- telegram: متن کانال بدون هشتگ، حداکثر ۴۰۰ کاراکتر
+- whatsapp: پیام کوتاه دوستانه، بدون هشتگ، حداکثر ۲۸۰ کاراکتر
+title را از همان چیزی که کاربر خواسته کوتاه بنویس؛ «کمپین جدید» ننویس. cta را خالی بگذار مگر کاربر دکمه خواسته باشد.
+imagePrompt را انگلیسی بنویس و همان محصولی را که کاربر گفته توصیف کن: product photo, no text, no logos, no people."""
+STUB_COPY = frozenset({"متن فارسی", "تیتر کوتاه", "title", "reply", "cta", "subtitle", "کمپین جدید", "ببین"})
 
 GREETING_TOKENS = frozenset(
     {
@@ -112,8 +114,43 @@ def _save(rows: list[dict]) -> None:
 def _clip_captions(captions: dict) -> dict:
     out = {}
     for key, limit in CAPTION_LIMITS.items():
-        out[key] = sanitize_persian(_real_copy(captions.get(key), limit=limit), limit=limit)
+        out[key] = sanitize_persian(_strip_latin_tags(_real_copy(captions.get(key), limit=limit)), limit=limit)
     return out
+
+
+def _strip_latin_tags(text: str) -> str:
+    cleaned = re.sub(r"#[A-Za-z][\w-]*", "", text or "")
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip()
+
+
+def _catalog_title(title: str) -> str:
+    value = str(title or "").strip()
+    if not value:
+        return ""
+    if re.search(r"[✨👋…]", value):
+        return ""
+    if re.search(r"[A-Za-z]{3,}", value) and not re.search(r"[\u0600-\u06FF]", value):
+        return ""
+    if any(mark in value for mark in ("آزمایش", "پست آزمایشی", "انتظارش را نداشتید")):
+        return ""
+    return value
+
+
+def _title_from_spoken(spoken: str) -> str:
+    text = sanitize_persian(spoken or "", limit=48)
+    for drop in ("بساز", "درست کن", "یک پست", "پست", "اینستاگرام", "تلگرام", "واتساپ", "استوری", "کپشن", "برای", "یک"):
+        text = text.replace(drop, " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:36]
+
+
+def _image_prompt(parsed: dict, spoken: str) -> str:
+    prompt = str(parsed.get("imagePrompt") or "").strip()
+    if prompt:
+        return prompt[:800]
+    subject = _title_from_spoken(spoken) or "product"
+    return f"product photo of {subject}, studio light, no text, no logos, no people"
 
 
 def _real_copy(text: object, *, limit: int = 400) -> str:
@@ -136,7 +173,7 @@ def _studio_prompt(spoken: str, *, media: dict | None) -> str:
         from app.services.storefront_service import list_products
 
         for item in (list_products().get("products") or [])[:8]:
-            title = str(item.get("title") or "").strip()
+            title = _catalog_title(item.get("title") or "")
             if title:
                 goods.append(title)
     except Exception:
@@ -530,9 +567,9 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
             payload={"role": "assistant", "text": reply, "id": assistant["id"], "error": True},
         )
         return {"messages": rows, "campaignId": ""}
-    title = _real_copy(parsed.get("title"), limit=80) or "کمپین جدید"
+    title = _real_copy(parsed.get("title"), limit=80) or _title_from_spoken(spoken)
     subtitle = _real_copy(parsed.get("subtitle"), limit=120)
-    cta = _real_copy(parsed.get("cta"), limit=40) or "ببین"
+    cta = _real_copy(parsed.get("cta"), limit=40)
     captions = _clip_captions(
         {
             "instagram": parsed.get("instagram"),
@@ -544,7 +581,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
     if not reply:
         reply = captions["instagram"][:180] or captions["telegram"][:180] or captions["whatsapp"][:180]
     reply = guard_output(reply)
-    image_prompt = str(parsed.get("imagePrompt") or "").strip()
+    image_prompt = _image_prompt(parsed, spoken)
     slug = f"c{uuid4().hex[:12]}"
     campaign_id = ""
     attachments: list[dict] = []

@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from app.database import SessionLocal
 from app.repositories.campaign_repository import AssetRepository, CampaignRepository, CopyRepository
 from app.services.campaign_service import CampaignService
-from app.services.image_provider_service import DEFAULT_STILL, generate_still
+from app.services.image_provider_service import generate_still
 from app.services.observe_client import emit_later
 from app.state_store import current_tenant, tenant_scope
 
@@ -96,7 +96,9 @@ async def _run(
                 attached = await studio_chat_service.attach_still(campaigns, cid, media)
                 raw_ok = attached
                 if not raw_ok:
-                    prompt = (image_prompt or "").strip() or f"{DEFAULT_STILL}. Subject: {title[:120]}"
+                    prompt = (image_prompt or "").strip()
+                    if not prompt:
+                        raise RuntimeError("still-failed")
 
                     def _touch() -> None:
                         studio_chat_service.touch_compose_start(message_id, job_id)

@@ -5,7 +5,6 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from app.config import settings
 from app.services.overlay_service import OverlayService
 from app.services.video_compose_service import VideoComposeService
 
@@ -34,13 +33,32 @@ def _pick(raw: Path, needles: tuple[str, ...]) -> list[Path]:
     return matched or files
 
 
+def _shop_brand() -> tuple[Path | None, str]:
+    from app.state_store import brand_dir
+
+    root = brand_dir()
+    mark = root / "logo-mark.png"
+    logo = root / "logo.png"
+    logo_path = mark if mark.is_file() else logo if logo.is_file() else None
+    about = ""
+    profile = root / "profile.json"
+    if profile.is_file():
+        try:
+            data = json.loads(profile.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        if isinstance(data, dict):
+            about = str(data.get("description") or "").strip()
+    return logo_path, about
+
+
 def write_captions(out: Path, brief: dict, about: str = "") -> Path:
     ig = brief.get("instagram_caption") or ""
     tg = brief.get("telegram_caption") or ""
     wa = brief.get("whatsapp_caption") or ""
     about_block = ""
     if about.strip():
-        about_block = "\n\n## درباره سوزان\n\n" + about.strip() + "\n"
+        about_block = "\n\n## درباره فروشگاه\n\n" + about.strip() + "\n"
     text = (
         "# کپشن‌ها\n\n## اینستاگرام\n\n"
         + ig.strip()
@@ -68,17 +86,14 @@ def compose_campaign_dir(
     out.mkdir(parents=True, exist_ok=True)
     overlay = OverlayService(fonts_dir)
     video = VideoComposeService()
-    mark = settings.brand_path / "logo-mark.png"
-    logo = settings.brand_path / "logo.png"
-    logo_path = mark if mark.is_file() else logo if logo.is_file() else None
-    profile = settings.brand_path / "profile.json"
-    about = ""
-    if profile.exists():
-        about = json.loads(profile.read_text(encoding="utf-8")).get("description") or ""
-
-    title = brief["title"]
-    subtitle = brief.get("subtitle") or ""
-    cta = brief.get("cta") or ""
+    logo_path, about = _shop_brand()
+    title = str(brief.get("title") or "").strip()
+    if title in {"کمپین جدید", "تیتر کوتاه"}:
+        title = ""
+    subtitle = str(brief.get("subtitle") or "").strip()
+    cta = str(brief.get("cta") or "").strip()
+    if cta in {"ببین", "cta"}:
+        cta = ""
     render_kw = dict(title=title, subtitle=subtitle, cta=cta, logo_path=logo_path)
 
     produced: dict[str, str] = {}

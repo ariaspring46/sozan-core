@@ -101,35 +101,26 @@ class ImageProviderTests(unittest.TestCase):
             png = image_provider_service.generate_still("mug")
         self.assertGreaterEqual(len(png), 2048)
 
-    def test_cloud_disabled_falls_back_local(self) -> None:
+    def test_cloud_fail_does_not_use_local(self) -> None:
         from app.services import image_provider_service
-
-        class FakeClient:
-            def __init__(self, *args, **kwargs):
-                pass
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                return False
-
-            def post(self, url, json=None, headers=None):
-                class Res:
-                    status_code = 200
-                    content = b"\x89PNG" + b"0" * 3000
-                    headers = {"content-type": "image/png"}
-                    text = ""
-                return Res()
 
         with patch(
             "app.services.llm_routing_service.get",
             return_value={"kind": "cloud", "model": "x", "provider": "p"},
         ), patch("app.services.llm_routing_service.provider", return_value={}), patch(
-            "app.services.image_provider_service.httpx.Client", FakeClient
-        ), patch("app.services.image_provider_service.observe_base", return_value="http://127.0.0.1:9292"):
+            "app.services.image_provider_service._observe_local", return_value=b"\x89PNG" + b"0" * 3000
+        ) as local:
             png = image_provider_service.generate_still("mug")
-        self.assertGreaterEqual(len(png), 2048)
+        local.assert_not_called()
+        self.assertEqual(png, b"")
+
+    def test_empty_prompt_does_not_generate(self) -> None:
+        from app.services import image_provider_service
+
+        with patch("app.services.image_provider_service._observe_local") as local:
+            png = image_provider_service.generate_still("")
+        local.assert_not_called()
+        self.assertEqual(png, b"")
 
 
 if __name__ == "__main__":

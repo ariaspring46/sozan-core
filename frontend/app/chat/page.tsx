@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
+import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
 import { api } from "@/lib/api";
 import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
 
@@ -36,6 +37,7 @@ export default function ChatPage() {
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [publishTargets, setPublishTargets] = useState<PublishTarget[]>([]);
   const chatKey = useRef(emptyIdempotencySlot());
   const epoch = useRef(0);
   const busyRef = useRef(false);
@@ -63,6 +65,9 @@ export default function ChatPage() {
 
   useEffect(() => {
     void load().catch((err) => setError(err instanceof Error ? err.message : "خطا"));
+    void api<{ targets?: PublishTarget[] }>("/studio")
+      .then((data) => setPublishTargets(data.targets || []))
+      .catch(() => setPublishTargets([]));
   }, [load]);
 
   useEffect(() => {
@@ -147,6 +152,45 @@ export default function ChatPage() {
     apply(data);
   }
 
+  async function publishStudio(payload: PublishPayload) {
+    return api<{ skipped?: boolean; message?: string }>("/studio/publish", {
+      method: "POST",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async function saveCaptions(payload: { messageId: string; captions: StudioCaptions }) {
+    const data = await api<{ messages?: ChatMsg[] }>("/studio/caption", {
+      method: "PATCH",
+      body: JSON.stringify({ messageId: payload.messageId, captions: payload.captions }),
+    });
+    if (data.messages) setMessages(data.messages);
+  }
+
+  async function regenerateStudio(payload: {
+    messageId: string;
+    campaignId?: string;
+    part: "image" | "caption";
+    file?: File;
+  }) {
+    const key = crypto.randomUUID();
+    if (payload.file) {
+      const body = new FormData();
+      body.set("messageId", payload.messageId);
+      body.set("part", payload.part);
+      body.set("file", payload.file);
+      await api("/studio/regenerate", { method: "POST", headers: { "Idempotency-Key": key }, body });
+    } else {
+      await api("/studio/regenerate", {
+        method: "POST",
+        headers: { "Idempotency-Key": key },
+        body: JSON.stringify({ messageId: payload.messageId, part: payload.part }),
+      });
+    }
+    await load();
+  }
+
   return (
     <AppShell
       header={
@@ -212,6 +256,10 @@ export default function ChatPage() {
             onSend={async (payload) => {
               await send(payload.text, payload.file);
             }}
+            publishTargets={publishTargets}
+            onPublish={publishStudio}
+            onSaveCaptions={saveCaptions}
+            onRegenerate={regenerateStudio}
           />
         </div>
       </div>
