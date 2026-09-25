@@ -877,13 +877,23 @@ def _latest_post(spoken: str = "", campaign_id: str = "") -> dict | None:
     if current is None:
         return None
     compose = current.get("compose") if isinstance(current.get("compose"), dict) else {}
+    captions = current.get("captions") if isinstance(current.get("captions"), dict) else {}
     if compose.get("status") == "running":
         return {"pending": True, "campaignId": str(current.get("campaignId") or "")}
     attachments = current.get("attachments") if isinstance(current.get("attachments"), list) else []
     file = _pick_publish_file(attachments, spoken)
     if not file:
-        return {"pending": True, "campaignId": str(current.get("campaignId") or "")} if compose.get("status") != "failed" else None
-    captions = current.get("captions") if isinstance(current.get("captions"), dict) else {}
+        if not captions:
+            return {"pending": True, "campaignId": str(current.get("campaignId") or "")} if compose.get("status") != "failed" else None
+        return {
+            "messageId": str(current.get("id") or ""),
+            "campaignId": str(current.get("campaignId") or ""),
+            "name": "",
+            "kind": "",
+            "captions": captions,
+            "text": str(current.get("text") or ""),
+            "pending": False,
+        }
     return {
         "messageId": str(current.get("id") or ""),
         "campaignId": str(current.get("campaignId") or ""),
@@ -933,6 +943,8 @@ def _publish_block(args: dict, spoken: str = "") -> str:
         return "هنوز فایل آماده‌ای برای ارسال نیست."
     if post.get("pending"):
         return "هنوز تصویر این پست تمام نشده."
+    if not str(post.get("name") or "").strip():
+        return "ساخت تصویر این پست انجام نشد. دوباره بگو."
     return ""
 
 
@@ -1224,6 +1236,7 @@ async def _run_tool(
                             "spoken": spoken,
                             "media": media if isinstance(media, dict) else None,
                             "studioMessageId": message_id,
+                            "campaignId": str(args.get("campaignId") or ""),
                         }
                     )
                 except Exception:
@@ -1415,11 +1428,14 @@ def _ask_message(args: dict) -> tuple[str, list[str]]:
 
 
 def route_tool(spoken: str, view_path: str = "", view_target: str = "") -> str:
-    kinds = {str(item.get("type") or "") for item in _shop_actions(spoken, view_path, view_target)}
     from app.services.shop_intent_service import catalog_add
+    from app.services.turn_parse import parse_turn
 
+    kinds = {str(item.get("type") or "") for item in _shop_actions(spoken, view_path, view_target)}
     if _force_shop_build(spoken):
         return "shop_chat"
+    if parse_turn(spoken).act == "publish":
+        return "publish_post"
     if catalog_add(spoken) is not None:
         return "add_product"
     if kinds & {"create_page", "set_colors", "show_prices", "hide_prices"}:
@@ -1444,17 +1460,20 @@ def decide(spoken: str, view_path: str = "", view_target: str = "") -> dict:
 def _stamp_content_id(name: str, args: dict, spoken: str) -> dict:
     from app.services.turn_parse import parse_turn
 
+    turn = parse_turn(spoken)
     if name not in {"studio_chat", "publish_post"}:
         return args
-    if name == "studio_chat" and not parse_turn(spoken).revise:
+    nxt = dict(args)
+    if name == "publish_post" and not str(nxt.get("platform") or "").strip():
+        nxt["platform"] = turn.platform or "instagram"
+    if name == "studio_chat" and not turn.revise:
         return args
-    cid = str(args.get("campaignId") or "").strip() or thread_campaign_id()
+    cid = str(nxt.get("campaignId") or "").strip() or thread_campaign_id()
     if not cid:
         post = _latest_post(spoken)
         cid = str((post or {}).get("campaignId") or "")
     if not cid:
-        return args
-    nxt = dict(args)
+        return nxt
     nxt["campaignId"] = cid
     return nxt
 

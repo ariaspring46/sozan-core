@@ -26,12 +26,18 @@ async def handle(job: dict) -> None:
                     CopyRepository(session),
                 )
                 media = job.get("media") if isinstance(job.get("media"), dict) else None
-                await studio_chat_service.chat(
+                cid = str(job.get("campaignId") or "")
+                if cid:
+                    router_service._remember_content({"campaignId": cid})
+                out = await studio_chat_service.chat(
                     str(job.get("spoken") or ""),
                     service,
                     media,
                     into_id=message_id,
                 )
+                done = str((out or {}).get("campaignId") or cid)
+                if done:
+                    router_service._remember_content({"campaignId": done})
         except Exception:
             log.exception("studio job failed")
             if message_id:

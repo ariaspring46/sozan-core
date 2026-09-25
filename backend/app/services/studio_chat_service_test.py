@@ -462,7 +462,13 @@ class StudioChatTests(unittest.TestCase):
                 "text": "قدیمی",
                 "campaignId": str(campaigns.last_id),
                 "captions": {"instagram": "کپشن اول", "telegram": "تلگرام", "whatsapp": "واتساپ"},
-            }
+            },
+            {
+                "id": "hold",
+                "role": "assistant",
+                "text": "در حال ساخت.",
+                "compose": {"status": "running", "jobId": "hold"},
+            },
         ]
         with tempfile.TemporaryDirectory() as raw:
             patches = self._patches(Path(raw), rows)
@@ -478,12 +484,18 @@ class StudioChatTests(unittest.TestCase):
                     }
                 ),
             ), patch("app.services.studio_compose_service.start") as started:
-                result = asyncio.run(studio_chat_service.chat("کپشن قبلی را رسمی‌تر کن", campaigns))
+                result = asyncio.run(
+                    studio_chat_service.chat("کپشن قبلی را رسمی‌تر کن", campaigns, into_id="hold")
+                )
         started.assert_not_called()
         self.assertEqual(campaigns.created, 0)
-        assistant = next(row for row in result["messages"] if row.get("campaignId"))
+        assistant = next(row for row in result["messages"] if row.get("id") == "s1")
         self.assertIn("نقره‌ای", assistant["captions"]["instagram"])
         self.assertNotIn("در حال ساخت", assistant["text"])
+        placeholder = next(row for row in result["messages"] if row.get("id") == "hold")
+        self.assertIn("نقره‌ای", placeholder["captions"]["instagram"])
+        self.assertEqual(placeholder["compose"]["status"], "done")
+        self.assertNotEqual(placeholder["text"], "در حال ساخت.")
 
     def test_recorded_model_sentence_drops_unclaimed_claims(self) -> None:
         sample = json.loads(

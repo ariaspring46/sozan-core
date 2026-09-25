@@ -1171,6 +1171,33 @@ class RouterServiceTests(unittest.TestCase):
             ]
         self.assertEqual(misses, [])
 
+    def test_failed_image_still_opens_a_caption_revise(self) -> None:
+        async def complete(_messages, _tools):
+            raise AssertionError("model")
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "sozan", "status": "ready"})
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "s1",
+                        "role": "assistant",
+                        "text": "کپشن اول",
+                        "campaignId": "c-old",
+                        "captions": {"instagram": "کپشن اول", "telegram": "تلگرام", "whatsapp": "واتساپ"},
+                        "compose": {"status": "failed"},
+                    }
+                ],
+            )
+        revise = self._turn("کپشن قبلی را رسمی‌تر کن", complete)
+        self.assertEqual(revise["pendingConfirm"]["tool"], "studio_chat")
+        self.assertIn("عوض شود", revise["messages"][-1]["text"])
+        self._turn("", complete, cancel_id=revise["pendingConfirm"]["id"])
+        publish = self._turn("همین را روی اینستاگرام منتشر کن", complete)
+        self.assertIsNone(publish.get("pendingConfirm"))
+        self.assertIn("تصویر", publish["messages"][-1]["text"])
+
     def test_worker_confirm_returns_before_the_model(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "studio_chat", "arguments": {}}]}

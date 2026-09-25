@@ -619,7 +619,12 @@ def expire_stale_compose(stale_sec: int) -> None:
             _save(rows)
 
 
-async def _rewrite_existing(spoken: str, prior: dict, campaigns: CampaignService) -> dict:
+async def _rewrite_existing(
+    spoken: str,
+    prior: dict,
+    campaigns: CampaignService,
+    into_id: str = "",
+) -> dict:
     old = prior.get("captions") if isinstance(prior.get("captions"), dict) else {}
     campaign_id = str(prior.get("campaignId") or "")
     allowed = _catalog_blob()
@@ -667,6 +672,20 @@ async def _rewrite_existing(spoken: str, prior: dict, campaigns: CampaignService
         row["text"] = reply
 
     updated = _update_message(str(prior.get("id") or ""), apply)
+    placeholder = str(into_id or "").strip()
+    if placeholder and placeholder != str(prior.get("id") or ""):
+
+        def finish(row: dict) -> None:
+            row["text"] = reply
+            row["captions"] = captions
+            if campaign_id:
+                row["campaignId"] = campaign_id
+            compose = dict(row.get("compose") or {}) if isinstance(row.get("compose"), dict) else {}
+            compose["status"] = "done"
+            compose.pop("error", None)
+            row["compose"] = compose
+
+        updated = _update_message(placeholder, finish) or updated
     rows = (updated or {}).get("messages") or _messages()
     try:
         if campaign_id:
@@ -731,7 +750,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         preferred = ""
     prior = _latest_campaign_message(preferred) if _revises_caption(spoken) else None
     if prior:
-        return await _rewrite_existing(spoken, prior, campaigns)
+        return await _rewrite_existing(spoken, prior, campaigns, into_id=into_id)
     prompt = _studio_prompt(spoken, media=media)
     parsed = await _studio_json(prompt)
     named = any(mark in spoken for mark in ("انگشتر", "گردنبند", "گوشواره", "آویز", "فیروزه", "کفش", "پیراهن"))
