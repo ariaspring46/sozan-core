@@ -85,9 +85,11 @@ async def publish(
                 await telegram_service.send_photo(token=token, chat_id=target, path=path, caption=text)
         elif key == "instagram":
             recipient = str(recipient_id or "").strip()
-            media_url = public_media_service.public_url(name=path.name, ttl=6 * 3600)
-            if recipient:
-                sendbox_id = channel_service.sendbox_account_id(row)
+            sendbox_id = channel_service.sendbox_account_id(row)
+            if sendbox_id:
+                if not recipient:
+                    raise ValueError("برای دایرکت اینستاگرام مخاطب را هم بگو.")
+                media_url = public_media_service.public_url(name=path.name, ttl=6 * 3600)
                 await sendbox_service.send_message(
                     account_id=sendbox_id,
                     recipient_id=recipient,
@@ -96,15 +98,7 @@ async def publish(
                     media_kind=kind,
                 )
             else:
-                from app.services import instagram_service
-
-                token = channel_service.token_for(row)
-                if not token:
-                    raise ValueError("توکن اینستاگرام برای انتشار پست نیست. حساب را دوباره وصل کن.")
-                if kind == "video":
-                    await instagram_service.publish_reel(token=token, video_url=media_url, caption=text)
-                else:
-                    await instagram_service.publish_image(token=token, image_url=media_url, caption=text)
+                raise ValueError(channel_service.IG_RECONNECT)
         else:
             creds = channel_service.credentials_for(row)
             target = channel_service.post_target_for(row)

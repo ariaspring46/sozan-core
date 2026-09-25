@@ -30,7 +30,7 @@ class SettingsApiGuardTests(unittest.TestCase):
 
     def test_tenant_patch_mock_sms_forbidden(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
-            with patch.object(settings, "state_dir", raw), patch.object(settings, "admin_phone", "09120000000"):
+            with patch.object(settings, "state_dir", raw), patch.object(settings, "admin_phone", "09135409482"):
                 write_json("settings.json", {"mockSms": False, "otpTtlSeconds": 300}, shared=True)
                 client = self._client("09121111111")
                 res = client.patch("/settings", json={"mockSms": True})
@@ -40,9 +40,9 @@ class SettingsApiGuardTests(unittest.TestCase):
 
     def test_admin_patch_mock_sms_ok(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
-            with patch.object(settings, "state_dir", raw), patch.object(settings, "admin_phone", "09120000000"):
+            with patch.object(settings, "state_dir", raw), patch.object(settings, "admin_phone", "09135409482"):
                 write_json("settings.json", {"mockSms": False}, shared=True)
-                client = self._client("09120000000")
+                client = self._client("09135409482")
                 res = client.patch("/settings", json={"mockSms": True})
                 stored = read_json("settings.json", {}, shared=True)
         self.assertEqual(res.status_code, 200)

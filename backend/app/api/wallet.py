@@ -1,8 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.config import settings
-from app.phone import normalize_phone
 from app.security import require_permission
 from app.services import wallet_service
 
@@ -20,10 +18,9 @@ class WithdrawDecisionIn(BaseModel):
 
 
 def _is_admin(user) -> bool:
-    try:
-        return normalize_phone(user.phone) == normalize_phone(settings.admin_phone)
-    except ValueError:
-        return False
+    from app.hub_admin import is_hub_admin
+
+    return is_hub_admin(user.phone)
 
 
 @router.get("")

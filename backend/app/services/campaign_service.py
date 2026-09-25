@@ -289,7 +289,8 @@ class CampaignService:
                 telegram_caption=brief.get("telegram_caption", ""),
                 whatsapp_caption=brief.get("whatsapp_caption", ""),
             )
-        _remember_campaign(existing.id)
+        if not _owns_campaign(existing.id):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "این کمپین متعلق به فروشگاه دیگری است.")
         await self.update_copy(
             existing.id,
             title=brief.get("title"),

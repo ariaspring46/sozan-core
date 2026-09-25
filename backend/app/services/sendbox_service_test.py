@@ -20,7 +20,9 @@ class SendboxServiceTests(unittest.TestCase):
         self.assertIn("token=abc", url)
 
     def test_start_instagram_returns_sendbox_url(self) -> None:
-        with patch.object(settings, "sendbox_api_key", "key"), patch.object(
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), patch.object(
+            settings, "sendbox_api_key", "key"
+        ), patch.object(
             settings, "sendbox_oauth_url", "https://api.sendbox.chat/instagram-oauth?token=abc"
         ), patch("app.services.sendbox_service.fetch_oauth_url", new=AsyncMock(return_value="")), patch(
             "app.services.sendbox_service.list_remote_accounts", new=AsyncMock(return_value=[])
@@ -31,7 +33,9 @@ class SendboxServiceTests(unittest.TestCase):
         self.assertIn("id=09135409482", result["url"])
 
     def test_start_instagram_prefers_live_oauth_url(self) -> None:
-        with patch.object(settings, "sendbox_api_key", "key"), patch.object(
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), patch.object(
+            settings, "sendbox_api_key", "key"
+        ), patch.object(
             settings, "sendbox_oauth_url", "https://api.sendbox.chat/instagram-oauth?token=abc"
         ), patch(
             "app.services.sendbox_service.fetch_oauth_url",
@@ -46,6 +50,7 @@ class SendboxServiceTests(unittest.TestCase):
             with patch.object(settings, "state_dir", raw), patch.object(
                 settings, "panel_url", "https://app.sozan-core.ir"
             ):
+                sendbox_service.mark_connect_started("09135409482")
                 url = sendbox_service.finish_redirect(
                     status="success",
                     account_id="acc-1",
@@ -127,7 +132,9 @@ class SendboxServiceTests(unittest.TestCase):
         self.assertEqual(channel_service.sendbox_account_id(row), "acc-1")
 
     def test_start_instagram_returns_existing_accounts(self) -> None:
-        with patch.object(settings, "sendbox_api_key", "key"), patch.object(
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), patch.object(
+            settings, "sendbox_api_key", "key"
+        ), patch.object(
             settings, "sendbox_oauth_url", "https://api.sendbox.chat/instagram-oauth?token=abc"
         ), patch("app.services.sendbox_service.fetch_oauth_url", new=AsyncMock(return_value="")), patch(
             "app.services.sendbox_service.list_remote_accounts",
@@ -415,3 +422,28 @@ class SendboxServiceTests(unittest.TestCase):
                     )
                 )
         self.assertIn("شبکه", str(ctx.exception))
+
+    def test_oauth_base_does_not_embed_api_key(self) -> None:
+        with patch.object(settings, "sendbox_api_key", "super-secret-key"), patch.object(
+            settings, "sendbox_oauth_url", ""
+        ):
+            self.assertEqual(sendbox_service.oauth_base(), "")
+            self.assertFalse(sendbox_service.configured())
+            with self.assertRaises(ValueError):
+                sendbox_service.login_url(phone="09135409482")
+
+    def test_finish_redirect_without_pending_does_not_bind(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), patch.object(
+                settings, "panel_url", "https://app.sozan-core.ir"
+            ):
+                url = sendbox_service.finish_redirect(
+                    status="success",
+                    account_id="acc-hijack",
+                    username="stolen",
+                    seller_id="09128880002",
+                )
+                with tenant_scope("09128880002"):
+                    row = channel_service.account_for_platform("instagram")
+        self.assertIn("instagram=error", url)
+        self.assertFalse(row)

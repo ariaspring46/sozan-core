@@ -3,8 +3,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.config import settings
-from app.phone import normalize_phone
 from app.security import require_permission
 from app.services.settings_service import STUDIO_KEYS, public_settings, save_settings
 
@@ -32,10 +30,9 @@ class SettingsIn(BaseModel):
 
 
 def _is_hub_admin(user) -> bool:
-    try:
-        return normalize_phone(user.phone) == normalize_phone(settings.admin_phone)
-    except ValueError:
-        return False
+    from app.hub_admin import is_hub_admin
+
+    return is_hub_admin(user.phone)
 
 
 @router.get("")

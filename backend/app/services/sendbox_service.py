@@ -11,6 +11,9 @@ from app.phone import normalize_phone
 from app.services import channel_service, inbox_service, plan_service
 from app.state_store import iter_tenants, read_json, tenant_scope, write_json
 
+CONNECT_TTL = 30 * 60
+PENDING_FILE = "sendbox-pending.json"
+
 
 def configured() -> bool:
     return bool(api_key() and oauth_base())
@@ -26,13 +29,7 @@ def base_url() -> str:
 
 
 def oauth_base() -> str:
-    raw = (settings.sendbox_oauth_url or "").strip()
-    if raw:
-        return raw
-    key = api_key()
-    if not key:
-        return ""
-    return f"https://api.sendbox.chat/instagram-oauth?token={key}"
+    return (settings.sendbox_oauth_url or "").strip()
 
 
 def webhook_secret() -> str:
@@ -48,6 +45,35 @@ def valid_webhook_token(token: str) -> bool:
 def webhook_url() -> str:
     origin = (settings.public_api_url or "https://api.sozan-core.ir").rstrip("/")
     return f"{origin}/channels/sendbox/webhook?token={webhook_secret()}"
+
+
+def _pending_rows() -> dict:
+    data = read_json(PENDING_FILE, {}, shared=True)
+    return data if isinstance(data, dict) else {}
+
+
+def mark_connect_started(phone: str) -> None:
+    tenant = normalize_phone(phone)
+    import time
+
+    rows = _pending_rows()
+    rows[tenant] = time.time()
+    write_json(PENDING_FILE, rows, shared=True)
+
+
+def consume_connect(phone: str) -> bool:
+    import time
+
+    try:
+        tenant = normalize_phone(phone)
+    except ValueError:
+        return False
+    rows = _pending_rows()
+    started = float(rows.get(tenant) or 0)
+    if tenant in rows:
+        rows.pop(tenant, None)
+        write_json(PENDING_FILE, rows, shared=True)
+    return bool(started) and time.time() - started <= CONNECT_TTL
 
 
 def panel_channels_url(query: str) -> str:
@@ -69,8 +95,6 @@ def login_url(*, phone: str, oauth: str = "") -> str:
         raise ValueError("لینک ورود رسمی BoxAPI در سوزان تنظیم نشده.")
     parts = urlsplit(raw)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
-    if not query.get("token") and api_key():
-        query["token"] = api_key()
     query["id"] = tenant
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
@@ -140,10 +164,12 @@ async def start_instagram(*, phone: str) -> dict:
         existing = unused_remote_accounts(await list_remote_accounts(), phone=phone)
     except Exception:
         existing = []
+    url = login_url(phone=phone, oauth=live)
+    mark_connect_started(phone)
     return {
         "configured": True,
         "provider": "sendbox",
-        "url": login_url(phone=phone, oauth=live),
+        "url": url,
         "existing": existing,
     }
 
@@ -344,6 +370,8 @@ def finish_redirect(*, status: str, account_id: str, username: str, seller_id: s
     ident = str(account_id or "").strip()
     name = str(username or "").lstrip("@").strip()
     if ident:
+        if not consume_connect(phone):
+            return _after_bind_url(phone, username=name, flag="error")
         try:
             bind_instagram(account_id=ident, phone=phone, handle=name)
         except ValueError:

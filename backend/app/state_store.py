@@ -18,7 +18,7 @@ _tenant: ContextVar[str] = ContextVar("sozan_tenant", default="")
 _shared_tls = threading.local()
 _shared_process_lock = threading.RLock()
 
-SHARED_FILES = frozenset({"profiles.json", "settings.json"})
+SHARED_FILES = frozenset({"profiles.json", "settings.json", "sendbox-pending.json"})
 TENANT_JSON = (
     "products.json",
     "sales.json",

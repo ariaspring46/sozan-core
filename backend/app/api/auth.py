@@ -12,13 +12,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _is_hub_admin(phone: str) -> bool:
-    from app.config import settings
-    from app.phone import normalize_phone
+    from app.hub_admin import is_hub_admin
 
-    try:
-        return normalize_phone(phone) == normalize_phone(settings.admin_phone)
-    except ValueError:
-        return False
+    return is_hub_admin(phone)
 
 
 def _auth(session: AsyncSession = Depends(get_session)) -> AuthService:
