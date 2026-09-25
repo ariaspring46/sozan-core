@@ -98,6 +98,10 @@ class RouterServiceTests(unittest.TestCase):
 
         with tenant_scope("09129900001"):
             write_json("shop.json", {"url": "https://sozan.sozan-core.ir", "slug": "sozan", "status": "ready"})
+        # A hub factory job for this slug must not replace the stored public URL.
+        job_lookup = patch("app.services.shop_service._latest_job_for_slug", return_value=None)
+        job_lookup.start()
+        self.addCleanup(job_lookup.stop)
         lines = [
             "به فروشگاه دسترسی داری سایت",
             "دامنه ی فروشگاه من چیه؟",
