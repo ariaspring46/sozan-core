@@ -76,16 +76,18 @@ def mime_for(filename: str, kind: str = "") -> str:
     return "image/png"
 
 
-def copy_file(path: Path) -> dict:
+def copy_file(path: Path, *, sweep: bool = True) -> dict:
     kind = kind_of("", path.name) or "image"
-    return save(path.name, path.read_bytes(), mime_for(path.name, kind))
+    return save(path.name, path.read_bytes(), mime_for(path.name, kind), sweep=sweep)
 
 
 def _referenced_names(root: Path) -> set[str]:
     names: set[str] = set()
     if not root.is_dir():
         return names
-    for path in root.glob("router-*-messages.json"):
+    for path in list(root.glob("router-*-messages.json")) + [root / "studio-messages.json"]:
+        if not path.is_file():
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except OSError:
@@ -121,8 +123,9 @@ def sweep_abandoned(now: float | None = None) -> int:
     return removed
 
 
-def save(filename: str, data: bytes, content_type: str) -> dict:
-    sweep_abandoned()
+def save(filename: str, data: bytes, content_type: str, *, sweep: bool = True) -> dict:
+    if sweep:
+        sweep_abandoned()
     if not data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "فایل خالی است.")
     kind = kind_of(content_type, filename)

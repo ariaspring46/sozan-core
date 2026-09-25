@@ -1,7 +1,9 @@
 import asyncio
+import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+from pathlib import Path
 from uuid import uuid4
 
 from app.services import studio_chat_service, studio_compose_service
@@ -123,6 +125,51 @@ class StudioComposeTests(unittest.TestCase):
         self.assertFalse(skipped)
         self.assertEqual(rows[0]["compose"]["status"], "running")
         self.assertEqual(rows[0]["compose"]["jobId"], "new")
+
+    def test_start_keeps_running_task(self) -> None:
+        async def fake_run(**_kwargs):
+            await asyncio.sleep(0.05)
+
+        async def inner() -> None:
+            with patch.object(studio_compose_service, "_run", fake_run), patch(
+                "app.services.studio_chat_service.set_compose"
+            ), patch("app.services.studio_compose_service.emit_later"), patch(
+                "app.services.studio_compose_service.current_tenant", return_value="09120001111"
+            ):
+                studio_compose_service.start(message_id="m", campaign_id="c")
+                self.assertTrue(studio_compose_service._COMPOSE_TASKS)
+                await asyncio.sleep(0.1)
+
+        asyncio.run(inner())
+        self.assertFalse(studio_compose_service._COMPOSE_TASKS)
+
+    def test_sweep_keeps_studio_attachments(self) -> None:
+        import os
+        import time
+
+        from app.services import chat_media_service
+        from app.services.campaign_service import _remember_campaign
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "studio-messages.json").write_text('{"name":"keep-image.png"}', encoding="utf-8")
+            media = root / "chat-media"
+            media.mkdir()
+            keep = media / "keep-image.png"
+            gone = media / "gone-image.png"
+            keep.write_bytes(b"keep")
+            gone.write_bytes(b"gone")
+            os.utime(gone, (1, 1))
+            with patch("app.services.chat_media_service.tenant_dir", return_value=root):
+                chat_media_service.sweep_abandoned(now=time.time())
+            self.assertTrue(keep.exists())
+            self.assertFalse(gone.exists())
+        with patch("app.services.campaign_service.tenant_file_lock") as lock, patch(
+            "app.services.campaign_service.read_json", return_value=[]
+        ), patch("app.services.campaign_service.write_json") as writer:
+            _remember_campaign(uuid4())
+        lock.assert_called()
+        writer.assert_called()
 
 
 if __name__ == "__main__":

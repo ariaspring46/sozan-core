@@ -598,20 +598,32 @@ def _refusal_reply(spoken: str) -> str:
     return ""
 
 
+def _ref_name() -> str:
+    tid = str(_THREAD.get() or "").strip()
+    return f"router-last-ref-{tid}.json" if tid else "router-last-ref.json"
+
+
+def thread_campaign_id() -> str:
+    row = read_json(_ref_name(), {})
+    if isinstance(row, dict) and row.get("campaignId"):
+        return str(row.get("campaignId") or "")
+    return ""
+
+
 def _remember_content(extra: dict) -> None:
     campaign = str(extra.get("campaignId") or "").strip()
     if not campaign:
         return
     write_json(
-        "router-last-ref.json",
+        _ref_name(),
         {"campaignId": campaign, "caption": _data_line(extra.get("text") or extra.get("captions") or "", 80)},
     )
 
 
 def _last_content_line() -> str:
-    row = read_json("router-last-ref.json", {})
-    if isinstance(row, dict) and row.get("campaignId"):
-        return f"آخرین محتوا: کمپین {row.get('campaignId')}"
+    campaign = thread_campaign_id()
+    if campaign:
+        return f"آخرین محتوا: کمپین {campaign}"
     from app.services.studio_chat_service import snapshot as studio_snapshot
 
     for item in reversed(studio_snapshot().get("messages") or []):
@@ -831,34 +843,67 @@ def _route_shop(name: str, spoken: str, view_path: str, view_target: str) -> tup
     return "shop_chat", ""
 
 
-def _latest_post() -> dict | None:
+def _pick_publish_file(attachments: list, spoken: str) -> dict | None:
+    text = spoken or ""
+    names: tuple[str, ...] = ()
+    if any(mark in text for mark in ("ریلز", "ریل", "ویدیو")):
+        names = ("ig-reel", "reel")
+    elif "استوری" in text:
+        names = ("ig-story", "story")
+    elif any(mark in text for mark in ("فید", "پست")):
+        names = ("ig-feed", "feed")
+    rows = [item for item in attachments if isinstance(item, dict) and item.get("kind") in {"image", "video"} and item.get("name")]
+    if names:
+        for item in rows:
+            blob = f"{item.get('name') or ''} {item.get('source') or ''}"
+            if any(name in blob for name in names):
+                return item
+        if names[0] == "ig-reel":
+            video = next((item for item in rows if item.get("kind") == "video"), None)
+            if video:
+                return video
+        if names[0] == "ig-story":
+            story = next((item for item in rows if "story" in f"{item.get('name') or ''} {item.get('source') or ''}"), None)
+            if story:
+                return story
+    return rows[0] if rows else None
+
+
+def _latest_post(spoken: str = "") -> dict | None:
     from app.services.studio_chat_service import snapshot
 
     rows = snapshot().get("messages") or []
-    for row in reversed(rows):
-        if not isinstance(row, dict) or row.get("role") == "user":
-            continue
-        attachments = row.get("attachments") if isinstance(row.get("attachments"), list) else []
-        file = next(
-            (
-                item
-                for item in attachments
-                if isinstance(item, dict) and item.get("kind") in {"image", "video"} and item.get("name")
-            ),
-            None,
-        )
-        if not file:
-            continue
-        captions = row.get("captions") if isinstance(row.get("captions"), dict) else {}
-        return {
-            "messageId": str(row.get("id") or ""),
-            "campaignId": str(row.get("campaignId") or ""),
-            "name": str(file.get("name") or ""),
-            "kind": str(file.get("kind") or ""),
-            "captions": captions,
-            "text": str(row.get("text") or ""),
-        }
-    return None
+    preferred = thread_campaign_id()
+    current = None
+    if preferred:
+        for row in reversed(rows):
+            if isinstance(row, dict) and str(row.get("campaignId") or "") == preferred:
+                current = row
+                break
+    if current is None:
+        for row in reversed(rows):
+            if isinstance(row, dict) and row.get("role") != "user" and str(row.get("campaignId") or "").strip():
+                current = row
+                break
+    if current is None:
+        return None
+    compose = current.get("compose") if isinstance(current.get("compose"), dict) else {}
+    if compose.get("status") == "running":
+        return {"pending": True, "campaignId": str(current.get("campaignId") or "")}
+    attachments = current.get("attachments") if isinstance(current.get("attachments"), list) else []
+    file = _pick_publish_file(attachments, spoken)
+    if not file:
+        return {"pending": True, "campaignId": str(current.get("campaignId") or "")} if compose.get("status") != "failed" else None
+    captions = current.get("captions") if isinstance(current.get("captions"), dict) else {}
+    return {
+        "messageId": str(current.get("id") or ""),
+        "campaignId": str(current.get("campaignId") or ""),
+        "name": str(file.get("name") or ""),
+        "kind": str(file.get("kind") or ""),
+        "captions": captions,
+        "text": str(current.get("text") or ""),
+        "pending": False,
+    }
 
 
 def _bind_recipient(args: dict, spoken: str) -> str:
@@ -872,7 +917,9 @@ def _bind_recipient(args: dict, spoken: str) -> str:
     hits = [
         row
         for row in rows
-        if len(str(row.get("sender") or "").strip()) >= 2 and str(row.get("sender") or "").strip() in text
+        if (name := str(row.get("sender") or "").strip())
+        and len(name) >= 2
+        and re.search(rf"(?<![\w\u0600-\u06FF]){re.escape(name)}(?![\w\u0600-\u06FF])", spoken or "")
     ]
     if len(hits) == 1:
         args["recipientId"] = str(hits[0].get("recipientId") or "")
@@ -892,8 +939,11 @@ def _publish_block(args: dict, spoken: str = "") -> str:
     named = _bind_recipient(args, spoken)
     if named:
         return named
-    if _latest_post() is None:
+    post = _latest_post(spoken)
+    if post is None:
         return "هنوز فایل آماده‌ای برای ارسال نیست."
+    if post.get("pending"):
+        return "هنوز تصویر این پست تمام نشده."
     return ""
 
 
@@ -1139,7 +1189,9 @@ async def _run_tool(
         blocked = _publish_block(args, spoken)
         if blocked:
             return blocked, {}
-        post = _latest_post() or {}
+        post = _latest_post(spoken) or {}
+        if post.get("pending") or not post.get("name"):
+            return "هنوز تصویر این پست تمام نشده.", {}
         platform = str(args.get("platform") or "")
         captions = post.get("captions") if isinstance(post.get("captions"), dict) else {}
         caption = str(captions.get(platform) or captions.get("instagram") or post.get("text") or "")

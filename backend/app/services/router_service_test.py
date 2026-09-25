@@ -861,6 +861,91 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("منتشر شود", held["messages"][-1]["text"])
         self.assertNotIn("مخاطب", held["messages"][-1]["text"])
 
+    def test_publish_waits_for_current_compose(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "telegram"}}]}
+
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "old",
+                        "role": "assistant",
+                        "campaignId": "c-old",
+                        "captions": {"telegram": "قدیمی"},
+                        "attachments": [{"kind": "image", "name": "old-image.png"}],
+                    },
+                    {
+                        "id": "new",
+                        "role": "assistant",
+                        "campaignId": "c-new",
+                        "compose": {"status": "running"},
+                        "captions": {"telegram": "تازه"},
+                    },
+                ],
+            )
+        sent = AsyncMock()
+        with patch("app.services.studio_publish_service.publish", new=sent):
+            out = self._turn("بفرست تلگرام", complete)
+        sent.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("تمام نشده", out["messages"][-1]["text"])
+
+    def test_publish_picks_reel_when_asked(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "telegram"}}]}
+
+        sent = AsyncMock(return_value={"ok": True, "message": "به تلگرام ارسال شد."})
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "m9",
+                        "role": "assistant",
+                        "text": "آماده",
+                        "campaignId": "c9",
+                        "captions": {"telegram": "کپشن تلگرام"},
+                        "attachments": [
+                            {"kind": "image", "name": "ig-feed.png", "source": "ig-feed.png"},
+                            {"kind": "video", "name": "ig-reel.mp4", "source": "ig-reel.mp4"},
+                        ],
+                    }
+                ],
+            )
+        with patch("app.services.studio_publish_service.publish", new=sent):
+            held = self._turn("ریلز را بفرست تلگرام", complete)
+            cid = held["pendingConfirm"]["id"]
+            self._turn("", complete, confirm_id=cid)
+        self.assertEqual(sent.await_args.kwargs["media_name"], "ig-reel.mp4")
+
+    def test_instagram_short_name_is_not_a_substring(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "instagram"}}]}
+
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "m9",
+                        "role": "assistant",
+                        "text": "آماده",
+                        "campaignId": "c9",
+                        "captions": {"instagram": "کپشن"},
+                        "attachments": [{"kind": "image", "name": "post-image.png"}],
+                    }
+                ],
+            )
+        audience = [{"sender": "سارا", "recipientId": "ig-sara", "id": "t1"}]
+        with patch("app.services.inbox_service.list_publish_audience", return_value=audience), patch(
+            "app.services.studio_publish_service.publish", new=AsyncMock()
+        ):
+            held = self._turn("این پست را برای سالار در اینستاگرام بفرست", complete)
+        self.assertEqual(held["pendingConfirm"]["tool"], "publish_post")
+        self.assertNotIn("سارا", held["messages"][-1]["text"])
+
     def test_publish_without_file_does_not_confirm(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "telegram"}}]}

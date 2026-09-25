@@ -18,6 +18,8 @@ from app.state_store import current_tenant, tenant_scope
 log = logging.getLogger("sozan.studio-compose")
 STALE_SEC = 600
 _still_lock = threading.Lock()
+_COMPOSE_TASKS: set[asyncio.Task] = set()
+_COMPOSE_THREADS: set[threading.Thread] = set()
 
 
 def _generate_still_locked(prompt: str, width: int, height: int, on_acquired=None) -> bytes:
@@ -69,9 +71,13 @@ def start(
     }
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(_run(**kwargs))
+        task = loop.create_task(_run(**kwargs))
+        _COMPOSE_TASKS.add(task)
+        task.add_done_callback(_COMPOSE_TASKS.discard)
     except RuntimeError:
-        threading.Thread(target=lambda: asyncio.run(_run(**kwargs)), daemon=True).start()
+        thread = threading.Thread(target=lambda: asyncio.run(_run(**kwargs)), daemon=True)
+        _COMPOSE_THREADS.add(thread)
+        thread.start()
     return job_id
 
 

@@ -12,6 +12,7 @@ from app.config import settings
 from app.models.user import Asset, Campaign
 from app.repositories.campaign_repository import AssetRepository, CampaignRepository, CopyRepository
 from app.services.compose_pipeline import compose_campaign_dir, save_brief, zip_out
+from app.services.tenant_lock import tenant_file_lock
 from app.state_store import read_json, write_json
 
 
@@ -21,11 +22,12 @@ def _campaign_ids() -> list[str]:
 
 
 def _remember_campaign(campaign_id: UUID) -> None:
-    rows = _campaign_ids()
-    key = str(campaign_id)
-    if key not in rows:
-        rows.append(key)
-        write_json("campaign-ids.json", rows)
+    with tenant_file_lock("campaigns"):
+        rows = _campaign_ids()
+        key = str(campaign_id)
+        if key not in rows:
+            rows.append(key)
+            write_json("campaign-ids.json", rows)
 
 
 def _owns_campaign(campaign_id: UUID) -> bool:

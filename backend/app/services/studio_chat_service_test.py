@@ -444,6 +444,67 @@ class StudioChatTests(unittest.TestCase):
     def test_no_text_on_photo_clears_overlay(self) -> None:
         self.assertTrue(studio_chat_service._no_overlay_text("عکس انگشتر بساز؛ روی عکس هیچ نوشته‌ای نباشد"))
 
+    def test_image_prompt_uses_spoken_product(self) -> None:
+        prompt = studio_chat_service._image_prompt(
+            {"imagePrompt": "product photo of a turquoise pendant"},
+            "برای گردنبند فیروزه یک پست بساز",
+        )
+        self.assertIn("گردنبند فیروزه", prompt)
+        self.assertNotIn("pendant", prompt)
+
+    def test_caption_rewrite_applies_instruction_without_compose(self) -> None:
+        campaigns = FakeCampaigns()
+        rows = [
+            {
+                "id": "s1",
+                "role": "assistant",
+                "text": "قدیمی",
+                "campaignId": str(campaigns.last_id),
+                "captions": {"instagram": "کپشن اول", "telegram": "تلگرام", "whatsapp": "واتساپ"},
+            }
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw), rows)
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(
+                    return_value={
+                        "reply": "کپشن رسمی شد.",
+                        "instagram": "گردنبند فیروزه با زنجیر نقره‌ای.",
+                        "telegram": "گردنبند فیروزه.",
+                        "whatsapp": "گردنبند فیروزه.",
+                        "compose": False,
+                    }
+                ),
+            ), patch("app.services.studio_compose_service.start") as started:
+                result = asyncio.run(studio_chat_service.chat("کپشن قبلی را رسمی‌تر کن", campaigns))
+        started.assert_not_called()
+        self.assertEqual(campaigns.created, 0)
+        assistant = next(row for row in result["messages"] if row.get("campaignId"))
+        self.assertIn("نقره‌ای", assistant["captions"]["instagram"])
+        self.assertNotIn("در حال ساخت", assistant["text"])
+
+    def test_regenerate_image_keeps_prompt(self) -> None:
+        campaigns = FakeCampaigns()
+        message_id = str(uuid4())
+        rows = [
+            {
+                "id": message_id,
+                "role": "assistant",
+                "text": "پست",
+                "campaignId": str(campaigns.last_id),
+                "imagePrompt": "product photo of انگشتر فیروزه, studio light, no text, no logos, no people",
+                "captions": {"instagram": "انگشتر", "telegram": "انگشتر", "whatsapp": "انگشتر"},
+            }
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw), rows)
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_compose_service.start", return_value="job"
+            ) as started:
+                asyncio.run(studio_chat_service.regenerate(message_id=message_id, part="image", campaigns=campaigns))
+        self.assertIn("انگشتر فیروزه", started.call_args.kwargs["image_prompt"])
+
 
 if __name__ == "__main__":
     unittest.main()

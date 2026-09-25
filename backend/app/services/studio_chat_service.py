@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 from pathlib import Path
@@ -207,7 +208,12 @@ def _revises_caption(spoken: str) -> bool:
     return "عکس" not in text and "تصویر" not in text
 
 
-def _latest_campaign_message() -> dict | None:
+def _latest_campaign_message(campaign_id: str = "") -> dict | None:
+    preferred = str(campaign_id or "").strip()
+    if preferred:
+        for row in reversed(_messages()):
+            if isinstance(row, dict) and str(row.get("campaignId") or "") == preferred:
+                return row
     for row in reversed(_messages()):
         if isinstance(row, dict) and row.get("role") != "user" and str(row.get("campaignId") or "").strip():
             return row
@@ -231,14 +237,8 @@ def _local_post(spoken: str) -> dict:
 
 
 def _image_prompt(parsed: dict, spoken: str) -> str:
-    prompt = str(parsed.get("imagePrompt") or "").strip()
     subject = _title_from_spoken(spoken) or "product"
-    if not prompt:
-        prompt = f"product photo of {subject}, studio light"
-    prompt = prompt[:720]
-    if "no people" not in prompt.lower():
-        prompt = f"{prompt}, no text, no logos, no people"
-    return prompt[:800]
+    return f"product photo of {subject}, studio light, no text, no logos, no people"
 
 
 def _real_copy(text: object, *, limit: int = 400) -> str:
@@ -279,6 +279,7 @@ def _studio_prompt(spoken: str, *, media: dict | None) -> str:
         history.append(f"{role}: {text[:240]}")
     history = history[-6:]
     blob = (
+        f"درخواست همین جمله: {spoken}\n"
         f"فروشگاه: {cfg.get('storeName') or 'فروشگاه'}\n"
         f"شعار: {cfg.get('storeTagline') or ''}\n"
         f"کالاها: {', '.join(goods) or 'ویترین فروشگاه'}\n"
@@ -468,7 +469,7 @@ def _copy_outputs(items: list[dict]) -> list[dict]:
         path = Path(item["path"])
         if not path.is_file():
             continue
-        saved = chat_media_service.copy_file(path)
+        saved = chat_media_service.copy_file(path, sweep=False)
         attachments.append({"kind": saved["kind"], "name": saved["name"], "source": path.name})
     return attachments
 
@@ -589,6 +590,70 @@ def expire_stale_compose(stale_sec: int) -> None:
             _save(rows)
 
 
+async def _rewrite_existing(spoken: str, prior: dict, campaigns: CampaignService) -> dict:
+    old = prior.get("captions") if isinstance(prior.get("captions"), dict) else {}
+    campaign_id = str(prior.get("campaignId") or "")
+    parsed: dict = {}
+    try:
+        parsed = await asyncio.wait_for(
+            complete_json(
+                STUDIO_SYSTEM,
+                (
+                    "همین پست را با دستور کاربر بازنویس. عکس نساز. compose را false کن. "
+                    "عنوان و تصویر را عوض نکن.\n"
+                    f"دستور: {spoken}\n"
+                    f"کپشن اینستاگرام: {old.get('instagram') or ''}\n"
+                    f"تلگرام: {old.get('telegram') or ''}\n"
+                    f"واتساپ: {old.get('whatsapp') or ''}"
+                ),
+                surface="studio",
+                max_tokens=700,
+            ),
+            timeout=40,
+        )
+    except Exception:
+        parsed = {"error": "timeout"}
+    if parsed.get("error"):
+        captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True)
+        reply = "کپشن همان پست ماند. دوباره کوتاه‌تر بگو."
+    else:
+        captions = _clip_captions(
+            {
+                "instagram": parsed.get("instagram") or old.get("instagram"),
+                "telegram": parsed.get("telegram") or old.get("telegram"),
+                "whatsapp": parsed.get("whatsapp") or old.get("whatsapp") or parsed.get("telegram") or old.get("instagram"),
+            },
+            spoken=spoken,
+            drop_unclaimed=True,
+        )
+        if not captions["instagram"]:
+            captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True)
+        reply = _real_copy(parsed.get("reply"), limit=400) or "کپشن همان پست عوض شد."
+    reply = guard_output(reply)
+
+    def apply(row: dict) -> None:
+        row["captions"] = captions
+        row["text"] = reply
+
+    with tenant_file_lock("studio"):
+        _update_message(str(prior.get("id") or ""), apply)
+        rows = _messages()
+    try:
+        if campaign_id:
+            await campaigns.update_copy(
+                UUID(campaign_id),
+                title=None,
+                subtitle=None,
+                cta=None,
+                instagram_caption=captions["instagram"],
+                telegram_caption=captions["telegram"],
+                whatsapp_caption=captions["whatsapp"],
+            )
+    except Exception:
+        campaign_id = ""
+    return {"messages": rows, "campaignId": campaign_id}
+
+
 async def chat(text: str, campaigns: CampaignService, media: dict | None = None) -> dict:
     from app.services import chat_media_service, studio_compose_service
 
@@ -630,33 +695,16 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
             payload={"role": "assistant", "text": assistant["text"], "id": assistant["id"]},
         )
         return {"messages": rows, "campaignId": ""}
-    prior = _latest_campaign_message() if _revises_caption(spoken) else None
+    preferred = ""
+    try:
+        from app.services.router_service import thread_campaign_id
+
+        preferred = thread_campaign_id()
+    except Exception:
+        preferred = ""
+    prior = _latest_campaign_message(preferred) if _revises_caption(spoken) else None
     if prior:
-        old = prior.get("captions") if isinstance(prior.get("captions"), dict) else {}
-        captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True)
-        reply = "کپشن همان پست، بدون واژهٔ انگلیسی و بدون ادعای نگفته، عوض شد."
-        campaign_id = str(prior.get("campaignId") or "")
-
-        def apply(row: dict) -> None:
-            row["captions"] = captions
-            row["text"] = reply
-
-        with tenant_file_lock("studio"):
-            _update_message(str(prior.get("id") or ""), apply)
-            rows = _messages()
-        try:
-            await campaigns.update_copy(
-                UUID(campaign_id),
-                title=None,
-                subtitle=None,
-                cta=None,
-                instagram_caption=captions["instagram"],
-                telegram_caption=captions["telegram"],
-                whatsapp_caption=captions["whatsapp"],
-            )
-        except Exception:
-            campaign_id = ""
-        return {"messages": rows, "campaignId": campaign_id}
+        return await _rewrite_existing(spoken, prior, campaigns)
     prompt = _studio_prompt(spoken, media=media)
     parsed = await _studio_json(prompt)
     named = any(mark in spoken for mark in ("انگشتر", "گردنبند", "گوشواره", "آویز", "فیروزه", "کفش", "پیراهن"))
@@ -715,33 +763,6 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
         want_compose = True
     if parsed.get("compose") is False and not (media and media.get("kind") == "image"):
         want_compose = False
-    prior = _latest_campaign_message() if _revises_caption(spoken) else None
-    if prior:
-        want_compose = False
-        campaign_id = str(prior.get("campaignId") or "")
-        reply = reply or "کپشن همان پست عوض شد."
-
-        def apply(row: dict) -> None:
-            row["captions"] = captions
-            row["text"] = reply
-
-        with tenant_file_lock("studio"):
-            _update_message(str(prior.get("id") or ""), apply)
-        try:
-            await campaigns.update_copy(
-                UUID(campaign_id),
-                title=None,
-                subtitle=None,
-                cta=None,
-                instagram_caption=captions["instagram"],
-                telegram_caption=captions["telegram"],
-                whatsapp_caption=captions["whatsapp"],
-            )
-        except Exception:
-            campaign_id = ""
-        with tenant_file_lock("studio"):
-            rows = _messages()
-        return {"messages": rows, "campaignId": campaign_id}
     if not has_copy and not want_compose:
         assistant = {
             "id": str(uuid4()),
@@ -789,6 +810,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
         "captions": captions,
         **({"campaignId": campaign_id} if campaign_id else {}),
         **({"attachments": attachments} if attachments else {}),
+        **({"imagePrompt": image_prompt} if image_prompt else {}),
     }
     if attachments:
         assistant["mediaKind"] = attachments[0]["kind"]
@@ -929,12 +951,13 @@ async def regenerate(*, message_id: str, part: str, campaigns: CampaignService, 
             raise ValueError("کمپین این پست نیست")
         if media and str(media.get("kind") or "") == "image":
             await _attach_still(campaigns, UUID(campaign_id), media)
+        prompt = str(target.get("imagePrompt") or "").strip() or _image_prompt({}, str(target.get("text") or ""))
         studio_compose_service.start(
             message_id=ident,
             campaign_id=campaign_id,
             media=media,
             title=str(target.get("text") or "")[:80],
-            image_prompt="",
+            image_prompt=prompt,
         )
         return {"messages": _messages()}
     raise ValueError("فقط عکس یا کپشن را می‌توان دوباره ساخت")
