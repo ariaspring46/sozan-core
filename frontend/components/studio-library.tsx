@@ -1,43 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { AuthMedia } from "@/components/auth-media";
 import { EmptyState } from "@/components/empty-state";
 import { api } from "@/lib/api";
 
-type CopyRow = { channel: string; body: string };
 type AssetRow = { kind: string; channel: string; format: string; name: string; relPath: string };
 type LibraryItem = {
   id: string;
   title: string;
-  copies: CopyRow[];
   assets: AssetRow[];
   compose?: string;
 };
 
-const CHANNEL: Record<string, string> = {
-  instagram: "اینستاگرام",
-  telegram: "تلگرام",
-  whatsapp: "واتساپ",
-};
-
-function channelLabel(channel: string) {
-  return CHANNEL[channel] || "متن";
-}
-
 function composeLabel(status?: string) {
   if (status === "running") return "در حال ساخت";
-  if (status === "ready") return "ساخته شد";
   if (status === "failed") return "ساخت کامل نشد";
   return "";
 }
 
 function isPicture(asset: AssetRow) {
   const name = asset.name.toLowerCase();
-  return asset.kind === "video" || name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".webp") || name.endsWith(".mp4");
+  return (
+    asset.kind === "video" ||
+    name.endsWith(".png") ||
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg") ||
+    name.endsWith(".webp") ||
+    name.endsWith(".mp4")
+  );
+}
+
+function mediaOf(item: LibraryItem) {
+  return (item.assets || []).filter((asset) => asset.relPath && isPicture(asset));
+}
+
+function onShelf(item: LibraryItem) {
+  return mediaOf(item).length > 0 || item.compose === "running" || item.compose === "failed";
 }
 
 function LibraryCard({ item }: { item: LibraryItem }) {
+  const media = mediaOf(item);
   const status = composeLabel(item.compose);
   return (
     <article className="space-y-3 rounded-2xl border border-line bg-paper p-4">
@@ -45,21 +49,11 @@ function LibraryCard({ item }: { item: LibraryItem }) {
         <h2 className="truncate text-base font-bold">{item.title}</h2>
         {status ? <p className="shrink-0 text-xs text-warm">{status}</p> : null}
       </div>
-      {item.copies.map((copy) => (
-        <div key={`${item.id}-${copy.channel}`}>
-          <p className="text-xs text-muted">{channelLabel(copy.channel)}</p>
-          <p className="mt-1 whitespace-pre-wrap text-sm leading-7 text-ink">{copy.body}</p>
-        </div>
-      ))}
-      {item.assets.length ? (
-        <ul className="space-y-2">
-          {item.assets.map((asset) => (
-            <li key={`${item.id}-${asset.relPath || asset.name}`}>
-              {asset.relPath && isPicture(asset) ? (
-                <AuthMedia campaignId={item.id} relPath={asset.relPath} kind={asset.kind} alt={item.title} />
-              ) : (
-                <p className="text-sm text-muted">{asset.name}</p>
-              )}
+      {media.length ? (
+        <ul className="space-y-3">
+          {media.map((asset) => (
+            <li key={`${item.id}-${asset.relPath}`}>
+              <AuthMedia campaignId={item.id} relPath={asset.relPath} kind={asset.kind} alt={item.title} />
             </li>
           ))}
         </ul>
@@ -74,17 +68,38 @@ export function StudioLibrary() {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    void api<{ items: LibraryItem[]; drafts: LibraryItem[] }>("/studio/content")
-      .then((data) => {
-        setItems(data.items || []);
-        setDrafts(data.drafts || []);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "خطا"))
-      .finally(() => setReady(true));
+  const load = useCallback(async () => {
+    try {
+      const data = await api<{ items: LibraryItem[]; drafts: LibraryItem[] }>("/studio/content");
+      setItems(data.items || []);
+      setDrafts(data.drafts || []);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setReady(true);
+    }
   }, []);
 
-  const empty = ready && !items.length && !drafts.length;
+  useEffect(() => {
+    void load();
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [load]);
+
+  const shown = [...items, ...drafts].filter(onShelf);
+  const live = shown.some((item) => item.compose === "running");
+
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setInterval(() => void load(), 2000);
+    return () => window.clearInterval(timer);
+  }, [live, load]);
+
+  const empty = ready && !shown.length;
   return (
     <div className="h-full space-y-3 overflow-y-auto px-4 py-3">
       {error ? (
@@ -94,12 +109,17 @@ export function StudioLibrary() {
       ) : null}
       {!ready && !error ? <p className="text-sm text-muted">در حال خواندن…</p> : null}
       {empty && !error ? (
-        <EmptyState title="هنوز محتوایی نساخته‌ای" detail="از چت استودیو بگو چه پستی می‌خواهی." />
+        <EmptyState
+          title="هنوز رسانه‌ای ساخته نشده"
+          detail="از چت بگو چه پست یا ویدیویی می‌خواهی. ساخته‌شده‌ها همین‌جا می‌مانند."
+          action={
+            <Link href="/chat" className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent">
+              رفتن به چت
+            </Link>
+          }
+        />
       ) : null}
-      {items.map((item) => (
-        <LibraryCard key={item.id} item={item} />
-      ))}
-      {drafts.map((item) => (
+      {shown.map((item) => (
         <LibraryCard key={item.id} item={item} />
       ))}
     </div>

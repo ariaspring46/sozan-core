@@ -69,13 +69,13 @@ export default function CampaignsPage() {
       {ready && items.length === 0 && !error ? (
         <EmptyState
           title="کمپینی نیست"
-          detail="از چت استودیو پست بساز، یا اگر پوشه روی دیسک داری شناسه را بالا بگذار."
+          detail="از چت بگو چه پستی می‌خواهی، یا اگر پوشه روی دیسک داری شناسه را بالا بگذار."
           action={
             <Link
-              href="/studio"
+              href="/chat"
               className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent"
             >
-              رفتن به چت استودیو
+              رفتن به چت
             </Link>
           }
         />

@@ -6,7 +6,7 @@ export function StudioNav({ current }: { current: "studio" | "campaigns" }) {
   return (
     <nav className="flex items-center gap-4 text-sm">
       <Link href="/studio" className={current === "studio" ? "font-bold text-ink" : "text-muted"} aria-current={current === "studio" ? "page" : undefined}>
-        چت استودیو
+        محتوا
       </Link>
       <Link
         href="/campaigns"

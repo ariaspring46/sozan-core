@@ -36,6 +36,7 @@ type StudioSettings = {
   paymentGateways?: CatalogItem[];
   plan: string;
   billing?: { ready: boolean; gateway: string };
+  hubAdmin?: boolean;
   walletAvailable?: number;
   voice?: { summary: string; tone: string; sampleReply: string };
   subscription?: {
@@ -85,10 +86,14 @@ export function ShopSettingsForm() {
       const saved = await api<StudioSettings>("/settings", {
         method: "PATCH",
         body: JSON.stringify({
-          mockSms: form.mockSms,
-          adminPhone: form.adminPhone,
-          otpTtlSeconds: form.otpTtlSeconds,
-          gatewayPublicUrl: form.gatewayPublicUrl,
+          ...(form.hubAdmin
+            ? {
+                mockSms: form.mockSms,
+                adminPhone: form.adminPhone,
+                otpTtlSeconds: form.otpTtlSeconds,
+                gatewayPublicUrl: form.gatewayPublicUrl,
+              }
+            : {}),
           storeName: form.storeName,
           storeTagline: form.storeTagline,
           paymentSandbox: form.paymentSandbox,
@@ -311,7 +316,7 @@ export function ShopSettingsForm() {
                   ) : null}
                 </>
               )}
-              <details className="rounded-xl border border-line bg-paper px-3 py-2">
+              {form.hubAdmin ? <details className="rounded-xl border border-line bg-paper px-3 py-2">
                 <summary className="cursor-pointer text-sm text-muted">تنظیمات پیشرفته استودیو</summary>
                 <div className="mt-3 space-y-3">
                   <Field label="شماره مدیر استودیو">
@@ -321,7 +326,7 @@ export function ShopSettingsForm() {
                     <Input dir="ltr" value={form.gatewayPublicUrl} onChange={(event) => setForm({ ...form, gatewayPublicUrl: event.target.value })} />
                   </Field>
                 </div>
-              </details>
+              </details> : null}
             </Card>
           ) : null}
           {form?.subscription ? (
