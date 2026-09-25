@@ -1,0 +1,7 @@
+[Unit]
+Description=Sozan nightly postgres and tenant-data backup
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/home/ubuntu/sozan-core/deploy/sozan-backup.sh
