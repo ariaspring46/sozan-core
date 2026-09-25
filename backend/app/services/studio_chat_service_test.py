@@ -396,6 +396,18 @@ class StudioChatTests(unittest.TestCase):
         )
         self.assertEqual(out["instagram"], "انگشتر فیروزه")
         self.assertNotIn("#", out["instagram"])
+        bare = studio_chat_service._clip_captions(
+            {
+                "instagram": "گردنبند فیروزه با زنجیر نقره‌ای و نقره خالص TurquoiseNecklace",
+                "telegram": "سلام",
+                "whatsapp": "سلام",
+            },
+            spoken="برای گردنبند فیروزه با زنجیر نقره‌ای یک پست بساز",
+            drop_unclaimed=True,
+        )
+        self.assertNotIn("Turquoise", bare["instagram"])
+        self.assertNotIn("خالص", bare["instagram"])
+        self.assertIn("نقره‌ای", bare["instagram"])
 
     def test_catalog_skips_test_titles(self) -> None:
         self.assertEqual(studio_chat_service._catalog_title("Winter is coming…"), "")

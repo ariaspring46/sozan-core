@@ -111,14 +111,34 @@ def _save(rows: list[dict]) -> None:
     write_json("studio-messages.json", kept)
 
 
+_CLAIM_WORDS = ("خالص", "طلا", "الماس", "یاقوت", "عیار", "پلاتین", "برلیان")
+
+
+def _strip_latin_tags(text: str) -> str:
+    cleaned = re.sub(r"#[A-Za-z][\w-]*", "", text or "")
+    cleaned = re.sub(r"[A-Za-z][A-Za-z0-9_-]*", "", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip(" ،")
+
+
+def _drop_unclaimed(text: str, spoken: str) -> str:
+    cleaned = text or ""
+    if not re.search(r"دست[\s\u200c-]*ساز", spoken or ""):
+        cleaned = re.sub(r"دست[\s\u200c-]*ساز", "", cleaned)
+    for word in _CLAIM_WORDS:
+        if word not in (spoken or ""):
+            cleaned = cleaned.replace(word, "")
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+([،.])", r"\1", cleaned)
+    return cleaned.strip(" ،")
+
+
 def _clip_captions(captions: dict, *, spoken: str = "", drop_unclaimed: bool = False) -> dict:
-    allow_handmade = (not drop_unclaimed) or bool(re.search(r"دست[\s\u200c-]*ساز", spoken or ""))
     out = {}
     for key, limit in CAPTION_LIMITS.items():
         text = sanitize_persian(_strip_latin_tags(_real_copy(captions.get(key), limit=limit)), limit=limit)
-        if not allow_handmade:
-            text = re.sub(r"دست[\s\u200c-]*ساز", "", text)
-            text = re.sub(r"\s{2,}", " ", text).strip(" ،")
+        if drop_unclaimed:
+            text = _drop_unclaimed(text, spoken)
         out[key] = text
     return out
 
@@ -126,12 +146,6 @@ def _clip_captions(captions: dict, *, spoken: str = "", drop_unclaimed: bool = F
 def _no_overlay_text(spoken: str) -> bool:
     text = spoken or ""
     return any(mark in text for mark in ("بدون متن", "هیچ نوشته", "روی عکس ننویس", "نوشته‌ای نباشد", "نوشته ای نباشد"))
-
-
-def _strip_latin_tags(text: str) -> str:
-    cleaned = re.sub(r"#[A-Za-z][\w-]*", "", text or "")
-    cleaned = re.sub(r"\s{2,}", " ", cleaned)
-    return cleaned.strip()
 
 
 def _catalog_title(title: str) -> str:
@@ -616,6 +630,33 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
             payload={"role": "assistant", "text": assistant["text"], "id": assistant["id"]},
         )
         return {"messages": rows, "campaignId": ""}
+    prior = _latest_campaign_message() if _revises_caption(spoken) else None
+    if prior:
+        old = prior.get("captions") if isinstance(prior.get("captions"), dict) else {}
+        captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True)
+        reply = "کپشن همان پست، بدون واژهٔ انگلیسی و بدون ادعای نگفته، عوض شد."
+        campaign_id = str(prior.get("campaignId") or "")
+
+        def apply(row: dict) -> None:
+            row["captions"] = captions
+            row["text"] = reply
+
+        with tenant_file_lock("studio"):
+            _update_message(str(prior.get("id") or ""), apply)
+            rows = _messages()
+        try:
+            await campaigns.update_copy(
+                UUID(campaign_id),
+                title=None,
+                subtitle=None,
+                cta=None,
+                instagram_caption=captions["instagram"],
+                telegram_caption=captions["telegram"],
+                whatsapp_caption=captions["whatsapp"],
+            )
+        except Exception:
+            campaign_id = ""
+        return {"messages": rows, "campaignId": campaign_id}
     prompt = _studio_prompt(spoken, media=media)
     parsed = await _studio_json(prompt)
     named = any(mark in spoken for mark in ("انگشتر", "گردنبند", "گوشواره", "آویز", "فیروزه", "کفش", "پیراهن"))
