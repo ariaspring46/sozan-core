@@ -1,4 +1,5 @@
 import asyncio
+import json
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -483,6 +484,20 @@ class StudioChatTests(unittest.TestCase):
         assistant = next(row for row in result["messages"] if row.get("campaignId"))
         self.assertIn("نقره‌ای", assistant["captions"]["instagram"])
         self.assertNotIn("در حال ساخت", assistant["text"])
+
+    def test_recorded_model_sentence_drops_unclaimed_claims(self) -> None:
+        sample = json.loads(
+            (Path(__file__).resolve().parent / "fixtures" / "studio_model_samples.json").read_text(encoding="utf-8")
+        )[0]
+        out = studio_chat_service._clip_captions(
+            {"instagram": sample["instagram"], "telegram": "سلام", "whatsapp": "سلام"},
+            spoken=sample["spoken"],
+            drop_unclaimed=True,
+        )
+        for word in sample["absent"]:
+            self.assertNotIn(word, out["instagram"])
+        for word in sample["present"]:
+            self.assertIn(word, out["instagram"])
 
     def test_regenerate_image_keeps_prompt(self) -> None:
         campaigns = FakeCampaigns()

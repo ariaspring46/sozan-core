@@ -73,8 +73,11 @@ async def lifespan(_app: FastAPI):
     from app.services import router_service
 
     router_service.clear_dead_busy()
+    from app.services.loop_watch import start as start_loop_watch
+
     poller = asyncio.create_task(_channel_poll_loop())
     housekeeper = asyncio.create_task(_housekeeping_loop())
+    loop_watch = start_loop_watch()
     from app.services import image_provider_service, llm_routing_service
 
     probe_task = asyncio.create_task(image_provider_service.probe_ollama_cloud_once())
@@ -84,7 +87,8 @@ async def lifespan(_app: FastAPI):
     housekeeper.cancel()
     probe_task.cancel()
     router_task.cancel()
-    for task in (poller, housekeeper, probe_task, router_task):
+    loop_watch.cancel()
+    for task in (poller, housekeeper, probe_task, router_task, loop_watch):
         try:
             await task
         except asyncio.CancelledError:

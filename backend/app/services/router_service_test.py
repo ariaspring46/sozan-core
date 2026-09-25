@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import tempfile
 import time
@@ -1123,6 +1124,66 @@ class RouterServiceTests(unittest.TestCase):
         joined = seen[1][0]["content"] + seen[1][1]["content"]
         self.assertNotIn("کامپیوتر", joined)
         self.assertNotIn(joke["messages"][-1]["text"], joined)
+
+    def test_writes_are_not_answered_as_facts(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "status", "arguments": {}}]}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "sozan", "status": "ready", "brand": "سوزان", "url": "https://sozan.sozan-core.ir"})
+            write_json("products.json", [{"title": "هودی", "stock": 4, "price": 100}, {"title": "کیف چرمی", "stock": 2, "price": 50}])
+        with patch("app.services.wallet_service.get", return_value={"available": 999}), patch(
+            "app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")
+        ):
+            discount = self._turn("برای تخفیف یلدا پست بساز", complete)
+            self.assertEqual(discount["pendingConfirm"]["tool"], "studio_chat")
+            self.assertNotIn("پرونده", discount["messages"][-1]["text"])
+            self._turn("", complete, cancel_id=discount["pendingConfirm"]["id"])
+            bag = self._turn("پست کیف چرمی بساز", complete)
+            self.assertEqual(bag["pendingConfirm"]["tool"], "studio_chat")
+            self.assertNotIn("موجودی کیف", bag["messages"][-1]["text"])
+            self._turn("", complete, cancel_id=bag["pendingConfirm"]["id"])
+            sport = self._turn("کفش اسپورت را اضافه کن", complete)
+            rename = self._turn("اسم فروشگاه را عوض کن", complete)
+            stock = self._turn("موجودی هودی", complete)
+        self.assertNotIn("پورت", sport["messages"][-1]["text"])
+        self.assertIn("قیمت", sport["messages"][-1]["text"])
+        self.assertNotIn("اسم فروشگاه سوزان", rename["messages"][-1]["text"])
+        self.assertIn("4", stock["messages"][-1]["text"])
+        self.assertIn("هودی", stock["messages"][-1]["text"])
+
+    def test_catalog_battery_opens_the_expected_gate(self) -> None:
+        path = Path(__file__).resolve().parents[3] / "tools" / "qa_battery.py"
+        spec = importlib.util.spec_from_file_location("qa_battery", path)
+        battery = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(battery)  # type: ignore[union-attr]
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "sozan", "status": "ready"})
+            write_json("products.json", [{"title": "هودی", "stock": 4, "price": 100}])
+            misses = [
+                row["intent"]
+                for row in battery.sentences(["هودی"])
+                if not battery.grade(router_service.decide(row["text"]), row)
+            ]
+        self.assertEqual(misses, [])
+
+    def test_worker_confirm_returns_before_the_model(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "studio_chat", "arguments": {}}]}
+
+        chat = AsyncMock()
+        enqueue = AsyncMock(return_value="job-1")
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "sozan", "status": "ready"})
+        with patch.dict("os.environ", {"SOZAN_WORKER": "1"}), patch(
+            "app.services.studio_chat_service.chat", new=chat
+        ), patch("app.services.job_queue.enqueue", new=enqueue):
+            held = self._turn("برای انگشتر یک پست بساز", complete, campaigns=object())
+            out = self._turn("", complete, confirm_id=held["pendingConfirm"]["id"], campaigns=object())
+        chat.assert_not_called()
+        enqueue.assert_awaited()
+        self.assertIn("در حال ساخت", out["messages"][-1]["text"])
+        self.assertEqual(out["messages"][-1]["compose"]["status"], "running")
 
     def test_font_has_a_named_refusal(self) -> None:
         async def complete(_messages, _tools):

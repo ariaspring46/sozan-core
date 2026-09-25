@@ -1,0 +1,10 @@
+[Unit]
+Description=Sozan nightly chat battery
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/sozan-core
+Environment=PYTHONPATH=/home/ubuntu/sozan-core/backend
+Environment=SOZAN_STATE=/home/ubuntu/sozan-core/backend/data
+ExecStart=/home/ubuntu/sozan-core/backend/.venv/bin/python /home/ubuntu/sozan-core/tools/qa_battery.py --live

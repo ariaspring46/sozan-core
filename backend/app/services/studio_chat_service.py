@@ -14,17 +14,11 @@ from app.services.tenant_lock import tenant_file_lock
 from app.state_store import read_json, write_json
 
 STUDIO_SYSTEM = """تو استودیوی محتوای سوزان هستی. فقط یک شیء JSON برگردان؛ متن بیرون JSON ننویس.
-کلیدها: reply, title, subtitle, cta, instagram, telegram, whatsapp, compose, imagePrompt.
-reply خلاصهٔ فارسی همان پست است که به کاربر نشان می‌دهیم؛ نام فیلد یا «متن فارسی» ننویس.
-سؤال نپرس و جزئیات نخواه. اگر چیزی کم است از نام فروشگاه و کالاهای واقعی کپشن بساز.
-ادعای دست‌ساز، جنس، یا موجودی را فقط اگر کاربر یا کاتالوگ گفته بنویس.
-اگر احوال‌پرسی است title و کپشن را خالی بگذار، compose را false کن، reply را یک جملهٔ کوتاه بگذار.
-اگر کاربر پست، استوری، ریلز، ویدیو یا کپشن خواست هر سه کپشن را پر کن و compose را true کن:
-- instagram: کپشن فید فارسی، بدون هشتگ لاتین، حدود ۲۵۰ تا ۴۰۰ کاراکتر
-- telegram: متن کانال بدون هشتگ، حداکثر ۴۰۰ کاراکتر
-- whatsapp: پیام کوتاه دوستانه، بدون هشتگ، حداکثر ۲۸۰ کاراکتر
-title را از همان چیزی که کاربر خواسته کوتاه بنویس؛ «کمپین جدید» ننویس. cta را خالی بگذار مگر کاربر دکمه خواسته باشد.
-imagePrompt را انگلیسی بنویس و همان محصولی را که کاربر گفته توصیف کن: product photo, no text, no logos, no people."""
+کلیدها فقط این‌هاست: reply, instagram, telegram, whatsapp.
+reply خلاصهٔ فارسی همان پست است. نام فیلد یا «متن فارسی» ننویس.
+عنوان، دکمه، و تصمیم ساخت عکس را ننویس. ادعا، جنس، و موجودی را فقط اگر در دستور کاربر آمده بنویس.
+اگر کاربر پست، استوری، ریلز یا کپشن خواست هر سه کپشن را فارسی و بدون هشتگ لاتین پر کن.
+instagram حدود ۲۵۰ تا ۴۰۰ کاراکتر، telegram حداکثر ۴۰۰، whatsapp حداکثر ۲۸۰."""
 STUB_COPY = frozenset({"متن فارسی", "تیتر کوتاه", "title", "reply", "cta", "subtitle", "کمپین جدید", "ببین"})
 
 GREETING_TOKENS = frozenset(
@@ -113,6 +107,7 @@ def _save(rows: list[dict]) -> None:
 
 
 _CLAIM_WORDS = ("خالص", "طلا", "الماس", "یاقوت", "عیار", "پلاتین", "برلیان")
+_FLUFF = ("کیفیت بالا", "منحصر به فرد")
 
 
 def _strip_latin_tags(text: str) -> str:
@@ -122,31 +117,58 @@ def _strip_latin_tags(text: str) -> str:
     return cleaned.strip(" ،")
 
 
-def _drop_unclaimed(text: str, spoken: str) -> str:
-    cleaned = text or ""
-    if not re.search(r"دست[\s\u200c-]*ساز", spoken or ""):
-        cleaned = re.sub(r"دست[\s\u200c-]*ساز", "", cleaned)
-    for word in _CLAIM_WORDS:
-        if word not in (spoken or ""):
-            cleaned = re.sub(rf"(?<![\u0600-\u06FF]){re.escape(word)}(?![\u0600-\u06FF])", "", cleaned)
-    cleaned = re.sub(r"\s{2,}", " ", cleaned)
-    cleaned = re.sub(r"\s+([،.])", r"\1", cleaned)
-    return cleaned.strip(" ،")
+def _claim_source(spoken: str, allowed: str = "") -> str:
+    return f"{spoken or ''} {allowed or ''}"
 
 
-def _clip_captions(captions: dict, *, spoken: str = "", drop_unclaimed: bool = False) -> dict:
+def _sentence_unclaimed(sentence: str, source: str) -> bool:
+    if re.search(r"دست[\s\u200c-]*ساز", sentence) and not re.search(r"دست[\s\u200c-]*ساز", source):
+        return True
+    for word in (*_CLAIM_WORDS, *_FLUFF):
+        if word in source:
+            continue
+        if re.search(rf"(?<![\u0600-\u06FF]){re.escape(word)}(?![\u0600-\u06FF])", sentence):
+            return True
+    return False
+
+
+def _drop_unclaimed(text: str, spoken: str, allowed: str = "") -> str:
+    source = _claim_source(spoken, allowed)
+    parts = re.split(r"(?<=[.!؟\n])\s+", text or "")
+    kept = [part for part in parts if part.strip() and not _sentence_unclaimed(part, source)]
+    cleaned = re.sub(r"\s{2,}", " ", " ".join(kept))
+    cleaned = re.sub(r"\s+([،.])", r"\1", cleaned).strip(" ،")
+    if cleaned:
+        return cleaned
+    if _sentence_unclaimed(text or "", source):
+        return _title_from_spoken(spoken)
+    return ""
+
+
+def _clip_captions(captions: dict, *, spoken: str = "", drop_unclaimed: bool = False, allowed: str = "") -> dict:
     out = {}
     for key, limit in CAPTION_LIMITS.items():
         text = sanitize_persian(_strip_latin_tags(_real_copy(captions.get(key), limit=limit)), limit=limit)
         if drop_unclaimed:
-            text = _drop_unclaimed(text, spoken)
+            text = _drop_unclaimed(text, spoken, allowed)
         out[key] = text
     return out
 
 
+def _catalog_blob() -> str:
+    try:
+        from app.services.storefront_service import list_products
+
+        rows = list_products().get("products") or []
+    except Exception:
+        return ""
+    return " ".join(f"{row.get('title') or ''} {row.get('description') or ''}" for row in rows if isinstance(row, dict))
+
+
 def _no_overlay_text(spoken: str) -> bool:
-    text = spoken or ""
-    return any(mark in text for mark in ("بدون متن", "هیچ نوشته", "روی عکس ننویس", "نوشته‌ای نباشد", "نوشته ای نباشد"))
+    from app.services.turn_parse import parse_turn
+
+    return parse_turn(spoken).no_overlay
 
 
 def _catalog_title(title: str) -> str:
@@ -166,46 +188,19 @@ _FORMAT_WORDS = ("اینستاگرام", "تلگرام", "واتساپ", "است
 
 
 def _title_from_spoken(spoken: str) -> str:
-    text = sanitize_persian(spoken or "", limit=80)
-    for drop in (
-        "بساز",
-        "درست کن",
-        "یک پست",
-        "هیچ نوشته",
-        "نوشته‌ای نباشد",
-        "نوشته ای نباشد",
-        "روی عکس",
-        "هشتگ",
-        "انگلیسی",
-        "لاتین",
-        "رسمی‌تر",
-        "رسمی تر",
-        *_FORMAT_WORDS,
-        "برای",
-        "یک",
-        "قبلی",
-        "کن",
-    ):
-        text = text.replace(drop, " ")
-    text = re.sub(r"\s+", " ", text).strip(" ،؛.")
-    return text[:36]
+    from app.services.turn_parse import parse_turn
+
+    return parse_turn(spoken).subject
 
 
 def _overlay_title(raw: str, spoken: str) -> str:
-    title = _real_copy(raw, limit=80) or _title_from_spoken(spoken)
-    for word in _FORMAT_WORDS:
-        title = title.replace(word, " ")
-    title = re.sub(r"\s+", " ", title).strip(" ،")
-    if not title:
-        title = _title_from_spoken(spoken)
-    return title[:36]
+    return _title_from_spoken(spoken)[:36]
 
 
 def _revises_caption(spoken: str) -> bool:
-    text = spoken or ""
-    if not any(mark in text for mark in ("کپشن قبلی", "پست قبلی", "همین پست", "رسمی‌تر", "رسمی تر")):
-        return False
-    return "عکس" not in text and "تصویر" not in text
+    from app.services.turn_parse import parse_turn
+
+    return parse_turn(spoken).revise
 
 
 def _latest_campaign_message(campaign_id: str = "") -> dict | None:
@@ -488,6 +483,40 @@ def _fallback_attachment(media: dict | None) -> list[dict]:
     return []
 
 
+def begin_placeholder() -> str:
+    ident = str(uuid4())
+    row = {
+        "id": ident,
+        "role": "assistant",
+        "text": "در حال ساخت.",
+        "at": int(time.time()),
+        "compose": {"status": "running", "startedAt": time.time(), "jobId": ident},
+    }
+    with tenant_file_lock("studio"):
+        rows = _messages()
+        rows.append(row)
+        _save(rows)
+    return ident
+
+
+def _put_assistant(assistant: dict, into_id: str = "") -> list[dict]:
+    if into_id:
+        assistant["id"] = into_id
+
+        def apply(row: dict) -> None:
+            row.clear()
+            row.update(assistant)
+
+        updated = _update_message(into_id, apply)
+        if updated:
+            return updated["messages"]
+    with tenant_file_lock("studio"):
+        rows = _messages()
+        rows.append(assistant)
+        _save(rows)
+        return rows
+
+
 def _update_message(message_id: str, fn) -> dict | None:
     ident = str(message_id or "").strip()
     with tenant_file_lock("studio"):
@@ -593,6 +622,7 @@ def expire_stale_compose(stale_sec: int) -> None:
 async def _rewrite_existing(spoken: str, prior: dict, campaigns: CampaignService) -> dict:
     old = prior.get("captions") if isinstance(prior.get("captions"), dict) else {}
     campaign_id = str(prior.get("campaignId") or "")
+    allowed = _catalog_blob()
     parsed: dict = {}
     try:
         parsed = await asyncio.wait_for(
@@ -614,7 +644,7 @@ async def _rewrite_existing(spoken: str, prior: dict, campaigns: CampaignService
     except Exception:
         parsed = {"error": "timeout"}
     if parsed.get("error"):
-        captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True)
+        captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True, allowed=allowed)
         reply = "کپشن همان پست ماند. دوباره کوتاه‌تر بگو."
     else:
         captions = _clip_captions(
@@ -625,9 +655,10 @@ async def _rewrite_existing(spoken: str, prior: dict, campaigns: CampaignService
             },
             spoken=spoken,
             drop_unclaimed=True,
+            allowed=allowed,
         )
         if not captions["instagram"]:
-            captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True)
+            captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True, allowed=allowed)
         reply = _real_copy(parsed.get("reply"), limit=400) or "کپشن همان پست عوض شد."
     reply = guard_output(reply)
 
@@ -635,9 +666,8 @@ async def _rewrite_existing(spoken: str, prior: dict, campaigns: CampaignService
         row["captions"] = captions
         row["text"] = reply
 
-    with tenant_file_lock("studio"):
-        _update_message(str(prior.get("id") or ""), apply)
-        rows = _messages()
+    updated = _update_message(str(prior.get("id") or ""), apply)
+    rows = (updated or {}).get("messages") or _messages()
     try:
         if campaign_id:
             await campaigns.update_copy(
@@ -654,7 +684,7 @@ async def _rewrite_existing(spoken: str, prior: dict, campaigns: CampaignService
     return {"messages": rows, "campaignId": campaign_id}
 
 
-async def chat(text: str, campaigns: CampaignService, media: dict | None = None) -> dict:
+async def chat(text: str, campaigns: CampaignService, media: dict | None = None, into_id: str = "") -> dict:
     from app.services import chat_media_service, studio_compose_service
 
     raw = text.strip()
@@ -682,10 +712,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
             "text": "بگو برای اینستاگرام، تلگرام یا واتساپ چه پستی می‌خواهی. تصویر کالا را هم می‌توانی پیوست کنی.",
             "at": int(time.time()),
         }
-        with tenant_file_lock("studio"):
-            rows = _messages()
-            rows.append(assistant)
-            _save(rows)
+        rows = _put_assistant(assistant, into_id)
         emit_later(
             kind="chat",
             surface="studio",
@@ -716,10 +743,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
             "text": reply,
             "at": int(time.time()),
         }
-        with tenant_file_lock("studio"):
-            rows = _messages()
-            rows.append(assistant)
-            _save(rows)
+        rows = _put_assistant(assistant, into_id)
         emit_later(
             kind="chat",
             surface="studio",
@@ -733,13 +757,10 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
         return {"messages": rows, "campaignId": ""}
     if parsed.get("error"):
         parsed = _local_post(spoken)
-    title = _overlay_title(str(parsed.get("title") or ""), spoken)
-    subtitle = _real_copy(parsed.get("subtitle"), limit=120)
-    cta = _real_copy(parsed.get("cta"), limit=40)
-    if _no_overlay_text(spoken):
-        title = ""
-        subtitle = ""
-        cta = ""
+    allowed = _catalog_blob()
+    title = "" if _no_overlay_text(spoken) else _title_from_spoken(spoken)
+    subtitle = ""
+    cta = ""
     captions = _clip_captions(
         {
             "instagram": parsed.get("instagram"),
@@ -748,6 +769,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
         },
         spoken=spoken,
         drop_unclaimed=True,
+        allowed=allowed,
     )
     reply = _real_copy(parsed.get("reply"), limit=400)
     if not reply:
@@ -758,11 +780,8 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
     campaign_id = ""
     attachments: list[dict] = []
     has_copy = bool(captions["instagram"] or captions["telegram"] or captions["whatsapp"])
-    want_compose = parsed.get("compose") is True or bool(media and media.get("kind") == "image")
-    if has_copy and parsed.get("compose") is not False:
-        want_compose = True
-    if parsed.get("compose") is False and not (media and media.get("kind") == "image"):
-        want_compose = False
+    has_media = bool(media and media.get("kind") == "image")
+    want_compose = has_media or has_copy
     if not has_copy and not want_compose:
         assistant = {
             "id": str(uuid4()),
@@ -770,10 +789,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
             "text": reply or "بگو چه پستی می‌خواهی؛ کپشن را همین‌جا می‌نویسم.",
             "at": int(time.time()),
         }
-        with tenant_file_lock("studio"):
-            rows = _messages()
-            rows.append(assistant)
-            _save(rows)
+        rows = _put_assistant(assistant, into_id)
         return {"messages": rows, "campaignId": ""}
     try:
         campaign = await campaigns.create(
@@ -815,10 +831,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None)
     if attachments:
         assistant["mediaKind"] = attachments[0]["kind"]
         assistant["mediaName"] = attachments[0]["name"]
-    with tenant_file_lock("studio"):
-        rows = _messages()
-        rows.append(assistant)
-        _save(rows)
+    rows = _put_assistant(assistant, into_id)
     if want_compose and campaign_id:
         studio_compose_service.start(
             message_id=assistant["id"],

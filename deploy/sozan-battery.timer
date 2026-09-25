@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the Sozan chat battery every night
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

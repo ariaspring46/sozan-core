@@ -1,0 +1,30 @@
+{
+  "write_marks": ["بساز", "اضافه", "عوض", "پست", "کپشن", "استوری", "ریلز"],
+  "write_words": ["کن"],
+  "format_words": ["اینستاگرام", "تلگرام", "واتساپ", "استوری", "ریلز", "کپشن", "پست", "کمپین", "عکس", "تصویر"],
+  "claim_words": ["خالص", "طلا", "الماس", "یاقوت", "عیار", "پلاتین", "برلیان"],
+  "fluff": ["کیفیت بالا", "منحصر به فرد"],
+  "advice_marks": ["پیشنهاد", "بهبود", "چطور", "چگونه", "به چه شکل"],
+  "publish_marks": ["منتشر", "بفرست", "انتشار"],
+  "revise_marks": ["کپشن قبلی", "پست قبلی", "همین پست", "رسمی‌تر", "رسمی تر"],
+  "examples": [
+    {"text": "برای تخفیف یلدا پست بساز", "act": "studio", "write": true, "topic": ""},
+    {"text": "پست کیف چرمی بساز", "act": "studio", "write": true, "topic": ""},
+    {"text": "کفش اسپورت را اضافه کن", "act": "add_product", "write": true, "topic": ""},
+    {"text": "اسم فروشگاه را عوض کن", "act": "unknown", "write": true, "topic": ""},
+    {"text": "موجودی هودی", "act": "read", "write": false, "topic": "stock"},
+    {"text": "کیف پولم چقدره", "act": "read", "write": false, "topic": "wallet"},
+    {"text": "کپشن قبلی را رسمی‌تر کن", "act": "studio", "write": true, "revise": true},
+    {"text": "عکس انگشتر فیروزه بساز", "act": "studio", "write": true},
+    {"text": "یک استوری از گوشواره بساز", "act": "studio", "write": true},
+    {"text": "چه بهبودی پیشنهاد میدی؟", "act": "advice", "write": false}
+  ],
+  "counter_examples": [
+    {"text": "موجودی هودی", "not_topic": "wallet"},
+    {"text": "کفش اسپورت را اضافه کن", "not_topic": "port"},
+    {"text": "پست کیف چرمی بساز", "not_topic": "wallet"},
+    {"text": "برای تخفیف یلدا پست بساز", "not_topic": "discount"},
+    {"text": "اسم فروشگاه را عوض کن", "not_topic": "shop_name"},
+    {"text": "کیف چرمی", "not_act": "wallet"}
+  ]
+}

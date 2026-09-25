@@ -1,0 +1,18 @@
+[Unit]
+Description=Sozan studio job worker
+After=network-online.target redis.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/sozan-core/backend
+Environment=PYTHONPATH=/home/ubuntu/sozan-core/backend
+Environment=SOZAN_WORKER=1
+EnvironmentFile=/home/ubuntu/sozan-core/.env
+ExecStart=/home/ubuntu/sozan-core/backend/.venv/bin/python -m app.worker
+Restart=on-failure
+RestartSec=4
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+{
+  "states": {
+    "idle": {
+      "allow": ["shop_chat", "add_product", "read"],
+      "edit": "ویترین هنوز نیست. اول بگو بساز؛ تغییر صفحه بعد از ساخت است."
+    },
+    "built": {
+      "allow": ["shop_chat", "edit_shop", "add_product", "studio_chat", "publish_post", "read"]
+    },
+    "card_open": {
+      "allow": ["read"],
+      "block": "اول کارت باز را تأیید یا انصراف بده."
+    },
+    "composing": {
+      "publish": "هنوز تصویر این پست تمام نشده."
+    }
+  }
+}
