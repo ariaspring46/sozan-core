@@ -127,7 +127,7 @@ def _drop_unclaimed(text: str, spoken: str) -> str:
         cleaned = re.sub(r"دست[\s\u200c-]*ساز", "", cleaned)
     for word in _CLAIM_WORDS:
         if word not in (spoken or ""):
-            cleaned = cleaned.replace(word, "")
+            cleaned = re.sub(rf"(?<![\u0600-\u06FF]){re.escape(word)}(?![\u0600-\u06FF])", "", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned)
     cleaned = re.sub(r"\s+([،.])", r"\1", cleaned)
     return cleaned.strip(" ،")

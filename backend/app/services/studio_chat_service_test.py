@@ -408,6 +408,12 @@ class StudioChatTests(unittest.TestCase):
         self.assertNotIn("Turquoise", bare["instagram"])
         self.assertNotIn("خالص", bare["instagram"])
         self.assertIn("نقره‌ای", bare["instagram"])
+        kept_info = studio_chat_service._clip_captions(
+            {"instagram": "برای خرید و اطلاعات بیشتر سر بزنید", "telegram": "سلام", "whatsapp": "سلام"},
+            spoken="یک پست بساز",
+            drop_unclaimed=True,
+        )
+        self.assertIn("اطلاعات", kept_info["instagram"])
 
     def test_catalog_skips_test_titles(self) -> None:
         self.assertEqual(studio_chat_service._catalog_title("Winter is coming…"), "")
