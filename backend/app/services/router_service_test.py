@@ -1263,6 +1263,13 @@ class RouterServiceTests(unittest.TestCase):
             self.assertIn("آماده", text)
             self.assertIn("پست", text)
 
+    def test_direct_message_without_a_post_asks_who(self) -> None:
+        for complete in (self._boom(), self._wrong("publish_post")):
+            with patch("app.services.inbox_service.list_publish_audience", return_value=[]):
+                out = self._turn("برای سارا در دایرکت اینستاگرام بفرست", complete)
+            self.assertIsNone(out.get("pendingConfirm"))
+            self.assertIn("مخاطب", out["messages"][-1]["text"])
+
     def test_named_product_delete_cards_then_drops_the_catalog_row(self) -> None:
         from app.state_store import read_json
 

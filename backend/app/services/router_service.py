@@ -73,6 +73,43 @@ _TOOL_RANK = {
 }
 _TURN_LOCKS: dict[str, asyncio.Lock] = {}
 _THREAD: ContextVar[str] = ContextVar("router_thread", default="")
+_TURN_TRACE: ContextVar[dict | None] = ContextVar("router_turn_trace", default=None)
+
+
+def _trace(**kwargs) -> None:
+    row = _TURN_TRACE.get()
+    if row is None:
+        return
+    row.update(kwargs)
+
+
+def _flush_trace(out: dict) -> None:
+    row = _TURN_TRACE.get()
+    _TURN_TRACE.set(None)
+    if not isinstance(row, dict):
+        return
+    messages = out.get("messages") if isinstance(out, dict) else None
+    last = ""
+    if isinstance(messages, list):
+        for item in reversed(messages):
+            if isinstance(item, dict) and item.get("role") == "assistant":
+                last = str(item.get("text") or "")[:500]
+                break
+    pending = out.get("pendingConfirm") if isinstance(out, dict) else None
+    if isinstance(pending, dict) and pending.get("tool") and not row.get("tool"):
+        row["tool"] = str(pending.get("tool") or "")
+    row["final"] = last
+    row["card"] = bool(isinstance(pending, dict) and pending.get("id"))
+    safe = {}
+    for key, value in row.items():
+        if key in {"token", "apiKey", "otp", "authorization"}:
+            continue
+        safe[key] = value
+    from app.state_store import tenant_dir
+
+    path = tenant_dir() / "router-turns.jsonl"
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(safe, ensure_ascii=False) + "\n")
 _PERSIAN = re.compile(r"[\u0600-\u06FF]")
 _UNSAFE_ERROR = re.compile(r"[/\\]|traceback|\.py\b|https?://|exception", re.I)
 HOLD_PENDING = "اول کارت باز را تأیید یا انصراف بده."
@@ -534,6 +571,8 @@ def _send_without_post(spoken: str) -> str:
     from app.services.turn_parse import parse_turn
 
     if parse_turn(spoken).act != "publish":
+        return ""
+    if "دایرکت" in spoken and "پست" not in spoken:
         return ""
     if _latest_post(spoken) is not None:
         return ""
@@ -1594,7 +1633,7 @@ async def turn(
         raise RouterBusy()
     beater = asyncio.create_task(_heartbeat(token))
     try:
-        return await _execute(
+        out = await _execute(
             text,
             confirm_id=confirm_id,
             cancel_id=cancel_id,
@@ -1606,6 +1645,8 @@ async def turn(
             view_target=view_target,
             embed=embed,
         )
+        _flush_trace(out)
+        return out
     finally:
         beater.cancel()
         try:
@@ -1629,6 +1670,7 @@ async def _execute(
     embed=None,
 ) -> dict:
     spoken = (text or "").strip()
+    _TURN_TRACE.set({"text": spoken[:400], "path": "", "tool": "", "arguments": {}})
     pending = _pending()
     if cancel_id and pending.get("id") == cancel_id:
         tool = str(pending.get("tool") or "")
@@ -1675,6 +1717,7 @@ async def _execute(
     _append_user(spoken, media if isinstance(media, dict) else None)
     choice = decide(spoken, view_path, view_target)
     if choice["kind"] == "direct":
+        _trace(path="gate")
         _append("assistant", str(choice.get("text") or ""))
         return snapshot()
     if pending_open and not any(mark in spoken for mark in ("وضعیت", "صندوق", "خوانده")):
@@ -1695,14 +1738,28 @@ async def _execute(
             )
 
     if choice["kind"] == "tool":
+        _trace(path="gate", tool=str(choice.get("tool") or ""), arguments={})
         result = {"text": "", "tool_calls": [{"name": choice["tool"], "arguments": {}}], "usage": {}}
     else:
         try:
             result = await completer(history, TOOLS)
         except Exception:
+            _trace(path="model")
             _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
             _emit("router-llm-fail", {"error": "unreachable"}, status="error")
             return snapshot()
+        usage = result.get("usage") if isinstance(result, dict) else {}
+        if not isinstance(usage, dict):
+            usage = {}
+        _trace(
+            path="model",
+            provider=str((result or {}).get("provider") or usage.get("provider") or ""),
+            model=str((result or {}).get("model") or ""),
+            promptTokens=int(usage.get("promptTokens") or 0),
+            completionTokens=int(usage.get("completionTokens") or 0),
+            cost=usage.get("cost"),
+            latencyMs=int((result or {}).get("latencyMs") or usage.get("latencyMs") or 0),
+        )
     _add_usage(result.get("usage") if isinstance(result, dict) else None)
 
     calls = result.get("tool_calls") if isinstance(result, dict) else None
@@ -1728,6 +1785,7 @@ async def _execute(
         return snapshot()
     name = str(call.get("name") or "")
     args = call.get("arguments") if isinstance(call.get("arguments"), dict) else {}
+    _trace(tool=name, arguments=args)
     if _force_shop_build(spoken) and name != "shop_chat":
         name = "shop_chat"
         args = {}

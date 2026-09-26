@@ -390,7 +390,7 @@ class CloudFallbackTests(unittest.TestCase):
         self.assertTrue(all(item.proxy is None for item in seen))
         self.assertTrue(all(item.timeout == 120 for item in seen))
         self.assertNotIn("shop-secret", str(proxies))
-        self.assertNotIn("think", seen_body)
+        self.assertIs(seen_body.get("think"), False)
 
     def test_router_cloud_failure_does_not_fall_back(self) -> None:
         calls: list[str] = []
@@ -473,9 +473,157 @@ class RouterToolsTests(unittest.TestCase):
         self.assertEqual(out["tool_calls"][0]["name"], "status")
         self.assertEqual(seen_body.get("tool_choice"), "auto")
         self.assertEqual(seen_body.get("max_tokens"), 150)
-        self.assertNotIn("think", seen_body)
+        self.assertIs(seen_body.get("think"), False)
         self.assertTrue(seen_body.get("tools"))
         self.assertEqual(seen_body.get("model"), "DeepSeek-V4-Pro")
+
+
+class OpenRouterCutoverTests(unittest.TestCase):
+    def _client(self, seen: list):
+        class FakeClient:
+            def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+                self.timeout = timeout
+                self.proxy = proxy
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                seen.append(
+                    {
+                        "url": url,
+                        "timeout": self.timeout,
+                        "proxy": self.proxy,
+                        "body": json or {},
+                        "auth": (headers or {}).get("Authorization"),
+                    }
+                )
+                if "openrouter.ai" in url:
+                    raise httpx.TimeoutException("late")
+                request = httpx.Request("POST", url)
+                return httpx.Response(
+                    200,
+                    json={
+                        "provider": "arvan",
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": "",
+                                    "tool_calls": [
+                                        {"id": "c1", "function": {"name": "ask_user", "arguments": "{}"}}
+                                    ],
+                                }
+                            }
+                        ],
+                    },
+                    request=request,
+                )
+
+        return FakeClient
+
+    def test_openrouter_body_key_and_ten_second_budget(self) -> None:
+        seen: list = []
+
+        class OkClient:
+            def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+                self.timeout = timeout
+                self.proxy = proxy
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                seen.append({"url": url, "timeout": self.timeout, "proxy": self.proxy, "body": json or {}, "auth": (headers or {}).get("Authorization")})
+                request = httpx.Request("POST", url)
+                return httpx.Response(
+                    200,
+                    json={
+                        "provider": "Together",
+                        "usage": {"prompt_tokens": 11, "completion_tokens": 3, "cost": 0.001},
+                        "choices": [
+                            {"message": {"tool_calls": [{"id": "c1", "function": {"name": "status", "arguments": "{}"}}]}}
+                        ],
+                    },
+                    request=request,
+                )
+
+        extra = json.dumps(
+            {"provider": {"sort": "latency", "ignore": ["Relace"], "allow_fallbacks": True}, "reasoning": {"enabled": False}}
+        )
+        env = {
+            "open_router_api_token": "or-test-key",
+            "CLOUD_LLM_EXTRA_BODY": extra,
+            "CLOUD_LLM_FALLBACK_URL": "https://api.arvancloudai.ir/v1",
+            "CLOUD_LLM_FALLBACK_MODEL": "GPT-OSS-120B",
+            "CLOUD_LLM_FALLBACK_TOKEN": "arvan-test",
+        }
+        with patch.dict(os.environ, env), patch("app.services.llm.settings") as settings, patch(
+            "app.services.llm_routing_service.get", return_value=None
+        ), patch("app.services.llm.httpx.AsyncClient", OkClient), patch("app.services.llm.emit_later"):
+            _apply_settings(
+                settings,
+                _route_settings(
+                    cloud_llm_url="https://openrouter.ai/api/v1",
+                    cloud_llm_model="deepseek/deepseek-v4.1-flash",
+                    cloud_llm_token="should-not-use",
+                ),
+            )
+            out = asyncio.run(complete_tools(messages=[{"role": "user", "content": "hi"}], tools=[{"type": "function"}]))
+        self.assertEqual(seen[0]["auth"], "Bearer or-test-key")
+        self.assertIsNone(seen[0]["proxy"])
+        self.assertEqual(seen[0]["timeout"], 10)
+        self.assertNotIn("think", seen[0]["body"])
+        self.assertEqual(seen[0]["body"]["provider"]["ignore"], ["Relace"])
+        self.assertIs(seen[0]["body"]["reasoning"]["enabled"], False)
+        self.assertEqual(out["provider"], "Together")
+        self.assertEqual(out["usage"]["cost"], 0.001)
+        self.assertNotIn("or-test-key", seen[0]["url"])
+
+    def test_timeout_then_arvan_fallback(self) -> None:
+        seen: list = []
+        titles: list[str] = []
+
+        def emit(**kwargs):
+            if kwargs.get("title") == "cloud-fallback":
+                titles.append(str((kwargs.get("payload") or {}).get("reason") or ""))
+
+        with patch.dict(
+            os.environ,
+            {
+                "open_router_api_token": "or-test-key",
+                "CLOUD_LLM_EXTRA_BODY": '{"reasoning":{"enabled":false}}',
+                "CLOUD_LLM_FALLBACK_URL": "https://api.arvancloudai.ir/v1",
+                "CLOUD_LLM_FALLBACK_MODEL": "GPT-OSS-120B",
+                "CLOUD_LLM_FALLBACK_TOKEN": "arvan-test",
+            },
+        ), patch("app.services.llm.settings") as settings, patch(
+            "app.services.llm_routing_service.get", return_value=None
+        ), patch("app.services.llm.httpx.AsyncClient", self._client(seen)), patch(
+            "app.services.llm.emit_later", new=emit
+        ), patch("app.services.llm._ensure_gpu1", new=AsyncMock(side_effect=lambda model: model)):
+            _apply_settings(
+                settings,
+                _route_settings(
+                    cloud_llm_url="https://openrouter.ai/api/v1",
+                    cloud_llm_model="deepseek/deepseek-v4.1-flash",
+                    cloud_llm_token="should-not-use",
+                ),
+            )
+            out = asyncio.run(complete_tools(messages=[{"role": "user", "content": "hi"}], tools=[{"type": "function"}], timeout=45))
+        self.assertEqual(out["tool_calls"][0]["name"], "ask_user")
+        self.assertEqual(seen[0]["timeout"], 10)
+        self.assertIn("openrouter.ai", seen[0]["url"])
+        self.assertIn("arvancloudai.ir", seen[1]["url"])
+        self.assertIs(seen[1]["body"].get("think"), False)
+        self.assertNotIn("provider", seen[1]["body"])
+        self.assertEqual(titles, ["timeout"])
+        self.assertEqual(len(seen), 2)
 
 
 class ChatFailReportTests(unittest.TestCase):

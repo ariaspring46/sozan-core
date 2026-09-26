@@ -27,6 +27,8 @@ SHOP_CLOUD_SURFACES = frozenset({"shop", "shop-edit", "router"})
 CLOUD_PRIMARY_SURFACES = frozenset({"shop", "shop-edit", "studio", "router"})
 ARVAN_HOST_SUFFIX = "arvancloudai.ir"
 CLOUD_PRIMARY_TIMEOUT = 120
+PRIMARY_CLOUD_TIMEOUT = 10
+FALLBACK_CLOUD_TIMEOUT = 45
 DEFAULT_SHOP_CLOUD_MODEL = "DeepSeek-V4-Pro"
 DEFAULT_STUDIO_CLOUD_MODEL = "Gemini-3.1-Flash-Lite-Preview"
 GPU1_LOCAL = frozenset(
@@ -131,9 +133,77 @@ def _is_arvan_url(url: str) -> bool:
 
 
 def _proxy_for_url(url: str) -> str | None:
-    if _is_arvan_url(url):
+    host = _host_of(url)
+    if _is_arvan_url(url) or host == "openrouter.ai" or host.endswith(".openrouter.ai"):
         return None
     return _cloud_proxy()
+
+
+def _openrouter_token() -> str:
+    return os.environ.get("open_router_api_token", "").strip()
+
+
+def _route_token(url: str, explicit: str) -> str:
+    if "openrouter.ai" in _host_of(url):
+        named = _openrouter_token()
+        if named:
+            return named
+    return explicit
+
+
+def _openrouter_extra_body(url: str) -> dict:
+    if "openrouter.ai" not in _host_of(url):
+        return {}
+    raw = os.environ.get("CLOUD_LLM_EXTRA_BODY", "").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _decorate_cloud_body(body: dict, route: dict) -> None:
+    url = str(route.get("url") or "")
+    if route.get("kind") == "cloud" and _is_arvan_url(url):
+        body["think"] = False
+    if route.get("kind") != "cloud":
+        return
+    for key, value in _openrouter_extra_body(url).items():
+        if key == "think":
+            continue
+        body[key] = value
+
+
+def _fallback_cloud_route() -> dict | None:
+    url = os.environ.get("CLOUD_LLM_FALLBACK_URL", "").strip().rstrip("/")
+    model = os.environ.get("CLOUD_LLM_FALLBACK_MODEL", "").strip()
+    token = os.environ.get("CLOUD_LLM_FALLBACK_TOKEN", "").strip()
+    if not url or not model or not token:
+        return None
+    auth = os.environ.get("CLOUD_LLM_FALLBACK_AUTH", "").strip() or "Bearer"
+    return {
+        "kind": "cloud",
+        "url": url,
+        "model": model,
+        "token": _route_token(url, token),
+        "proxy": _proxy_for_url(url),
+        "auth": auth,
+        "source": "fallback",
+        "cloud": "fallback",
+    }
+
+
+def _emit_cloud_fallback(*, surface: str, reason: str, requested: str, used: str) -> None:
+    emit_later(
+        kind="llm",
+        title="cloud-fallback",
+        surface=surface,
+        status="fallback",
+        stage="cloud-fallback",
+        payload={"requested": requested, "used": used, "reason": reason},
+    )
 
 
 def _auth_scheme(value: object) -> str:
@@ -149,7 +219,7 @@ def _shop_cloud_route(*, source: str = "default") -> dict | None:
         "kind": "cloud",
         "url": url,
         "model": _str_setting(settings.cloud_llm_model, DEFAULT_SHOP_CLOUD_MODEL) or DEFAULT_SHOP_CLOUD_MODEL,
-        "token": token,
+        "token": _route_token(url, token),
         "proxy": _proxy_for_url(url),
         "auth": _auth_scheme(getattr(settings, "cloud_llm_auth", "Bearer")),
         "source": source,
@@ -167,7 +237,7 @@ def _studio_cloud_route(*, source: str = "default") -> dict | None:
         "url": url,
         "model": _str_setting(getattr(settings, "studio_cloud_model", ""), DEFAULT_STUDIO_CLOUD_MODEL)
         or DEFAULT_STUDIO_CLOUD_MODEL,
-        "token": token,
+        "token": _route_token(url, token),
         "proxy": _proxy_for_url(url),
         "auth": _auth_scheme(getattr(settings, "studio_cloud_auth", "Bearer")),
         "source": source,
@@ -252,7 +322,7 @@ def _routing_override(surface: str) -> dict | None:
             "kind": "cloud",
             "url": base,
             "model": model,
-            "token": token,
+            "token": _route_token(base, token),
             "proxy": _proxy_for_url(base),
             "auth": _auth_scheme(getattr(settings, "cloud_llm_auth", "Bearer")),
             "source": "override",
@@ -442,15 +512,30 @@ def _usage_counts(payload: dict) -> dict[str, int]:
     return {"promptTokens": max(0, prompt), "completionTokens": max(0, completion)}
 
 
-def _emit_usage(*, surface: str, model: str, payload: dict) -> dict[str, int]:
+def _emit_usage(*, surface: str, model: str, payload: dict, latency_ms: float = 0) -> dict:
     counts = _usage_counts(payload)
-    emit_later(
-        kind="llm",
-        title="llm-usage",
-        surface=surface,
-        status="ok",
-        payload={"promptTokens": counts["promptTokens"], "completionTokens": counts["completionTokens"], "model": model or ""},
-    )
+    usage = payload.get("usage") if isinstance(payload, dict) else {}
+    cost = None
+    if isinstance(usage, dict) and usage.get("cost") is not None:
+        try:
+            cost = float(usage.get("cost"))
+        except (TypeError, ValueError):
+            cost = None
+    provider = str(payload.get("provider") or "") if isinstance(payload, dict) else ""
+    observed = {
+        "promptTokens": counts["promptTokens"],
+        "completionTokens": counts["completionTokens"],
+        "model": model or "",
+        "provider": provider,
+        "latencyMs": int(latency_ms),
+    }
+    if cost is not None:
+        observed["cost"] = cost
+    emit_later(kind="llm", title="llm-usage", surface=surface, status="ok", payload=observed)
+    counts["provider"] = provider
+    counts["latencyMs"] = int(latency_ms)
+    if cost is not None:
+        counts["cost"] = cost
     return counts
 
 
@@ -461,6 +546,9 @@ async def _complete_with_route(
     temperature: float,
     max_tokens: int,
     surface: str,
+    timeout_override: float | None = None,
+    attempts: int = 2,
+    report: bool = True,
 ) -> str:
     body = {
         "model": route["model"],
@@ -475,13 +563,16 @@ async def _complete_with_route(
     timeout = 180 if max_tokens > 700 else 120
     if route["kind"] != "cloud":
         body["think"] = False
+    _decorate_cloud_body(body, route)
+    if timeout_override is not None:
+        timeout = timeout_override
     if route["kind"] == "cloud":
         scheme = _auth_scheme(route.get("auth"))
         headers["Authorization"] = f"{scheme} {route['token']}"
         headers["User-Agent"] = CLOUD_UA
-        if surface in CLOUD_PRIMARY_SURFACES:
+        if timeout_override is None and surface in CLOUD_PRIMARY_SURFACES:
             timeout = CLOUD_PRIMARY_TIMEOUT
-        else:
+        elif timeout_override is None:
             timeout = max(timeout, 90)
     else:
         body["chat_template_kwargs"] = {"enable_thinking": False, "thinking": False}
@@ -490,38 +581,46 @@ async def _complete_with_route(
             headers["Authorization"] = f"Bearer {route['token']}"
         body["model"] = await _ensure_gpu1(route["model"])
     last_exc: Exception | None = None
-    for attempt in (1, 2):
+    started = time.perf_counter()
+    for attempt in range(1, max(1, attempts) + 1):
         try:
             async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route["proxy"]) as client:
                 res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
                 res.raise_for_status()
                 data = res.json()
-                _emit_usage(surface=surface, model=str(route.get("model") or ""), payload=data if isinstance(data, dict) else {})
+                latency_ms = (time.perf_counter() - started) * 1000
+                _emit_usage(
+                    surface=surface,
+                    model=str(route.get("model") or ""),
+                    payload=data if isinstance(data, dict) else {},
+                    latency_ms=latency_ms,
+                )
                 return _choice_text(data)
         except Exception as exc:
             last_exc = exc
             klass = _classify_llm_error(exc)
-            if attempt == 1 and klass in {"http-5xx", "unreachable"}:
+            if attempt < attempts and klass in {"http-5xx", "unreachable"}:
                 log.warning("llm %s retry after %s", surface, klass)
                 import asyncio
 
                 await asyncio.sleep(1.2)
                 continue
             log.warning("llm %s failed: %s: %s", surface, type(exc).__name__, str(exc)[:200])
-            report_llm_fail(
-                surface=surface,
-                error_class=klass,
-                detail=f"{type(exc).__name__}: {str(exc)[:200]}",
-                request_id=request_id,
-                prompt=_last_user_prompt(messages),
-            )
+            if report:
+                report_llm_fail(
+                    surface=surface,
+                    error_class=klass,
+                    detail=f"{type(exc).__name__}: {str(exc)[:200]}",
+                    request_id=request_id,
+                    prompt=_last_user_prompt(messages),
+                )
             raise
     raise last_exc or RuntimeError("llm")
 
 
 async def _chat_completion(*, messages: list[dict], temperature: float, max_tokens: int, surface: str) -> str:
     route = route_for_surface(surface)
-    try:
+    if route.get("kind") != "cloud":
         return await _complete_with_route(
             route,
             messages=messages,
@@ -529,31 +628,55 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
             max_tokens=max_tokens,
             surface=surface,
         )
-    except Exception as cloud_exc:
-        if surface == "router":
-            raise
-        if route.get("kind") != "cloud" or surface not in CLOUD_PRIMARY_SURFACES:
-            raise
-        local = _local_default_route(surface)
-        log.warning("llm %s cloud failed; fallback local %s", surface, local.get("model"))
-        emit_later(
-            kind="llm",
-            title="cloud-fallback",
-            surface=surface,
-            status="fallback",
-            stage="cloud-fallback",
-            payload={"requested": route.get("model") or "", "used": local.get("model") or ""},
-        )
+    fallback = _fallback_cloud_route()
+    chained = bool(fallback) and str(fallback.get("url") or "") != str(route.get("url") or "")
+    if chained:
+        hops: list[tuple[dict, float, int]] = [
+            (route, PRIMARY_CLOUD_TIMEOUT, 1),
+            (fallback, FALLBACK_CLOUD_TIMEOUT, 2),
+        ]
+        allow_local = surface in CLOUD_PRIMARY_SURFACES
+    else:
+        primary_timeout = CLOUD_PRIMARY_TIMEOUT if surface in CLOUD_PRIMARY_SURFACES else 120
+        hops = [(route, primary_timeout, 2)]
+        allow_local = surface in CLOUD_PRIMARY_SURFACES and surface != "router"
+    last_exc: Exception | None = None
+    for index, (hop, timeout, attempts) in enumerate(hops):
+        final_hop = index == len(hops) - 1 and not allow_local
         try:
             return await _complete_with_route(
-                local,
+                hop,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 surface=surface,
+                timeout_override=timeout,
+                attempts=attempts,
+                report=final_hop,
             )
-        except Exception:
-            raise cloud_exc
+        except Exception as exc:
+            last_exc = exc
+            if final_hop:
+                raise
+            nxt = _local_default_route(surface) if index == len(hops) - 1 else hops[index + 1][0]
+            _emit_cloud_fallback(
+                surface=surface,
+                reason=_classify_llm_error(exc),
+                requested=str(hop.get("model") or ""),
+                used=str(nxt.get("model") or ""),
+            )
+    local = _local_default_route(surface)
+    log.warning("llm %s cloud failed; fallback local %s", surface, local.get("model"))
+    try:
+        return await _complete_with_route(
+            local,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            surface=surface,
+        )
+    except Exception:
+        raise last_exc or RuntimeError("llm")
 
 
 async def complete_json(system: str, user: str, *, surface: str = "llm", max_tokens: int = 700) -> dict:
@@ -626,36 +749,7 @@ async def complete_chat(*, system: str, turns: list[dict], surface: str = "shop"
     return reply
 
 
-async def complete_tools(
-    *,
-    messages: list[dict],
-    tools: list[dict],
-    temperature: float = 0.2,
-    max_tokens: int = ROUTER_MAX_TOKENS,
-    timeout: float | None = None,
-) -> dict:
-    """One cloud tool-call round for the product router. No local fallback."""
-    route = route_for_surface("router")
-    if route.get("kind") != "cloud":
-        raise RuntimeError("router_requires_cloud")
-    body = {
-        "model": route["model"],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "messages": messages,
-        "tools": tools,
-        "tool_choice": "auto",
-    }
-    headers = {"Content-Type": "application/json", **llm_headers(surface="router")}
-    scheme = _auth_scheme(route.get("auth"))
-    headers["Authorization"] = f"{scheme} {route['token']}"
-    headers["User-Agent"] = CLOUD_UA
-    client_timeout = CLOUD_PRIMARY_TIMEOUT if timeout is None else timeout
-    async with httpx.AsyncClient(timeout=client_timeout, trust_env=False, proxy=route["proxy"]) as client:
-        res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
-        res.raise_for_status()
-        payload = res.json()
-    counts = _emit_usage(surface="router", model=str(route.get("model") or ""), payload=payload if isinstance(payload, dict) else {})
+def _tool_result(route: dict, payload: dict, counts: dict) -> dict:
     choice = (payload.get("choices") or [{}])[0] if isinstance(payload, dict) else {}
     msg = (choice.get("message") or {}) if isinstance(choice, dict) else {}
     finish = str(choice.get("finish_reason") or "") if isinstance(choice, dict) else ""
@@ -677,4 +771,113 @@ async def complete_tools(
                 parsed = {}
             args = parsed if isinstance(parsed, dict) else {}
         calls.append({"id": str(raw.get("id") or ""), "name": name, "arguments": args})
-    return {"text": str(msg.get("content") or "").strip(), "tool_calls": calls, "usage": counts, "finish_reason": finish}
+    return {
+        "text": str(msg.get("content") or "").strip(),
+        "tool_calls": calls,
+        "usage": counts,
+        "finish_reason": finish,
+        "provider": str(counts.get("provider") or ""),
+        "model": str(route.get("model") or ""),
+        "latencyMs": int(counts.get("latencyMs") or 0),
+    }
+
+
+async def _tools_once(
+    route: dict,
+    *,
+    messages: list[dict],
+    tools: list[dict],
+    temperature: float,
+    max_tokens: int,
+    timeout: float,
+) -> dict:
+    body = {
+        "model": route["model"],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "messages": messages,
+        "tools": tools,
+        "tool_choice": "auto",
+    }
+    headers = {"Content-Type": "application/json", **llm_headers(surface="router")}
+    if route["kind"] != "cloud":
+        body["think"] = False
+        body["chat_template_kwargs"] = {"enable_thinking": False, "thinking": False}
+        body["reasoning_format"] = "none"
+        if route.get("token"):
+            headers["Authorization"] = f"Bearer {route['token']}"
+        body["model"] = await _ensure_gpu1(route["model"])
+    else:
+        _decorate_cloud_body(body, route)
+        scheme = _auth_scheme(route.get("auth"))
+        headers["Authorization"] = f"{scheme} {route['token']}"
+        headers["User-Agent"] = CLOUD_UA
+    started = time.perf_counter()
+    async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route.get("proxy")) as client:
+        res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
+        res.raise_for_status()
+        payload = res.json()
+    counts = _emit_usage(
+        surface="router",
+        model=str(body.get("model") or route.get("model") or ""),
+        payload=payload if isinstance(payload, dict) else {},
+        latency_ms=(time.perf_counter() - started) * 1000,
+    )
+    return _tool_result(route, payload if isinstance(payload, dict) else {}, counts)
+
+
+async def complete_tools(
+    *,
+    messages: list[dict],
+    tools: list[dict],
+    temperature: float = 0.2,
+    max_tokens: int = ROUTER_MAX_TOKENS,
+    timeout: float | None = None,
+) -> dict:
+    """Tool-call round for the product router. OpenRouter, then the configured cloud fallback, then local."""
+    route = route_for_surface("router")
+    if route.get("kind") != "cloud":
+        raise RuntimeError("router_requires_cloud")
+    fallback = _fallback_cloud_route()
+    chained = bool(fallback) and str(fallback.get("url") or "") != str(route.get("url") or "")
+    later = FALLBACK_CLOUD_TIMEOUT if timeout is None else timeout
+    if chained:
+        hops: list[tuple[dict, float]] = [(route, PRIMARY_CLOUD_TIMEOUT), (fallback, later)]
+        allow_local = True
+    else:
+        hops = [(route, CLOUD_PRIMARY_TIMEOUT if timeout is None else timeout)]
+        allow_local = False
+    last_exc: Exception | None = None
+    for index, (hop, hop_timeout) in enumerate(hops):
+        try:
+            return await _tools_once(
+                hop,
+                messages=messages,
+                tools=tools,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=hop_timeout,
+            )
+        except Exception as exc:
+            last_exc = exc
+            if index == len(hops) - 1 and not allow_local:
+                raise
+            nxt = _local_default_route("router") if index == len(hops) - 1 else hops[index + 1][0]
+            _emit_cloud_fallback(
+                surface="router",
+                reason=_classify_llm_error(exc),
+                requested=str(hop.get("model") or ""),
+                used=str(nxt.get("model") or ""),
+            )
+    local = _local_default_route("router")
+    try:
+        return await _tools_once(
+            local,
+            messages=messages,
+            tools=tools,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=later,
+        )
+    except Exception:
+        raise last_exc or RuntimeError("llm")
