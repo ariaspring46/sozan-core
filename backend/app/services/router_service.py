@@ -506,15 +506,68 @@ def _language_refusal(spoken: str) -> str:
     return ""
 
 
+def _registry_text(key: str) -> str:
+    from app.services.turn_parse import registry
+
+    return str(registry().get(key) or "")
+
+
+def _has_registry_mark(text: str, key: str) -> bool:
+    from app.services.turn_parse import registry
+
+    return any(mark and str(mark) in (text or "") for mark in (registry().get(key) or []))
+
+
+def _continue_reply(spoken: str) -> str:
+    if not _has_registry_mark(spoken, "continue_marks"):
+        return ""
+    pending = _pending()
+    if _card_open(pending):
+        return str(pending.get("summary") or "همان کارت باز است.")
+    prior = _last_content_line()
+    if prior:
+        return prior
+    return _registry_text("continue_ask")
+
+
+def _send_without_post(spoken: str) -> str:
+    from app.services.turn_parse import parse_turn
+
+    if parse_turn(spoken).act != "publish":
+        return ""
+    if _latest_post(spoken) is not None:
+        return ""
+    return _registry_text("no_send")
+
+
+def _studio_without_post(spoken: str) -> str:
+    from app.services.turn_parse import parse_turn
+
+    turn = parse_turn(spoken)
+    if turn.revise or turn.act == "publish":
+        return ""
+    if _last_content_line():
+        return ""
+    if not _has_registry_mark(spoken, "prior_marks") or not _has_registry_mark(spoken, "prior_topics"):
+        return ""
+    return _registry_text("missing_post")
+
+
 def _direct_reply(spoken: str) -> str:
     fact = _fact_reply(spoken)
     if fact:
         return fact
     text = (spoken or "").strip()
+    continued = _continue_reply(text)
+    if continued:
+        return continued
     compact = text.replace("؟", "").replace("?", "").strip()
     lang = _language_refusal(text)
     if lang:
         return lang
+    unsent = _send_without_post(text)
+    if unsent:
+        return unsent
     if any(mark in text for mark in ("چه کار", "چکار", "چه می‌توانی", "چه میتونی", "قابلیت")):
         return _CAPABILITY
     if compact in {"فروشگاه", "فروشگاهم", "سایت", "ویترین"} or (
@@ -528,6 +581,9 @@ def _direct_reply(spoken: str) -> str:
         if not _last_content_line():
             return "پست قبلی در این گفتگو ندارم. بگو کپشن چه باشد."
         return ""
+    missing = _studio_without_post(text)
+    if missing:
+        return missing
     if "بدون https" in text or ("بدون" in text and "https" in text):
         prior = " ".join(str(row.get("text") or "") for row in _messages()[-6:] if isinstance(row, dict))
         if "دامنه" in prior or "http" in prior:
@@ -811,7 +867,7 @@ def _route_shop(name: str, spoken: str, view_path: str, view_target: str) -> tup
     if mut and str(mut.get("type") or "") == "add_product":
         return "add_product", ""
     if mut:
-        if _live_root() is None:
+        if str(mut.get("type") or "") != "remove_product" and _live_root() is None:
             return "shop_chat", "ویترین هنوز نیست. اول بگو بساز؛ تغییر صفحه بعد از ساخت است."
         return "edit_shop", ""
     clar = next((str(item.get("reply") or "") for item in actions if item.get("type") == "ask_clarify"), "")
@@ -940,7 +996,7 @@ def _publish_block(args: dict, spoken: str = "") -> str:
         return named
     post = _latest_post(spoken, campaign_id=str(args.get("campaignId") or ""))
     if post is None:
-        return "هنوز فایل آماده‌ای برای ارسال نیست."
+        return _registry_text("no_send")
     if post.get("pending"):
         return "هنوز تصویر این پست تمام نشده."
     if not str(post.get("name") or "").strip():
@@ -999,6 +1055,8 @@ def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = ""
             return f"پست {cid} در اینستاگرام منتشر شود؟" if cid else "این پست در اینستاگرام منتشر شود؟"
         label = _PUBLISH_FA.get(platform, "کانال")
         return f"این پست در {label} فرستاده شود؟"
+    if name == "shop_chat":
+        return "فروشگاه از نو ساخته شود؟"
     return "این تغییر اعمال شود؟"
 
 
@@ -1174,6 +1232,9 @@ async def _run_tool(
         from app.services.shop_service import _shop
 
         actions = [item for item in _shop_actions(spoken, view_path, view_target) if str(item.get("type") or "") in _MUTATIONS]
+        removes = [item for item in actions if str(item.get("type") or "") == "remove_product"]
+        if removes and len(removes) == len(actions):
+            return _remove_from_catalog(removes), {}
         if not actions or _live_root() is None:
             return "این تغییر روی صفحه اعمال نشد.", {}
         out = await apply_live_edit(_shop(), spoken, view_path, view_target, classified={"actions": actions})
@@ -1216,8 +1277,8 @@ async def _run_tool(
         from app.services import shop_service
 
         out = await shop_service.chat(spoken, media, view_path, view_target)
-        last = _last_assistant(out)
-        return str(last.get("text") or "فروشگاه به‌روز شد."), {}
+        picked = out.get("assistant") if isinstance(out.get("assistant"), dict) else _last_assistant(out)
+        return str(picked.get("text") or "فروشگاه به‌روز شد."), {}
     if name == "studio_chat":
         from app.services import studio_chat_service
 
@@ -1427,18 +1488,52 @@ def _ask_message(args: dict) -> tuple[str, list[str]]:
     return question, options
 
 
+def _remove_from_catalog(actions: list[dict]) -> str:
+    from app.services.shop_service import _shop, _shop_is_live
+    from app.services.storefront_service import list_products, remove_product_by_title
+
+    titles = [str(item.get("title") or "").strip() for item in actions if str(item.get("title") or "").strip()]
+    before = {
+        str(row.get("title") or "")
+        for row in (list_products().get("products") or [])
+        if isinstance(row, dict) and str(row.get("title") or "")
+    }
+    for title in titles:
+        remove_product_by_title(title)
+    if _live_root() is not None and _shop_is_live(_shop()):
+        from app.services import catalog_sync_service
+
+        catalog_sync_service.sync_live()
+    left = [
+        str(row.get("title") or "")
+        for row in (list_products().get("products") or [])
+        if isinstance(row, dict) and str(row.get("title") or "")
+    ]
+    shown = "، ".join(titles) or "کالا"
+    if titles and not any(title in before for title in titles):
+        return "این کالا در کاتالوگ نیست."
+    if any(title in left for title in titles):
+        return "کالا از کاتالوگ حذف نشد."
+    if left:
+        return f"«{shown}» از کاتالوگ حذف شد. مانده: {'، '.join(left)}."
+    return f"«{shown}» از کاتالوگ حذف شد. کاتالوگ خالی است."
+
+
 def route_tool(spoken: str, view_path: str = "", view_target: str = "") -> str:
     from app.services.shop_intent_service import catalog_add
+    from app.services.shop_service import _explicit_rebuild
     from app.services.turn_parse import parse_turn
 
     kinds = {str(item.get("type") or "") for item in _shop_actions(spoken, view_path, view_target)}
     if _force_shop_build(spoken):
         return "shop_chat"
+    if _explicit_rebuild(spoken):
+        return "shop_chat"
     if parse_turn(spoken).act == "publish":
         return "publish_post"
     if catalog_add(spoken) is not None:
         return "add_product"
-    if kinds & {"create_page", "set_colors", "show_prices", "hide_prices"}:
+    if kinds & {"create_page", "set_colors", "show_prices", "hide_prices", "remove_product"}:
         return "edit_shop"
     if _wants_advice(spoken):
         return "shop_chat"
@@ -1660,7 +1755,16 @@ async def _execute(
         _append("assistant", _guard_reply(spoken, direct))
         _emit("router-tool", {"tool": name, "level": _tool_level(name), "applied": False})
         return snapshot()
-    if name in WRITE_TOOLS:
+    if name == "studio_chat":
+        blocked = _studio_without_post(spoken)
+        if blocked:
+            _append("assistant", blocked)
+            _emit("router-tool", {"tool": name, "level": "read", "applied": False})
+            return snapshot()
+    from app.services.shop_service import _explicit_rebuild
+
+    rebuild_card = name == "shop_chat" and _explicit_rebuild(spoken)
+    if name in WRITE_TOOLS or rebuild_card:
         pending_id = str(uuid4())
         summary = _summary_for(name, args, spoken=spoken, view_path=view_path, view_target=view_target)
         stored = {

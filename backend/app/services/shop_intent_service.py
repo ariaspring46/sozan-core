@@ -128,6 +128,22 @@ def catalog_add(text: str) -> dict | None:
     return {"title": title, "price": _price_toman(text)}
 
 
+def _catalog_title_in(text: str) -> str:
+    from app.services.storefront_service import list_products
+
+    titles: list[str] = []
+    for row in list_products().get("products") or []:
+        if not isinstance(row, dict):
+            continue
+        title = str(row.get("title") or "").strip()
+        if len(title) >= 2:
+            titles.append(title)
+    for title in sorted(titles, key=len, reverse=True):
+        if title in text:
+            return title
+    return ""
+
+
 def _quoted(text: str) -> str:
     match = QUOTED.search(text or "")
     return match.group(1).strip() if match else ""
@@ -204,12 +220,19 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
             actions.append({"type": "ask_clarify", "reply": "قیمت تومان را هم بگو تا در کاتالوگ بنویسم."})
         else:
             actions.append({"type": "add_product", "title": title, "price": price})
-    if REMOVE_PRODUCT_RE.search(text):
+    wipe_all = "همه" in text and re.search(r"(?:کالا|محصول)", text) and re.search(r"(?:حذف|بردار|پاک)", text)
+    if wipe_all:
+        pass
+    elif REMOVE_PRODUCT_RE.search(text):
         title = _quoted(text) or target
         if title:
             actions.append({"type": "remove_product", "title": title})
         elif catalog_add(text) is None:
             actions.append({"type": "ask_clarify", "reply": "کدام کالا حذف شود؟"})
+    elif re.search(r"(?:حذف|بردار|پاک)", text):
+        titled = _catalog_title_in(text)
+        if titled:
+            actions.append({"type": "remove_product", "title": titled})
     if HEADER_RE.search(text) and not CREATE_PAGE_RE.search(text):
         logo = _quoted(text)
         kind = page_kind_from_text(text)

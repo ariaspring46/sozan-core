@@ -82,6 +82,17 @@ class ShopIntentClassifyTests(unittest.TestCase):
         self.assertNotIn("`", marked["title"])
         self.assertNotIn("\u202e", marked["title"])
 
+    def test_bare_catalog_title_is_a_remove(self) -> None:
+        from unittest.mock import patch
+
+        catalog = {"products": [{"title": "انگشتر نقره"}, {"title": "انگشتر"}]}
+        with patch("app.services.storefront_service.list_products", return_value=catalog):
+            removed = classify_actions("انگشتر نقره را حذف کن")
+        self.assertEqual(removed[0]["type"], "remove_product")
+        self.assertEqual(removed[0]["title"], "انگشتر نقره")
+        wiped = classify_actions("همه کالاها را پاک کن")
+        self.assertFalse(any(item.get("type") == "remove_product" for item in wiped))
+
     def test_greet_and_continue_are_canned(self) -> None:
         self.assertEqual(classify_actions("سلام")[0]["type"], "greet")
         self.assertEqual(classify_actions("خب")[0]["type"], "greet")

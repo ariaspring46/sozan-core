@@ -1762,7 +1762,11 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
         elif result.get("queued"):
             reply = "ساخت قبلی هنوز تمام نشده. مرحله‌ها را همین‌جا می‌بینی."
         else:
-            reply = f"ساخت شروع نشد: {_operator_error(str(result.get('error') or result.get('message') or '')) or 'خطای کارخانه'}"
+            detail = _operator_error(str(result.get("error") or result.get("message") or ""))
+            if detail and detail != SAFE_BUILD and "مشکل موقت" not in detail:
+                reply = f"ساخت شروع نشد: {detail}"
+            else:
+                reply = "ساخت الان ممکن نیست، چند دقیقهٔ دیگر."
         assistant = {
             "id": str(uuid4()),
             "role": "assistant",

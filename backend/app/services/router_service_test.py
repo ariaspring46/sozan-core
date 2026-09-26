@@ -959,7 +959,8 @@ class RouterServiceTests(unittest.TestCase):
             out = self._turn("بفرست", complete)
         sent.assert_not_called()
         self.assertIsNone(out.get("pendingConfirm"))
-        self.assertIn("فایل آماده", out["messages"][-1]["text"])
+        self.assertIn("آماده", out["messages"][-1]["text"])
+        self.assertIn("پست", out["messages"][-1]["text"])
 
     def test_idle_build_sentence_is_shop_chat(self) -> None:
         async def studio(_messages, _tools):
@@ -1223,6 +1224,95 @@ class RouterServiceTests(unittest.TestCase):
         out = self._turn("فونت را عوض کن", complete)
         self.assertIn("فونت", out["messages"][-1]["text"])
         self.assertNotIn("نشناختم", out["messages"][-1]["text"])
+
+    def _boom(self):
+        async def complete(_messages, _tools):
+            raise AssertionError("model")
+
+        return complete
+
+    def _wrong(self, name: str):
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": name, "arguments": {}}]}
+
+        return complete
+
+    def test_continue_without_context_asks_without_the_model(self) -> None:
+        for complete in (self._boom(), self._wrong("status")):
+            out = self._turn("ادامه بده روی همان کار", complete)
+            self.assertIsNone(out.get("pendingConfirm"))
+            self.assertIn("کدام کار", out["messages"][-1]["text"])
+
+    def test_story_reference_without_a_post_does_not_open_a_card(self) -> None:
+        for complete in (self._boom(), self._wrong("studio_chat")):
+            out = self._turn("همون پست را برای استوری هم بساز", complete)
+            self.assertIsNone(out.get("pendingConfirm"))
+            self.assertIn("ساخته نشده", out["messages"][-1]["text"])
+
+    def test_caption_you_wrote_without_a_post_does_not_open_a_card(self) -> None:
+        for complete in (self._boom(), self._wrong("studio_chat")):
+            out = self._turn("کپشنی که ساختی را انگلیسی نکن، فارسی نگه دار", complete)
+            self.assertIsNone(out.get("pendingConfirm"))
+            self.assertIn("ساخته نشده", out["messages"][-1]["text"])
+
+    def test_send_without_a_post_uses_one_sentence(self) -> None:
+        for complete in (self._boom(), self._wrong("publish_post")):
+            out = self._turn("همین پست را در تلگرام بفرست", complete)
+            self.assertIsNone(out.get("pendingConfirm"))
+            text = out["messages"][-1]["text"]
+            self.assertIn("آماده", text)
+            self.assertIn("پست", text)
+
+    def test_named_product_delete_cards_then_drops_the_catalog_row(self) -> None:
+        from app.state_store import read_json
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"status": "idle"})
+            write_json(
+                "products.json",
+                [
+                    {"id": "p1", "title": "انگشتر نقره", "price": 2500000, "stock": 3},
+                    {"id": "p2", "title": "گردنبند فیروزه", "price": 1800000, "stock": 0},
+                ],
+            )
+        sync = unittest.mock.Mock()
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=None), patch(
+            "app.services.catalog_sync_service.sync_live", sync
+        ):
+            for complete in (self._boom(), self._wrong("edit_shop")):
+                held = self._turn("انگشتر نقره را حذف کن", complete)
+                self.assertEqual(held["pendingConfirm"]["tool"], "edit_shop")
+                self.assertIn("حذف", held["messages"][-1]["text"])
+                self._turn("", complete, cancel_id=held["pendingConfirm"]["id"])
+            held = self._turn("انگشتر نقره را حذف کن", self._boom())
+            out = self._turn("", self._boom(), confirm_id=held["pendingConfirm"]["id"])
+        sync.assert_not_called()
+        self.assertIn("گردنبند فیروزه", out["messages"][-1]["text"])
+        self.assertNotIn("انگشتر نقره", out["messages"][-1]["text"].split("مانده:", 1)[-1])
+        with tenant_scope("09129900001"):
+            rows = read_json("products.json", [])
+        self.assertEqual([row["title"] for row in rows], ["گردنبند فیروزه"])
+
+    def test_rebuild_cards_before_the_factory(self) -> None:
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "batt-test", "status": "ready", "brand": "تست"})
+        start = unittest.mock.Mock(return_value={"ok": False, "error": 'Traceback (most recent call last):\n  File "x.py", line 1, in build'})
+        with patch("app.services.shop_service.start_build", start):
+            for complete in (self._boom(), self._wrong("shop_chat")):
+                held = self._turn("فروشگاه را از نو بساز", complete)
+                self.assertEqual(held["pendingConfirm"]["tool"], "shop_chat")
+                self.assertIn("از نو", held["messages"][-1]["text"])
+                start.assert_not_called()
+                self._turn("", complete, cancel_id=held["pendingConfirm"]["id"])
+            held = self._turn("فروشگاه را از نو بساز", self._boom())
+            out = self._turn("", self._boom(), confirm_id=held["pendingConfirm"]["id"])
+        start.assert_called()
+        self.assertIn("ساخت الان ممکن نیست", out["messages"][-1]["text"])
+
+    def test_wipe_all_products_stays_a_refusal(self) -> None:
+        out = self._turn("همه کالاها را پاک کن", self._boom())
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("پاک نمی‌کنم", out["messages"][-1]["text"])
 
 
 if __name__ == "__main__":

@@ -969,8 +969,20 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
         else:
             text = f"«{title}» به کاتالوگ اضافه شد."
     elif kind == "remove_product":
-        title = action.get("title") or "کالا"
-        text = f"«{title}» از کاتالوگ حذف شد." if ok else "کالا از کاتالوگ حذف نشد."
+        title = str(action.get("title") or "کالا")
+        from app.services.storefront_service import list_products
+
+        left = [
+            str(row.get("title") or "")
+            for row in (list_products().get("products") or [])
+            if isinstance(row, dict) and str(row.get("title") or "")
+        ]
+        if not ok or title in left:
+            text = "کالا از کاتالوگ حذف نشد."
+        elif left:
+            text = f"«{title}» از کاتالوگ حذف شد. مانده: {'، '.join(left)}."
+        else:
+            text = f"«{title}» از کاتالوگ حذف شد. کاتالوگ خالی است."
     elif kind == "set_header":
         text = "متن هدر عوض شد." if ok else "هدر روی سایت عوض نشد."
     elif kind == "add_nav_link":
@@ -1075,8 +1087,10 @@ def _execute_action(shop: dict, root: Path, action: dict, view_path: str) -> dic
         title = str(action.get("title") or "").strip()
         storefront_service.remove_product_by_title(title)
         from app.services import catalog_sync_service
+        from app.services.shop_service import _shop_is_live
 
-        catalog_sync_service.sync_live()
+        if _shop_is_live(shop):
+            catalog_sync_service.sync_live()
         files = ["public/catalog.json"]
         preview = _preview_payload(reload=True)
     elif kind == "set_header":
