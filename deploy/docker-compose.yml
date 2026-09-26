@@ -3,7 +3,8 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: sozan
-      POSTGRES_PASSWORD: sozan
+      # Used only when the data volume is empty. The live hub password lives in .env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sozan}
       POSTGRES_DB: sozan_ads
     ports:
       - "127.0.0.1:15432:5432"

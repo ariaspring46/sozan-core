@@ -1,0 +1,6 @@
+[Unit]
+Description=Pull Sozan hub backups onto this machine
+
+[Service]
+Type=oneshot
+ExecStart=%h/work-f/Sozan-Core/deploy/sozan-backup-pull.sh

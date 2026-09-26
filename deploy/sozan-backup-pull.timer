@@ -1,0 +1,10 @@
+[Unit]
+Description=Pull Sozan backups after the hub nightly run
+
+[Timer]
+# Hub backup is 02:40 UTC, which is 06:10 in Tehran.
+OnCalendar=*-*-* 06:25:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
