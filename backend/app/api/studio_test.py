@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api import studio as studio_api
+from app.config import settings
 from app.database import get_session
 from app.security import get_current_user
 from app.services import studio_chat_service
@@ -17,6 +18,8 @@ from app.state_store import tenant_scope
 class StudioApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.dir = tempfile.TemporaryDirectory()
+        self.state = patch.object(settings, "state_dir", self.dir.name)
+        self.state.start()
         app = FastAPI()
         app.include_router(studio_api.router)
 
@@ -47,6 +50,7 @@ class StudioApiTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.idem_read.stop()
         self.idem_write.stop()
+        self.state.stop()
         self.dir.cleanup()
 
     def test_chat_idempotent_replay(self) -> None:

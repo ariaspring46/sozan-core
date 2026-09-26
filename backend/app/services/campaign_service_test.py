@@ -27,7 +27,9 @@ class CampaignImportTests(unittest.TestCase):
                 '{"pillar":"shop","title":"x","subtitle":"","cta":"","instagram_caption":"","telegram_caption":"","whatsapp_caption":""}',
                 encoding="utf-8",
             )
-            with patch.object(settings, "campaigns_dir", raw), tenant_scope("09128880001"):
+            with patch.object(settings, "campaigns_dir", raw), patch.object(
+                settings, "state_dir", raw
+            ), tenant_scope("09128880001"):
                 write_json("campaign-ids.json", [])
                 with self.assertRaises(HTTPException) as ctx:
                     import asyncio

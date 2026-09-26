@@ -62,6 +62,20 @@ async def _housekeeping_loop() -> None:
         await asyncio.sleep(60)
 
 
+async def _rearm_inbox() -> None:
+    from app.services import inbox_service
+    from app.state_store import iter_tenants, tenant_scope
+
+    for phone in iter_tenants():
+        try:
+            with tenant_scope(phone):
+                await inbox_service.rearm_pending_auto_replies()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("inbox rearm failed")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     async with engine.begin() as conn:
@@ -77,6 +91,7 @@ async def lifespan(_app: FastAPI):
 
     poller = asyncio.create_task(_channel_poll_loop())
     housekeeper = asyncio.create_task(_housekeeping_loop())
+    rearm = asyncio.create_task(_rearm_inbox())
     loop_watch = start_loop_watch()
     from app.services import image_provider_service, llm_routing_service
 
@@ -85,10 +100,11 @@ async def lifespan(_app: FastAPI):
     yield
     poller.cancel()
     housekeeper.cancel()
+    rearm.cancel()
     probe_task.cancel()
     router_task.cancel()
     loop_watch.cancel()
-    for task in (poller, housekeeper, probe_task, router_task, loop_watch):
+    for task in (poller, housekeeper, rearm, probe_task, router_task, loop_watch):
         try:
             await task
         except asyncio.CancelledError:

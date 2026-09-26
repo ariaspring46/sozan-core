@@ -417,6 +417,34 @@ class InboxModeTests(unittest.TestCase):
         autos = [msg for msg in opened["messages"] if msg.get("auto") and msg.get("kind") == "outbound"]
         self.assertEqual(len(autos), 2)
 
+    def test_rearm_after_restart_sends_deferred(self) -> None:
+        async def run() -> dict:
+            await inbox_service.handle_inbound(
+                platform="telegram", sender="علی", text="سلام", sender_id="1", chat_id="9", external_id="9:r1"
+            )
+            await inbox_service.drain_auto_replies()
+            await inbox_service.handle_inbound(
+                platform="telegram", sender="علی", text="قیمت؟", sender_id="1", chat_id="9", external_id="9:r2"
+            )
+            await inbox_service.drain_auto_replies()
+            inbox_service.cancel_deferred_auto_replies()
+            await inbox_service.rearm_pending_auto_replies()
+            await inbox_service.drain_deferred_auto_replies()
+            snap = inbox_service.list_threads()["threads"][0]
+            return inbox_service.get_thread(snap["id"])
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": "send", "dmSync": True, "label": "پرو مکس"}), patch(
+            "app.services.voice_service.draft_reply", new=AsyncMock(side_effect=["سلام", "قیمت دو میلیون"])
+        ), patch("app.services.channel_outbound_service.deliver", new=AsyncMock()) as deliver, patch.object(
+            inbox_service, "AUTO_GAP_SEC", 0.05
+        ):
+            opened = asyncio.run(run())
+        self.assertEqual(deliver.await_count, 2)
+        autos = [msg for msg in opened["messages"] if msg.get("auto") and msg.get("kind") == "outbound"]
+        self.assertEqual(len(autos), 2)
+
     def test_hourly_auto_send_cap(self) -> None:
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_service.emit_later"

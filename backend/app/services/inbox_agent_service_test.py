@@ -85,6 +85,14 @@ class InboxAgentTests(unittest.TestCase):
         self.assertIn("4000000", tool_blob)
         self.assertIn('"stock": 2', tool_blob)
 
+    def test_stock_matches_one_edit_typo(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)):
+            storefront_service.add_product(title="انگشتر نقره", price=2500000, stock=3, sku="s")
+            storefront_service.add_product(title="گردنبند فیروزه", price=1800000, stock=0, sku="t")
+            hits = inbox_agent_service._match_products("نفره")
+        self.assertEqual(len(hits), 1)
+        self.assertIn("نقره", str(hits[0].get("title") or ""))
+
     def test_missing_order_is_honest(self) -> None:
         seen: list = []
         payloads = [

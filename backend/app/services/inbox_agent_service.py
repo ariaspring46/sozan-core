@@ -89,6 +89,21 @@ def _norm(text: str) -> str:
     return str(text or "").replace("ي", "ی").replace("ك", "ک").strip().lower()
 
 
+def _one_edit(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1 or min(la, lb) < 3:
+        return False
+    prev = list(range(lb + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1] <= 1
+
+
 def _products() -> list[dict]:
     from app.services.storefront_service import list_products
 
@@ -106,7 +121,15 @@ def _match_products(needle: str) -> list[dict]:
         pid = _norm(str(item.get("id") or ""))
         if wanted in title or wanted == pid or title in wanted:
             hits.append(item)
-    return hits[:3]
+    if hits:
+        return hits[:3]
+    fuzzy = []
+    for item in _products():
+        title = _norm(str(item.get("title") or ""))
+        tokens = [tok for tok in title.split() if len(tok) >= 3]
+        if any(_one_edit(wanted, tok) for tok in tokens) or _one_edit(wanted, title):
+            fuzzy.append(item)
+    return fuzzy[:3]
 
 
 def _public_product(item: dict) -> dict:

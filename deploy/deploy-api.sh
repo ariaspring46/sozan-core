@@ -20,14 +20,13 @@ LOCAL="$(git rev-parse "$COMMIT")"
 echo "deploy ${LOCAL}"
 git archive "$COMMIT" backend tools/qa_battery.py deploy/sozan-worker.service deploy/sozan-battery.service deploy/sozan-battery.timer deploy/sozan-backup.sh deploy/sozan-backup.service deploy/sozan-backup.timer \
   | ssh -o ConnectTimeout=15 "$HOST" "cd ${REMOTE} && tar -x"
+ssh -o ConnectTimeout=15 "$HOST" "SUITE_DIR=\$(mktemp -d /tmp/sozan-suite.XXXXXX) && cd ${REMOTE}/backend && PYTHONPATH=${REMOTE}/backend STATE_DIR=\$SUITE_DIR .venv/bin/python -m unittest discover -s app -p '*_test.py' -q; status=\$?; rm -rf \$SUITE_DIR; exit \$status"
 ssh -o ConnectTimeout=15 "$HOST" "printf '%s\n' '${LOCAL}' > ${REMOTE}/DEPLOYED_COMMIT"
 REMOTE_HASH="$(ssh -o ConnectTimeout=15 "$HOST" "cat ${REMOTE}/DEPLOYED_COMMIT")"
 if [ "$REMOTE_HASH" != "$LOCAL" ]; then
   echo "hash mismatch local=${LOCAL} remote=${REMOTE_HASH}" >&2
   exit 1
 fi
-
-ssh -o ConnectTimeout=15 "$HOST" "cd ${REMOTE}/backend && PYTHONPATH=${REMOTE}/backend .venv/bin/python -m unittest discover -s app -p '*_test.py' -q"
 ssh -o ConnectTimeout=15 "$HOST" "chmod +x ${REMOTE}/deploy/sozan-backup.sh && sudo cp ${REMOTE}/deploy/sozan-worker.service /etc/systemd/system/sozan-worker.service && sudo cp ${REMOTE}/deploy/sozan-battery.service /etc/systemd/system/sozan-battery.service && sudo cp ${REMOTE}/deploy/sozan-battery.timer /etc/systemd/system/sozan-battery.timer && sudo cp ${REMOTE}/deploy/sozan-backup.service /etc/systemd/system/sozan-backup.service && sudo cp ${REMOTE}/deploy/sozan-backup.timer /etc/systemd/system/sozan-backup.timer && sudo mkdir -p /etc/systemd/system/sozan-api.service.d && printf '%s\n' '[Service]' 'Environment=SOZAN_WORKER=1' | sudo tee /etc/systemd/system/sozan-api.service.d/worker.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl enable --now sozan-worker.service sozan-battery.timer sozan-backup.timer"
 
 if ! ssh -o ConnectTimeout=15 "$HOST" "sudo systemctl restart sozan-api && sleep 3 && curl -fsS -m 8 http://127.0.0.1:8012/health"; then

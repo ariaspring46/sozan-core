@@ -616,6 +616,22 @@ def cancel_deferred_auto_replies() -> None:
     _DEFERRED.clear()
 
 
+async def rearm_pending_auto_replies() -> int:
+    """After a process restart, pick up unanswered inbound still waiting on the gap."""
+    if not effective_auto_reply():
+        return 0
+    n = 0
+    for thread in _state().get("threads") or []:
+        if not isinstance(thread, dict):
+            continue
+        tid = str(thread.get("id") or "")
+        if not tid or not _needs_auto_reply(thread):
+            continue
+        n += 1
+        await maybe_auto_reply(tid)
+    return n
+
+
 def expire_stale_sending(stale_sec: int = SENDING_STALE_SEC) -> int:
     now = int(time.time())
     changed = 0
