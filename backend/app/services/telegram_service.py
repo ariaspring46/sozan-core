@@ -200,6 +200,12 @@ async def pull_updates(*, token: str, handle: str = "") -> dict:
         return {"ok": False, "imported": 0, "error": str(exc)}
     except Exception:
         return {"ok": False, "imported": 0, "error": "خواندن تلگرام به شبکه نرسید."}
+    if response.status_code == 409 or payload.get("error_code") == 409:
+        return {
+            "ok": False,
+            "imported": 0,
+            "error": "ربات جای دیگری هم پیام می‌خواند. همان بات را فقط در سوزان وصل کن.",
+        }
     if response.status_code >= 400 or payload.get("ok") is not True:
         return {"ok": False, "imported": 0, "error": "توکن تلگرام پیام‌ها را نداد. از BotFather دوباره کپی کن."}
     rows = payload.get("result") if isinstance(payload.get("result"), list) else []

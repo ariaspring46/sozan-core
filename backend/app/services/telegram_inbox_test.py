@@ -107,6 +107,28 @@ class TelegramInboxTests(unittest.TestCase):
         self.assertEqual(opened["messages"][-1]["text"], "خصوصی")
         self.assertEqual(int(offset.get("offset") or 0), 22)
 
+    def test_getupdates_conflict_is_not_a_bad_token(self) -> None:
+        client = AsyncMock()
+        client.post.side_effect = [
+            _Resp({"ok": True}),
+            _Resp(
+                {"ok": False, "error_code": 409, "description": "Conflict: terminated by other getUpdates request"},
+                status_code=409,
+            ),
+        ]
+        client.get.return_value = _Resp({"ok": True, "result": {"id": 9}})
+        client.__aenter__.return_value = client
+        client.__aexit__.return_value = False
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), patch(
+                "app.services.telegram_service._client", return_value=client
+            ), tenant_scope("09120001111"):
+                result = asyncio.run(telegram_service.pull_updates(token="tok"))
+        self.assertFalse(result.get("ok"))
+        self.assertEqual(result.get("imported"), 0)
+        self.assertIn("جای دیگری", str(result.get("error") or ""))
+        self.assertNotIn("BotFather", str(result.get("error") or ""))
+
 
 class InboundMediaTests(unittest.TestCase):
     def test_rejects_non_http(self) -> None:
