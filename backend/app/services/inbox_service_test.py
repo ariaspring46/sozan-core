@@ -13,6 +13,7 @@ def _handle(**kwargs):
     async def run():
         out = await inbox_service.handle_inbound(**kwargs)
         await inbox_service.drain_auto_replies()
+        inbox_service.cancel_deferred_auto_replies()
         tid = str((out.get("thread") or {}).get("id") or "")
         if not tid:
             return out
@@ -32,6 +33,7 @@ class InboxServiceTests(unittest.TestCase):
         self.root = Path(self.dir.name)
 
     def tearDown(self) -> None:
+        inbox_service.cancel_deferred_auto_replies()
         self.dir.cleanup()
 
     def _scope(self):
@@ -133,6 +135,7 @@ class InboxModeTests(unittest.TestCase):
         self.root = Path(self.dir.name)
 
     def tearDown(self) -> None:
+        inbox_service.cancel_deferred_auto_replies()
         self.dir.cleanup()
 
     def _plan(self, **kwargs):
@@ -371,6 +374,66 @@ class InboxModeTests(unittest.TestCase):
         self.assertEqual(deliver.await_count, 1)
         self.assertGreaterEqual(first["thread"]["count"], 1)
 
+    def test_back_to_back_drafts(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": "draft", "dmSync": True, "label": "پرو"}), patch(
+            "app.services.voice_service.draft_reply", new=AsyncMock(side_effect=["پیش‌نویس یک", "پیش‌نویس دو"])
+        ), patch("app.services.channel_outbound_service.deliver", new=AsyncMock()) as deliver:
+            _handle(
+                    platform="telegram", sender="علی", text="سلام", sender_id="1", chat_id="9", external_id="9:dr1"
+                )
+            second = _handle(
+                    platform="telegram", sender="علی", text="قیمت؟", sender_id="1", chat_id="9", external_id="9:dr2"
+                )
+        drafts = [msg for msg in second["messages"] if msg.get("kind") == "draft"]
+        self.assertEqual(len(drafts), 2)
+        self.assertTrue(all(msg.get("auto") for msg in drafts))
+        deliver.assert_not_awaited()
+
+    def test_second_inbound_sends_after_gap(self) -> None:
+        async def run() -> dict:
+            await inbox_service.handle_inbound(
+                platform="telegram", sender="علی", text="سلام", sender_id="1", chat_id="9", external_id="9:g1"
+            )
+            await inbox_service.drain_auto_replies()
+            await inbox_service.handle_inbound(
+                platform="telegram", sender="علی", text="قیمت؟", sender_id="1", chat_id="9", external_id="9:g2"
+            )
+            await inbox_service.drain_auto_replies()
+            await inbox_service.drain_deferred_auto_replies()
+            snap = inbox_service.list_threads()["threads"][0]
+            return inbox_service.get_thread(snap["id"])
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": "send", "dmSync": True, "label": "پرو مکس"}), patch(
+            "app.services.voice_service.draft_reply", new=AsyncMock(side_effect=["سلام", "قیمت دو میلیون"])
+        ), patch("app.services.channel_outbound_service.deliver", new=AsyncMock()) as deliver, patch.object(
+            inbox_service, "AUTO_GAP_SEC", 0.05
+        ):
+            opened = asyncio.run(run())
+        self.assertEqual(deliver.await_count, 2)
+        autos = [msg for msg in opened["messages"] if msg.get("auto") and msg.get("kind") == "outbound"]
+        self.assertEqual(len(autos), 2)
+
+    def test_hourly_auto_send_cap(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": "send", "dmSync": True, "label": "پرو مکس"}), patch(
+            "app.services.voice_service.draft_reply", new=AsyncMock(return_value="پاسخ")
+        ), patch("app.services.channel_outbound_service.deliver", new=AsyncMock()) as deliver, patch.object(
+            inbox_service, "AUTO_GAP_SEC", 0
+        ), patch.object(inbox_service, "AUTO_SEND_HOUR_CAP", 2):
+            _handle(platform="telegram", sender="علی", text="یک", sender_id="1", chat_id="9", external_id="9:h1")
+            _handle(platform="telegram", sender="علی", text="دو", sender_id="1", chat_id="9", external_id="9:h2")
+            third = _handle(platform="telegram", sender="علی", text="سه", sender_id="1", chat_id="9", external_id="9:h3")
+        self.assertEqual(deliver.await_count, 2)
+        inbound_count = sum(1 for msg in third["messages"] if msg.get("kind") == "inbound")
+        outbound_count = sum(1 for msg in third["messages"] if msg.get("kind") == "outbound")
+        self.assertEqual(inbound_count, 3)
+        self.assertEqual(outbound_count, 2)
+
     def test_name_match_only_when_unique(self) -> None:
         rows = [
             {"platform": "telegram", "sender": "علی", "chatId": "", "senderId": ""},
@@ -436,6 +499,7 @@ class InboxSyncDiscardTests(unittest.TestCase):
         self.root = Path(self.dir.name)
 
     def tearDown(self) -> None:
+        inbox_service.cancel_deferred_auto_replies()
         self.dir.cleanup()
 
     def test_sync_now_pulls_telegram(self) -> None:

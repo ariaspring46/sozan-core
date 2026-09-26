@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dry-run by default. --apply deletes only the two audit tenants and their test shop."""
+"""Dry-run by default. --apply deletes only the listed test tenants and their shops."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path("/home/ubuntu/sozan-core")
 DATA = ROOT / "backend" / "data"
 MAP = ROOT / "deploy" / "shop-upstreams.map"
-ALLOWED = {"09128880001", "09128880002"}
+ALLOWED = {"09128880001", "09128880002", "09128880003"}
 PROTECTED_PHONES = {"09120007777", "09135409482", "09120000000"}
 PROTECTED_SLUGS = {"joahr-froshi", "cahrm-srai-pars", "sozan"}
 
@@ -30,13 +30,14 @@ def main() -> int:
     apply = args.apply
     slugs: list[str] = []
     for phone in sorted(ALLOWED):
+        slug = ""
         shop = DATA / "tenants" / phone / "shop.json"
         if shop.is_file():
             row = json.loads(shop.read_text())
             slug = str(row.get("slug") or "").strip()
             if slug:
                 slugs.append(slug)
-        print(f"tenant {phone} slug={slugs[-1] if slugs else '-'}")
+        print(f"tenant {phone} slug={slug or '-'}")
     for slug in slugs:
         if slug in PROTECTED_SLUGS:
             raise SystemExit(f"refusing protected slug {slug}")

@@ -16,12 +16,15 @@ MODE_RANK = {"": 0, "draft": 1, "send": 2}
 MODE_PLAN_LABEL = {"": "رایگان", "draft": "پرو", "send": "پرو مکس"}
 ECHO_SEC = 180
 AUTO_GAP_SEC = 45
+AUTO_SEND_HOUR_CAP = 20
+AUTO_HOUR_SEC = 3600
 THREAD_CAP = 200
 MSG_CAP = 80
 AUTO_RETRY_MAX = 2
 SENDING_STALE_SEC = 120
 SETTINGS_FILE = "inbox-settings.json"
 _AUTO_TASKS: set[asyncio.Task] = set()
+_DEFERRED: dict[str, asyncio.Task] = {}
 
 
 def _state() -> dict:
@@ -171,6 +174,7 @@ def _messages(thread: dict) -> list[dict]:
             "platform": platform if inbound else "",
             "platformLabel": PLATFORMS.get(platform, platform) if inbound else "",
             "sender": thread.get("sender") if inbound else "",
+            "auto": bool(msg.get("auto")),
         }
         if msg.get("mediaKind") and msg.get("mediaName"):
             row["mediaKind"] = msg.get("mediaKind")
@@ -377,14 +381,39 @@ def _is_echo(thread: dict | None, text: str, *, now: int | None = None) -> bool:
     return body in _recent_outbound_texts(thread, stamp)
 
 
-def _auto_reply_too_soon(thread: dict, now: int) -> bool:
+def _auto_gap_remaining(thread: dict, now: float, *, mode: str) -> float:
+    if mode != "send":
+        return 0
     for msg in reversed(thread.get("messages") or []):
         if str(msg.get("role") or "") != "outbound":
             continue
-        if str(msg.get("kind") or "") == "failed":
+        if str(msg.get("kind") or "") in {"failed", "draft"}:
             continue
-        return now - int(msg.get("at") or 0) < AUTO_GAP_SEC
-    return False
+        elapsed = float(now) - float(msg.get("at") or 0)
+        if elapsed < AUTO_GAP_SEC:
+            return float(AUTO_GAP_SEC - elapsed)
+        return 0
+    return 0
+
+
+def _auto_reply_too_soon(thread: dict, now: int, *, mode: str = "send") -> bool:
+    return _auto_gap_remaining(thread, now, mode=mode) > 0
+
+
+def _auto_sends_last_hour(thread: dict, now: int) -> int:
+    count = 0
+    for msg in thread.get("messages") or []:
+        if not msg.get("auto"):
+            continue
+        if str(msg.get("role") or "") != "outbound":
+            continue
+        if str(msg.get("kind") or "") in {"failed", "draft"}:
+            continue
+        if str(msg.get("status") or "") == "failed":
+            continue
+        if now - int(msg.get("at") or 0) < AUTO_HOUR_SEC:
+            count += 1
+    return count
 
 
 def _match_thread(rows: list[dict], *, platform: str, sender: str, sender_id: str, chat_id: str) -> dict | None:
@@ -547,6 +576,46 @@ async def drain_auto_replies() -> None:
         await asyncio.gather(*pending, return_exceptions=True)
 
 
+def _schedule_deferred_auto_reply(thread_id: str, wait: float) -> None:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    existing = _DEFERRED.get(thread_id)
+    current = asyncio.current_task()
+    if existing is not None and not existing.done() and existing is not current:
+        return
+    delay = max(0.05, float(wait))
+
+    async def _run() -> None:
+        try:
+            await asyncio.sleep(delay)
+            await maybe_auto_reply(thread_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("deferred auto-reply failed")
+        finally:
+            held = _DEFERRED.get(thread_id)
+            if held is asyncio.current_task():
+                _DEFERRED.pop(thread_id, None)
+
+    task = loop.create_task(_run())
+    _DEFERRED[thread_id] = task
+
+
+async def drain_deferred_auto_replies() -> None:
+    pending = [task for task in _DEFERRED.values() if not task.done()]
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+
+
+def cancel_deferred_auto_replies() -> None:
+    for task in list(_DEFERRED.values()):
+        task.cancel()
+    _DEFERRED.clear()
+
+
 def expire_stale_sending(stale_sec: int = SENDING_STALE_SEC) -> int:
     now = int(time.time())
     changed = 0
@@ -639,8 +708,12 @@ async def maybe_auto_reply(thread_id: str) -> None:
     last = _needs_auto_reply(thread)
     if not last:
         return
-    now = int(time.time())
-    if _auto_reply_too_soon(thread, now):
+    now = time.time()
+    wait = _auto_gap_remaining(thread, now, mode=mode)
+    if wait > 0:
+        _schedule_deferred_auto_reply(thread_id, wait)
+        return
+    if mode == "send" and _auto_sends_last_hour(thread, now) >= AUTO_SEND_HOUR_CAP:
         return
     attempts = 0
     while attempts < AUTO_RETRY_MAX:
@@ -659,7 +732,13 @@ async def maybe_auto_reply(thread_id: str) -> None:
                 return
             continue
         try:
-            await reply(thread_id, draft, deliver=(mode == "send"), as_draft=(mode == "draft"))
+            await reply(
+                thread_id,
+                draft,
+                deliver=(mode == "send"),
+                as_draft=(mode == "draft"),
+                auto=True,
+            )
             return
         except Exception:
             if _bump_auto_retries(thread_id) >= AUTO_RETRY_MAX:
@@ -677,6 +756,7 @@ async def reply(
     deliver: bool = True,
     draft_id: str = "",
     as_draft: bool = False,
+    auto: bool = False,
 ) -> dict:
     body = text.strip()
     if not body:
@@ -721,6 +801,8 @@ async def reply(
             }
             thread["messages"].append(row)
             target = row
+        if auto:
+            target["auto"] = True
         thread["updatedAt"] = now
         thread["messages"] = thread["messages"][-MSG_CAP:]
         _save(data)

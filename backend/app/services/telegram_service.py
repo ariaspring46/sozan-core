@@ -221,6 +221,8 @@ async def pull_updates(*, token: str, handle: str = "") -> dict:
         sender = str(from_user.get("username") or from_user.get("first_name") or handle or "مشتری")
         if not mid or not chat_id:
             continue
+        if str(chat.get("type") or "private").lower() != "private":
+            continue
         if bot_id and sender_id == bot_id:
             continue
         key = f"{chat_id}:{mid}"
