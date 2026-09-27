@@ -1,0 +1,1077 @@
+diff --git a/frontend/app/campaigns/page.tsx b/frontend/app/campaigns/page.tsx
+index f411044..5193df1 100644
+--- a/frontend/app/campaigns/page.tsx
++++ b/frontend/app/campaigns/page.tsx
+@@ -15,6 +15,7 @@ export default function CampaignsPage() {
+   const [slug, setSlug] = useState("");
+   const [error, setError] = useState("");
+   const [ready, setReady] = useState(false);
++  const [isAdmin, setIsAdmin] = useState(false);
+ 
+   async function load() {
+     const data = await api<Campaign[]>("/campaigns");
+@@ -22,6 +23,12 @@ export default function CampaignsPage() {
+     setReady(true);
+   }
+ 
++  useEffect(() => {
++    void api<{ isAdmin?: boolean }>("/auth/me")
++      .then((me) => setIsAdmin(Boolean(me.isAdmin)))
++      .catch(() => undefined);
++  }, []);
++
+   useEffect(() => {
+     void load().catch((err) => {
+       setError(err.message);
+@@ -51,6 +58,7 @@ export default function CampaignsPage() {
+     >
+     <main className="h-full space-y-4 overflow-y-auto p-4">
+       <StudioNav current="campaigns" />
++      {isAdmin ? (
+       <details className="rounded-2xl bg-canvas px-4 py-3 text-sm shadow-card">
+         <summary className="cursor-pointer text-muted">ورود کمپین از پوشهٔ دیسک</summary>
+         <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+@@ -64,6 +72,7 @@ export default function CampaignsPage() {
+           </Button>
+         </div>
+       </details>
++      ) : null}
+       {error ? <p className="text-sm text-danger">{error}</p> : null}
+       {!ready && !error ? <p className="text-sm text-muted">در حال خواندن…</p> : null}
+       {ready && items.length === 0 && !error ? (
+diff --git a/frontend/app/chat/page.tsx b/frontend/app/chat/page.tsx
+index 02ade90..7b61744 100644
+--- a/frontend/app/chat/page.tsx
++++ b/frontend/app/chat/page.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { useCallback, useEffect, useRef, useState } from "react";
+ import { AppShell } from "@/components/app-shell";
++import { ChannelAlert } from "@/components/channel-alert";
+ import { ChatThread, type ChatMsg } from "@/components/chat-thread";
+ import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
+ import { api } from "@/lib/api";
+@@ -195,10 +196,11 @@ export default function ChatPage() {
+     <AppShell
+       header={
+         <div className="flex min-w-0 items-center gap-2">
+-          <div className="min-w-0 flex-1">
++          <div className="shrink-0">
+             <p className="text-sm text-muted">گفتگو</p>
+-            <h1 className="text-lg font-bold">سوزان</h1>
++            <h1 className="whitespace-nowrap text-lg font-bold">سوزان</h1>
+           </div>
++          <div className="min-w-0 flex-1" />
+           {threads.length ? (
+             <label className="sr-only" htmlFor="sozan-thread">
+               گفتگوها
+@@ -207,7 +209,7 @@ export default function ChatPage() {
+           {threads.length ? (
+             <select
+               id="sozan-thread"
+-              className="max-w-[9rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink"
++              className="min-w-0 max-w-[8rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink sm:max-w-[14rem]"
+               value={threadId}
+               onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
+             >
+@@ -229,6 +231,7 @@ export default function ChatPage() {
+       }
+     >
+       <div className="sozan-chat flex h-full flex-col">
++        <ChannelAlert />
+         {error ? (
+           <p className="px-4 pt-3 text-sm text-danger" role="alert">
+             {error}
+diff --git a/frontend/app/inbox/page.tsx b/frontend/app/inbox/page.tsx
+index 9b59c66..f424ebc 100644
+--- a/frontend/app/inbox/page.tsx
++++ b/frontend/app/inbox/page.tsx
+@@ -3,6 +3,7 @@
+ import Link from "next/link";
+ import { useCallback, useEffect, useRef, useState } from "react";
+ import { AppShell } from "@/components/app-shell";
++import { ChannelAlert } from "@/components/channel-alert";
+ import { Card } from "@/components/ui/card";
+ import { EmptyState } from "@/components/empty-state";
+ import { api } from "@/lib/api";
+@@ -175,12 +176,13 @@ export default function InboxPage() {
+     <AppShell
+       header={
+         <div>
+-          <p className="text-sm text-muted">چت کاربران</p>
+-          <h1 className="text-lg font-bold">پیام از همه کانال‌ها</h1>
++          <p className="text-sm text-muted">صندوق</p>
++          <h1 className="text-lg font-bold">پیام مشتری‌ها</h1>
+         </div>
+       }
+     >
+       <div className="h-full space-y-3 overflow-y-auto p-4">
++        <ChannelAlert inset={false} />
+         <div className="flex gap-1 rounded-2xl border border-line/70 bg-paper p-1">
+           {MODES.map((mode) => {
+             const locked = RANK[mode.id] > RANK[autoReplyMax || ""];
+diff --git a/frontend/app/login/page.tsx b/frontend/app/login/page.tsx
+index 19f27e7..836f716 100644
+--- a/frontend/app/login/page.tsx
++++ b/frontend/app/login/page.tsx
+@@ -1,8 +1,9 @@
+ "use client";
+ 
+-import { FormEvent, useState } from "react";
++import { FormEvent, useEffect, useRef, useState } from "react";
+ import { useRouter } from "next/navigation";
+ import { api, setOnboarded, setToken } from "@/lib/api";
++import { toLatinDigits } from "@/lib/digits";
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+ import { Card } from "@/components/ui/card";
+@@ -10,6 +11,38 @@ import { Field } from "@/components/field";
+ import { LoginCoderScene } from "@/components/login-coder-scene";
+ import { SozanMark } from "@/components/sozan-mark";
+ 
++const RESEND_SECONDS = 60;
++
++/** ۰۹۱۲… یا 0912… یا +98912… یا 98912… با فاصله و خط تیره → 09xxxxxxxxx */
++function normalizePhone(raw: string): string {
++  let value = toLatinDigits(raw).replace(/[\s\-()]/g, "");
++  if (value.startsWith("+98")) value = `0${value.slice(3)}`;
++  else if (value.startsWith("0098")) value = `0${value.slice(4)}`;
++  else if (value.startsWith("98") && value.length === 12) value = `0${value.slice(2)}`;
++  else if (value.startsWith("9") && value.length === 10) value = `0${value}`;
++  return value;
++}
++
++function normalizeCode(raw: string): string {
++  return toLatinDigits(raw).replace(/\D/g, "");
++}
++
++function phoneHint(raw: string): string {
++  const value = normalizePhone(raw);
++  if (!value) return "";
++  if (!/^\d+$/.test(value)) return "فقط رقم بنویس.";
++  if (!value.startsWith("09")) return "شماره موبایل با ۰۹ شروع می‌شود.";
++  if (value.length < 11) return `${(11 - value.length).toLocaleString("fa-IR")} رقم دیگر مانده.`;
++  if (value.length > 11) return "شماره موبایل ۱۱ رقم است.";
++  return "";
++}
++
++function faSeconds(sec: number): string {
++  const m = Math.floor(sec / 60);
++  const s = sec % 60;
++  return `${m.toLocaleString("fa-IR")}:${s.toLocaleString("fa-IR").padStart(2, "۰")}`;
++}
++
+ export default function LoginPage() {
+   const router = useRouter();
+   const [phone, setPhone] = useState("");
+@@ -17,38 +50,78 @@ export default function LoginPage() {
+   const [sent, setSent] = useState(false);
+   const [hint, setHint] = useState("");
+   const [error, setError] = useState("");
++  const [busy, setBusy] = useState(false);
++  const [wait, setWait] = useState(0);
++  const autoTried = useRef("");
+ 
+-  async function send(e: FormEvent) {
+-    e.preventDefault();
++  const cleanPhone = normalizePhone(phone);
++  const phoneOk = /^09\d{9}$/.test(cleanPhone);
++  const cleanCode = normalizeCode(code);
++
++  useEffect(() => {
++    if (wait <= 0) return;
++    const timer = window.setTimeout(() => setWait((value) => value - 1), 1000);
++    return () => window.clearTimeout(timer);
++  }, [wait]);
++
++  async function requestCode() {
+     setError("");
++    setBusy(true);
+     try {
+       const data = await api<{ ok: boolean; dev_code?: string }>("/auth/otp/send", {
+         method: "POST",
+-        body: JSON.stringify({ phone }),
++        body: JSON.stringify({ phone: cleanPhone }),
+       });
+       setSent(true);
+       setHint(data.dev_code || "");
++      setWait(RESEND_SECONDS);
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : "خطا");
++      setError(err instanceof Error && err.message ? err.message : "ارسال کد انجام نشد. دوباره امتحان کن.");
++    } finally {
++      setBusy(false);
+     }
+   }
+ 
+-  async function verify(e: FormEvent) {
++  async function send(e: FormEvent) {
+     e.preventDefault();
++    if (!phoneOk || busy) return;
++    await requestCode();
++  }
++
++  async function verifyCode(value: string) {
++    if (!value || busy) return;
+     setError("");
++    setBusy(true);
+     try {
+       const data = await api<{ access_token: string; onboarded?: boolean }>("/auth/otp/verify", {
+         method: "POST",
+-        body: JSON.stringify({ phone, code }),
++        body: JSON.stringify({ phone: cleanPhone, code: value }),
+       });
+       setToken(data.access_token);
+       setOnboarded(Boolean(data.onboarded));
+       router.push(data.onboarded ? "/chat" : "/onboard");
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : "خطا");
++      setError(err instanceof Error && err.message ? err.message : "کد درست نبود. دوباره بنویس.");
++    } finally {
++      setBusy(false);
+     }
+   }
+ 
++  async function verify(e: FormEvent) {
++    e.preventDefault();
++    await verifyCode(cleanCode);
++  }
++
++  // وقتی کد کامل شد (مثلاً با پرکردن خودکار از پیامک)، یک بار خودش وارد می‌شود.
++  useEffect(() => {
++    if (!sent || cleanCode.length !== 6 || autoTried.current === cleanCode) return;
++    autoTried.current = cleanCode;
++    void verifyCode(cleanCode);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [cleanCode, sent]);
++
++  const hintText = phoneHint(phone);
++
+   return (
+     <main className="sozan-lamp relative flex min-h-screen items-end justify-center overflow-hidden sm:items-center">
+       <LoginCoderScene />
+@@ -67,16 +140,21 @@ export default function LoginPage() {
+               <Field label="شماره موبایل">
+                 <Input
+                   dir="ltr"
++                  type="tel"
+                   inputMode="numeric"
+                   autoComplete="tel"
+-                  maxLength={11}
+-                  placeholder="0912…"
++                  maxLength={16}
++                  placeholder="09xx xxx xxxx"
+                   value={phone}
++                  aria-describedby="phone-hint"
+                   onChange={(e) => setPhone(e.target.value)}
+                 />
+               </Field>
+-              <Button type="submit" className="w-full" disabled={!/^09\d{9}$/.test(phone.trim())}>
+-                ارسال کد
++              <p id="phone-hint" className="min-h-5 text-xs text-muted" aria-live="polite">
++                {hintText}
++              </p>
++              <Button type="submit" className="w-full" disabled={!phoneOk || busy}>
++                {busy ? "در حال ارسال…" : "ارسال کد"}
+               </Button>
+             </form>
+           ) : (
+@@ -86,28 +164,65 @@ export default function LoginPage() {
+                   کد آزمایشی {hint}
+                 </p>
+               ) : null}
+-              <p className="text-sm text-muted">کد پیامک به {phone} فرستاده شد.</p>
+-              <button
+-                type="button"
+-                className="text-sm text-warm"
+-                onClick={() => {
+-                  setSent(false);
+-                  setCode("");
+-                  setHint("");
+-                  setError("");
+-                }}
+-              >
+-                ویرایش شماره
+-              </button>
+-              <Field label="کد">
+-                <Input dir="ltr" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
++              <p className="text-sm text-muted">
++                کد پیامک به <bdi dir="ltr">{cleanPhone}</bdi> فرستاده شد.
++              </p>
++              <Field label="کد پیامک">
++                <Input
++                  dir="ltr"
++                  inputMode="numeric"
++                  autoComplete="one-time-code"
++                  maxLength={8}
++                  className="text-center tracking-[0.4em]"
++                  value={code}
++                  autoFocus
++                  onChange={(e) => setCode(e.target.value)}
++                />
+               </Field>
+-              <Button type="submit" className="w-full">
+-                ورود
++              <Button type="submit" className="w-full" disabled={!cleanCode || busy}>
++                {busy ? "در حال بررسی…" : "ورود"}
+               </Button>
++              <div className="flex items-center justify-between gap-2 text-sm">
++                <button
++                  type="button"
++                  className="min-h-11 px-1 text-warm"
++                  onClick={() => {
++                    setSent(false);
++                    setCode("");
++                    setHint("");
++                    setError("");
++                    setWait(0);
++                    autoTried.current = "";
++                  }}
++                >
++                  ویرایش شماره
++                </button>
++                {wait > 0 ? (
++                  <span className="text-muted" aria-live="polite">
++                    ارسال دوباره تا {faSeconds(wait)}
++                  </span>
++                ) : (
++                  <button
++                    type="button"
++                    className="min-h-11 px-1 text-warm disabled:opacity-50"
++                    disabled={busy}
++                    onClick={() => {
++                      setCode("");
++                      autoTried.current = "";
++                      void requestCode();
++                    }}
++                  >
++                    ارسال دوبارهٔ کد
++                  </button>
++                )}
++              </div>
+             </form>
+           )}
+-          {error ? <p className="text-sm text-danger">{error}</p> : null}
++          {error ? (
++            <p className="text-sm text-danger" role="alert">
++              {error}
++            </p>
++          ) : null}
+         </Card>
+       </div>
+     </main>
+diff --git a/frontend/app/more/channels/page.tsx b/frontend/app/more/channels/page.tsx
+index 5d196b9..c56af9d 100644
+--- a/frontend/app/more/channels/page.tsx
++++ b/frontend/app/more/channels/page.tsx
+@@ -29,7 +29,7 @@ type Voice = { summary: string; tone: string; sampleReply: string };
+ 
+ const INSTAGRAM_OAUTH_NOTICE: Record<string, string> = {
+   ok: "اینستاگرام وصل شد.",
+-  exists: "این پیج از قبل در BoxAPI هست. از لیست انتخابش کن.",
++  exists: "این پیج از قبل وصل شده است. از فهرست انتخابش کن.",
+   denied: "اجازهٔ اینستاگرام داده نشد.",
+   expired: "نشست ورود اینستاگرام تمام شد. دوباره از پنل وصل کن.",
+   config: "اتصال اینستاگرام در سوزان هنوز تنظیم نشده.",
+@@ -181,7 +181,7 @@ export default function ChannelsPage() {
+       );
+       if (data.existing?.some((item) => !item.bound)) {
+         setExisting(data.existing);
+-        setNotice("این پیج از قبل در BoxAPI هست. انتخابش کن.");
++        setNotice("این پیج از قبل وصل شده است. انتخابش کن.");
+         return;
+       }
+       if (data.existing?.some((item) => item.bound)) {
+@@ -190,7 +190,7 @@ export default function ChannelsPage() {
+         return;
+       }
+       if (data.url) window.location.href = data.url;
+-      else setError("نشانی ورود رسمی BoxAPI نیامد.");
++      else setError("صفحهٔ ورود اینستاگرام باز نشد. دوباره امتحان کن.");
+     } catch (err) {
+       setError(err instanceof Error ? err.message : "خطا");
+     } finally {
+@@ -258,7 +258,7 @@ export default function ChannelsPage() {
+     >
+       <div className="h-full space-y-4 overflow-y-auto p-4">
+         <p className="text-sm text-muted">
+-          اینستاگرام را با ورود رسمی BoxAPI وصل کن. اگر بات سوزان روی هاب باشد، برای تلگرام فقط مقصد کانال را بگذار. پست استودیو برای تلگرام به کانالی که بات ادمین آن است می‌رود.
++          اینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.
+         </p>
+         {error ? <p className="text-sm text-danger">{error}</p> : null}
+         {notice ? <p className="text-sm text-signal">{notice}</p> : null}
+@@ -278,13 +278,13 @@ export default function ChannelsPage() {
+             ) : null}
+             {spec?.help ? <p className="text-xs leading-6 text-muted">{spec.help}</p> : null}
+             {spec?.docs ? (
+-              <a className="inline-block text-xs text-warm" href={spec.docs} target="_blank" rel="noreferrer">
++              <a className="block text-xs text-warm" href={spec.docs} target="_blank" rel="noreferrer">
+                 اسناد اتصال {spec.label}
+               </a>
+             ) : null}
+             {spec?.id === "instagram" && spec.sendboxConfigured ? (
+-              <Button type="button" disabled={busy} onClick={() => void startInstagram()}>
+-                ورود رسمی BoxAPI
++              <Button type="button" className="w-full" disabled={busy} onClick={() => void startInstagram()}>
++                ورود با اینستاگرام
+               </Button>
+             ) : null}
+             {existing.filter((item) => !item.bound).map((item) => (
+@@ -312,7 +312,7 @@ export default function ChannelsPage() {
+               </Button>
+             ))}
+             {spec?.id === "instagram" && spec.oauth && !spec.sendboxConfigured ? (
+-              <p className="text-xs text-warm">ورود رسمی BoxAPI وقتی اتصال سوزان در سرور تنظیم شود روشن می‌شود.</p>
++              <p className="text-xs text-warm">ورود با اینستاگرام به‌زودی روشن می‌شود.</p>
+             ) : null}
+             <Field label={spec?.handleLabel || "شناسه حساب"}>
+               <Input
+@@ -385,8 +385,8 @@ export default function ChannelsPage() {
+                   </div>
+                   <div className="flex flex-col gap-2">
+                     {account.platform === "instagram" && account.needsReconnect ? (
+-                      <Button variant="ghost" disabled={busy} onClick={() => void startInstagram()}>
+-                        ورود رسمی BoxAPI
++                      <Button disabled={busy} onClick={() => void startInstagram()}>
++                        اتصال دوباره
+                       </Button>
+                     ) : null}
+                     {account.platform === "telegram" ? (
+diff --git a/frontend/app/more/page.tsx b/frontend/app/more/page.tsx
+index 082180a..952fa47 100644
+--- a/frontend/app/more/page.tsx
++++ b/frontend/app/more/page.tsx
+@@ -6,12 +6,12 @@ import { Button } from "@/components/ui/button";
+ import { clearToken } from "@/lib/api";
+ 
+ const HUB = [
++  { href: "/more/inventory", title: "انبار", hint: "کالا، قیمت و موجودی" },
+   { href: "/more/docs", title: "اسناد آموزشی", hint: "از ورود تا دامنه و ویرایش" },
+   { href: "/more/channels", title: "کانال‌ها", hint: "اینستاگرام تا روبیکا" },
+-  { href: "/more/inventory", title: "انبار", hint: "کالا، قیمت و موجودی" },
+-  { href: "/brand", title: "هویت و لوگو", hint: "نام سوزان و موشن" },
+-  { href: "/campaigns", title: "کمپین‌ها", hint: "پست‌های ساخته‌شده" },
+-  { href: "/more/settings", title: "پرداخت و پیامک", hint: "درگاه، OTP و اشتراک" },
++  { href: "/brand", title: "هویت و لوگو", hint: "نام، لوگو و حرکت برند" },
++  { href: "/studio", title: "استودیو", hint: "پست‌ها و کمپین‌های ساخته‌شده" },
++  { href: "/more/settings", title: "پرداخت و پیامک", hint: "اشتراک، درگاه پرداخت و کد ورود" },
+   { href: "/more/wallet", title: "کیف پول", hint: "مانده، برداشت شبا و پیامک" },
+ ] as const;
+ 
+diff --git a/frontend/app/more/wallet/page.tsx b/frontend/app/more/wallet/page.tsx
+index a44f4f5..3c81408 100644
+--- a/frontend/app/more/wallet/page.tsx
++++ b/frontend/app/more/wallet/page.tsx
+@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
+ import { Card } from "@/components/ui/card";
+ import { Input } from "@/components/ui/input";
+ import { api } from "@/lib/api";
+-import { formatWhen, money, parseNonNegativeInt } from "@/lib/digits";
++import { formatWhen, money, parseNonNegativeInt, toLatinDigits } from "@/lib/digits";
+ import { EmptyState } from "@/components/empty-state";
+ 
+ type LedgerRow = { id: string; at: number; kind: string; amount: number; note?: string; orderId?: string };
+@@ -86,8 +86,10 @@ export default function WalletPage() {
+       setError("مبلغ را با عدد بنویس.");
+       return;
+     }
+-    if (!/^IR\d{24}$/i.test(iban.replace(/\s/g, ""))) {
+-      setError("شماره شبا ۲۶ رقم است");
++    const cleanIban = toLatinDigits(iban).replace(/[\s-]/g, "").toUpperCase();
++    const fullIban = /^\d{24}$/.test(cleanIban) ? `IR${cleanIban}` : cleanIban;
++    if (!/^IR\d{24}$/.test(fullIban)) {
++      setError("شبا باید IR و ۲۴ رقم باشد.");
+       return;
+     }
+     setBusy(true);
+@@ -96,7 +98,7 @@ export default function WalletPage() {
+     try {
+       const data = await api<{ wallet: WalletSnap }>("/wallet/withdraw", {
+         method: "POST",
+-        body: JSON.stringify({ amount: nextAmount, iban, name }),
++        body: JSON.stringify({ amount: nextAmount, iban: fullIban, name }),
+       });
+       setWallet(data.wallet);
+       setAmount("");
+@@ -164,7 +166,7 @@ export default function WalletPage() {
+             <Card>
+               <p className="text-sm leading-7 text-muted">
+                 فروش دستی وارد کیف نمی‌شود. اگر مرچنت شخصی داشته باشی پول در حساب خودت می‌ماند و اینجا فقط ثبت می‌شود.
+-                درگاه سوزان {wallet.commissionBps / 100}٪ کمیسیون دارد.
++                درگاه سوزان {(wallet.commissionBps / 100).toLocaleString("fa-IR")}٪ کمیسیون دارد.
+               </p>
+               <p className="mt-2 text-sm text-muted">
+                 پیامک این ماه: {money(wallet.smsUsed)} از {money(wallet.smsQuota)}
+@@ -178,7 +180,7 @@ export default function WalletPage() {
+                   <Input dir="ltr" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} />
+                 </Field>
+                 <Field label="شبا">
+-                  <Input dir="ltr" placeholder="IR و ۲۴ رقم" value={iban} onChange={(event) => setIban(event.target.value)} />
++                  <Input dir="ltr" inputMode="text" autoComplete="off" spellCheck={false} placeholder="IR00 0000 0000 0000 0000 0000 00" value={iban} onChange={(event) => setIban(event.target.value)} />
+                 </Field>
+                 <Field label="نام صاحب حساب">
+                   <Input value={name} onChange={(event) => setName(event.target.value)} />
+diff --git a/frontend/components/app-shell.tsx b/frontend/components/app-shell.tsx
+index 156af05..c4722fa 100644
+--- a/frontend/components/app-shell.tsx
++++ b/frontend/components/app-shell.tsx
+@@ -3,22 +3,28 @@
+ import Link from "next/link";
+ import { useEffect, useState } from "react";
+ import { usePathname } from "next/navigation";
+-import { Clapperboard, Inbox, Menu, MessageCircle, MoreHorizontal, ShoppingBag, Store, X } from "lucide-react";
++import { Clapperboard, Inbox, MessageCircle, MoreHorizontal, ShoppingBag, Store } from "lucide-react";
+ import { cn } from "@/lib/utils";
+ import { SozanMark } from "@/components/sozan-mark";
+ import { api } from "@/lib/api";
+ import { useAppViewport } from "@/lib/use-app-viewport";
+ 
+-const TABS = [
++type Tab = { href: string; label: string; icon: typeof MessageCircle };
++
++/** ستون ثابت دسکتاپ: همهٔ مقصدها. */
++const TABS: readonly Tab[] = [
+   { href: "/chat", label: "چت", icon: MessageCircle },
+   { href: "/shop", label: "فروشگاه", icon: Store },
+   { href: "/studio", label: "استودیو", icon: Clapperboard },
+   { href: "/inbox", label: "صندوق", icon: Inbox },
+   { href: "/sales", label: "فروش", icon: ShoppingBag },
+   { href: "/more", label: "بیشتر", icon: MoreHorizontal },
+-] as const;
++];
++
++/** نوار پایین موبایل: پنج مقصد اصلی؛ استودیو از «بیشتر» و چت در دسترس است. */
++const MOBILE_TABS: readonly Tab[] = TABS.filter((tab) => tab.href !== "/studio");
+ 
+-function tabActive(pathname: string, href: string) {
++function tabActive(pathname: string, href: string, mobile: boolean) {
+   if (href === "/studio") {
+     return pathname.startsWith("/studio") || pathname.startsWith("/campaigns");
+   }
+@@ -26,7 +32,9 @@ function tabActive(pathname: string, href: string) {
+     return pathname === "/sales" || pathname.startsWith("/sales/");
+   }
+   if (href === "/more") {
+-    return pathname === "/more" || pathname.startsWith("/more/") || pathname.startsWith("/brand");
++    const inMore = pathname === "/more" || pathname.startsWith("/more/") || pathname.startsWith("/brand");
++    const studio = pathname.startsWith("/studio") || pathname.startsWith("/campaigns");
++    return inMore || (mobile && studio);
+   }
+   return pathname === href || pathname.startsWith(`${href}/`);
+ }
+@@ -36,6 +44,14 @@ function unreadLabel(count: number) {
+   return count.toLocaleString("fa-IR");
+ }
+ 
++function Badge({ count }: { count: number }) {
++  return (
++    <span className="absolute -end-2.5 -top-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-accentStrong px-1 text-[10px] font-bold leading-[18px] text-onAccent">
++      {unreadLabel(count)}
++    </span>
++  );
++}
++
+ export function AppShell({
+   children,
+   header,
+@@ -46,20 +62,21 @@ export function AppShell({
+   const pathname = usePathname();
+   useAppViewport();
+   const [unread, setUnread] = useState(0);
+-  const [open, setOpen] = useState(false);
++  const [typing, setTyping] = useState(false);
+ 
++  // وقتی کیبورد موبایل باز است، نوار پایین جا را از فیلد نوشتن نگیرد.
+   useEffect(() => {
+-    setOpen(false);
+-  }, [pathname]);
+-
+-  useEffect(() => {
+-    if (!open) return;
+-    const onKey = (event: KeyboardEvent) => {
+-      if (event.key === "Escape") setOpen(false);
++    const isField = (el: EventTarget | null) =>
++      el instanceof HTMLElement && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && !["checkbox", "radio", "file", "button", "submit"].includes((el as HTMLInputElement).type)) || el.isContentEditable);
++    const onIn = (event: FocusEvent) => setTyping(isField(event.target));
++    const onOut = () => window.setTimeout(() => setTyping(isField(document.activeElement)), 0);
++    document.addEventListener("focusin", onIn);
++    document.addEventListener("focusout", onOut);
++    return () => {
++      document.removeEventListener("focusin", onIn);
++      document.removeEventListener("focusout", onOut);
+     };
+-    window.addEventListener("keydown", onKey);
+-    return () => window.removeEventListener("keydown", onKey);
+-  }, [open]);
++  }, []);
+ 
+   useEffect(() => {
+     let cancelled = false;
+@@ -72,7 +89,7 @@ export function AppShell({
+         .catch(() => undefined);
+     };
+     tick();
+-    const timer = window.setInterval(tick, 4000);
++    const timer = window.setInterval(tick, 15000);
+     const onVis = () => {
+       if (!document.hidden) tick();
+     };
+@@ -84,77 +101,80 @@ export function AppShell({
+     };
+   }, [pathname]);
+ 
+-  const menuLabel = unread > 0 ? `فهرست، ${unread} خوانده‌نشده` : "فهرست";
++  const label = (tab: Tab) => (tab.href === "/inbox" && unread > 0 ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label);
+ 
+   return (
+     <div className="sozan-app-shell flex w-full overflow-hidden bg-canvas">
+-      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0px)]">
+-        <header className="relative z-20 flex shrink-0 items-center gap-3 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
+-          <button
+-            type="button"
+-            aria-label={menuLabel}
+-            aria-expanded={open}
+-            aria-controls="sozan-nav"
+-            onClick={() => setOpen((value) => !value)}
+-            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-warm"
+-          >
+-            {open ? <X size={20} /> : <Menu size={20} />}
+-            {!open && unread > 0 ? (
+-              <span className="absolute -end-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] text-onAccent">
+-                {unreadLabel(unread)}
+-              </span>
+-            ) : null}
+-          </button>
+-          <SozanMark className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
+-          <div className="min-w-0 flex-1">{header}</div>
+-        </header>
+-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
+-      </div>
+-      {open ? (
+-        <button
+-          type="button"
+-          aria-label="بستن فهرست"
+-          className="absolute inset-0 z-40 bg-ink/40"
+-          onClick={() => setOpen(false)}
+-        />
+-      ) : null}
+       <nav
+-        id="sozan-nav"
+         aria-label="ناوبری"
+-        className={cn(
+-          "absolute inset-y-0 start-0 z-50 flex w-44 flex-col gap-1 border-e border-line bg-canvas px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] transition-transform",
+-          open ? "translate-x-0" : "pointer-events-none translate-x-full",
+-        )}
++        className="hidden w-52 shrink-0 flex-col gap-1 border-e border-line bg-canvas px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:flex"
+       >
++        <div className="mb-3 flex items-center gap-2 px-2">
++          <SozanMark className="h-9 w-9" />
++          <span className="font-bold text-ink">سوزان</span>
++        </div>
+         {TABS.map((tab) => {
+-          const active = tabActive(pathname, tab.href);
++          const active = tabActive(pathname, tab.href, false);
+           const Icon = tab.icon;
+-          const badge = tab.href === "/inbox" && unread > 0;
+           return (
+             <Link
+               key={tab.href}
+               href={tab.href}
+               aria-current={active ? "page" : undefined}
+-              aria-label={badge ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label}
++              aria-label={label(tab)}
+               className={cn(
+-                "relative flex min-h-11 items-center justify-start gap-2 rounded-xl px-3 py-2 text-sm",
+-                active ? "bg-paper text-warm" : "text-muted",
++                "relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm",
++                active ? "bg-paper font-bold text-warm" : "text-muted hover:bg-paper/60 hover:text-ink",
+               )}
+             >
+               {active ? <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-accent" /> : null}
+               <span className="relative">
+                 <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
+-                {badge ? (
+-                  <span className="absolute -end-2 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] text-onAccent">
+-                    {unreadLabel(unread)}
+-                  </span>
+-                ) : null}
++                {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
+               </span>
+               <span className="truncate">{tab.label}</span>
+             </Link>
+           );
+         })}
+       </nav>
++
++      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:pb-[env(safe-area-inset-bottom,0px)]">
++        <header className="relative z-20 flex shrink-0 items-center gap-3 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
++          <SozanMark className="h-9 w-9 shrink-0 md:hidden" />
++          <div className="min-w-0 flex-1">{header}</div>
++        </header>
++        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
++        <nav
++          aria-label="ناوبری"
++          className={cn(
++            "shrink-0 border-t border-line bg-canvas pb-[env(safe-area-inset-bottom,0px)] md:hidden",
++            typing ? "hidden" : "flex",
++          )}
++        >
++          {MOBILE_TABS.map((tab) => {
++            const active = tabActive(pathname, tab.href, true);
++            const Icon = tab.icon;
++            return (
++              <Link
++                key={tab.href}
++                href={tab.href}
++                aria-current={active ? "page" : undefined}
++                aria-label={label(tab)}
++                className={cn(
++                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px]",
++                  active ? "font-bold text-warm" : "text-muted",
++                )}
++              >
++                <span className="relative">
++                  <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
++                  {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
++                </span>
++                <span>{tab.label}</span>
++              </Link>
++            );
++          })}
++        </nav>
++      </div>
+     </div>
+   );
+ }
+diff --git a/frontend/components/channel-alert.tsx b/frontend/components/channel-alert.tsx
+new file mode 100644
+index 0000000..4d7530a
+--- /dev/null
++++ b/frontend/components/channel-alert.tsx
+@@ -0,0 +1,50 @@
++"use client";
++
++import Link from "next/link";
++import { useEffect, useState } from "react";
++import { api } from "@/lib/api";
++
++type AlertAccount = { id: string; platform: string; label?: string; handle?: string; needsReconnect?: boolean };
++
++const PLATFORM_FA: Record<string, string> = {
++  instagram: "اینستاگرام",
++  telegram: "تلگرام",
++  whatsapp: "واتساپ",
++  bale: "بله",
++  rubika: "روبیکا",
++};
++
++/** نوار هشدار وقتی یکی از کانال‌ها قطع است؛ پیام تازه نمی‌آید و پاسخ خودکار کار نمی‌کند. */
++export function ChannelAlert({ inset = true }: { inset?: boolean }) {
++  const [broken, setBroken] = useState<AlertAccount[]>([]);
++
++  useEffect(() => {
++    let cancelled = false;
++    void api<{ accounts?: AlertAccount[] }>("/channels")
++      .then((data) => {
++        if (cancelled) return;
++        setBroken((data.accounts || []).filter((row) => row && row.needsReconnect));
++      })
++      .catch(() => undefined);
++    return () => {
++      cancelled = true;
++    };
++  }, []);
++
++  if (!broken.length) return null;
++  const first = broken[0];
++  const name = PLATFORM_FA[first.platform] || first.label || "کانال";
++  const handle = first.handle ? ` (${first.handle.replace(/^@?/, "@")})` : "";
++  return (
++    <div role="alert" className={`${inset ? "mx-3 mt-3 sm:mx-4" : ""} flex items-center gap-3 rounded-2xl border border-danger/50 bg-danger/10 px-4 py-3 text-sm`}>
++      <p className="min-w-0 flex-1 leading-6 text-ink">
++        اتصال {name}
++        <bdi dir="ltr">{handle}</bdi> قطع است؛ پیام تازهٔ مشتری نمی‌رسد و پاسخ خودکار کار نمی‌کند.
++        {broken.length > 1 ? ` (${broken.length.toLocaleString("fa-IR")} کانال)` : ""}
++      </p>
++      <Link href="/more/channels" className="shrink-0 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-onAccent">
++        اتصال دوباره
++      </Link>
++    </div>
++  );
++}
+diff --git a/frontend/components/inventory-catalog.tsx b/frontend/components/inventory-catalog.tsx
+index 4186f1d..c8ff0cf 100644
+--- a/frontend/components/inventory-catalog.tsx
++++ b/frontend/components/inventory-catalog.tsx
+@@ -115,7 +115,7 @@ export function InventoryCatalog() {
+         {error ? <p className="text-sm text-danger">{error}</p> : null}
+         {shop?.needsBuild ? (
+           <p className="rounded-xl border border-line px-3 py-2 text-sm leading-7">
+-            برای نمایش کالاها روی سایت، بیلد بزن{" "}
++            برای نمایش کالاها روی سایت، تغییرات را منتشر کن{" "}
+             <Link href="/shop" className="text-warm">
+               رفتن به فروشگاه
+             </Link>
+@@ -124,7 +124,7 @@ export function InventoryCatalog() {
+           <p className="rounded-xl bg-canvas px-3 py-2 text-sm leading-7 text-muted">تغییرات همان لحظه روی سایت می‌رود.</p>
+         ) : (
+           <p className="rounded-xl bg-canvas px-3 py-2 text-sm leading-7 text-muted">
+-            فروشگاه هنوز ساخته نشده؛ کالاها بعد از بیلد می‌آیند.
++            فروشگاه هنوز ساخته نشده؛ کالاها بعد از ساختن سایت روی آن می‌آیند.
+           </p>
+         )}
+         {hint ? (
+diff --git a/frontend/components/login-coder-scene.tsx b/frontend/components/login-coder-scene.tsx
+index ad581ec..3e2fceb 100644
+--- a/frontend/components/login-coder-scene.tsx
++++ b/frontend/components/login-coder-scene.tsx
+@@ -11,19 +11,19 @@ const CODE_LINES = [
+ export function LoginCoderScene() {
+   return (
+     <div className="login-coder-scene pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+-      <div className="login-code-drift login-code-drift-a absolute right-[6%] top-[8%] rounded-lg border border-line/40 bg-paper/15 px-3 py-2 font-mono text-[10px] text-warm/70 sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-a absolute right-[6%] top-[8%] rounded-lg border border-line/40 bg-paper/15 px-3 py-2 font-mono text-[10px] text-warm/70 sm:text-xs">
+         {CODE_LINES[0]}
+       </div>
+-      <div className="login-code-drift login-code-drift-b absolute left-[5%] top-[14%] rounded-lg border border-line/30 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/80 sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-b absolute left-[5%] top-[14%] rounded-lg border border-line/30 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/80 sm:text-xs">
+         {CODE_LINES[1]}
+       </div>
+-      <div className="login-code-drift login-code-drift-c absolute right-[8%] bottom-[14%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-accent/50 sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-c absolute right-[8%] bottom-[14%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-accent/50 sm:text-xs">
+         {CODE_LINES[2]}
+       </div>
+-      <div className="login-code-drift login-code-drift-d absolute left-[7%] bottom-[10%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-warm/60 sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-d absolute left-[7%] bottom-[10%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-warm/60 sm:text-xs">
+         {CODE_LINES[3]}
+       </div>
+-      <div className="login-code-drift login-code-drift-e absolute right-[22%] top-[22%] hidden rounded-lg border border-line/20 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/70 sm:block sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-e absolute right-[22%] top-[22%] hidden rounded-lg border border-line/20 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/70 sm:block sm:text-xs">
+         {CODE_LINES[4]}
+       </div>
+ 
+@@ -33,7 +33,7 @@ export function LoginCoderScene() {
+           <rect x="78" y="118" width="124" height="58" rx="10" fill="#3A3A40" stroke="#52525A" strokeWidth="1.5" />
+           <rect x="88" y="128" width="104" height="38" rx="6" fill="#2F2F33" stroke="#C45C26" strokeOpacity="0.4" />
+           <g className="login-code-typing">
+-            <text x="96" y="146" fill="#E8A87C" fontSize="9" fontFamily="ui-monospace, monospace" opacity="0.9">
++            <text x="96" y="146" direction="ltr" unicodeBidi="isolate" fill="#E8A87C" fontSize="9" fontFamily="ui-monospace, monospace" opacity="0.9">
+               build_shop()
+             </text>
+             <rect x="168" y="138" width="2" height="12" fill="#C45C26" className="login-cursor-blink" />
+diff --git a/frontend/components/onboard-gate.tsx b/frontend/components/onboard-gate.tsx
+index fee3960..01f47a3 100644
+--- a/frontend/components/onboard-gate.tsx
++++ b/frontend/components/onboard-gate.tsx
+@@ -2,7 +2,7 @@
+ 
+ import { useEffect, useState } from "react";
+ import { usePathname, useRouter } from "next/navigation";
+-import { api, getOnboarded, getToken, setOnboarded } from "@/lib/api";
++import { ApiError, api, getOnboarded, getToken, setOnboarded } from "@/lib/api";
+ 
+ const PUBLIC = new Set(["/login", "/onboard", "/"]);
+ 
+@@ -27,6 +27,8 @@ export function OnboardGate({ children }: { children: React.ReactNode }) {
+   const pathname = usePathname();
+   const publicPath = isPublicPath(pathname);
+   const [ok, setOk] = useState(publicPath);
++  const [offline, setOffline] = useState(false);
++  const [retry, setRetry] = useState(0);
+ 
+   useEffect(() => {
+     if (isPublicPath(pathname)) {
+@@ -48,15 +50,36 @@ export function OnboardGate({ children }: { children: React.ReactNode }) {
+         setOnboarded(true);
+         setOk(true);
+       })
+-      .catch(() => {
+-        router.replace("/login");
++      .catch((err) => {
++        // فقط نشست نامعتبر (۴۰۱) یعنی خروج؛ خطای موقت شبکه یا سرور کاربر را بیرون نمی‌اندازد.
++        if (err instanceof ApiError && err.status === 401) {
++          router.replace("/login");
++          return;
++        }
++        if (!getOnboarded()) setOffline(true);
+       });
+-  }, [pathname, router]);
++  }, [pathname, router, retry]);
+ 
+   if (!ok) {
+     return (
+-      <div className="flex min-h-screen items-center justify-center bg-canvas">
+-        <p className="text-sm text-muted">در حال بارگذاری…</p>
++      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
++        {offline ? (
++          <>
++            <p className="text-sm text-ink">اتصال به سوزان برقرار نشد.</p>
++            <button
++              type="button"
++              className="min-h-11 rounded-xl bg-accent px-4 text-sm font-bold text-onAccent"
++              onClick={() => {
++                setOffline(false);
++                setRetry((value) => value + 1);
++              }}
++            >
++              دوباره
++            </button>
++          </>
++        ) : (
++          <p className="text-sm text-muted">در حال بارگذاری…</p>
++        )}
+       </div>
+     );
+   }
+diff --git a/frontend/components/panel-home.tsx b/frontend/components/panel-home.tsx
+index 6d4ccfa..c1b6039 100644
+--- a/frontend/components/panel-home.tsx
++++ b/frontend/components/panel-home.tsx
+@@ -1,19 +1,48 @@
+ "use client";
+ 
+-import { useEffect } from "react";
++import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { api, getToken } from "@/lib/api";
++import { ApiError, api, getOnboarded, getToken } from "@/lib/api";
+ 
+ export function PanelHome() {
+   const router = useRouter();
++  const [offline, setOffline] = useState(false);
++  const [retry, setRetry] = useState(0);
+   useEffect(() => {
+     if (!getToken()) {
+       router.replace("/login");
+       return;
+     }
++    if (getOnboarded()) {
++      router.replace("/chat");
++      return;
++    }
+     void api<{ onboarded?: boolean }>("/auth/me")
+       .then((data) => router.replace(data.onboarded ? "/chat" : "/onboard"))
+-      .catch(() => router.replace("/login"));
+-  }, [router]);
+-  return <p className="p-8 text-muted">در حال انتقال…</p>;
++      .catch((err) => {
++        if (err instanceof ApiError && err.status === 401) router.replace("/login");
++        else setOffline(true);
++      });
++  }, [router, retry]);
++  return (
++    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
++      {offline ? (
++        <>
++          <p className="text-sm text-ink">اتصال به سوزان برقرار نشد.</p>
++          <button
++            type="button"
++            className="min-h-11 rounded-xl bg-accent px-4 text-sm font-bold text-onAccent"
++            onClick={() => {
++              setOffline(false);
++              setRetry((value) => value + 1);
++            }}
++          >
++            دوباره
++          </button>
++        </>
++      ) : (
++        <p className="text-sm text-muted">در حال بارگذاری…</p>
++      )}
++    </div>
++  );
+ }
+diff --git a/frontend/components/shop-live-build.tsx b/frontend/components/shop-live-build.tsx
+index eaa4d99..906eb9c 100644
+--- a/frontend/components/shop-live-build.tsx
++++ b/frontend/components/shop-live-build.tsx
+@@ -317,8 +317,8 @@ function ShopLivePreview({
+                 (pendingBuild > 0 || failed) && !(overlay && !failed) ? "bg-accent text-onAccent" : "text-muted",
+               )}
+             >
+-              بیلد
+-              {pendingBuild > 0 ? ` ${pendingBuild.toLocaleString("fa-IR")}` : ""}
++              {failed ? "ساخت دوباره" : "انتشار تغییرات"}
++              {pendingBuild > 0 ? ` (${pendingBuild.toLocaleString("fa-IR")})` : ""}
+             </button>
+           ) : null}
+           <IconBtn label={phone ? "نمایش دسکتاپ" : "نمایش موبایل"} active={phone} onClick={() => setPhone((value) => !value)}>
+@@ -357,7 +357,7 @@ function ShopLivePreview({
+   }
+ 
+   return (
+-    <section className="relative mx-3 mt-2 flex h-[min(38dvh,20rem)] min-h-[11rem] shrink-0 flex-col overflow-hidden rounded-3xl border border-accent/25 bg-paper shadow-card sm:mx-4 sm:mt-3 sm:h-[min(46dvh,26rem)] lg:h-[min(58%,32rem)]">
++    <section className="relative mx-3 mt-2 flex h-[min(62dvh,34rem)] min-h-[16rem] shrink-0 flex-col overflow-hidden rounded-3xl border border-accent/25 bg-paper shadow-card sm:mx-4 sm:mt-3 sm:h-[min(66dvh,40rem)] lg:h-[min(78%,48rem)]">
+       {bar}
+       <div className="flex shrink-0 gap-1 border-b border-line/60 px-2 py-1">
+         {PAGES.map((page) => (
+diff --git a/frontend/components/ui/button.tsx b/frontend/components/ui/button.tsx
+index 3970a0d..45ff039 100644
+--- a/frontend/components/ui/button.tsx
++++ b/frontend/components/ui/button.tsx
+@@ -12,7 +12,7 @@ export function Button({
+         "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-medium disabled:opacity-50",
+         variant === "ghost"
+           ? "border border-line bg-paper text-ink hover:bg-canvas"
+-          : "bg-accent text-onAccent hover:bg-warm",
++          : "bg-accentStrong text-onAccent hover:bg-accent",
+         className,
+       )}
+       {...props}
+diff --git a/frontend/components/ui/input.tsx b/frontend/components/ui/input.tsx
+index e5ef49a..c46ee77 100644
+--- a/frontend/components/ui/input.tsx
++++ b/frontend/components/ui/input.tsx
+@@ -5,7 +5,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
+   return (
+     <input
+       className={cn(
+-        "min-h-11 w-full rounded-xl border border-line bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
++        "min-h-11 w-full rounded-xl border border-field bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
+         className,
+       )}
+       {...props}
+diff --git a/frontend/components/ui/select.tsx b/frontend/components/ui/select.tsx
+index c862b42..644f29d 100644
+--- a/frontend/components/ui/select.tsx
++++ b/frontend/components/ui/select.tsx
+@@ -5,7 +5,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
+   return (
+     <select
+       className={cn(
+-        "min-h-11 w-full rounded-xl border border-line bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
++        "min-h-11 w-full rounded-xl border border-field bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
+         className,
+       )}
+       {...props}
+diff --git a/frontend/components/ui/textarea.tsx b/frontend/components/ui/textarea.tsx
+index 9747b7a..d6dfe66 100644
+--- a/frontend/components/ui/textarea.tsx
++++ b/frontend/components/ui/textarea.tsx
+@@ -5,7 +5,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
+   return (
+     <textarea
+       className={cn(
+-        "min-h-32 w-full rounded-xl border border-line bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
++        "min-h-32 w-full rounded-xl border border-field bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
+         className,
+       )}
+       {...props}
+diff --git a/frontend/tailwind.config.js b/frontend/tailwind.config.js
+index 7d35f2f..7434c1d 100644
+--- a/frontend/tailwind.config.js
++++ b/frontend/tailwind.config.js
+@@ -11,10 +11,12 @@ module.exports = {
+         surface: "#3A3A40",
+         line: "#52525A",
+         accent: "#C45C26",
++        accentStrong: "#B0521F",
++        field: "#8E8E98",
+         onAccent: "#FFF6EE",
+         warm: "#E8A87C",
+         signal: "#7EB8B0",
+-        danger: "#E06B63",
++        danger: "#F08C84",
+       },
+       fontFamily: {
+         vazir: ["Vazirmatn", "sans-serif"],

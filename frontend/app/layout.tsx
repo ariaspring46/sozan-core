@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DropStaleWorkers } from "@/components/drop-stale-workers";
 import { OnboardGate } from "@/components/onboard-gate";
+import { THEME_BAR, THEME_BOOT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,7 +11,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2F2F33",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_BAR.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_BAR.dark },
+  ],
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -19,8 +23,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fa" dir="rtl">
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <link rel="preload" href="/fonts/estedad-arabic.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="preload" href="/fonts/estedad-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>

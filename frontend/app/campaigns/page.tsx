@@ -15,12 +15,19 @@ export default function CampaignsPage() {
   const [slug, setSlug] = useState("");
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   async function load() {
     const data = await api<Campaign[]>("/campaigns");
     setItems(data);
     setReady(true);
   }
+
+  useEffect(() => {
+    void api<{ isAdmin?: boolean }>("/auth/me")
+      .then((me) => setIsAdmin(Boolean(me.isAdmin)))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     void load().catch((err) => {
@@ -51,6 +58,7 @@ export default function CampaignsPage() {
     >
     <main className="h-full space-y-4 overflow-y-auto p-4">
       <StudioNav current="campaigns" />
+      {isAdmin ? (
       <details className="rounded-2xl bg-canvas px-4 py-3 text-sm shadow-card">
         <summary className="cursor-pointer text-muted">ورود کمپین از پوشهٔ دیسک</summary>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row">
@@ -64,6 +72,7 @@ export default function CampaignsPage() {
           </Button>
         </div>
       </details>
+      ) : null}
       {error ? <p className="text-sm text-danger">{error}</p> : null}
       {!ready && !error ? <p className="text-sm text-muted">در حال خواندن…</p> : null}
       {ready && items.length === 0 && !error ? (

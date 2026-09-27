@@ -251,12 +251,8 @@ export default function ShopPage() {
             </button>
           </div>
         ) : null}
-        {live && shopPublic ? (
-          <a href={shopPublic} target="_blank" rel="noreferrer" className="relative px-4 pt-2 text-sm text-warm underline">
-            باز کردن ویترین
-          </a>
-        ) : null}
-        <div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {/* پیش‌نمایش تقریباً کل صفحه را می‌گیرد؛ «باز کردن ویترین» در نوار بالای خود پیش‌نمایش است. */}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto p-2 sm:p-3">
           <ShopLiveBuild
             build={build}
             href={shopPublic}
