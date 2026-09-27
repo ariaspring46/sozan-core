@@ -19,6 +19,7 @@ type Thread = {
   pending?: boolean;
   delivered?: boolean;
   paused?: boolean;
+  handoffReason?: string;
   unread?: number;
   lastRole?: string;
   updatedAt?: number;
@@ -302,7 +303,11 @@ export default function InboxPage() {
                           {thread.unread}
                         </span>
                       ) : null}
-                      {thread.paused ? <span className="text-[11px] text-warm">پاسخ دستی</span> : null}
+                      {thread.handoffReason ? (
+                        <span className="text-[11px] text-warm">منتظر شما</span>
+                      ) : thread.paused ? (
+                        <span className="text-[11px] text-warm">پاسخ دستی</span>
+                      ) : null}
                     </div>
                     <p className="truncate text-sm text-muted">{preview(thread)}</p>
                     {thread.lastRole === "draft" ? (
