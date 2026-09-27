@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -63,6 +66,18 @@ _BAN_CLAIM = (
     "آدرس و شماره",
 )
 _PRICE_NUM = re.compile(r"[0-9۰-۹٠-٩]{3,}")
+_LATIN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+_PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+_MONEY_KEYS = ("listPrice", "price", "priceToman", "codePrice", "phonePrice")
+_PLANS_URL = "https://api.sozan-core.ir/billing/plans"
+_PLANS_TTL_S = 600
+_ONES = ("", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه")
+_TEENS = ("ده", "یازده", "دوازده", "سیزده", "چهارده", "پانزده", "شانزده", "هفده", "هجده", "نوزده")
+_TENS = ("", "", "بیست", "سی", "چهل", "پنجاه", "شصت", "هفتاد", "هشتاد", "نود")
+_HUNDREDS = ("", "صد", "دویست", "سیصد", "چهارصد", "پانصد", "ششصد", "هفتصد", "هشتصد", "نهصد")
+_plans_cache: dict | None = None
+_plans_cached_at = 0.0
+_plans_fetcher = None
 _STAGE_FA = {
     "greet": "سلام",
     "discover": "کشف",
@@ -158,15 +173,175 @@ _START_WORDS = (
 )
 
 
+def _under_1000(value: int) -> str:
+    parts: list[str] = []
+    number = value
+    if number >= 100:
+        parts.append(_HUNDREDS[number // 100])
+        number %= 100
+    if 10 <= number <= 19:
+        parts.append(_TEENS[number - 10])
+        number = 0
+    if number >= 20:
+        parts.append(_TENS[number // 10])
+        number %= 10
+    if number:
+        parts.append(_ONES[number])
+    return " و ".join(parts)
+
+
+def toman_words(amount: int) -> str:
+    number = int(amount)
+    if number <= 0:
+        return ""
+    parts: list[str] = []
+    for scale, name in ((1_000_000_000, "میلیارد"), (1_000_000, "میلیون"), (1000, "هزار")):
+        chunk, number = divmod(number, scale)
+        if chunk:
+            parts.append(f"{_under_1000(chunk)} {name}")
+    if number:
+        parts.append(_under_1000(number))
+    return " و ".join(parts)
+
+
+def plans_url() -> str:
+    return os.environ.get("PLANS_URL", _PLANS_URL).strip() or _PLANS_URL
+
+
+def reset_plan_cache() -> None:
+    global _plans_cache, _plans_cached_at, _plans_fetcher
+    _plans_cache = None
+    _plans_cached_at = 0.0
+    _plans_fetcher = None
+
+
+def set_plans_fetcher(fn) -> None:
+    global _plans_fetcher, _plans_cache, _plans_cached_at
+    _plans_fetcher = fn
+    _plans_cache = None
+    _plans_cached_at = 0.0
+
+
+def _http_plans() -> dict:
+    request = urllib.request.Request(plans_url(), headers={"Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=4) as response:
+        body = json.loads(response.read().decode("utf-8"))
+    if not isinstance(body, dict) or not isinstance(body.get("plans"), list):
+        raise ValueError("plans")
+    return body
+
+
+def plan_catalog() -> dict | None:
+    global _plans_cache, _plans_cached_at
+    now = time.monotonic()
+    if _plans_cache is not None and now - _plans_cached_at < _PLANS_TTL_S:
+        return _plans_cache
+    try:
+        loaded = _plans_fetcher() if _plans_fetcher else _http_plans()
+    except (OSError, urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(loaded, dict) or not isinstance(loaded.get("plans"), list):
+        return None
+    _plans_cache = loaded
+    _plans_cached_at = now
+    return loaded
+
+
+def _plan_amounts(plan: dict) -> list[int]:
+    found: list[int] = []
+    for key in _MONEY_KEYS:
+        try:
+            amount = int(plan.get(key) or 0)
+        except (TypeError, ValueError):
+            continue
+        if amount >= 1000 and amount not in found:
+            found.append(amount)
+    return found
+
+
+def _money_forms(catalog: dict | None) -> tuple[set[str], list[str]]:
+    digits: set[str] = set()
+    phrases: list[str] = []
+    if not catalog:
+        return digits, phrases
+    for plan in catalog.get("plans") or []:
+        if not isinstance(plan, dict):
+            continue
+        for amount in _plan_amounts(plan):
+            text = str(amount)
+            digits.add(text)
+            digits.add(text.translate(_PERSIAN_DIGITS))
+            words = toman_words(amount)
+            if words and words not in phrases:
+                phrases.append(words)
+    phrases.sort(key=len, reverse=True)
+    return digits, phrases
+
+
+def _plan_sentence(plan: dict) -> str:
+    label = str(plan.get("label") or plan.get("id") or "").strip()
+    features = [str(item).strip() for item in (plan.get("features") or []) if str(item).strip()]
+    bits = [f"{label}: {'، '.join(features)}." if features else f"{label}."]
+    listed = int(plan.get("listPrice") or 0)
+    price = int(plan.get("price") or 0)
+    if price <= 0 and listed <= 0:
+        bits.append("رایگان است.")
+    elif listed > price > 0:
+        bits.append(f"با تخفیف سایت {toman_words(price)} تومان. قیمت اصلی {toman_words(listed)} تومان.")
+    elif price > 0:
+        bits.append(f"{toman_words(price)} تومان.")
+    if plan.get("checkout") == "soon" or plan.get("purchasable") is False:
+        bits.append("خریدش به‌زودی است.")
+    return " ".join(bits)
+
+
+def price_clause() -> str:
+    catalog = plan_catalog()
+    if not catalog:
+        return (
+            "قیمت هیچ پلنی را نگو. اگر قیمت پرسیدند، عدد نگو و فقط بگو برید sozan-core.ir و دکمهٔ ورود را بزنند.\n"
+        )
+    lines = ["قیمت را فقط اگر پرسیدند بگو، و فقط با همین عددها. عدد دیگری ممنوع است."]
+    for plan in catalog.get("plans") or []:
+        if not isinstance(plan, dict) or str(plan.get("id") or "") == "free":
+            continue
+        lines.append(_plan_sentence(plan))
+    lines.append("اگر این عددها را نداری، قیمت نگو و آدرس سایت را بگو.")
+    return "\n".join(lines) + "\n"
+
+
+def _code_amount(plan_id: str) -> int:
+    catalog = plan_catalog()
+    if not catalog:
+        return 0
+    for plan in catalog.get("plans") or []:
+        if not isinstance(plan, dict) or str(plan.get("id") or "") != plan_id:
+            continue
+        for key in ("codePrice", "phonePrice"):
+            try:
+                amount = int(plan.get(key) or 0)
+            except (TypeError, ValueError):
+                continue
+            if amount >= 1000:
+                return amount
+    return 0
+
+
 def gift_spoken_code() -> str:
-    return os.environ.get("GIFT_CODE_SPOKEN", "سوزان سی").strip() or "سوزان سی"
+    return os.environ.get("GIFT_CODE_SPOKEN", "").strip()
 
 
 def gift_line() -> str:
     code = gift_spoken_code()
-    return (
-        f"یه هدیه هم براتون دارم: اگه پرو خواستید کد {code} رو بزنید، سی درصد کمتر."
-    )
+    if not code:
+        return ""
+    amount = _code_amount("pro")
+    if amount:
+        return (
+            f"یه هدیه هم براتون دارم: کد {code} روی تخفیف سایت می‌نشیند "
+            f"و پرو می‌شود {toman_words(amount)} تومان."
+        )
+    return f"یه هدیه هم براتون دارم: کد {code} روی تخفیف سایت می‌نشیند."
 
 
 def wait_line(heard: str) -> str:
@@ -217,8 +392,8 @@ def sales_open() -> str:
         "اگر پرسید شماره را از کجا آوردی، راست بگو: از بین پیج‌های فروشگاهی اینستاگرام زنگ می‌زنم، جزئیات لیست را نمی‌گویم. "
         "اگر دوباره همان را پرسید، همان جواب را بده و بعد آدرس سایت را بگو.\n"
         "اگر گفت مغازه ندارم، اشتباه گرفتید، شرکت است، دانشجو است، اینستاگرام ندارد، یا زنگ نزنید، عذرخواهی کن و فقط خداحافظی کن. سایت را پیشنهاد نکن.\n"
-        "پرو فقط خواندن دایرکت است، چهارصد و نود هزار تومان، و فقط اگر از قیمت پرو پرسید.\n"
-        "اگر مستقیم پرسید رباتی، راست بگو: دستیار صوتی سوزانم.\n"
+        + price_clause()
+        + "اگر مستقیم پرسید رباتی، راست بگو: دستیار صوتی سوزانم.\n"
         "وقتی کار تمام است فقط بنویس [پایان]. وقتی هدیه مناسب است فقط بنویس [هدیه]. "
         "کد تخفیف را خودت نساز.\n"
         "نمونه‌های زیر فقط لحن‌اند، از بر تکرارشان نکن:\n"
@@ -327,7 +502,7 @@ def read_signals(heard: str) -> Signals:
     if "چطور" in blob and not any(part in blob for part in ("بساز", "سایت", "وبسایت", "وب سایت")):
         howdy = True
     source = any(part in blob for part in ("شماره من", "از کجا آورد", "از کجا شماره"))
-    price = any(part in blob for part in ("گرون", "گران", "هزینه", "قیمت", "پول", "مبلغ", "پرو", "چهارصد", "تخفیف"))
+    price = any(part in blob for part in ("گرون", "گران", "هزینه", "قیمت", "پول", "مبلغ", "پرو", "تخفیف", "تومان"))
     if "پول" in blob and any(part in blob for part in ("نه", "نمی", "نمی‌")) and "گرون" not in blob:
         price = False
     later = any(part in blob for part in ("بعدا", "بعداً", "الان نه", "وقت ندارم", "سردم"))
@@ -620,6 +795,32 @@ def strip_invented_names(reply: str, heard: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip(" ،,")
 
 
+def _price_sentence_ok(sent: str) -> bool:
+    has_toman = "تومان" in sent
+    long_nums = []
+    for num in _PRICE_NUM.findall(sent):
+        latin = num.translate(_LATIN_DIGITS)
+        if len(latin) >= 4:
+            long_nums.append(latin)
+    if not has_toman and not long_nums:
+        return True
+    digits, phrases = _money_forms(plan_catalog())
+    allowed = {item.translate(_LATIN_DIGITS) for item in digits}
+    if not allowed:
+        return False
+    if any(latin not in allowed for latin in long_nums):
+        return False
+    if not has_toman:
+        return True
+    scrubbed = sent
+    for phrase in phrases:
+        scrubbed = scrubbed.replace(phrase, " ")
+    for token in digits:
+        scrubbed = scrubbed.replace(token, " ")
+    scrubbed = scrubbed.replace("تومان", " ")
+    return re.search(r"میلیون|هزار|[0-9۰-۹٠-٩]{3,}", scrubbed) is None
+
+
 def guard_reply(reply: str, heard: str) -> str:
     text = formalize_you(strip_invented_names(reply or "", heard or ""))
     kept: list[str] = []
@@ -635,15 +836,9 @@ def guard_reply(reply: str, heard: str) -> str:
             continue
         if "تخفیف" in sent and any(part in sent for part in ("نیست", "نمی‌تونم", "نمیتونم", "نمی‌توانم")):
             continue
-        if "کد" in sent and allowed_code not in sent and "سوزان سی" not in sent:
-            if re.search(r"کد\s+\S+", sent):
-                continue
-        bad_price = False
-        for num in _PRICE_NUM.findall(sent):
-            digits = num.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
-            if digits not in {"490000", "490", "343000", "343"} and len(digits) >= 4:
-                bad_price = True
-        if bad_price:
+        if re.search(r"کد\s+\S+", sent) and (not allowed_code or allowed_code not in sent):
+            continue
+        if not _price_sentence_ok(sent):
             continue
         kept.append(sent.strip())
     return shorten_reply(" ".join(kept).strip())
@@ -707,7 +902,7 @@ def sales_kind(heard: str) -> str:
         return "shop"
     if any(part in blob for part in ("اسمت", "اسم چیه", "اسمت چیه")) and "سوزان" not in blob:
         return "name"
-    if any(part in blob for part in ("پرو", "چهارصد", "نود هزار")):
+    if any(part in blob for part in ("پرو", "تومان")):
         return "price"
     if any(part in blob for part in ("عکس", "فیلم", "ویدیو", "استودیو", "پست", "پوستر")):
         return "studio"

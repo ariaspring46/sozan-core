@@ -591,6 +591,8 @@ class Gateway:
             lines.append(intent.again)
         started = time.monotonic()
         for line in dict.fromkeys(lines):
+            if not (line or "").strip():
+                continue
             pcm, _ = self.brain.synthesize(line)
             if pcm:
                 self._voice[line] = pcm
@@ -1303,7 +1305,7 @@ class Gateway:
             spoken = f"{spoken} {extra}".strip()
         if offer_gift:
             bonus = gift_line()
-            if bonus not in spoken:
+            if bonus and bonus not in spoken:
                 self._speak_more(session, generation, bonus)
                 spoken = f"{spoken} {bonus}".strip()
             state.gifted = True

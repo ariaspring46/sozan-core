@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import array
+import json
+import os
+import time
 import unittest
+from pathlib import Path
 
 from sim_call import mix_shop_noise
 from audio_codec import (
@@ -78,14 +82,52 @@ from sales import (
     sales_ended,
     sales_kind,
     sales_open,
+    set_plans_fetcher,
     shorten_reply,
     split_sentences,
     take_ready_sentences,
+    toman_words,
     too_alike,
     wait_line,
     wants_address,
+    plan_catalog,
+    reset_plan_cache,
 )
 from sip import _private_ip, digest_response, normalize_dial, parse_auth_challenge, parse_message
+
+ROOT = Path(__file__).resolve().parent
+PLAN_FIXTURE = {
+    "paymentReady": False,
+    "plans": [
+        {
+            "id": "pro",
+            "label": "پرو",
+            "listPrice": 1_414_000,
+            "price": 1_414_000,
+            "features": ["یک فروشگاه", "خواندن دایرکت اینستاگرام", "پیش‌نویس پاسخ با لحن فروشنده"],
+            "purchasable": True,
+            "checkout": "open",
+        },
+        {
+            "id": "promax",
+            "label": "پرو مکس",
+            "listPrice": 2_414_000,
+            "price": 1_931_000,
+            "features": ["پاسخ خودکار دایرکت با لحن فروشنده"],
+            "purchasable": True,
+            "checkout": "open",
+        },
+        {
+            "id": "ultra",
+            "label": "اولترا",
+            "listPrice": 3_843_000,
+            "price": 2_690_000,
+            "features": ["تا ۲ فضای کاری کامل"],
+            "purchasable": False,
+            "checkout": "soon",
+        },
+    ],
+}
 
 
 class CodecTest(unittest.TestCase):
@@ -361,6 +403,13 @@ class SpeechTest(unittest.TestCase):
 
 
 class SalesTest(unittest.TestCase):
+    def setUp(self) -> None:
+        set_plans_fetcher(lambda: PLAN_FIXTURE)
+
+    def tearDown(self) -> None:
+        os.environ.pop("GIFT_CODE_SPOKEN", None)
+        reset_plan_cache()
+
     def test_brief_names_the_shop_and_is_not_a_script(self) -> None:
         brief = sales_brief(ShopCard("kif_shop", "کیف چرم"))
         self.assertIn("سوزان هستی", brief)
@@ -443,13 +492,16 @@ class SalesTest(unittest.TestCase):
         self.assertTrue(gift_allowed(state, read_signals("گرونه")))
         state.gifted = True
         self.assertFalse(gift_allowed(state, read_signals("گرونه")))
-        os.environ.pop("GIFT_CODE_SPOKEN", None)
         self.assertIn("سوزان سی", gift_line())
+        self.assertIn("براتون", gift_line())
+        self.assertIn("تخفیف سایت", gift_line())
+        self.assertNotIn("برات ", gift_line())
+        os.environ.pop("GIFT_CODE_SPOKEN", None)
+        self.assertEqual(gift_line(), "")
+        self.assertFalse(gift_allowed(state, read_signals("گرونه")))
         self.assertIn("sozan-core.ir", CLOSE_LINE)
         self.assertIn("پیجتون", HELLO_LINE)
         self.assertNotIn("پیجت ", HELLO_LINE)
-        self.assertNotIn("برات ", gift_line())
-        self.assertIn("براتون", gift_line())
         self.assertNotIn("کور", ADDRESS_LINE)
         self.assertIn("کُر", ADDRESS_LINE)
         self.assertIn(ADDRESS_LINE, REPEAT_FREE)
@@ -565,6 +617,67 @@ class SalesTest(unittest.TestCase):
             found = load_campaign(path)
             self.assertEqual(found["09121234567"], ShopCard("kif_shop", "کیف چرم"))
             self.assertEqual(load_campaign(path.with_name("missing.json")), {})
+
+    def test_spoken_prices_match_the_catalog(self) -> None:
+        self.assertEqual(toman_words(1_414_000), "یک میلیون و چهارصد و چهارده هزار")
+        self.assertEqual(toman_words(1_931_000), "یک میلیون و نهصد و سی و یک هزار")
+        self.assertEqual(toman_words(2_690_000), "دو میلیون و ششصد و نود هزار")
+        opened = sales_open()
+        self.assertIn("یک میلیون و چهارصد و چهارده هزار تومان", opened)
+        self.assertIn("یک میلیون و نهصد و سی و یک هزار تومان", opened)
+        self.assertIn("دو میلیون و چهارصد و چهارده هزار تومان", opened)
+        self.assertIn("پاسخ خودکار", opened)
+        self.assertIn("به‌زودی", opened)
+        self.assertNotIn("فقط خواندن دایرکت", opened)
+        kept = guard_reply("پرو یک میلیون و چهارصد و چهارده هزار تومان است.", "قیمت پرو چقدره")
+        self.assertIn("یک میلیون و چهارصد و چهارده هزار", kept)
+        promax = guard_reply("پرو مکس با تخفیف سایت یک میلیون و نهصد و سی و یک هزار تومان است.", "پرو مکس")
+        self.assertIn("یک میلیون و نهصد و سی و یک هزار", promax)
+        self.assertEqual(guard_reply("پرو چهارصد و نود هزار تومان است.", "قیمت"), "")
+        self.assertEqual(guard_reply("قیمت 490000 تومان است.", "قیمت"), "")
+        self.assertEqual(guard_reply("343000 تومان.", "قیمت"), "")
+
+    def test_missing_catalog_quotes_no_price(self) -> None:
+        def down():
+            raise OSError("down")
+
+        set_plans_fetcher(down)
+        opened = sales_open()
+        self.assertIn("قیمت هیچ پلنی را نگو", opened)
+        self.assertNotIn("تومان", opened)
+        self.assertEqual(guard_reply("پرو یک میلیون تومان است.", "قیمت"), "")
+
+    def test_plan_catalog_is_cached_for_ten_minutes(self) -> None:
+        import sales
+
+        calls = {"n": 0}
+
+        def fetch():
+            calls["n"] += 1
+            return PLAN_FIXTURE
+
+        set_plans_fetcher(fetch)
+        self.assertIsNotNone(plan_catalog())
+        self.assertIsNotNone(plan_catalog())
+        self.assertEqual(calls["n"], 1)
+        sales._plans_cached_at = time.monotonic() - 601
+        self.assertIsNotNone(plan_catalog())
+        self.assertEqual(calls["n"], 2)
+
+    def test_campaign_example_uses_runner_keys(self) -> None:
+        spec = json.loads((ROOT / "campaign.example.json").read_text(encoding="utf-8"))
+        self.assertEqual(spec.get("source"), "instagram-shops")
+        self.assertTrue(spec.get("contacts"))
+        self.assertNotIn("targets", spec)
+
+    def test_gift_uses_code_price_from_the_catalog(self) -> None:
+        priced = json.loads(json.dumps(PLAN_FIXTURE))
+        priced["plans"][0]["codePrice"] = 989_800
+        set_plans_fetcher(lambda: priced)
+        os.environ["GIFT_CODE_SPOKEN"] = "سوزان سی"
+        line = gift_line()
+        self.assertIn("نهصد و هشتاد و نه هزار و هشتصد", line)
+        self.assertIn("تخفیف سایت", line)
 
     def test_sim_command_never_looks_like_a_dial(self) -> None:
         self.assertEqual(parse_sim_command("SIM"), ("", ""))
