@@ -1,0 +1,2409 @@
+diff --git a/app/campaigns/page.tsx b/app/campaigns/page.tsx
+index f411044..5193df1 100644
+--- a/app/campaigns/page.tsx
++++ b/app/campaigns/page.tsx
+@@ -15,6 +15,7 @@ export default function CampaignsPage() {
+   const [slug, setSlug] = useState("");
+   const [error, setError] = useState("");
+   const [ready, setReady] = useState(false);
++  const [isAdmin, setIsAdmin] = useState(false);
+ 
+   async function load() {
+     const data = await api<Campaign[]>("/campaigns");
+@@ -22,6 +23,12 @@ export default function CampaignsPage() {
+     setReady(true);
+   }
+ 
++  useEffect(() => {
++    void api<{ isAdmin?: boolean }>("/auth/me")
++      .then((me) => setIsAdmin(Boolean(me.isAdmin)))
++      .catch(() => undefined);
++  }, []);
++
+   useEffect(() => {
+     void load().catch((err) => {
+       setError(err.message);
+@@ -51,6 +58,7 @@ export default function CampaignsPage() {
+     >
+     <main className="h-full space-y-4 overflow-y-auto p-4">
+       <StudioNav current="campaigns" />
++      {isAdmin ? (
+       <details className="rounded-2xl bg-canvas px-4 py-3 text-sm shadow-card">
+         <summary className="cursor-pointer text-muted">ورود کمپین از پوشهٔ دیسک</summary>
+         <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+@@ -64,6 +72,7 @@ export default function CampaignsPage() {
+           </Button>
+         </div>
+       </details>
++      ) : null}
+       {error ? <p className="text-sm text-danger">{error}</p> : null}
+       {!ready && !error ? <p className="text-sm text-muted">در حال خواندن…</p> : null}
+       {ready && items.length === 0 && !error ? (
+diff --git a/app/chat/page.tsx b/app/chat/page.tsx
+index 02ade90..6abfb02 100644
+--- a/app/chat/page.tsx
++++ b/app/chat/page.tsx
+@@ -2,6 +2,8 @@
+ 
+ import { useCallback, useEffect, useRef, useState } from "react";
+ import { AppShell } from "@/components/app-shell";
++import { ChannelAlert } from "@/components/channel-alert";
++import { GettingStarted } from "@/components/getting-started";
+ import { ChatThread, type ChatMsg } from "@/components/chat-thread";
+ import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
+ import { api } from "@/lib/api";
+@@ -27,6 +29,20 @@ function welcomeLines(brand: string) {
+   ];
+ }
+ 
++/** نمونه‌جمله‌هایی که سوزان واقعاً انجام می‌دهد؛ در چت خالی تایپ می‌شوند. */
++const CHAT_HINTS = [
++  "برای انگشتر نقره یک پست اینستاگرام بساز",
++  "رنگ دکمه‌های فروشگاه را زرشکی کن",
++  "حس فروشگاه را لوکس و خلوت کن",
++  "یک بخش درباره ما به سایت اضافه کن",
++  "برای تخفیف یلدا پست بساز",
++  "دایرکت‌های اینستاگرام را خودکار جواب بده",
++  "کالای تازه اضافه کن: دستبند چرم، ۴۵۰ هزار تومان",
++  "دامنهٔ فروشگاه من چیه؟",
++  "اینستاگرام وصل هست یا نه؟",
++  "تو چه کارهایی می‌توانی بکنی؟",
++];
++
+ export default function ChatPage() {
+   const [messages, setMessages] = useState<ChatMsg[]>([]);
+   const [pendingConfirm, setPendingConfirm] = useState<ChatPayload["pendingConfirm"]>(null);
+@@ -195,10 +211,11 @@ export default function ChatPage() {
+     <AppShell
+       header={
+         <div className="flex min-w-0 items-center gap-2">
+-          <div className="min-w-0 flex-1">
++          <div className="shrink-0">
+             <p className="text-sm text-muted">گفتگو</p>
+-            <h1 className="text-lg font-bold">سوزان</h1>
++            <h1 className="whitespace-nowrap text-lg font-bold">سوزان</h1>
+           </div>
++          <div className="min-w-0 flex-1" />
+           {threads.length ? (
+             <label className="sr-only" htmlFor="sozan-thread">
+               گفتگوها
+@@ -207,7 +224,7 @@ export default function ChatPage() {
+           {threads.length ? (
+             <select
+               id="sozan-thread"
+-              className="max-w-[9rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink"
++              className="min-w-0 max-w-[8rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink sm:max-w-[14rem]"
+               value={threadId}
+               onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
+             >
+@@ -229,6 +246,8 @@ export default function ChatPage() {
+       }
+     >
+       <div className="sozan-chat flex h-full flex-col">
++        <ChannelAlert />
++        <GettingStarted />
+         {error ? (
+           <p className="px-4 pt-3 text-sm text-danger" role="alert">
+             {error}
+@@ -246,6 +265,7 @@ export default function ChatPage() {
+             pendingText={pending}
+             welcome
+             welcomeLines={welcomeLines(brand)}
++            hints={CHAT_HINTS}
+             placeholder="به سوزان بگو…"
+             persona="سوزان"
+             showTime
+diff --git a/app/globals.css b/app/globals.css
+index 4a54013..2887bfb 100644
+--- a/app/globals.css
++++ b/app/globals.css
+@@ -22,8 +22,85 @@
+   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+ }
+ 
+-html {
++/* تم پنل: پیش‌فرض از تنظیم دستگاه؛ انتخاب کاربر روی <html data-theme> می‌نشیند. */
++:root,
++:root[data-theme="dark"] {
++  --c-ink: 243 238 230;
++  --c-muted: 180 176 168;
++  --c-paper: 58 58 64;
++  --c-canvas: 47 47 51;
++  --c-surface: 58 58 64;
++  --c-line: 82 82 90;
++  --c-accent: 196 92 38;
++  --c-accentStrong: 176 82 31;
++  --c-field: 142 142 152;
++  --c-onAccent: 255 246 238;
++  --c-warm: 232 168 124;
++  --c-signal: 126 184 176;
++  --c-danger: 240 140 132;
++  --shadow-card: 0 1px 2px rgb(0 0 0 / 28%), 0 10px 28px rgb(0 0 0 / 22%);
+   color-scheme: dark;
++}
++
++@media (prefers-color-scheme: light) {
++  :root:not([data-theme]) {
++    --c-ink: 42 38 34;
++    --c-muted: 103 95 86;
++    --c-paper: 244 239 232;
++    --c-canvas: 255 255 255;
++    --c-surface: 255 255 255;
++    --c-line: 220 211 199;
++    --c-accent: 196 92 38;
++    --c-accentStrong: 166 74 27;
++    --c-field: 140 131 120;
++    --c-onAccent: 255 248 242;
++    --c-warm: 156 74 28;
++    --c-signal: 39 112 106;
++    --c-danger: 185 58 46;
++    --shadow-card: 0 1px 2px rgb(60 40 20 / 8%), 0 8px 24px rgb(60 40 20 / 8%);
++    color-scheme: light;
++  }
++}
++
++:root[data-theme="light"] {
++  --c-ink: 42 38 34;
++  --c-muted: 103 95 86;
++  --c-paper: 244 239 232;
++  --c-canvas: 255 255 255;
++  --c-surface: 255 255 255;
++  --c-line: 220 211 199;
++  --c-accent: 196 92 38;
++  --c-accentStrong: 166 74 27;
++  --c-field: 140 131 120;
++  --c-onAccent: 255 248 242;
++  --c-warm: 156 74 28;
++  --c-signal: 39 112 106;
++  --c-danger: 185 58 46;
++  --shadow-card: 0 1px 2px rgb(60 40 20 / 8%), 0 8px 24px rgb(60 40 20 / 8%);
++  color-scheme: light;
++}
++
++/* لندینگ، ورود و آنبورد همیشه تیره می‌مانند (صحنه‌های برند با رنگ ثابت). */
++.sozan-landing,
++.sozan-lamp {
++  --c-ink: 243 238 230;
++  --c-muted: 180 176 168;
++  --c-paper: 58 58 64;
++  --c-canvas: 47 47 51;
++  --c-surface: 58 58 64;
++  --c-line: 82 82 90;
++  --c-accent: 196 92 38;
++  --c-accentStrong: 176 82 31;
++  --c-field: 142 142 152;
++  --c-onAccent: 255 246 238;
++  --c-warm: 232 168 124;
++  --c-signal: 126 184 176;
++  --c-danger: 240 140 132;
++  --shadow-card: 0 1px 2px rgb(0 0 0 / 28%), 0 10px 28px rgb(0 0 0 / 22%);
++  color-scheme: dark;
++}
++
++html {
+   -webkit-text-size-adjust: 100%;
+   text-size-adjust: 100%;
+   touch-action: manipulation;
+@@ -31,8 +108,8 @@ html {
+ 
+ html,
+ body {
+-  background: #2f2f33;
+-  color: #f3eee6;
++  background: rgb(var(--c-canvas));
++  color: rgb(var(--c-ink));
+   min-height: 100dvh;
+   font-family: Vazirmatn, sans-serif;
+   overscroll-behavior: none;
+@@ -479,7 +556,7 @@ html:has(.sozan-landing) {
+   background:
+     radial-gradient(80% 48% at 50% -12%, rgb(196 92 38 / 22%), transparent 58%),
+     radial-gradient(55% 40% at 108% 108%, rgb(196 92 38 / 10%), transparent 52%),
+-    #2f2f33;
++    rgb(var(--c-canvas));
+ }
+ 
+ .sozan-aurora {
+@@ -528,7 +605,7 @@ html:has(.sozan-landing) {
+ .sozan-chat {
+   background:
+     radial-gradient(70% 42% at 50% -8%, rgb(196 92 38 / 8%), transparent 58%),
+-    #2f2f33;
++    rgb(var(--c-canvas));
+ }
+ 
+ .sozan-live-ring {
+@@ -690,3 +767,55 @@ html:has(.sozan-landing) {
+     opacity: 0;
+   }
+ }
++
++/* جمله‌های راهنمای چت خالی: مکان‌نما و «باد» که کلمه‌ها را می‌برد (جهت راست‌به‌چپ). */
++@keyframes sozan-caret {
++  0%,
++  45% {
++    opacity: 1;
++  }
++  55%,
++  100% {
++    opacity: 0;
++  }
++}
++
++.sozan-caret {
++  animation: sozan-caret 0.9s steps(1) infinite;
++}
++
++@keyframes sozan-wind {
++  0% {
++    opacity: 1;
++    transform: translate(0, 0) rotate(0) skewX(0);
++    filter: blur(0);
++  }
++  35% {
++    opacity: 0.9;
++    transform: translate(-0.6rem, -0.15rem) rotate(-2deg) skewX(6deg);
++  }
++  100% {
++    opacity: 0;
++    transform: translate(-4.5rem, -1.6rem) rotate(-10deg) skewX(14deg);
++    filter: blur(6px);
++  }
++}
++
++.sozan-wind {
++  animation-name: sozan-wind;
++  animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.45);
++  animation-fill-mode: both;
++  will-change: transform, opacity, filter;
++}
++
++.sozan-wind-still {
++  opacity: 0;
++  transition: opacity 0.4s ease;
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .sozan-caret,
++  .sozan-wind {
++    animation: none;
++  }
++}
+diff --git a/app/inbox/page.tsx b/app/inbox/page.tsx
+index 9b59c66..89c6a65 100644
+--- a/app/inbox/page.tsx
++++ b/app/inbox/page.tsx
+@@ -3,6 +3,7 @@
+ import Link from "next/link";
+ import { useCallback, useEffect, useRef, useState } from "react";
+ import { AppShell } from "@/components/app-shell";
++import { ChannelAlert } from "@/components/channel-alert";
+ import { Card } from "@/components/ui/card";
+ import { EmptyState } from "@/components/empty-state";
+ import { api } from "@/lib/api";
+@@ -175,40 +176,59 @@ export default function InboxPage() {
+     <AppShell
+       header={
+         <div>
+-          <p className="text-sm text-muted">چت کاربران</p>
+-          <h1 className="text-lg font-bold">پیام از همه کانال‌ها</h1>
++          <p className="text-sm text-muted">صندوق</p>
++          <h1 className="text-lg font-bold">پیام مشتری‌ها</h1>
+         </div>
+       }
+     >
+       <div className="h-full space-y-3 overflow-y-auto p-4">
+-        <div className="flex gap-1 rounded-2xl border border-line/70 bg-paper p-1">
+-          {MODES.map((mode) => {
+-            const locked = RANK[mode.id] > RANK[autoReplyMax || ""];
+-            const active = autoReply === mode.id;
+-            return (
+-              <button
+-                key={mode.id || "off"}
+-                type="button"
+-                disabled={saving || locked}
+-                title={locked ? `در پلن ${mode.id === "send" ? "پرو مکس" : "پرو"}` : undefined}
+-                onClick={() => void setMode(mode.id)}
+-                className={cn(
+-                  "min-h-10 flex-1 rounded-xl px-2 text-xs",
+-                  active ? "bg-accent text-onAccent" : "text-muted",
+-                  locked && "opacity-40",
+-                )}
+-              >
+-                {mode.label}
+-              </button>
+-            );
+-          })}
+-        </div>
+-        {planLabel ? (
+-          <p className="text-[11px] text-muted">
+-            سقف پلن {planLabel}
+-            {autoReplyMax === "send" ? " · ارسال خودکار" : autoReplyMax === "draft" ? " · پیش‌نویس" : " · پاسخ دستی"}
++        <ChannelAlert inset={false} />
++        <section aria-label="پاسخ به دایرکت" className="space-y-2 rounded-2xl border border-line/70 bg-paper p-3">
++          <div className="flex items-center justify-between gap-2">
++            <h2 className="text-sm font-bold">پاسخ سوزان به دایرکت</h2>
++            {planLabel ? <span className="text-[11px] text-muted">پلن {planLabel}</span> : null}
++          </div>
++          <div className="flex gap-1 rounded-xl bg-canvas p-1" role="radiogroup" aria-label="حالت پاسخ">
++            {MODES.map((mode) => {
++              const locked = RANK[mode.id] > RANK[autoReplyMax || ""];
++              const active = autoReply === mode.id;
++              return (
++                <button
++                  key={mode.id || "off"}
++                  type="button"
++                  role="radio"
++                  aria-checked={active}
++                  disabled={saving || locked}
++                  title={locked ? `در پلن ${mode.id === "send" ? "پرو مکس" : "پرو"}` : undefined}
++                  onClick={() => void setMode(mode.id)}
++                  className={cn(
++                    "min-h-10 flex-1 rounded-lg px-2 text-xs",
++                    active ? "bg-accentStrong font-bold text-onAccent" : "text-muted",
++                    locked && "opacity-40",
++                  )}
++                >
++                  {mode.label}
++                  {locked ? " 🔒" : ""}
++                </button>
++              );
++            })}
++          </div>
++          <p className="text-xs leading-6 text-muted">
++            {autoReply === "send"
++              ? "سوزان خودش جواب مشتری را می‌فرستد."
++              : autoReply === "draft"
++                ? "سوزان جواب را می‌نویسد؛ تو با یک لمس می‌فرستی."
++                : "جواب‌ها را خودت می‌نویسی."}
++            {autoReplyMax !== "send" ? (
++              <>
++                {" "}
++                <Link href="/more/settings" className="text-warm underline-offset-4 hover:underline">
++                  {autoReplyMax === "draft" ? "ارسال خودکار در پرو مکس" : "پیش‌نویس و ارسال خودکار در پلن‌های پولی"}
++                </Link>
++              </>
++            ) : null}
+           </p>
+-        ) : null}
++        </section>
+         {!dmSync ? (
+           <Card>
+             <p className="text-sm">همگام‌سازی دایرکت در این پلن خاموش است. پیام‌های جدید از اینستاگرام و تلگرام نمی‌آیند.</p>
+@@ -220,7 +240,7 @@ export default function InboxPage() {
+             onClick={() => void syncNow()}
+             className="min-h-11 w-full rounded-2xl border border-line/80 bg-paper px-3 text-sm text-warm disabled:opacity-50"
+           >
+-            {syncing ? "در حال همگام‌سازی…" : "همگام‌سازی پیام‌ها"}
++            {syncing ? "در حال گرفتن پیام‌های تازه…" : "گرفتن پیام‌های تازه"}
+           </button>
+         )}
+         {syncNote ? <p className="text-sm text-muted">{syncNote}</p> : null}
+@@ -239,7 +259,7 @@ export default function InboxPage() {
+               onClick={() => setFilter(item.id)}
+               className={cn(
+                 "min-h-9 rounded-full px-3 text-xs",
+-                filter === item.id ? "bg-accent text-onAccent" : "border border-line/70 text-muted",
++                filter === item.id ? "bg-accentStrong text-onAccent" : "border border-line/70 text-muted",
+               )}
+             >
+               {item.label}
+@@ -252,7 +272,7 @@ export default function InboxPage() {
+               onClick={() => setPlatform(item.id)}
+               className={cn(
+                 "min-h-9 rounded-full px-3 text-xs",
+-                platform === item.id ? "bg-accent text-onAccent" : "border border-line/70 text-muted",
++                platform === item.id ? "bg-accentStrong text-onAccent" : "border border-line/70 text-muted",
+               )}
+             >
+               {item.label}
+@@ -278,7 +298,7 @@ export default function InboxPage() {
+               q || filter || platform ? undefined : (
+                 <Link
+                   href="/more/channels"
+-                  className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent"
++                  className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm text-onAccent"
+                 >
+                   وصل کردن کانال
+                 </Link>
+@@ -298,11 +318,11 @@ export default function InboxPage() {
+                     <div className="mt-0.5 flex items-center gap-2">
+                       <p className="font-medium">{thread.sender}</p>
+                       {thread.unread ? (
+-                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] text-onAccent">
+-                          {thread.unread}
++                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accentStrong px-1.5 text-[11px] text-onAccent">
++                          {Number(thread.unread).toLocaleString("fa-IR")}
+                         </span>
+                       ) : null}
+-                      {thread.paused ? <span className="text-[11px] text-warm">پاسخ دستی</span> : null}
++                      {thread.paused ? <span className="text-[11px] text-warm">پاسخ خودکار متوقف</span> : null}
+                     </div>
+                     <p className="truncate text-sm text-muted">{preview(thread)}</p>
+                     {thread.lastRole === "draft" ? (
+diff --git a/app/layout.tsx b/app/layout.tsx
+index b83a057..f38224e 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,6 +1,7 @@
+ import type { Metadata, Viewport } from "next";
+ import { DropStaleWorkers } from "@/components/drop-stale-workers";
+ import { OnboardGate } from "@/components/onboard-gate";
++import { THEME_BAR, THEME_BOOT } from "@/lib/theme";
+ import "./globals.css";
+ 
+ export const metadata: Metadata = {
+@@ -10,7 +11,10 @@ export const metadata: Metadata = {
+ };
+ 
+ export const viewport: Viewport = {
+-  themeColor: "#2F2F33",
++  themeColor: [
++    { media: "(prefers-color-scheme: light)", color: THEME_BAR.light },
++    { media: "(prefers-color-scheme: dark)", color: THEME_BAR.dark },
++  ],
+   width: "device-width",
+   initialScale: 1,
+   viewportFit: "cover",
+@@ -19,8 +23,9 @@ export const viewport: Viewport = {
+ 
+ export default function RootLayout({ children }: { children: React.ReactNode }) {
+   return (
+-    <html lang="fa" dir="rtl">
++    <html lang="fa" dir="rtl" suppressHydrationWarning>
+       <head>
++        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+         <link rel="preload" href="/fonts/estedad-arabic.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+         <link rel="preload" href="/fonts/estedad-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+       </head>
+diff --git a/app/login/page.tsx b/app/login/page.tsx
+index 19f27e7..836f716 100644
+--- a/app/login/page.tsx
++++ b/app/login/page.tsx
+@@ -1,8 +1,9 @@
+ "use client";
+ 
+-import { FormEvent, useState } from "react";
++import { FormEvent, useEffect, useRef, useState } from "react";
+ import { useRouter } from "next/navigation";
+ import { api, setOnboarded, setToken } from "@/lib/api";
++import { toLatinDigits } from "@/lib/digits";
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+ import { Card } from "@/components/ui/card";
+@@ -10,6 +11,38 @@ import { Field } from "@/components/field";
+ import { LoginCoderScene } from "@/components/login-coder-scene";
+ import { SozanMark } from "@/components/sozan-mark";
+ 
++const RESEND_SECONDS = 60;
++
++/** ۰۹۱۲… یا 0912… یا +98912… یا 98912… با فاصله و خط تیره → 09xxxxxxxxx */
++function normalizePhone(raw: string): string {
++  let value = toLatinDigits(raw).replace(/[\s\-()]/g, "");
++  if (value.startsWith("+98")) value = `0${value.slice(3)}`;
++  else if (value.startsWith("0098")) value = `0${value.slice(4)}`;
++  else if (value.startsWith("98") && value.length === 12) value = `0${value.slice(2)}`;
++  else if (value.startsWith("9") && value.length === 10) value = `0${value}`;
++  return value;
++}
++
++function normalizeCode(raw: string): string {
++  return toLatinDigits(raw).replace(/\D/g, "");
++}
++
++function phoneHint(raw: string): string {
++  const value = normalizePhone(raw);
++  if (!value) return "";
++  if (!/^\d+$/.test(value)) return "فقط رقم بنویس.";
++  if (!value.startsWith("09")) return "شماره موبایل با ۰۹ شروع می‌شود.";
++  if (value.length < 11) return `${(11 - value.length).toLocaleString("fa-IR")} رقم دیگر مانده.`;
++  if (value.length > 11) return "شماره موبایل ۱۱ رقم است.";
++  return "";
++}
++
++function faSeconds(sec: number): string {
++  const m = Math.floor(sec / 60);
++  const s = sec % 60;
++  return `${m.toLocaleString("fa-IR")}:${s.toLocaleString("fa-IR").padStart(2, "۰")}`;
++}
++
+ export default function LoginPage() {
+   const router = useRouter();
+   const [phone, setPhone] = useState("");
+@@ -17,38 +50,78 @@ export default function LoginPage() {
+   const [sent, setSent] = useState(false);
+   const [hint, setHint] = useState("");
+   const [error, setError] = useState("");
++  const [busy, setBusy] = useState(false);
++  const [wait, setWait] = useState(0);
++  const autoTried = useRef("");
+ 
+-  async function send(e: FormEvent) {
+-    e.preventDefault();
++  const cleanPhone = normalizePhone(phone);
++  const phoneOk = /^09\d{9}$/.test(cleanPhone);
++  const cleanCode = normalizeCode(code);
++
++  useEffect(() => {
++    if (wait <= 0) return;
++    const timer = window.setTimeout(() => setWait((value) => value - 1), 1000);
++    return () => window.clearTimeout(timer);
++  }, [wait]);
++
++  async function requestCode() {
+     setError("");
++    setBusy(true);
+     try {
+       const data = await api<{ ok: boolean; dev_code?: string }>("/auth/otp/send", {
+         method: "POST",
+-        body: JSON.stringify({ phone }),
++        body: JSON.stringify({ phone: cleanPhone }),
+       });
+       setSent(true);
+       setHint(data.dev_code || "");
++      setWait(RESEND_SECONDS);
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : "خطا");
++      setError(err instanceof Error && err.message ? err.message : "ارسال کد انجام نشد. دوباره امتحان کن.");
++    } finally {
++      setBusy(false);
+     }
+   }
+ 
+-  async function verify(e: FormEvent) {
++  async function send(e: FormEvent) {
+     e.preventDefault();
++    if (!phoneOk || busy) return;
++    await requestCode();
++  }
++
++  async function verifyCode(value: string) {
++    if (!value || busy) return;
+     setError("");
++    setBusy(true);
+     try {
+       const data = await api<{ access_token: string; onboarded?: boolean }>("/auth/otp/verify", {
+         method: "POST",
+-        body: JSON.stringify({ phone, code }),
++        body: JSON.stringify({ phone: cleanPhone, code: value }),
+       });
+       setToken(data.access_token);
+       setOnboarded(Boolean(data.onboarded));
+       router.push(data.onboarded ? "/chat" : "/onboard");
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : "خطا");
++      setError(err instanceof Error && err.message ? err.message : "کد درست نبود. دوباره بنویس.");
++    } finally {
++      setBusy(false);
+     }
+   }
+ 
++  async function verify(e: FormEvent) {
++    e.preventDefault();
++    await verifyCode(cleanCode);
++  }
++
++  // وقتی کد کامل شد (مثلاً با پرکردن خودکار از پیامک)، یک بار خودش وارد می‌شود.
++  useEffect(() => {
++    if (!sent || cleanCode.length !== 6 || autoTried.current === cleanCode) return;
++    autoTried.current = cleanCode;
++    void verifyCode(cleanCode);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [cleanCode, sent]);
++
++  const hintText = phoneHint(phone);
++
+   return (
+     <main className="sozan-lamp relative flex min-h-screen items-end justify-center overflow-hidden sm:items-center">
+       <LoginCoderScene />
+@@ -67,16 +140,21 @@ export default function LoginPage() {
+               <Field label="شماره موبایل">
+                 <Input
+                   dir="ltr"
++                  type="tel"
+                   inputMode="numeric"
+                   autoComplete="tel"
+-                  maxLength={11}
+-                  placeholder="0912…"
++                  maxLength={16}
++                  placeholder="09xx xxx xxxx"
+                   value={phone}
++                  aria-describedby="phone-hint"
+                   onChange={(e) => setPhone(e.target.value)}
+                 />
+               </Field>
+-              <Button type="submit" className="w-full" disabled={!/^09\d{9}$/.test(phone.trim())}>
+-                ارسال کد
++              <p id="phone-hint" className="min-h-5 text-xs text-muted" aria-live="polite">
++                {hintText}
++              </p>
++              <Button type="submit" className="w-full" disabled={!phoneOk || busy}>
++                {busy ? "در حال ارسال…" : "ارسال کد"}
+               </Button>
+             </form>
+           ) : (
+@@ -86,28 +164,65 @@ export default function LoginPage() {
+                   کد آزمایشی {hint}
+                 </p>
+               ) : null}
+-              <p className="text-sm text-muted">کد پیامک به {phone} فرستاده شد.</p>
+-              <button
+-                type="button"
+-                className="text-sm text-warm"
+-                onClick={() => {
+-                  setSent(false);
+-                  setCode("");
+-                  setHint("");
+-                  setError("");
+-                }}
+-              >
+-                ویرایش شماره
+-              </button>
+-              <Field label="کد">
+-                <Input dir="ltr" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
++              <p className="text-sm text-muted">
++                کد پیامک به <bdi dir="ltr">{cleanPhone}</bdi> فرستاده شد.
++              </p>
++              <Field label="کد پیامک">
++                <Input
++                  dir="ltr"
++                  inputMode="numeric"
++                  autoComplete="one-time-code"
++                  maxLength={8}
++                  className="text-center tracking-[0.4em]"
++                  value={code}
++                  autoFocus
++                  onChange={(e) => setCode(e.target.value)}
++                />
+               </Field>
+-              <Button type="submit" className="w-full">
+-                ورود
++              <Button type="submit" className="w-full" disabled={!cleanCode || busy}>
++                {busy ? "در حال بررسی…" : "ورود"}
+               </Button>
++              <div className="flex items-center justify-between gap-2 text-sm">
++                <button
++                  type="button"
++                  className="min-h-11 px-1 text-warm"
++                  onClick={() => {
++                    setSent(false);
++                    setCode("");
++                    setHint("");
++                    setError("");
++                    setWait(0);
++                    autoTried.current = "";
++                  }}
++                >
++                  ویرایش شماره
++                </button>
++                {wait > 0 ? (
++                  <span className="text-muted" aria-live="polite">
++                    ارسال دوباره تا {faSeconds(wait)}
++                  </span>
++                ) : (
++                  <button
++                    type="button"
++                    className="min-h-11 px-1 text-warm disabled:opacity-50"
++                    disabled={busy}
++                    onClick={() => {
++                      setCode("");
++                      autoTried.current = "";
++                      void requestCode();
++                    }}
++                  >
++                    ارسال دوبارهٔ کد
++                  </button>
++                )}
++              </div>
+             </form>
+           )}
+-          {error ? <p className="text-sm text-danger">{error}</p> : null}
++          {error ? (
++            <p className="text-sm text-danger" role="alert">
++              {error}
++            </p>
++          ) : null}
+         </Card>
+       </div>
+     </main>
+diff --git a/app/more/channels/page.tsx b/app/more/channels/page.tsx
+index 5d196b9..c56af9d 100644
+--- a/app/more/channels/page.tsx
++++ b/app/more/channels/page.tsx
+@@ -29,7 +29,7 @@ type Voice = { summary: string; tone: string; sampleReply: string };
+ 
+ const INSTAGRAM_OAUTH_NOTICE: Record<string, string> = {
+   ok: "اینستاگرام وصل شد.",
+-  exists: "این پیج از قبل در BoxAPI هست. از لیست انتخابش کن.",
++  exists: "این پیج از قبل وصل شده است. از فهرست انتخابش کن.",
+   denied: "اجازهٔ اینستاگرام داده نشد.",
+   expired: "نشست ورود اینستاگرام تمام شد. دوباره از پنل وصل کن.",
+   config: "اتصال اینستاگرام در سوزان هنوز تنظیم نشده.",
+@@ -181,7 +181,7 @@ export default function ChannelsPage() {
+       );
+       if (data.existing?.some((item) => !item.bound)) {
+         setExisting(data.existing);
+-        setNotice("این پیج از قبل در BoxAPI هست. انتخابش کن.");
++        setNotice("این پیج از قبل وصل شده است. انتخابش کن.");
+         return;
+       }
+       if (data.existing?.some((item) => item.bound)) {
+@@ -190,7 +190,7 @@ export default function ChannelsPage() {
+         return;
+       }
+       if (data.url) window.location.href = data.url;
+-      else setError("نشانی ورود رسمی BoxAPI نیامد.");
++      else setError("صفحهٔ ورود اینستاگرام باز نشد. دوباره امتحان کن.");
+     } catch (err) {
+       setError(err instanceof Error ? err.message : "خطا");
+     } finally {
+@@ -258,7 +258,7 @@ export default function ChannelsPage() {
+     >
+       <div className="h-full space-y-4 overflow-y-auto p-4">
+         <p className="text-sm text-muted">
+-          اینستاگرام را با ورود رسمی BoxAPI وصل کن. اگر بات سوزان روی هاب باشد، برای تلگرام فقط مقصد کانال را بگذار. پست استودیو برای تلگرام به کانالی که بات ادمین آن است می‌رود.
++          اینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.
+         </p>
+         {error ? <p className="text-sm text-danger">{error}</p> : null}
+         {notice ? <p className="text-sm text-signal">{notice}</p> : null}
+@@ -278,13 +278,13 @@ export default function ChannelsPage() {
+             ) : null}
+             {spec?.help ? <p className="text-xs leading-6 text-muted">{spec.help}</p> : null}
+             {spec?.docs ? (
+-              <a className="inline-block text-xs text-warm" href={spec.docs} target="_blank" rel="noreferrer">
++              <a className="block text-xs text-warm" href={spec.docs} target="_blank" rel="noreferrer">
+                 اسناد اتصال {spec.label}
+               </a>
+             ) : null}
+             {spec?.id === "instagram" && spec.sendboxConfigured ? (
+-              <Button type="button" disabled={busy} onClick={() => void startInstagram()}>
+-                ورود رسمی BoxAPI
++              <Button type="button" className="w-full" disabled={busy} onClick={() => void startInstagram()}>
++                ورود با اینستاگرام
+               </Button>
+             ) : null}
+             {existing.filter((item) => !item.bound).map((item) => (
+@@ -312,7 +312,7 @@ export default function ChannelsPage() {
+               </Button>
+             ))}
+             {spec?.id === "instagram" && spec.oauth && !spec.sendboxConfigured ? (
+-              <p className="text-xs text-warm">ورود رسمی BoxAPI وقتی اتصال سوزان در سرور تنظیم شود روشن می‌شود.</p>
++              <p className="text-xs text-warm">ورود با اینستاگرام به‌زودی روشن می‌شود.</p>
+             ) : null}
+             <Field label={spec?.handleLabel || "شناسه حساب"}>
+               <Input
+@@ -385,8 +385,8 @@ export default function ChannelsPage() {
+                   </div>
+                   <div className="flex flex-col gap-2">
+                     {account.platform === "instagram" && account.needsReconnect ? (
+-                      <Button variant="ghost" disabled={busy} onClick={() => void startInstagram()}>
+-                        ورود رسمی BoxAPI
++                      <Button disabled={busy} onClick={() => void startInstagram()}>
++                        اتصال دوباره
+                       </Button>
+                     ) : null}
+                     {account.platform === "telegram" ? (
+diff --git a/app/more/page.tsx b/app/more/page.tsx
+index 082180a..00874bc 100644
+--- a/app/more/page.tsx
++++ b/app/more/page.tsx
+@@ -2,20 +2,23 @@
+ 
+ import Link from "next/link";
+ import { AppShell } from "@/components/app-shell";
++import { ThemeToggle } from "@/components/theme-toggle";
+ import { Button } from "@/components/ui/button";
+ import { clearToken } from "@/lib/api";
++import { usePlan } from "@/lib/use-plan";
+ 
+ const HUB = [
++  { href: "/more/inventory", title: "انبار", hint: "کالا، قیمت و موجودی" },
+   { href: "/more/docs", title: "اسناد آموزشی", hint: "از ورود تا دامنه و ویرایش" },
+   { href: "/more/channels", title: "کانال‌ها", hint: "اینستاگرام تا روبیکا" },
+-  { href: "/more/inventory", title: "انبار", hint: "کالا، قیمت و موجودی" },
+-  { href: "/brand", title: "هویت و لوگو", hint: "نام سوزان و موشن" },
+-  { href: "/campaigns", title: "کمپین‌ها", hint: "پست‌های ساخته‌شده" },
+-  { href: "/more/settings", title: "پرداخت و پیامک", hint: "درگاه، OTP و اشتراک" },
++  { href: "/brand", title: "هویت و لوگو", hint: "نام، لوگو و حرکت برند" },
++  { href: "/studio", title: "استودیو", hint: "پست‌ها و کمپین‌های ساخته‌شده" },
++  { href: "/more/settings", title: "پرداخت و پیامک", hint: "اشتراک، درگاه پرداخت و کد ورود" },
+   { href: "/more/wallet", title: "کیف پول", hint: "مانده، برداشت شبا و پیامک" },
+ ] as const;
+ 
+ export default function MorePage() {
++  const plan = usePlan();
+   return (
+     <AppShell
+       header={
+@@ -26,6 +29,20 @@ export default function MorePage() {
+       }
+     >
+       <div className="h-full space-y-4 overflow-y-auto p-4">
++        {plan ? (
++          <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-canvas p-4 shadow-card">
++            <div>
++              <p className="text-xs text-muted">پلن فعلی</p>
++              <p className="text-lg font-bold">{plan.label}</p>
++            </div>
++            <Link
++              href="/more/settings"
++              className={plan.canUpgrade ? "min-h-11 rounded-xl bg-accentStrong px-4 py-2.5 text-sm font-bold text-onAccent" : "min-h-11 rounded-xl border border-line px-4 py-2.5 text-sm text-warm"}
++            >
++              {plan.canUpgrade ? "ارتقای پلن" : "جزئیات اشتراک"}
++            </Link>
++          </div>
++        ) : null}
+         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+           {HUB.map((item) => (
+             <Link key={item.href} href={item.href} className="rounded-2xl bg-canvas p-4 shadow-card">
+@@ -34,6 +51,11 @@ export default function MorePage() {
+             </Link>
+           ))}
+         </div>
++        <section aria-labelledby="theme-title" className="rounded-2xl bg-canvas p-4 shadow-card">
++          <p id="theme-title" className="font-bold">ظاهر پنل</p>
++          <p className="mt-1 text-xs leading-6 text-muted">«خودکار» همان روشن یا تیرهٔ گوشی/سیستم را دنبال می‌کند.</p>
++          <ThemeToggle className="mt-3" />
++        </section>
+         <Button
+           variant="ghost"
+           className="w-full"
+diff --git a/app/more/wallet/page.tsx b/app/more/wallet/page.tsx
+index a44f4f5..3c81408 100644
+--- a/app/more/wallet/page.tsx
++++ b/app/more/wallet/page.tsx
+@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
+ import { Card } from "@/components/ui/card";
+ import { Input } from "@/components/ui/input";
+ import { api } from "@/lib/api";
+-import { formatWhen, money, parseNonNegativeInt } from "@/lib/digits";
++import { formatWhen, money, parseNonNegativeInt, toLatinDigits } from "@/lib/digits";
+ import { EmptyState } from "@/components/empty-state";
+ 
+ type LedgerRow = { id: string; at: number; kind: string; amount: number; note?: string; orderId?: string };
+@@ -86,8 +86,10 @@ export default function WalletPage() {
+       setError("مبلغ را با عدد بنویس.");
+       return;
+     }
+-    if (!/^IR\d{24}$/i.test(iban.replace(/\s/g, ""))) {
+-      setError("شماره شبا ۲۶ رقم است");
++    const cleanIban = toLatinDigits(iban).replace(/[\s-]/g, "").toUpperCase();
++    const fullIban = /^\d{24}$/.test(cleanIban) ? `IR${cleanIban}` : cleanIban;
++    if (!/^IR\d{24}$/.test(fullIban)) {
++      setError("شبا باید IR و ۲۴ رقم باشد.");
+       return;
+     }
+     setBusy(true);
+@@ -96,7 +98,7 @@ export default function WalletPage() {
+     try {
+       const data = await api<{ wallet: WalletSnap }>("/wallet/withdraw", {
+         method: "POST",
+-        body: JSON.stringify({ amount: nextAmount, iban, name }),
++        body: JSON.stringify({ amount: nextAmount, iban: fullIban, name }),
+       });
+       setWallet(data.wallet);
+       setAmount("");
+@@ -164,7 +166,7 @@ export default function WalletPage() {
+             <Card>
+               <p className="text-sm leading-7 text-muted">
+                 فروش دستی وارد کیف نمی‌شود. اگر مرچنت شخصی داشته باشی پول در حساب خودت می‌ماند و اینجا فقط ثبت می‌شود.
+-                درگاه سوزان {wallet.commissionBps / 100}٪ کمیسیون دارد.
++                درگاه سوزان {(wallet.commissionBps / 100).toLocaleString("fa-IR")}٪ کمیسیون دارد.
+               </p>
+               <p className="mt-2 text-sm text-muted">
+                 پیامک این ماه: {money(wallet.smsUsed)} از {money(wallet.smsQuota)}
+@@ -178,7 +180,7 @@ export default function WalletPage() {
+                   <Input dir="ltr" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} />
+                 </Field>
+                 <Field label="شبا">
+-                  <Input dir="ltr" placeholder="IR و ۲۴ رقم" value={iban} onChange={(event) => setIban(event.target.value)} />
++                  <Input dir="ltr" inputMode="text" autoComplete="off" spellCheck={false} placeholder="IR00 0000 0000 0000 0000 0000 00" value={iban} onChange={(event) => setIban(event.target.value)} />
+                 </Field>
+                 <Field label="نام صاحب حساب">
+                   <Input value={name} onChange={(event) => setName(event.target.value)} />
+diff --git a/app/sales/page.tsx b/app/sales/page.tsx
+index 4b1ca74..461c7f0 100644
+--- a/app/sales/page.tsx
++++ b/app/sales/page.tsx
+@@ -1,6 +1,6 @@
+ "use client";
+ 
+-import { FormEvent, useEffect, useState } from "react";
++import { FormEvent, useEffect, useMemo, useState } from "react";
+ import Link from "next/link";
+ import { AppShell } from "@/components/app-shell";
+ import { Field } from "@/components/field";
+@@ -22,12 +22,24 @@ type Sale = {
+   at: number;
+ };
+ 
++type Order = { id: string; title: string; amount: number; status: string; channel: string; payUrl?: string };
++
+ type Account = { id: string; label: string; handle: string };
+ 
+ const SHOP_CHANNEL = "فروشگاه";
++const DAY = 24 * 60 * 60;
++
++function isPaid(sale: Sale) {
++  return !sale.status || sale.status === "paid";
++}
++
++function sumSince(rows: Sale[], since: number) {
++  return rows.filter((row) => isPaid(row) && (row.at || 0) >= since).reduce((acc, row) => acc + (row.amount || 0), 0);
++}
+ 
+ export default function SalesPage() {
+   const [sales, setSales] = useState<Sale[]>([]);
++  const [orders, setOrders] = useState<Order[]>([]);
+   const [channels, setChannels] = useState<string[]>([SHOP_CHANNEL]);
+   const [title, setTitle] = useState("");
+   const [amount, setAmount] = useState("");
+@@ -36,23 +48,40 @@ export default function SalesPage() {
+   const [busy, setBusy] = useState(false);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState("");
++  const [formOpen, setFormOpen] = useState(false);
+ 
+   async function load() {
+-    const [saleData, channelData] = await Promise.all([
++    const [saleData, channelData, orderData] = await Promise.all([
+       api<{ sales: Sale[] }>("/sales"),
+       api<{ accounts: Account[] }>("/channels").catch(() => ({ accounts: [] as Account[] })),
++      api<{ orders: Order[] }>("/wallet/orders").catch(() => ({ orders: [] as Order[] })),
+     ]);
+     setSales(saleData.sales || []);
++    setOrders(orderData.orders || []);
+     const connected = (channelData.accounts || []).map((item) => item.label).filter(Boolean);
+     setChannels([SHOP_CHANNEL, ...connected.filter((item, index, all) => item !== SHOP_CHANNEL && all.indexOf(item) === index)]);
+   }
+ 
+   useEffect(() => {
+     void load()
+-      .catch((err) => setError(err.message))
++      .catch((err) => setError(err instanceof Error ? err.message : "خواندن فروش‌ها انجام نشد."))
+       .finally(() => setLoading(false));
+   }, []);
+ 
++  const now = Math.floor(Date.now() / 1000);
++  const startOfToday = useMemo(() => {
++    const d = new Date();
++    d.setHours(0, 0, 0, 0);
++    return Math.floor(d.getTime() / 1000);
++  }, []);
++  const stats = [
++    { label: "امروز", value: sumSince(sales, startOfToday) },
++    { label: "۷ روز اخیر", value: sumSince(sales, now - 7 * DAY) },
++    { label: "۳۰ روز اخیر", value: sumSince(sales, now - 30 * DAY) },
++  ];
++  const pending = orders.filter((row) => row.status === "pending");
++  const shown = sales;
++
+   async function addSale(event: FormEvent) {
+     event.preventDefault();
+     const nextAmount = parseNonNegativeInt(amount);
+@@ -76,77 +105,136 @@ export default function SalesPage() {
+       setTitle("");
+       setAmount("");
+       setCustomer("");
++      setFormOpen(false);
+     } catch (err) {
+-      setError(err instanceof Error ? err.message : "خطا");
++      setError(err instanceof Error ? err.message : "ثبت فروش انجام نشد.");
+     } finally {
+       setBusy(false);
+     }
+   }
+ 
++  const amountPreview = parseNonNegativeInt(amount);
++
+   return (
+     <AppShell
+       header={
+         <div className="flex items-center justify-between gap-3">
+           <div>
+             <p className="text-sm text-muted">فروش</p>
+-            <h1 className="text-lg font-bold">ثبت فروش</h1>
++            <h1 className="text-lg font-bold">فروش و سفارش‌ها</h1>
+           </div>
+           <div className="flex gap-3 text-sm">
+             <Link href="/more/wallet" className="text-warm">
+               کیف پول
+             </Link>
+             <Link href="/more/inventory" className="text-warm">
+-              انبار کالا
++              انبار
+             </Link>
+           </div>
+         </div>
+       }
+     >
+       <div className="h-full space-y-4 overflow-y-auto p-4">
+-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+-        <Card>
+-          <form className="space-y-3" onSubmit={(event) => void addSale(event)}>
+-            <Field label="شرح فروش">
+-              <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+-            </Field>
+-            <Field label="مبلغ به تومان">
+-              <Input dir="ltr" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} />
+-            </Field>
+-            <Field label="مشتری">
+-              <Input value={customer} onChange={(event) => setCustomer(event.target.value)} />
+-            </Field>
+-            <Field label="کانال">
+-              <Select value={channel} onChange={(event) => setChannel(event.target.value)}>
+-                {channels.map((item) => (
+-                  <option key={item} value={item}>
+-                    {item}
+-                  </option>
+-                ))}
+-              </Select>
+-            </Field>
+-            <Button type="submit" disabled={busy || !title.trim()}>
+-              ثبت فروش
+-            </Button>
+-          </form>
+-        </Card>
++        {error ? (
++          <p className="text-sm text-danger" role="alert">
++            {error}
++          </p>
++        ) : null}
++
++        <section aria-label="خلاصهٔ فروش" className="grid grid-cols-3 gap-2">
++          {stats.map((item) => (
++            <div key={item.label} className="rounded-2xl bg-canvas p-3 shadow-card">
++              <p className="text-xs text-muted">{item.label}</p>
++              <p className="mt-1 text-base font-bold text-ink">{loading ? "…" : money(item.value)}</p>
++              <p className="text-[11px] text-muted">تومان</p>
++            </div>
++          ))}
++        </section>
++
++        {pending.length ? (
++          <Card>
++            <div className="flex items-center justify-between gap-2">
++              <h2 className="font-bold">منتظر پرداخت</h2>
++              <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-warm">{pending.length.toLocaleString("fa-IR")} سفارش</span>
++            </div>
++            <p className="mt-1 text-xs leading-6 text-muted">لینک پرداخت ساخته شده ولی هنوز پرداخت نشده.</p>
++            <ul className="mt-2 divide-y divide-line">
++              {pending.slice(0, 5).map((row) => (
++                <li key={row.id} className="flex items-center justify-between gap-3 py-2 text-sm">
++                  <span className="min-w-0 truncate">{row.title || "سفارش"}</span>
++                  <span className="shrink-0 text-muted">{money(row.amount)} تومان</span>
++                </li>
++              ))}
++            </ul>
++          </Card>
++        ) : null}
++
++        <div className="flex items-center justify-between gap-2">
++          <h2 className="font-bold">فروش‌ها</h2>
++          <Button type="button" variant={formOpen ? "ghost" : "primary"} onClick={() => setFormOpen((open) => !open)}>
++            {formOpen ? "بستن" : "ثبت فروش دستی"}
++          </Button>
++        </div>
++
++        {formOpen ? (
++          <Card>
++            <form className="space-y-3" onSubmit={(event) => void addSale(event)}>
++              <p className="text-xs leading-6 text-muted">فروشی که بیرون از درگاه سوزان گرفته‌ای (کارت‌به‌کارت، حضوری…). وارد کیف پول نمی‌شود.</p>
++              <Field label="چه فروختی؟">
++                <Input value={title} placeholder="مثلاً انگشتر نقره" onChange={(event) => setTitle(event.target.value)} />
++              </Field>
++              <Field label="مبلغ (تومان)">
++                <Input dir="ltr" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} />
++              </Field>
++              {amountPreview ? <p className="-mt-2 text-xs text-muted">{money(amountPreview)} تومان</p> : null}
++              <Field label="مشتری (اختیاری)">
++                <Input value={customer} onChange={(event) => setCustomer(event.target.value)} />
++              </Field>
++              <Field label="کانال">
++                <Select value={channel} onChange={(event) => setChannel(event.target.value)}>
++                  {channels.map((item) => (
++                    <option key={item} value={item}>
++                      {item}
++                    </option>
++                  ))}
++                </Select>
++              </Field>
++              <Button type="submit" className="w-full" disabled={busy || !title.trim() || amountPreview === null}>
++                {busy ? "در حال ثبت…" : "ثبت فروش"}
++              </Button>
++            </form>
++          </Card>
++        ) : null}
++
+         {loading ? (
+           <ul className="space-y-2">
+             {Array.from({ length: 3 }).map((_, index) => (
+-              <li key={index} className="h-24 animate-pulse rounded-2xl bg-canvas" />
++              <li key={index} className="h-20 animate-pulse rounded-2xl bg-canvas" />
+             ))}
+           </ul>
+-        ) : sales.length === 0 ? (
+-          <EmptyState title="هنوز فروشی ثبت نشده" detail="اولین فروش را از فرم بالا وارد کن." />
++        ) : shown.length === 0 ? (
++          <EmptyState
++            title="هنوز فروشی نیامده"
++            detail={
++                "فروش‌هایی که از درگاه سایت یا لینک پرداخت دایرکت می‌آیند خودکار اینجا می‌نشینند. فروش بیرونی را با «ثبت فروش دستی» وارد کن."
++            }
++          />
+         ) : (
+           <ul className="space-y-2">
+-            {sales.map((sale) => (
++            {shown.map((sale) => (
+               <li key={sale.id}>
+                 <Card>
+-                  <p className="text-xs text-warm">{sale.channel}</p>
+-                  <p className="font-medium">{sale.title}</p>
+-                  <p className="text-sm">{money(sale.amount)} تومان</p>
+-                  <p className="text-sm text-muted">{sale.customer}</p>
+-                  {sale.at ? <p className="text-xs text-muted">{formatWhen(sale.at)}</p> : null}
++                  <div className="flex items-start justify-between gap-3">
++                    <div className="min-w-0">
++                      <p className="truncate font-medium">{sale.title}</p>
++                      <p className="mt-0.5 text-xs text-muted">
++                        {sale.channel}
++                        {sale.customer ? ` · ${sale.customer}` : ""}
++                        {sale.at ? ` · ${formatWhen(sale.at)}` : ""}
++                      </p>
++                    </div>
++                    <p className="shrink-0 text-sm font-bold">{money(sale.amount)} تومان</p>
++                  </div>
+                 </Card>
+               </li>
+             ))}
+diff --git a/app/shop/page.tsx b/app/shop/page.tsx
+index 1276fa1..a8e95ac 100644
+--- a/app/shop/page.tsx
++++ b/app/shop/page.tsx
+@@ -251,12 +251,8 @@ export default function ShopPage() {
+             </button>
+           </div>
+         ) : null}
+-        {live && shopPublic ? (
+-          <a href={shopPublic} target="_blank" rel="noreferrer" className="relative px-4 pt-2 text-sm text-warm underline">
+-            باز کردن ویترین
+-          </a>
+-        ) : null}
+-        <div className="relative min-h-0 flex-1 overflow-y-auto px-4 py-3">
++        {/* پیش‌نمایش تقریباً کل صفحه را می‌گیرد؛ «باز کردن ویترین» در نوار بالای خود پیش‌نمایش است. */}
++        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto p-2 sm:p-3">
+           <ShopLiveBuild
+             build={build}
+             href={shopPublic}
+diff --git a/components/app-shell.tsx b/components/app-shell.tsx
+index 156af05..f9cf425 100644
+--- a/components/app-shell.tsx
++++ b/components/app-shell.tsx
+@@ -3,22 +3,31 @@
+ import Link from "next/link";
+ import { useEffect, useState } from "react";
+ import { usePathname } from "next/navigation";
+-import { Clapperboard, Inbox, Menu, MessageCircle, MoreHorizontal, ShoppingBag, Store, X } from "lucide-react";
++import { Clapperboard, Inbox, MessageCircle, MoreHorizontal, ShoppingBag, Store } from "lucide-react";
+ import { cn } from "@/lib/utils";
+ import { SozanMark } from "@/components/sozan-mark";
+ import { api } from "@/lib/api";
+ import { useAppViewport } from "@/lib/use-app-viewport";
++import { usePlan } from "@/lib/use-plan";
++import { applyTheme, readTheme } from "@/lib/theme";
++import { ThemeToggle } from "@/components/theme-toggle";
+ 
+-const TABS = [
++type Tab = { href: string; label: string; icon: typeof MessageCircle };
++
++/** ستون ثابت دسکتاپ: همهٔ مقصدها. */
++const TABS: readonly Tab[] = [
+   { href: "/chat", label: "چت", icon: MessageCircle },
+   { href: "/shop", label: "فروشگاه", icon: Store },
+   { href: "/studio", label: "استودیو", icon: Clapperboard },
+   { href: "/inbox", label: "صندوق", icon: Inbox },
+   { href: "/sales", label: "فروش", icon: ShoppingBag },
+   { href: "/more", label: "بیشتر", icon: MoreHorizontal },
+-] as const;
++];
++
++/** نوار پایین موبایل: پنج مقصد اصلی؛ استودیو از «بیشتر» و چت در دسترس است. */
++const MOBILE_TABS: readonly Tab[] = TABS.filter((tab) => tab.href !== "/studio");
+ 
+-function tabActive(pathname: string, href: string) {
++function tabActive(pathname: string, href: string, mobile: boolean) {
+   if (href === "/studio") {
+     return pathname.startsWith("/studio") || pathname.startsWith("/campaigns");
+   }
+@@ -26,7 +35,9 @@ function tabActive(pathname: string, href: string) {
+     return pathname === "/sales" || pathname.startsWith("/sales/");
+   }
+   if (href === "/more") {
+-    return pathname === "/more" || pathname.startsWith("/more/") || pathname.startsWith("/brand");
++    const inMore = pathname === "/more" || pathname.startsWith("/more/") || pathname.startsWith("/brand");
++    const studio = pathname.startsWith("/studio") || pathname.startsWith("/campaigns");
++    return inMore || (mobile && studio);
+   }
+   return pathname === href || pathname.startsWith(`${href}/`);
+ }
+@@ -36,6 +47,14 @@ function unreadLabel(count: number) {
+   return count.toLocaleString("fa-IR");
+ }
+ 
++function Badge({ count }: { count: number }) {
++  return (
++    <span className="absolute -end-2.5 -top-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-accentStrong px-1 text-[10px] font-bold leading-[18px] text-onAccent">
++      {unreadLabel(count)}
++    </span>
++  );
++}
++
+ export function AppShell({
+   children,
+   header,
+@@ -46,20 +65,27 @@ export function AppShell({
+   const pathname = usePathname();
+   useAppViewport();
+   const [unread, setUnread] = useState(0);
+-  const [open, setOpen] = useState(false);
++  const [typing, setTyping] = useState(false);
++  const plan = usePlan();
+ 
++  // رنگ نوار مرورگر را با تم انتخابی هم‌راستا کن (اسکریپت head ممکن است قبل از متاها اجرا شده باشد).
+   useEffect(() => {
+-    setOpen(false);
+-  }, [pathname]);
++    applyTheme(readTheme());
++  }, []);
+ 
++  // وقتی کیبورد موبایل باز است، نوار پایین جا را از فیلد نوشتن نگیرد.
+   useEffect(() => {
+-    if (!open) return;
+-    const onKey = (event: KeyboardEvent) => {
+-      if (event.key === "Escape") setOpen(false);
++    const isField = (el: EventTarget | null) =>
++      el instanceof HTMLElement && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && !["checkbox", "radio", "file", "button", "submit"].includes((el as HTMLInputElement).type)) || el.isContentEditable);
++    const onIn = (event: FocusEvent) => setTyping(isField(event.target));
++    const onOut = () => window.setTimeout(() => setTyping(isField(document.activeElement)), 0);
++    document.addEventListener("focusin", onIn);
++    document.addEventListener("focusout", onOut);
++    return () => {
++      document.removeEventListener("focusin", onIn);
++      document.removeEventListener("focusout", onOut);
+     };
+-    window.addEventListener("keydown", onKey);
+-    return () => window.removeEventListener("keydown", onKey);
+-  }, [open]);
++  }, []);
+ 
+   useEffect(() => {
+     let cancelled = false;
+@@ -72,7 +98,7 @@ export function AppShell({
+         .catch(() => undefined);
+     };
+     tick();
+-    const timer = window.setInterval(tick, 4000);
++    const timer = window.setInterval(tick, 15000);
+     const onVis = () => {
+       if (!document.hidden) tick();
+     };
+@@ -84,77 +110,92 @@ export function AppShell({
+     };
+   }, [pathname]);
+ 
+-  const menuLabel = unread > 0 ? `فهرست، ${unread} خوانده‌نشده` : "فهرست";
++  const label = (tab: Tab) => (tab.href === "/inbox" && unread > 0 ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label);
+ 
+   return (
+     <div className="sozan-app-shell flex w-full overflow-hidden bg-canvas">
+-      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0px)]">
+-        <header className="relative z-20 flex shrink-0 items-center gap-3 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
+-          <button
+-            type="button"
+-            aria-label={menuLabel}
+-            aria-expanded={open}
+-            aria-controls="sozan-nav"
+-            onClick={() => setOpen((value) => !value)}
+-            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-warm"
+-          >
+-            {open ? <X size={20} /> : <Menu size={20} />}
+-            {!open && unread > 0 ? (
+-              <span className="absolute -end-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] text-onAccent">
+-                {unreadLabel(unread)}
+-              </span>
+-            ) : null}
+-          </button>
+-          <SozanMark className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
+-          <div className="min-w-0 flex-1">{header}</div>
+-        </header>
+-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
+-      </div>
+-      {open ? (
+-        <button
+-          type="button"
+-          aria-label="بستن فهرست"
+-          className="absolute inset-0 z-40 bg-ink/40"
+-          onClick={() => setOpen(false)}
+-        />
+-      ) : null}
+       <nav
+-        id="sozan-nav"
+         aria-label="ناوبری"
+-        className={cn(
+-          "absolute inset-y-0 start-0 z-50 flex w-44 flex-col gap-1 border-e border-line bg-canvas px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] transition-transform",
+-          open ? "translate-x-0" : "pointer-events-none translate-x-full",
+-        )}
++        className="hidden w-52 shrink-0 flex-col gap-1 border-e border-line bg-canvas px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:flex"
+       >
++        <div className="mb-3 flex items-center gap-2 px-2">
++          <SozanMark className="h-9 w-9" />
++          <span className="font-bold text-ink">سوزان</span>
++        </div>
+         {TABS.map((tab) => {
+-          const active = tabActive(pathname, tab.href);
++          const active = tabActive(pathname, tab.href, false);
+           const Icon = tab.icon;
+-          const badge = tab.href === "/inbox" && unread > 0;
+           return (
+             <Link
+               key={tab.href}
+               href={tab.href}
+               aria-current={active ? "page" : undefined}
+-              aria-label={badge ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label}
++              aria-label={label(tab)}
+               className={cn(
+-                "relative flex min-h-11 items-center justify-start gap-2 rounded-xl px-3 py-2 text-sm",
+-                active ? "bg-paper text-warm" : "text-muted",
++                "relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm",
++                active ? "bg-paper font-bold text-warm" : "text-muted hover:bg-paper/60 hover:text-ink",
+               )}
+             >
+               {active ? <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-accent" /> : null}
+               <span className="relative">
+                 <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
+-                {badge ? (
+-                  <span className="absolute -end-2 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] text-onAccent">
+-                    {unreadLabel(unread)}
+-                  </span>
+-                ) : null}
++                {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
+               </span>
+               <span className="truncate">{tab.label}</span>
+             </Link>
+           );
+         })}
++        <ThemeToggle compact className="mt-auto" />
++        {plan ? (
++          <div className="mt-2 rounded-2xl border border-line bg-paper p-3 text-sm">
++            <p className="text-xs text-muted">پلن فعلی</p>
++            <p className="font-bold text-ink">{plan.label}</p>
++            {plan.canUpgrade ? (
++              <Link href="/more/settings" className="mt-2 flex min-h-9 items-center justify-center rounded-xl bg-accentStrong px-3 text-xs font-bold text-onAccent">
++                ارتقای پلن
++              </Link>
++            ) : null}
++          </div>
++        ) : null}
+       </nav>
++
++      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:pb-[env(safe-area-inset-bottom,0px)]">
++        <header className="relative z-20 flex shrink-0 items-center gap-3 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
++          <SozanMark className="h-9 w-9 shrink-0 md:hidden" />
++          <div className="min-w-0 flex-1">{header}</div>
++        </header>
++        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
++        <nav
++          aria-label="ناوبری"
++          className={cn(
++            "shrink-0 border-t border-line bg-canvas pb-[env(safe-area-inset-bottom,0px)] md:hidden",
++            typing ? "hidden" : "flex",
++          )}
++        >
++          {MOBILE_TABS.map((tab) => {
++            const active = tabActive(pathname, tab.href, true);
++            const Icon = tab.icon;
++            return (
++              <Link
++                key={tab.href}
++                href={tab.href}
++                aria-current={active ? "page" : undefined}
++                aria-label={label(tab)}
++                className={cn(
++                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px]",
++                  active ? "font-bold text-warm" : "text-muted",
++                )}
++              >
++                <span className="relative">
++                  <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
++                  {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
++                </span>
++                <span>{tab.label}</span>
++              </Link>
++            );
++          })}
++        </nav>
++      </div>
+     </div>
+   );
+ }
+diff --git a/components/channel-alert.tsx b/components/channel-alert.tsx
+new file mode 100644
+index 0000000..4d7530a
+--- /dev/null
++++ b/components/channel-alert.tsx
+@@ -0,0 +1,50 @@
++"use client";
++
++import Link from "next/link";
++import { useEffect, useState } from "react";
++import { api } from "@/lib/api";
++
++type AlertAccount = { id: string; platform: string; label?: string; handle?: string; needsReconnect?: boolean };
++
++const PLATFORM_FA: Record<string, string> = {
++  instagram: "اینستاگرام",
++  telegram: "تلگرام",
++  whatsapp: "واتساپ",
++  bale: "بله",
++  rubika: "روبیکا",
++};
++
++/** نوار هشدار وقتی یکی از کانال‌ها قطع است؛ پیام تازه نمی‌آید و پاسخ خودکار کار نمی‌کند. */
++export function ChannelAlert({ inset = true }: { inset?: boolean }) {
++  const [broken, setBroken] = useState<AlertAccount[]>([]);
++
++  useEffect(() => {
++    let cancelled = false;
++    void api<{ accounts?: AlertAccount[] }>("/channels")
++      .then((data) => {
++        if (cancelled) return;
++        setBroken((data.accounts || []).filter((row) => row && row.needsReconnect));
++      })
++      .catch(() => undefined);
++    return () => {
++      cancelled = true;
++    };
++  }, []);
++
++  if (!broken.length) return null;
++  const first = broken[0];
++  const name = PLATFORM_FA[first.platform] || first.label || "کانال";
++  const handle = first.handle ? ` (${first.handle.replace(/^@?/, "@")})` : "";
++  return (
++    <div role="alert" className={`${inset ? "mx-3 mt-3 sm:mx-4" : ""} flex items-center gap-3 rounded-2xl border border-danger/50 bg-danger/10 px-4 py-3 text-sm`}>
++      <p className="min-w-0 flex-1 leading-6 text-ink">
++        اتصال {name}
++        <bdi dir="ltr">{handle}</bdi> قطع است؛ پیام تازهٔ مشتری نمی‌رسد و پاسخ خودکار کار نمی‌کند.
++        {broken.length > 1 ? ` (${broken.length.toLocaleString("fa-IR")} کانال)` : ""}
++      </p>
++      <Link href="/more/channels" className="shrink-0 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-onAccent">
++        اتصال دوباره
++      </Link>
++    </div>
++  );
++}
+diff --git a/components/chat-thread.tsx b/components/chat-thread.tsx
+index a17039e..1aaac05 100644
+--- a/components/chat-thread.tsx
++++ b/components/chat-thread.tsx
+@@ -9,6 +9,7 @@ import { ChatAttach } from "@/components/chat-attach";
+ import { SozanMark } from "@/components/sozan-mark";
+ import { StudioPublishCard, type PublishPayload, type PublishTarget, type StudioAttachment, type StudioCaptions } from "@/components/studio-publish";
+ import { formatWhen } from "@/lib/digits";
++import { TypingHints } from "@/components/typing-hints";
+ 
+ export type ChatMsg = {
+   id: string;
+@@ -83,6 +84,7 @@ export function ChatThread({
+   sanitize = false,
+   welcome = false,
+   welcomeLines,
++  hints,
+   confirmId = "",
+   onConfirm,
+   onCancel,
+@@ -106,6 +108,8 @@ export function ChatThread({
+   sanitize?: boolean;
+   welcome?: boolean;
+   welcomeLines?: string[];
++  /** جمله‌های راهنما که در چت خالی تایپ می‌شوند و باد می‌بردشان. */
++  hints?: string[];
+   confirmId?: string;
+   onConfirm?: (confirmId: string) => void;
+   onCancel?: (confirmId: string) => void;
+@@ -120,6 +124,7 @@ export function ChatThread({
+   const scrollerRef = useRef<HTMLDivElement>(null);
+   const stickRef = useRef(true);
+   const fileRef = useRef<HTMLInputElement>(null);
++  const draftRef = useRef<HTMLTextAreaElement>(null);
+   const recorderRef = useRef<MediaRecorder | null>(null);
+   const chunksRef = useRef<Blob[]>([]);
+   const future = tone === "future";
+@@ -220,10 +225,21 @@ export function ChatThread({
+         <div className="space-y-3 px-4 py-5">
+           {messages.length === 0 && !pendingText ? (
+             welcome || welcomeLines ? (
+-              <div className="space-y-2 pt-8 text-center text-sm leading-7 text-muted">
+-                {(welcomeLines || SHOP_WELCOME).map((line) => (
+-                  <p key={line}>{line}</p>
+-                ))}
++              <div className="flex min-h-[min(60vh,28rem)] flex-col items-center justify-center gap-6 pt-6">
++                <div className="space-y-1 text-center text-sm leading-7 text-muted">
++                  {(welcomeLines || SHOP_WELCOME).map((line) => (
++                    <p key={line}>{line}</p>
++                  ))}
++                </div>
++                {hints?.length && !draft.trim() && !busy ? (
++                  <TypingHints
++                    hints={hints}
++                    onPick={(text) => {
++                      setDraft(text);
++                      window.requestAnimationFrame(() => draftRef.current?.focus());
++                    }}
++                  />
++                ) : null}
+               </div>
+             ) : (
+               <p className="pt-10 text-center text-sm leading-7 text-muted">پیام را پایین بنویس.</p>
+@@ -501,6 +517,7 @@ export function ChatThread({
+             </>
+           ) : null}
+           <textarea
++            ref={draftRef}
+             className="max-h-28 min-h-11 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 outline-none"
+             rows={1}
+             value={draft}
+diff --git a/components/getting-started.tsx b/components/getting-started.tsx
+new file mode 100644
+index 0000000..3cbeddf
+--- /dev/null
++++ b/components/getting-started.tsx
+@@ -0,0 +1,154 @@
++"use client";
++
++import Link from "next/link";
++import { useEffect, useState } from "react";
++import { Check } from "lucide-react";
++import { api } from "@/lib/api";
++
++type Step = { id: string; title: string; hint: string; href: string; done: boolean };
++
++const HIDE_KEY = "sozan_start_hidden";
++
++function readHidden(): boolean {
++  try {
++    return localStorage.getItem(HIDE_KEY) === "1";
++  } catch {
++    return false;
++  }
++}
++
++/** فهرست «شروع کار» برای فروشندهٔ تازه؛ وقتی همه انجام شد یا بسته شد، دیده نمی‌شود. */
++export function GettingStarted() {
++  const [steps, setSteps] = useState<Step[] | null>(null);
++  const [hidden, setHidden] = useState(true);
++  const [open, setOpen] = useState(false);
++
++  useEffect(() => {
++    setHidden(readHidden());
++    let cancelled = false;
++    void Promise.all([
++      api<{ accounts?: { connected?: boolean; needsReconnect?: boolean }[] }>("/channels").catch(() => ({ accounts: [] })),
++      api<{ products?: { price?: number }[] }>("/catalog").catch(() => ({ products: [] })),
++      api<{ shop?: { status?: string; publicHost?: string; url?: string } }>("/shop").catch(() => ({ shop: undefined })),
++      api<unknown[]>("/campaigns").catch(() => [] as unknown[]),
++      api<{ autoReply?: string }>("/inbox?status=unread").catch(() => ({ autoReply: "" })),
++    ]).then(([channels, catalog, shop, campaigns, inbox]) => {
++      if (cancelled) return;
++      const products = catalog.products || [];
++      const priced = products.filter((row) => Number(row.price) > 0).length;
++      const siteReady = Boolean(shop.shop && (shop.shop.status === "ready" || shop.shop.publicHost || shop.shop.url));
++      setSteps([
++        {
++          id: "channel",
++          title: "اتصال اینستاگرام یا تلگرام",
++          hint: "تا دایرکت مشتری‌ها به صندوق بیاید.",
++          href: "/more/channels",
++          done: (channels.accounts || []).some((row) => row.connected && !row.needsReconnect),
++        },
++        {
++          id: "prices",
++          title: "کالاها با قیمت واقعی",
++          hint: products.length ? `${priced.toLocaleString("fa-IR")} از ${products.length.toLocaleString("fa-IR")} کالا قیمت دارد.` : "کالا اضافه کن یا از صفحهٔ اینستاگرامت بخوان.",
++          href: "/more/inventory",
++          done: products.length > 0 && priced === products.length,
++        },
++        {
++          id: "site",
++          title: "ساختن سایت فروشگاه",
++          hint: "در تب فروشگاه بگو چه حسی می‌خواهی و بساز.",
++          href: "/shop",
++          done: siteReady,
++        },
++        {
++          id: "post",
++          title: "اولین پست",
++          hint: "در همین چت بگو برای کدام کالا پست بسازم.",
++          href: "/chat",
++          done: Array.isArray(campaigns) && campaigns.length > 0,
++        },
++        {
++          id: "auto",
++          title: "روشن کردن پاسخ به دایرکت",
++          hint: "پیش‌نویس یا ارسال خودکار، در صندوق.",
++          href: "/inbox",
++          done: Boolean(inbox.autoReply),
++        },
++      ]);
++    });
++    return () => {
++      cancelled = true;
++    };
++  }, []);
++
++  if (hidden || !steps) return null;
++  const doneCount = steps.filter((step) => step.done).length;
++  if (doneCount === steps.length) return null;
++  const next = steps.find((step) => !step.done);
++
++  return (
++    <section aria-label="شروع کار" className="mx-3 mt-3 rounded-2xl border border-accent/30 bg-canvas p-4 shadow-card sm:mx-4">
++      <div className="flex items-center justify-between gap-2">
++        <button type="button" className="flex min-h-9 items-center gap-2 font-bold" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
++          شروع کار
++          <span className="text-xs font-normal text-warm">{open ? "کمتر" : "همه"}</span>
++        </button>
++        <div className="flex items-center gap-3">
++          <span className="text-xs text-muted">
++            {doneCount.toLocaleString("fa-IR")} از {steps.length.toLocaleString("fa-IR")}
++          </span>
++          <button
++            type="button"
++            className="min-h-9 px-1 text-xs text-muted"
++            onClick={() => {
++              try {
++                localStorage.setItem(HIDE_KEY, "1");
++              } catch {
++                /* ignore */
++              }
++              setHidden(true);
++            }}
++          >
++            بستن
++          </button>
++        </div>
++      </div>
++      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden>
++        <div className="h-full rounded-full bg-warm" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
++      </div>
++      {!open && next ? (
++        <Link href={next.href} className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded-xl bg-paper px-3 py-2 text-sm">
++          <span className="min-w-0">
++            <span className="block text-xs text-muted">قدم بعد</span>
++            <span className="block truncate font-medium text-ink">{next.title}</span>
++          </span>
++          <span className="shrink-0 text-warm">انجام بده</span>
++        </Link>
++      ) : null}
++      {open ? (
++      <ol className="mt-3 space-y-1">
++        {steps.map((step) => (
++          <li key={step.id}>
++            <Link href={step.href} className="flex min-h-11 items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-paper">
++              <span
++                className={
++                  step.done
++                    ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal text-canvas"
++                    : "h-6 w-6 shrink-0 rounded-full border-2 border-field"
++                }
++                aria-hidden
++              >
++                {step.done ? <Check size={14} strokeWidth={3} /> : null}
++              </span>
++              <span className="min-w-0">
++                <span className={step.done ? "block text-sm text-muted line-through" : "block text-sm font-medium text-ink"}>{step.title}</span>
++                {!step.done ? <span className="block text-xs text-muted">{step.hint}</span> : null}
++              </span>
++              <span className="sr-only">{step.done ? "انجام شد" : "انجام نشده"}</span>
++            </Link>
++          </li>
++        ))}
++      </ol>
++      ) : null}
++    </section>
++  );
++}
+diff --git a/components/inventory-catalog.tsx b/components/inventory-catalog.tsx
+index 4186f1d..4e25dde 100644
+--- a/components/inventory-catalog.tsx
++++ b/components/inventory-catalog.tsx
+@@ -42,6 +42,7 @@ export function InventoryCatalog() {
+   const [shop, setShop] = useState<ShopMeta | null>(null);
+   const [query, setQuery] = useState("");
+   const [category, setCategory] = useState("");
++  const [onlyUnpriced, setOnlyUnpriced] = useState(false);
+   const [busy, setBusy] = useState(false);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState("");
+@@ -78,10 +79,12 @@ export function InventoryCatalog() {
+     }
+   }, [loading, products, focus, editor]);
+ 
++  const unpricedCount = products.filter((product) => missingPrice(product)).length;
+   const visible = useMemo(() => {
+     const needle = query.trim();
+     const rows = products.filter((product) => {
+       if (category && product.category !== category) return false;
++      if (onlyUnpriced && !missingPrice(product)) return false;
+       if (!needle) return true;
+       const blob = `${product.title} ${product.category || ""} ${product.subcategory || ""} ${product.sku || ""}`;
+       return blob.includes(needle);
+@@ -91,7 +94,7 @@ export function InventoryCatalog() {
+       const rightGap = Number(missingPhoto(right) || missingPrice(right));
+       return rightGap - leftGap;
+     });
+-  }, [products, query, category]);
++  }, [products, query, category, onlyUnpriced]);
+ 
+   async function bump(id: string, delta: number) {
+     setBusy(true);
+@@ -115,7 +118,7 @@ export function InventoryCatalog() {
+         {error ? <p className="text-sm text-danger">{error}</p> : null}
+         {shop?.needsBuild ? (
+           <p className="rounded-xl border border-line px-3 py-2 text-sm leading-7">
+-            برای نمایش کالاها روی سایت، بیلد بزن{" "}
++            برای نمایش کالاها روی سایت، تغییرات را منتشر کن{" "}
+             <Link href="/shop" className="text-warm">
+               رفتن به فروشگاه
+             </Link>
+@@ -124,7 +127,7 @@ export function InventoryCatalog() {
+           <p className="rounded-xl bg-canvas px-3 py-2 text-sm leading-7 text-muted">تغییرات همان لحظه روی سایت می‌رود.</p>
+         ) : (
+           <p className="rounded-xl bg-canvas px-3 py-2 text-sm leading-7 text-muted">
+-            فروشگاه هنوز ساخته نشده؛ کالاها بعد از بیلد می‌آیند.
++            فروشگاه هنوز ساخته نشده؛ کالاها بعد از ساختن سایت روی آن می‌آیند.
+           </p>
+         )}
+         {hint ? (
+@@ -135,6 +138,21 @@ export function InventoryCatalog() {
+             </Link>
+           </p>
+         ) : null}
++        {unpricedCount > 0 ? (
++          <div className="flex items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm leading-7">
++            <span>
++              {unpricedCount.toLocaleString("fa-IR")} کالا قیمت ندارد؛ مشتری نمی‌تواند آن‌ها را آنلاین بخرد.
++            </span>
++            <button
++              type="button"
++              className="min-h-9 shrink-0 rounded-lg px-2 text-warm"
++              aria-pressed={onlyUnpriced}
++              onClick={() => setOnlyUnpriced((value) => !value)}
++            >
++              {onlyUnpriced ? "نمایش همه" : "فقط بی‌قیمت‌ها"}
++            </button>
++          </div>
++        ) : null}
+         <div className="flex flex-wrap items-center gap-2">
+           <Input
+             className="min-w-40 flex-1"
+@@ -150,7 +168,7 @@ export function InventoryCatalog() {
+           <div className="flex flex-wrap gap-2">
+             <button
+               type="button"
+-              className={`rounded-full border px-3 py-1 text-sm ${category ? "border-line" : "border-accent bg-accent text-onAccent"}`}
++              className={`rounded-full border px-3 py-1 text-sm ${category ? "border-line" : "border-accentStrong bg-accentStrong text-onAccent"}`}
+               onClick={() => setCategory("")}
+             >
+               همه
+@@ -160,7 +178,7 @@ export function InventoryCatalog() {
+                 key={item.title}
+                 type="button"
+                 className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm ${
+-                  category === item.title ? "border-accent bg-accent text-onAccent" : "border-line"
++                  category === item.title ? "border-accentStrong bg-accentStrong text-onAccent" : "border-line"
+                 }`}
+                 onClick={() => setCategory(item.title)}
+               >
+@@ -183,7 +201,7 @@ export function InventoryCatalog() {
+               <div className="flex flex-wrap justify-center gap-2">
+                 <Link
+                   href="/more/channels"
+-                  className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent"
++                  className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm text-onAccent"
+                 >
+                   وصل کردن کانال
+                 </Link>
+diff --git a/components/login-coder-scene.tsx b/components/login-coder-scene.tsx
+index ad581ec..3e2fceb 100644
+--- a/components/login-coder-scene.tsx
++++ b/components/login-coder-scene.tsx
+@@ -11,19 +11,19 @@ const CODE_LINES = [
+ export function LoginCoderScene() {
+   return (
+     <div className="login-coder-scene pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+-      <div className="login-code-drift login-code-drift-a absolute right-[6%] top-[8%] rounded-lg border border-line/40 bg-paper/15 px-3 py-2 font-mono text-[10px] text-warm/70 sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-a absolute right-[6%] top-[8%] rounded-lg border border-line/40 bg-paper/15 px-3 py-2 font-mono text-[10px] text-warm/70 sm:text-xs">
+         {CODE_LINES[0]}
+       </div>
+-      <div className="login-code-drift login-code-drift-b absolute left-[5%] top-[14%] rounded-lg border border-line/30 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/80 sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-b absolute left-[5%] top-[14%] rounded-lg border border-line/30 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/80 sm:text-xs">
+         {CODE_LINES[1]}
+       </div>
+-      <div className="login-code-drift login-code-drift-c absolute right-[8%] bottom-[14%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-accent/50 sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-c absolute right-[8%] bottom-[14%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-accent/50 sm:text-xs">
+         {CODE_LINES[2]}
+       </div>
+-      <div className="login-code-drift login-code-drift-d absolute left-[7%] bottom-[10%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-warm/60 sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-d absolute left-[7%] bottom-[10%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-warm/60 sm:text-xs">
+         {CODE_LINES[3]}
+       </div>
+-      <div className="login-code-drift login-code-drift-e absolute right-[22%] top-[22%] hidden rounded-lg border border-line/20 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/70 sm:block sm:text-xs">
++      <div dir="ltr" className="login-code-drift login-code-drift-e absolute right-[22%] top-[22%] hidden rounded-lg border border-line/20 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/70 sm:block sm:text-xs">
+         {CODE_LINES[4]}
+       </div>
+ 
+@@ -33,7 +33,7 @@ export function LoginCoderScene() {
+           <rect x="78" y="118" width="124" height="58" rx="10" fill="#3A3A40" stroke="#52525A" strokeWidth="1.5" />
+           <rect x="88" y="128" width="104" height="38" rx="6" fill="#2F2F33" stroke="#C45C26" strokeOpacity="0.4" />
+           <g className="login-code-typing">
+-            <text x="96" y="146" fill="#E8A87C" fontSize="9" fontFamily="ui-monospace, monospace" opacity="0.9">
++            <text x="96" y="146" direction="ltr" unicodeBidi="isolate" fill="#E8A87C" fontSize="9" fontFamily="ui-monospace, monospace" opacity="0.9">
+               build_shop()
+             </text>
+             <rect x="168" y="138" width="2" height="12" fill="#C45C26" className="login-cursor-blink" />
+diff --git a/components/onboard-gate.tsx b/components/onboard-gate.tsx
+index fee3960..01f47a3 100644
+--- a/components/onboard-gate.tsx
++++ b/components/onboard-gate.tsx
+@@ -2,7 +2,7 @@
+ 
+ import { useEffect, useState } from "react";
+ import { usePathname, useRouter } from "next/navigation";
+-import { api, getOnboarded, getToken, setOnboarded } from "@/lib/api";
++import { ApiError, api, getOnboarded, getToken, setOnboarded } from "@/lib/api";
+ 
+ const PUBLIC = new Set(["/login", "/onboard", "/"]);
+ 
+@@ -27,6 +27,8 @@ export function OnboardGate({ children }: { children: React.ReactNode }) {
+   const pathname = usePathname();
+   const publicPath = isPublicPath(pathname);
+   const [ok, setOk] = useState(publicPath);
++  const [offline, setOffline] = useState(false);
++  const [retry, setRetry] = useState(0);
+ 
+   useEffect(() => {
+     if (isPublicPath(pathname)) {
+@@ -48,15 +50,36 @@ export function OnboardGate({ children }: { children: React.ReactNode }) {
+         setOnboarded(true);
+         setOk(true);
+       })
+-      .catch(() => {
+-        router.replace("/login");
++      .catch((err) => {
++        // فقط نشست نامعتبر (۴۰۱) یعنی خروج؛ خطای موقت شبکه یا سرور کاربر را بیرون نمی‌اندازد.
++        if (err instanceof ApiError && err.status === 401) {
++          router.replace("/login");
++          return;
++        }
++        if (!getOnboarded()) setOffline(true);
+       });
+-  }, [pathname, router]);
++  }, [pathname, router, retry]);
+ 
+   if (!ok) {
+     return (
+-      <div className="flex min-h-screen items-center justify-center bg-canvas">
+-        <p className="text-sm text-muted">در حال بارگذاری…</p>
++      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
++        {offline ? (
++          <>
++            <p className="text-sm text-ink">اتصال به سوزان برقرار نشد.</p>
++            <button
++              type="button"
++              className="min-h-11 rounded-xl bg-accent px-4 text-sm font-bold text-onAccent"
++              onClick={() => {
++                setOffline(false);
++                setRetry((value) => value + 1);
++              }}
++            >
++              دوباره
++            </button>
++          </>
++        ) : (
++          <p className="text-sm text-muted">در حال بارگذاری…</p>
++        )}
+       </div>
+     );
+   }
+diff --git a/components/panel-home.tsx b/components/panel-home.tsx
+index 6d4ccfa..c1b6039 100644
+--- a/components/panel-home.tsx
++++ b/components/panel-home.tsx
+@@ -1,19 +1,48 @@
+ "use client";
+ 
+-import { useEffect } from "react";
++import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { api, getToken } from "@/lib/api";
++import { ApiError, api, getOnboarded, getToken } from "@/lib/api";
+ 
+ export function PanelHome() {
+   const router = useRouter();
++  const [offline, setOffline] = useState(false);
++  const [retry, setRetry] = useState(0);
+   useEffect(() => {
+     if (!getToken()) {
+       router.replace("/login");
+       return;
+     }
++    if (getOnboarded()) {
++      router.replace("/chat");
++      return;
++    }
+     void api<{ onboarded?: boolean }>("/auth/me")
+       .then((data) => router.replace(data.onboarded ? "/chat" : "/onboard"))
+-      .catch(() => router.replace("/login"));
+-  }, [router]);
+-  return <p className="p-8 text-muted">در حال انتقال…</p>;
++      .catch((err) => {
++        if (err instanceof ApiError && err.status === 401) router.replace("/login");
++        else setOffline(true);
++      });
++  }, [router, retry]);
++  return (
++    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
++      {offline ? (
++        <>
++          <p className="text-sm text-ink">اتصال به سوزان برقرار نشد.</p>
++          <button
++            type="button"
++            className="min-h-11 rounded-xl bg-accent px-4 text-sm font-bold text-onAccent"
++            onClick={() => {
++              setOffline(false);
++              setRetry((value) => value + 1);
++            }}
++          >
++            دوباره
++          </button>
++        </>
++      ) : (
++        <p className="text-sm text-muted">در حال بارگذاری…</p>
++      )}
++    </div>
++  );
+ }
+diff --git a/components/shop-live-build.tsx b/components/shop-live-build.tsx
+index eaa4d99..fe0fc50 100644
+--- a/components/shop-live-build.tsx
++++ b/components/shop-live-build.tsx
+@@ -317,8 +317,8 @@ function ShopLivePreview({
+                 (pendingBuild > 0 || failed) && !(overlay && !failed) ? "bg-accent text-onAccent" : "text-muted",
+               )}
+             >
+-              بیلد
+-              {pendingBuild > 0 ? ` ${pendingBuild.toLocaleString("fa-IR")}` : ""}
++              {failed ? "ساخت دوباره" : "انتشار تغییرات"}
++              {pendingBuild > 0 ? ` (${pendingBuild.toLocaleString("fa-IR")})` : ""}
+             </button>
+           ) : null}
+           <IconBtn label={phone ? "نمایش دسکتاپ" : "نمایش موبایل"} active={phone} onClick={() => setPhone((value) => !value)}>
+@@ -331,7 +331,8 @@ function ShopLivePreview({
+             href={href.replace(/\/$/, "") + (path.split("?")[0] || "/")}
+             target="_blank"
+             rel="noreferrer"
+-            aria-label="تب جدید"
++            aria-label="باز کردن ویترین در تب جدید"
++            title="باز کردن ویترین در تب جدید"
+             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-warm hover:bg-canvas"
+           >
+             <ExternalLink size={14} />
+@@ -353,11 +354,11 @@ function ShopLivePreview({
+   );
+ 
+   if (!open) {
+-    return <section className="mx-4 mt-3 shrink-0 overflow-hidden rounded-3xl border border-accent/25 bg-paper shadow-card">{bar}</section>;
++    return <section className="shrink-0 overflow-hidden rounded-2xl border border-accent/25 bg-paper shadow-card">{bar}</section>;
+   }
+ 
+   return (
+-    <section className="relative mx-3 mt-2 flex h-[min(38dvh,20rem)] min-h-[11rem] shrink-0 flex-col overflow-hidden rounded-3xl border border-accent/25 bg-paper shadow-card sm:mx-4 sm:mt-3 sm:h-[min(46dvh,26rem)] lg:h-[min(58%,32rem)]">
++    <section className="relative flex min-h-[22rem] flex-1 flex-col overflow-hidden rounded-2xl border border-accent/25 bg-paper shadow-card">
+       {bar}
+       <div className="flex shrink-0 gap-1 border-b border-line/60 px-2 py-1">
+         {PAGES.map((page) => (
+diff --git a/components/theme-toggle.tsx b/components/theme-toggle.tsx
+new file mode 100644
+index 0000000..6ebd75b
+--- /dev/null
++++ b/components/theme-toggle.tsx
+@@ -0,0 +1,51 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import { Monitor, Moon, Sun } from "lucide-react";
++import { cn } from "@/lib/utils";
++import { readTheme, saveTheme, type ThemeChoice } from "@/lib/theme";
++
++const OPTIONS: { id: ThemeChoice; label: string; icon: typeof Sun }[] = [
++  { id: "light", label: "روشن", icon: Sun },
++  { id: "dark", label: "تیره", icon: Moon },
++  { id: "system", label: "خودکار", icon: Monitor },
++];
++
++/** انتخاب تم پنل: روشن، تیره یا همان تنظیم دستگاه. */
++export function ThemeToggle({ compact = false, className }: { compact?: boolean; className?: string }) {
++  const [choice, setChoice] = useState<ThemeChoice>("system");
++
++  useEffect(() => {
++    setChoice(readTheme());
++  }, []);
++
++  return (
++    <div role="radiogroup" aria-label="تم پنل" className={cn("flex gap-1 rounded-xl border border-line bg-paper p-1", className)}>
++      {OPTIONS.map((option) => {
++        const Icon = option.icon;
++        const active = choice === option.id;
++        return (
++          <button
++            key={option.id}
++            type="button"
++            role="radio"
++            aria-checked={active}
++            aria-label={option.label}
++            title={option.label}
++            onClick={() => {
++              setChoice(option.id);
++              saveTheme(option.id);
++            }}
++            className={cn(
++              "flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-xs",
++              active ? "bg-canvas font-bold text-ink shadow-card" : "text-muted hover:text-ink",
++            )}
++          >
++            <Icon size={15} aria-hidden />
++            {compact ? null : <span>{option.label}</span>}
++          </button>
++        );
++      })}
++    </div>
++  );
++}
+diff --git a/components/typing-hints.tsx b/components/typing-hints.tsx
+new file mode 100644
+index 0000000..ccb33f4
+--- /dev/null
++++ b/components/typing-hints.tsx
+@@ -0,0 +1,109 @@
++"use client";
++
++import { useEffect, useMemo, useState } from "react";
++
++type Phase = "type" | "hold" | "wind" | "gap";
++
++const TYPE_MS = 55;
++const HOLD_MS = 1500;
++const WIND_MS = 900;
++const WIND_STAGGER_MS = 70;
++const GAP_MS = 1000;
++
++function reducedMotion() {
++  try {
++    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
++  } catch {
++    return false;
++  }
++}
++
++/**
++ * جمله‌های راهنما در پس‌زمینهٔ چت خالی: تایپ می‌شوند، باد کلمه‌ها را می‌برد،
++ * یک ثانیه مکث و جملهٔ بعدی. زدن روی جمله آن را در کادر نوشتن می‌گذارد.
++ */
++export function TypingHints({ hints, onPick }: { hints: string[]; onPick?: (text: string) => void }) {
++  const [index, setIndex] = useState(0);
++  const [count, setCount] = useState(0);
++  const [phase, setPhase] = useState<Phase>("type");
++  const [still, setStill] = useState(false);
++
++  const text = hints.length ? hints[index % hints.length] : "";
++  const chars = useMemo(() => Array.from(text), [text]);
++  const words = useMemo(() => text.split(" ").filter(Boolean), [text]);
++
++  useEffect(() => {
++    setStill(reducedMotion());
++  }, []);
++
++  useEffect(() => {
++    if (!text) return;
++    let timer = 0;
++    if (phase === "type") {
++      if (still) {
++        setCount(chars.length);
++        setPhase("hold");
++        return;
++      }
++      if (count < chars.length) {
++        // کمی نامنظم تا حس تایپ واقعی بدهد
++        timer = window.setTimeout(() => setCount((value) => value + 1), TYPE_MS + Math.random() * 40);
++      } else {
++        setPhase("hold");
++      }
++    } else if (phase === "hold") {
++      timer = window.setTimeout(() => setPhase("wind"), still ? HOLD_MS * 2 : HOLD_MS);
++    } else if (phase === "wind") {
++      timer = window.setTimeout(() => setPhase("gap"), still ? 400 : WIND_MS + words.length * WIND_STAGGER_MS);
++    } else {
++      timer = window.setTimeout(() => {
++        setIndex((value) => (value + 1) % hints.length);
++        setCount(0);
++        setPhase("type");
++      }, GAP_MS);
++    }
++    return () => window.clearTimeout(timer);
++  }, [phase, count, chars.length, words.length, hints.length, still, text]);
++
++  if (!text) return null;
++
++  const typed = phase === "type" || phase === "hold";
++
++  return (
++    <div className="flex min-h-[5.5rem] flex-col items-center justify-center px-2 text-center">
++      <button
++        type="button"
++        className="max-w-md text-lg font-medium leading-9 text-ink/70 outline-none transition-colors hover:text-ink focus-visible:text-ink sm:text-xl"
++        aria-label={`نمونه: ${text}. برای نوشتنش در کادر بزن`}
++        onClick={() => onPick?.(text)}
++        disabled={phase === "gap"}
++      >
++        {typed ? (
++          <span aria-hidden>
++            «{chars.slice(0, count).join("")}
++            {count >= chars.length ? "»" : null}
++            <span className="sozan-caret ms-0.5 inline-block h-6 w-0.5 translate-y-1 rounded-full bg-warm" />
++          </span>
++        ) : phase === "wind" ? (
++          <span aria-hidden className={still ? "sozan-wind-still" : undefined}>
++            {words.map((word, i) => (
++              <span key={`${index}-${i}`}>
++                <span
++                  className={still ? "inline-block" : "sozan-wind inline-block"}
++                  style={still ? undefined : { animationDelay: `${i * WIND_STAGGER_MS}ms`, animationDuration: `${WIND_MS}ms` }}
++                >
++                  {i === 0 ? "«" : ""}
++                  {word}
++                  {i === words.length - 1 ? "»" : ""}
++                </span>{" "}
++              </span>
++            ))}
++          </span>
++        ) : (
++          <span aria-hidden>&nbsp;</span>
++        )}
++      </button>
++      <p className="mt-1 text-[11px] text-muted">مثلاً این را بنویس — یا روی جمله بزن</p>
++    </div>
++  );
++}
+diff --git a/components/ui/button.tsx b/components/ui/button.tsx
+index 3970a0d..45ff039 100644
+--- a/components/ui/button.tsx
++++ b/components/ui/button.tsx
+@@ -12,7 +12,7 @@ export function Button({
+         "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-medium disabled:opacity-50",
+         variant === "ghost"
+           ? "border border-line bg-paper text-ink hover:bg-canvas"
+-          : "bg-accent text-onAccent hover:bg-warm",
++          : "bg-accentStrong text-onAccent hover:bg-accent",
+         className,
+       )}
+       {...props}
+diff --git a/components/ui/input.tsx b/components/ui/input.tsx
+index e5ef49a..c46ee77 100644
+--- a/components/ui/input.tsx
++++ b/components/ui/input.tsx
+@@ -5,7 +5,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
+   return (
+     <input
+       className={cn(
+-        "min-h-11 w-full rounded-xl border border-line bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
++        "min-h-11 w-full rounded-xl border border-field bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
+         className,
+       )}
+       {...props}
+diff --git a/components/ui/select.tsx b/components/ui/select.tsx
+index c862b42..644f29d 100644
+--- a/components/ui/select.tsx
++++ b/components/ui/select.tsx
+@@ -5,7 +5,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
+   return (
+     <select
+       className={cn(
+-        "min-h-11 w-full rounded-xl border border-line bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
++        "min-h-11 w-full rounded-xl border border-field bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
+         className,
+       )}
+       {...props}
+diff --git a/components/ui/textarea.tsx b/components/ui/textarea.tsx
+index 9747b7a..d6dfe66 100644
+--- a/components/ui/textarea.tsx
++++ b/components/ui/textarea.tsx
+@@ -5,7 +5,7 @@ export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTex
+   return (
+     <textarea
+       className={cn(
+-        "min-h-32 w-full rounded-xl border border-line bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
++        "min-h-32 w-full rounded-xl border border-field bg-paper px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20",
+         className,
+       )}
+       {...props}
+diff --git a/lib/theme.ts b/lib/theme.ts
+new file mode 100644
+index 0000000..2c2f8a9
+--- /dev/null
++++ b/lib/theme.ts
+@@ -0,0 +1,50 @@
++export type ThemeChoice = "light" | "dark" | "system";
++
++export const THEME_KEY = "sozan_theme";
++export const THEME_BAR = { light: "#F4EFE8", dark: "#2F2F33" } as const;
++
++/** اسکریپت پیش از رندر در <head>: تم ذخیره‌شده را بدون چشمک روی <html> می‌نشاند. */
++export const THEME_BOOT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"${THEME_BAR.light}":"${THEME_BAR.dark}";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}})();`;
++
++export function readTheme(): ThemeChoice {
++  try {
++    const value = localStorage.getItem(THEME_KEY);
++    return value === "light" || value === "dark" ? value : "system";
++  } catch {
++    return "system";
++  }
++}
++
++function systemTheme(): "light" | "dark" {
++  try {
++    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
++  } catch {
++    return "dark";
++  }
++}
++
++export function applyTheme(choice: ThemeChoice) {
++  const root = document.documentElement;
++  if (choice === "system") root.removeAttribute("data-theme");
++  else root.setAttribute("data-theme", choice);
++  const effective = choice === "system" ? systemTheme() : choice;
++  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
++    const media = meta.getAttribute("media");
++    // در حالت «خودکار» متاهای media-دار خودشان درست‌اند؛ فقط انتخاب دستی همه را یکی می‌کند.
++    if (choice === "system" && media) {
++      meta.setAttribute("content", media.includes("light") ? THEME_BAR.light : THEME_BAR.dark);
++    } else {
++      meta.setAttribute("content", THEME_BAR[effective]);
++    }
++  });
++}
++
++export function saveTheme(choice: ThemeChoice) {
++  try {
++    if (choice === "system") localStorage.removeItem(THEME_KEY);
++    else localStorage.setItem(THEME_KEY, choice);
++  } catch {
++    /* ذخیره نشد؛ فقط برای همین بارگذاری اعمال می‌شود */
++  }
++  applyTheme(choice);
++}
+diff --git a/lib/use-plan.ts b/lib/use-plan.ts
+new file mode 100644
+index 0000000..55d6e0a
+--- /dev/null
++++ b/lib/use-plan.ts
+@@ -0,0 +1,41 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import { api } from "@/lib/api";
++
++type PlanRow = { id: string; label: string; priceToman?: number };
++type SettingsPlan = { plan?: string; subscription?: { plan?: string; label?: string; plans?: PlanRow[] } };
++
++export type PlanInfo = { id: string; label: string; canUpgrade: boolean };
++
++let cache: PlanInfo | null = null;
++
++/** پلن فعلی فروشنده از `/settings`؛ یک بار در هر بارگذاری صفحه خوانده می‌شود. */
++export function usePlan(): PlanInfo | null {
++  const [plan, setPlan] = useState<PlanInfo | null>(cache);
++
++  useEffect(() => {
++    if (cache) return;
++    let cancelled = false;
++    void api<SettingsPlan>("/settings")
++      .then((data) => {
++        const id = String(data.subscription?.plan || data.plan || "free");
++        const plans = [...(data.subscription?.plans || [])].sort((a, b) => (a.priceToman || 0) - (b.priceToman || 0));
++        const current = plans.find((row) => row.id === id);
++        const top = plans[plans.length - 1];
++        const info: PlanInfo = {
++          id,
++          label: data.subscription?.label || current?.label || (id === "free" ? "رایگان" : id),
++          canUpgrade: Boolean(top && top.id !== id),
++        };
++        cache = info;
++        if (!cancelled) setPlan(info);
++      })
++      .catch(() => undefined);
++    return () => {
++      cancelled = true;
++    };
++  }, []);
++
++  return plan;
++}
+diff --git a/tailwind.config.js b/tailwind.config.js
+index 7d35f2f..beda2ba 100644
+--- a/tailwind.config.js
++++ b/tailwind.config.js
+@@ -1,27 +1,30 @@
+ /** @type {import('tailwindcss').Config} */
+ module.exports = {
++  darkMode: ["selector", '[data-theme="dark"]'],
+   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+   theme: {
+     extend: {
+       colors: {
+-        ink: "#F3EEE6",
+-        muted: "#B4B0A8",
+-        paper: "#3A3A40",
+-        canvas: "#2F2F33",
+-        surface: "#3A3A40",
+-        line: "#52525A",
+-        accent: "#C45C26",
+-        onAccent: "#FFF6EE",
+-        warm: "#E8A87C",
+-        signal: "#7EB8B0",
+-        danger: "#E06B63",
++        ink: "rgb(var(--c-ink) / <alpha-value>)",
++        muted: "rgb(var(--c-muted) / <alpha-value>)",
++        paper: "rgb(var(--c-paper) / <alpha-value>)",
++        canvas: "rgb(var(--c-canvas) / <alpha-value>)",
++        surface: "rgb(var(--c-surface) / <alpha-value>)",
++        line: "rgb(var(--c-line) / <alpha-value>)",
++        accent: "rgb(var(--c-accent) / <alpha-value>)",
++        accentStrong: "rgb(var(--c-accentStrong) / <alpha-value>)",
++        field: "rgb(var(--c-field) / <alpha-value>)",
++        onAccent: "rgb(var(--c-onAccent) / <alpha-value>)",
++        warm: "rgb(var(--c-warm) / <alpha-value>)",
++        signal: "rgb(var(--c-signal) / <alpha-value>)",
++        danger: "rgb(var(--c-danger) / <alpha-value>)",
+       },
+       fontFamily: {
+         vazir: ["Vazirmatn", "sans-serif"],
+         sozan: ["Estedad", "Tahoma", "sans-serif"],
+       },
+       boxShadow: {
+-        card: "0 1px 2px rgb(0 0 0 / 28%), 0 10px 28px rgb(0 0 0 / 22%)",
++        card: "var(--shadow-card)",
+       },
+     },
+   },
