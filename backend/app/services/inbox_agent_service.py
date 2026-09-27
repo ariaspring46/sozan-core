@@ -387,6 +387,37 @@ def _hand_off(thread: dict | None, reason: str) -> str:
     return HANDOFF_LINE
 
 
+def _is_timeout(exc: BaseException) -> bool:
+    return isinstance(exc, TimeoutError) or "Timeout" in type(exc).__name__
+
+
+_QUALITATIVE = tuple(mark for mark in _CLAIM_MARKS if mark not in {"قیمت", "موجود"})
+
+
+def _availability_conflict(text: str, facts: str) -> bool:
+    stocks = [int(item) for item in re.findall(r'"stock":\s*(-?\d+)', facts)]
+    if not stocks:
+        return False
+    says_out = any(word in text for word in ("ناموجود", "موجود نیست", "تموم", "تمام شده"))
+    says_in = "موجود" in text and not says_out
+    if says_in and max(stocks) <= 0:
+        return True
+    if says_out and min(stocks) > 0:
+        return True
+    return False
+
+
+def _needs_claims_model(text: str, facts: str) -> bool:
+    """A second model call only for a product claim that is not already in the tool text."""
+    if any(mark in text and mark not in facts for mark in _QUALITATIVE):
+        return True
+    if re.search(r"اصل(?!ا)", text) and not re.search(r"اصل(?!ا)", facts):
+        return True
+    if re.search(r'"stock":\s*-?\d+', facts):
+        return False
+    return "موجود" in text or "تموم" in text or "تمام" in text
+
+
 async def _inbox_claims_complete(system: str, user: str, **_kwargs) -> dict:
     from app.services.llm import complete_json
 
@@ -394,7 +425,9 @@ async def _inbox_claims_complete(system: str, user: str, **_kwargs) -> dict:
 
 
 async def _claims(text: str, facts: str) -> str:
-    if not facts.strip() and not _looks_like_claim(text):
+    if _availability_conflict(text, facts):
+        return CLAIMS_LINE
+    if not _needs_claims_model(text, facts):
         return text
     try:
         from app.services.claims_guard import check
@@ -534,6 +567,7 @@ def _system(thread: dict | None) -> str:
     return (
         "تو فروشندهٔ همین فروشگاه هستی و در دایرکت جواب می‌دهی. فقط فارسی کوتاه بنویس.\n"
         "موجودی، قیمت، وضعیت سفارش و لینک پرداخت را فقط از ابزار بگیر. "
+        "اگر چند ابزار لازم است، همه را در همان نوبت صدا بزن. "
         "اگر ابزار چیزی پیدا نکرد، همان را بگو و عدد یا لینک نساز.\n"
         f"{prompt_block()}\n"
         f"فروشگاه: {cfg.get('storeName') or ''} / {cfg.get('storeTagline') or ''}\n"
@@ -596,14 +630,16 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                 for url in pay_urls:
                     if url and url not in reply:
                         reply = f"{reply}\n{url}".strip()
+                if not str(reply or "").strip():
+                    reply = _hand_off(thread, "جواب خالی")
                 emit_later(
                     kind="inbox",
                     surface="inbox",
                     title="inbox-agent",
-                    status="ready" if reply else "empty",
+                    status="handoff" if reply == HANDOFF_LINE else "ready",
                     payload={"tools": used, "nudge": nudged},
                 )
-                return reply[:1000] or None
+                return reply[:1000]
             messages.append(
                 {
                     "role": "assistant",
@@ -623,7 +659,20 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
             )
             for call in calls:
                 used.append(call["name"])
-                result = await run_tool(call["name"], call["arguments"], thread=thread)
+                try:
+                    result = await run_tool(call["name"], call["arguments"], thread=thread)
+                except Exception as exc:
+                    reason = "خطای ابزار پرداخت" if call["name"] == "payment_link" else "خطای ابزار"
+                    log.warning("inbox tool failed: %s %s", call["name"], type(exc).__name__)
+                    reply = _hand_off(thread, reason)
+                    emit_later(
+                        kind="inbox",
+                        surface="inbox",
+                        title="inbox-agent",
+                        status="handoff",
+                        payload={"tools": used, "reason": reason, "errorClass": type(exc).__name__},
+                    )
+                    return reply
                 url = str(result.get("payUrl") or "").strip()
                 if url:
                     pay_urls.append(url)
@@ -635,20 +684,23 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                     }
                 )
     except Exception as exc:
+        reason = "مهلت مدل" if _is_timeout(exc) else "خطای پاسخ"
         log.warning("inbox agent failed: %s", type(exc).__name__)
+        reply = _hand_off(thread, reason)
         emit_later(
             kind="inbox",
             surface="inbox",
             title="inbox-agent",
-            status="failed",
-            payload={"errorClass": type(exc).__name__},
+            status="handoff",
+            payload={"tools": used, "reason": reason, "errorClass": type(exc).__name__},
         )
-        return None
+        return reply
+    reply = _hand_off(thread, "دورها تمام شد")
     emit_later(
         kind="inbox",
         surface="inbox",
         title="inbox-agent",
-        status="empty",
-        payload={"tools": used, "nudge": nudged},
+        status="handoff",
+        payload={"tools": used, "nudge": nudged, "reason": "دورها تمام شد"},
     )
-    return None
+    return reply

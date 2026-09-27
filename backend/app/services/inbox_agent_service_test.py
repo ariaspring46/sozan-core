@@ -341,6 +341,76 @@ class InboxAgentTests(unittest.TestCase):
         self.assertNotIn("09120000000", seen[-1]["user"])
         self.assertIn("[تلفن]", seen[-1]["user"])
 
+    def test_payment_tool_error_hands_off_instead_of_empty(self) -> None:
+        from app.services import inbox_service
+
+        payloads = [_chat(calls=[_call("payment_link", {"product": "کفش", "qty": 1})])]
+
+        async def broken(*_args, **_kwargs):
+            raise ValueError("درگاه سوزان هنوز تنظیم نشده.")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
+            "app.services.inbox_agent_service.tool_payment_link", broken
+        ):
+            created = inbox_service.inbound(platform="instagram", sender="مشتری", text="لینک پرداخت")
+            reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت", thread=created["thread"]))
+            shown = inbox_service.get_thread(created["thread"]["id"])
+            waiting = inbox_service.list_threads(status_filter="pending")
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+        self.assertTrue(shown["thread"]["paused"])
+        self.assertEqual(shown["thread"]["handoffReason"], "خطای ابزار پرداخت")
+        self.assertGreaterEqual(shown["thread"]["unread"], 1)
+        self.assertTrue(any(row.get("handoffReason") == "خطای ابزار پرداخت" for row in waiting["threads"]))
+
+    def test_exhausted_rounds_hand_off(self) -> None:
+        from app.services import inbox_service
+
+        payloads = [_chat(calls=[_call("stock", {"product": "کفش"}, call_id=f"c{i}")]) for i in range(4)]
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])):
+            storefront_service.add_product(title="کفش چرم", price=10, stock=1, sku="c")
+            created = inbox_service.inbound(platform="instagram", sender="مشتری", text="موجودی")
+            reply = asyncio.run(inbox_agent_service.answer("موجودی", thread=created["thread"]))
+            shown = inbox_service.get_thread(created["thread"]["id"])
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+        self.assertEqual(shown["thread"]["handoffReason"], "دورها تمام شد")
+        self.assertTrue(shown["thread"]["paused"])
+        self.assertEqual(payloads, [])
+
+    def test_tool_echo_skips_the_claims_model(self) -> None:
+        payloads = [
+            _chat(calls=[_call("stock", {"product": "کفش چرم"})]),
+            _chat(content="کفش چرم موجود است."),
+        ]
+        self.claims_complete.reset_mock()
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])):
+            storefront_service.add_product(title="کفش چرم", price=10, stock=2, sku="c")
+            reply = asyncio.run(inbox_agent_service.answer("هست؟"))
+        self.assertIn("موجود", reply or "")
+        self.claims_complete.assert_not_called()
+
+    def test_sold_out_claim_is_replaced_without_a_second_model(self) -> None:
+        payloads = [
+            _chat(calls=[_call("stock", {"product": "صندل"})]),
+            _chat(content="صندل تابستانی موجود است."),
+        ]
+        self.claims_complete.reset_mock()
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])):
+            storefront_service.add_product(title="صندل تابستانی", price=10, stock=0, sku="s")
+            reply = asyncio.run(inbox_agent_service.answer("هست؟"))
+        self.assertEqual(reply, inbox_agent_service.CLAIMS_LINE)
+        self.claims_complete.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
