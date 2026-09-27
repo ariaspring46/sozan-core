@@ -1,5 +1,7 @@
 import { LandingSloganRotator } from "@/components/landing-slogan-rotator";
 import { SozanMark } from "@/components/sozan-mark";
+import { money } from "@/lib/digits";
+import { loadPublicPlans, type PublicPlan } from "@/lib/public-plans";
 
 const CHAPTERS = [
   {
@@ -88,25 +90,11 @@ const CHANNELS = [
   },
 ] as const;
 
-const PLANS = [
-  {
-    name: "رایگان",
-    lead: "برای راه‌اندازی اولین فروشگاه",
-    items: ["۱ فروشگاه", "۲ کانال", "پاسخ دستی و بات تلگرام", "۵۰ پیامک در ماه"],
-    featured: false,
-  },
-  {
-    name: "پرو",
-    lead: "برای فروشنده‌ای که هر روز محتوا و پیام دارد",
-    items: ["۳ فروشگاه", "۵ کانال", "خواندن دایرکت", "پیش‌نویس پاسخ با لحن تو", "۵۰۰ پیامک در ماه"],
-    featured: true,
-  },
-  {
-    name: "پرو مکس",
-    lead: "برای فروش پیوسته و پاسخ‌گویی خودکار",
-    items: ["فروشگاه نامحدود", "کانال نامحدود", "پاسخ خودکار با لحن تو", "۲۰۰۰ پیامک در ماه"],
-    featured: false,
-  },
+const LEGAL = [
+  { href: "/about", label: "درباره ما" },
+  { href: "/contact", label: "تماس با ما" },
+  { href: "/terms", label: "قوانین و مقررات" },
+  { href: "/refund", label: "لغو اشتراک و بازگشت وجه" },
 ] as const;
 
 const ENAMAD_SEAL =
@@ -147,6 +135,51 @@ const FAQS = [
   },
 ] as const;
 
+function PlanCard({ plan, start, until }: { plan: PublicPlan; start: string; until: string }) {
+  const featured = plan.id === "pro";
+  const discounted = plan.listPrice > plan.price && plan.price > 0;
+  const action =
+    plan.checkout === "soon" ? (
+      <span className="mt-auto inline-flex h-12 items-center justify-center rounded-full border border-line/80 px-6 text-sm text-ink/50">به‌زودی</span>
+    ) : (
+      <a
+        href={start}
+        className={`mt-auto inline-flex h-12 items-center justify-center rounded-full px-6 text-sm ${
+          featured ? "bg-accent text-onAccent hover:bg-warm" : "border border-line/80 text-ink hover:border-warm/60"
+        }`}
+      >
+        {plan.checkout === "free" ? "رایگان شروع کن" : `انتخاب ${plan.label}`}
+      </a>
+    );
+  return (
+    <article
+      className={`relative flex min-h-[24rem] flex-col rounded-3xl border p-6 ${
+        featured ? "border-accent/70 bg-accent/[0.08]" : "border-line/50 bg-canvas/70"
+      }`}
+    >
+      {featured ? (
+        <span className="absolute -top-3 end-6 rounded-full bg-accent px-3 py-1 text-[11px] text-onAccent">پیشنهاد سوزان</span>
+      ) : null}
+      <h3 className="landing-display text-2xl">{plan.label}</h3>
+      <div className="mt-4">
+        {discounted ? <p className="text-sm text-ink/40 line-through">{money(plan.listPrice)} تومان</p> : null}
+        <p className="landing-display text-2xl">{plan.price > 0 ? `${money(plan.price)} تومان` : "رایگان"}</p>
+        <p className="mt-1 text-xs text-warm">{plan.price > 0 ? "ماهانه" : "بدون پرداخت"}</p>
+        {discounted && until ? <p className="mt-1 text-xs text-ink/60">تا {until}</p> : null}
+      </div>
+      <ul className="mt-6 space-y-3 border-t border-line/50 pt-6 text-sm text-ink/80">
+        {plan.features.map((item) => (
+          <li key={item} className="flex items-start gap-3">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-warm" />
+            <span className="leading-7">{item}</span>
+          </li>
+        ))}
+      </ul>
+      {action}
+    </article>
+  );
+}
+
 function ShopMock() {
   return (
     <div className="landing-demo-card relative p-4">
@@ -166,7 +199,7 @@ function ShopMock() {
             <div key={name} className="rounded-lg border border-line/40 bg-ink/5 p-1.5">
               <div className="landing-tile h-10 rounded-md" />
               <p className="mt-1.5 truncate text-[9px] text-ink/70">{name}</p>
-              <p className="text-[9px] text-warm">۹۸۰ هزار</p>
+              <p className="text-[9px] text-warm">نمونه · ۹۸۰ هزار</p>
             </div>
           ))}
         </div>
@@ -258,7 +291,9 @@ function ChapterVisual({ id }: { id: string }) {
   return <PanelMock />;
 }
 
-export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
+export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
+  const catalog = await loadPublicPlans();
+  const plans = catalog?.plans ?? [];
   const start = panelOrigin ? `${panelOrigin.replace(/\/$/, "")}/login` : "/login";
 
   return (
@@ -288,6 +323,16 @@ export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             <a className="transition-colors hover:text-ink" href="#plans">
               پلن‌ها
             </a>
+            <details className="relative">
+              <summary className="cursor-pointer list-none marker:content-none hover:text-ink">شرکت</summary>
+              <div className="absolute end-0 top-8 z-50 w-56 rounded-2xl border border-line/70 bg-paper/95 p-3 text-sm shadow-card">
+                {LEGAL.map((item) => (
+                  <a key={item.href} className="block py-2 text-ink/80 hover:text-ink" href={item.href}>
+                    {item.label}
+                  </a>
+                ))}
+              </div>
+            </details>
           </nav>
           <div className="flex items-center gap-3">
             <details className="landing-nav-menu relative md:hidden">
@@ -307,6 +352,11 @@ export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
                 <a className="block py-2 text-ink/80 hover:text-ink" href="#plans">
                   پلن‌ها
                 </a>
+                {LEGAL.map((item) => (
+                  <a key={item.href} className="block py-2 text-ink/80 hover:text-ink" href={item.href}>
+                    {item.label}
+                  </a>
+                ))}
               </div>
             </details>
             <a
@@ -421,7 +471,7 @@ export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
                         <div key={item.name} className="rounded-lg border border-line/40 bg-ink/5 p-1.5">
                           <div className="landing-tile h-9 rounded-md" />
                           <p className="mt-1.5 truncate text-[9px] text-ink/70">{item.name}</p>
-                          <p className="text-[9px] text-warm">{item.price} هزار</p>
+                          <p className="text-[9px] text-warm">نمونه · {item.price} هزار</p>
                         </div>
                       ))}
                     </div>
@@ -572,40 +622,17 @@ export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
                 تفاوت پلن‌ها در تعداد فروشگاه و کانال، سهمیهٔ پیامک و میزان خودکار بودن پاسخ مشتری است.
               </p>
             </div>
-            <div className="mt-12 grid gap-4 lg:grid-cols-3">
-              {PLANS.map((plan) => (
-                <article
-                  key={plan.name}
-                  className={`relative flex min-h-[28rem] flex-col rounded-3xl border p-6 ${
-                    plan.featured ? "border-accent/70 bg-accent/[0.08]" : "border-line/50 bg-canvas/70"
-                  }`}
-                >
-                  {plan.featured ? (
-                    <span className="absolute -top-3 end-6 rounded-full bg-accent px-3 py-1 text-[11px] text-onAccent">پیشنهاد سوزان</span>
-                  ) : null}
-                  <h3 className="landing-display text-2xl">{plan.name}</h3>
-                  <p className="landing-lede mt-3 min-h-14 text-sm leading-7">{plan.lead}</p>
-                  <ul className="mt-6 space-y-3 border-t border-line/50 pt-6 text-sm text-ink/80">
-                    {plan.items.map((item) => (
-                      <li key={item} className="flex items-start gap-3">
-                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-warm" />
-                        <span className="leading-7">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href={start}
-                    className={`mt-auto inline-flex h-12 items-center justify-center rounded-full px-6 text-sm ${
-                      plan.featured ? "bg-accent text-onAccent hover:bg-warm" : "border border-line/80 text-ink hover:border-warm/60"
-                    }`}
-                  >
-                    {plan.name === "رایگان" ? "رایگان شروع کن" : `انتخاب ${plan.name}`}
-                  </a>
-                </article>
+            <div className="mt-12 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {plans.map((plan) => (
+                <PlanCard key={plan.id} plan={plan} start={start} until={catalog?.discountUntilLabel || ""} />
               ))}
             </div>
+            {plans.length === 0 ? (
+              <p className="mt-6 text-sm text-ink/70">قیمت پلن‌ها الان در دسترس نیست.</p>
+            ) : null}
             <p className="mt-6 text-xs leading-6 text-ink/55">
-              بعد از پایان سهمیهٔ پیامک، هزینهٔ هر پیامک از کیف پول کم می‌شود. جزئیات مبلغ اشتراک هنگام انتخاب پلن در پنل نمایش داده می‌شود.
+              مبلغ روی کارت همان مبلغ پرداخت است و دورهٔ اشتراک ماهانه است.
+              {catalog?.discountUntilLabel ? ` تخفیف تا ${catalog.discountUntilLabel}.` : ""}
             </p>
           </div>
         </section>
@@ -655,6 +682,9 @@ export function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             <a href="#capabilities" className="hover:text-warm">امکانات</a>
             <a href="#channels" className="hover:text-warm">کانال‌ها</a>
             <a href="#plans" className="hover:text-warm">پلن‌ها</a>
+            {LEGAL.map((item) => (
+              <a key={item.href} href={item.href} className="hover:text-warm">{item.label}</a>
+            ))}
             <a href={panelOrigin || "https://app.sozan-core.ir"} className="hover:text-warm">ورود به پنل</a>
           </nav>
           <div className="flex items-center gap-4">

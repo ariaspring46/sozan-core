@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api, getOnboarded, getToken, setOnboarded } from "@/lib/api";
 
-const PUBLIC = new Set(["/login", "/onboard", "/"]);
+const PUBLIC = new Set(["/login", "/onboard", "/", "/about", "/contact", "/terms", "/refund"]);
 
 function isPublicPath(pathname: string) {
   return PUBLIC.has(pathname) || pathname === "/p" || pathname.startsWith("/p/");

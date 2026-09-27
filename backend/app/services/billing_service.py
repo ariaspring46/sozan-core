@@ -51,9 +51,11 @@ async def start_subscription(plan_id: str, *, phone: str) -> dict:
     spec = plan_service.PLANS.get(wanted)
     if spec is None:
         raise ValueError("این اشتراک وجود ندارد")
+    if wanted == "ultra":
+        raise ValueError("خرید اولترا به‌زودی باز می‌شود")
     if wanted == plan_service.current_plan_id():
         return {"activated": True, "plan": wanted, "subscription": plan_service.snapshot()}
-    amount = int(spec.get("priceToman") or 0)
+    amount = plan_service.effective_price(wanted)
     if amount <= 0:
         plan_service.set_plan(wanted)
         return {"activated": True, "plan": wanted, "subscription": plan_service.snapshot()}

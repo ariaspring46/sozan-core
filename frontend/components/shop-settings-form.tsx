@@ -45,7 +45,17 @@ type StudioSettings = {
     sitesUsed: number;
     sitesLimit: number;
     features: string[];
-    plans: { id: string; label: string; sites: number; priceToman?: number; smsQuota?: number; features: string[] }[];
+    plans: {
+      id: string;
+      label: string;
+      sites: number;
+      priceToman?: number;
+      listPrice?: number;
+      purchasable?: boolean;
+      smsQuota?: number;
+      features: string[];
+    }[];
+    discountUntilLabel?: string;
   };
 };
 
@@ -372,13 +382,23 @@ export function ShopSettingsForm() {
                         </p>
                         <p className="text-xs text-muted">
                           {plan.sites === 1 ? "یک وب‌سایت" : plan.sites === 0 ? "وب‌سایت نامحدود" : `تا ${plan.sites} وب‌سایت`}
-                          {plan.priceToman ? ` · ${money(plan.priceToman)} تومان` : " · رایگان"}
-                          {plan.smsQuota ? ` · ${plan.smsQuota} پیامک` : ""}
+                          {plan.listPrice && plan.priceToman && plan.listPrice > plan.priceToman ? (
+                            <span className="mx-1 line-through">{money(plan.listPrice)}</span>
+                          ) : null}
+                          {plan.priceToman ? ` · ${money(plan.priceToman)} تومان در ماه` : " · رایگان"}
+                          {plan.purchasable === false ? " · به‌زودی" : ""}
+                          {plan.smsQuota ? ` · ${money(plan.smsQuota)} پیامک` : ""}
                         </p>
                       </button>
                     );
                   })}
-                  {pickedPlan && pickedPlan !== form.plan ? (
+                  {form.subscription.discountUntilLabel ? (
+                    <p className="text-xs text-muted">تخفیف تا {form.subscription.discountUntilLabel}</p>
+                  ) : null}
+                  {pickedPlan && pickedPlan !== form.plan && pickedSpec?.purchasable === false ? (
+                    <Button disabled>به‌زودی</Button>
+                  ) : null}
+                  {pickedPlan && pickedPlan !== form.plan && pickedSpec?.purchasable !== false ? (
                     <div className="space-y-2">
                       {confirmPay && pickedPlan !== "free" ? (
                         <p className="text-sm text-muted">

@@ -26,8 +26,11 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_bot_handle: str = ""
     telegram_post_target: str = ""
-    plan_price_pro: int = 490000
-    plan_price_promax: int = 1490000
+    plan_price_pro: int = 1_414_000
+    plan_price_promax: int = 2_414_000
+    plan_price_ultra: int = 3_843_000
+    plan_discount_percent: int = 30
+    plan_discount_until: str = ""
     commission_bps: int = 200
     sms_overage_toman: int = 200
     sms_quota_free: int = 50

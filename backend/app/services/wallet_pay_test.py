@@ -263,7 +263,7 @@ class WalletPayTests(unittest.TestCase):
                 request.assert_not_called()
                 self.assertEqual(
                     wallet_service.get()["available"],
-                    2_000_000 - int(plan_service.PLANS["pro"]["priceToman"]),
+                    2_000_000 - plan_service.effective_price("pro"),
                 )
 
     def test_withdraw_roundtrip(self) -> None:

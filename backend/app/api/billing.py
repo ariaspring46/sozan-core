@@ -8,6 +8,13 @@ from app.services import billing_service
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 
+@router.get("/plans")
+async def public_plans():
+    from app.services import plan_service
+
+    return plan_service.public_catalog()
+
+
 class SubscribeIn(BaseModel):
     plan: str = Field(min_length=2, max_length=16)
 
