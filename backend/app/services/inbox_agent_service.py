@@ -26,7 +26,21 @@ log = logging.getLogger("sozan.inbox.agent")
 AGENT_MODEL = "qwen3.5-9b"
 EMBED_MODEL = "bge-m3"
 MAX_ROUNDS = 4
-INBOX_TIMEOUT = 20
+INBOX_TIMEOUT = 4
+DRY_PAY_HOST = "dry-mock.invalid"
+_BUY_MARKS = (
+    "لینک پرداخت",
+    "پرداخت",
+    "بخرم",
+    "بخرید",
+    "بخر",
+    "خرید",
+    "پول",
+    "کارت به کارت",
+    "لینک بده",
+    "درگاه",
+)
+_TITLE_NOISE = {"چرم", "نخی", "کوچک", "فلزی", "مردانه", "تابستانی"}
 TIMEOUT = 45.0
 INTENT_THRESHOLD = 0.75
 INTENT_SAMPLES = {
@@ -45,8 +59,28 @@ def _cloud_base(url: str) -> bool:
     return ARVAN_HOST_SUFFIX in url.lower()
 
 
-def _tools() -> list[dict]:
-    return [
+def _explicit_buy(text: str) -> bool:
+    folded = _norm(text)
+    return any(_norm(mark) in folded for mark in _BUY_MARKS)
+
+
+def _mentioned_products(text: str) -> list[dict]:
+    folded = _norm(text)
+    scored: list[tuple[int, dict]] = []
+    for item in _products():
+        title = _norm(str(item.get("title") or ""))
+        words = [word for word in title.split() if len(word) >= 3 and word not in _TITLE_NOISE]
+        hits = [word for word in words if word in folded]
+        if hits:
+            scored.append((len(hits), item))
+    if not scored:
+        return []
+    best = max(count for count, _item in scored)
+    return [item for count, item in scored if count == best]
+
+
+def _tools(*, allow_payment: bool = True) -> list[dict]:
+    rows = [
         {
             "type": "function",
             "function": {
@@ -87,6 +121,9 @@ def _tools() -> list[dict]:
             },
         },
     ]
+    if allow_payment:
+        return rows
+    return [row for row in rows if (row.get("function") or {}).get("name") != "payment_link"]
 
 
 def _norm(text: str) -> str:
@@ -169,6 +206,20 @@ def tool_order_status(order_id: str) -> dict:
     }
 
 
+def _dry_mock_payment() -> bool:
+    """Fake link only on the dry edge, and only while the shop gateway is still mock.
+
+    Real shops without a merchant keep the handoff. payment_service stays unchanged.
+    """
+    from app.services.arvan_dns_service import edge_dry
+    from app.services.settings_service import get_settings
+
+    if not edge_dry():
+        return False
+    gateway = str(get_settings().get("paymentGateway") or "mock").strip().lower()
+    return gateway in {"", "mock"}
+
+
 async def tool_payment_link(product: str, qty: int, *, thread: dict | None) -> dict:
     from app.services.channel_service import PLATFORMS
     from app.services.pay_service import create_order
@@ -181,6 +232,15 @@ async def tool_payment_link(product: str, qty: int, *, thread: dict | None) -> d
     if price <= 0:
         return {"ok": False, "error": "قیمت تومان برای این کالا نیست"}
     count = min(5, max(1, int(qty or 1)))
+    if _dry_mock_payment():
+        slug = re.sub(r"[^a-z0-9]+", "-", str(item.get("id") or "item").lower()).strip("-") or "item"
+        return {
+            "ok": True,
+            "dry": True,
+            "title": str(item.get("title") or ""),
+            "amount": price * count,
+            "payUrl": f"https://{DRY_PAY_HOST}/p/{slug}-{count}",
+        }
     platform = str((thread or {}).get("platform") or "")
     channel = PLATFORMS.get(platform, platform) or "دایرکت"
     order = await create_order(
@@ -287,7 +347,12 @@ def _amounts(text: str) -> set[str]:
 
 
 def _tool_blob(messages: list[dict]) -> str:
-    return "\n".join(str(msg.get("content") or "") for msg in messages if msg.get("role") == "tool")
+    parts = []
+    for msg in messages:
+        content = str(msg.get("content") or "")
+        if msg.get("role") == "tool" or content.startswith("موجودی این کالاها"):
+            parts.append(content)
+    return "\n".join(parts)
 
 
 def _numbers_ok(reply: str, tool_blob: str) -> bool:
@@ -443,10 +508,10 @@ async def _claims(text: str, facts: str) -> str:
     return text
 
 
-async def _complete(messages: list[dict]) -> tuple[str, list[dict]]:
+async def _complete(messages: list[dict], *, allow_payment: bool) -> tuple[str, list[dict]]:
     result = await complete_tools(
         messages=_mask_for_model(messages),
-        tools=_tools(),
+        tools=_tools(allow_payment=allow_payment),
         temperature=0.3,
         max_tokens=500,
         timeout=INBOX_TIMEOUT,
@@ -576,6 +641,21 @@ def _system(thread: dict | None) -> str:
     ).strip()
 
 
+def _seed_stock(messages: list[dict], products: list[dict]) -> None:
+    lines = []
+    for item in products:
+        title = str(item.get("title") or "")
+        lines.append(json.dumps(tool_stock(title), ensure_ascii=False))
+    messages.append(
+        {
+            "role": "system",
+            "content": "موجودی این کالاها از کاتالوگ آمده است.\n"
+            + "\n".join(lines)
+            + "\nجواب را از همین عددها بنویس و ابزار پرداخت را صدا نزن.",
+        }
+    )
+
+
 async def answer(customer_text: str, thread: dict | None = None) -> str | None:
     sentence = str(customer_text or "").strip()
     if not sentence:
@@ -589,15 +669,23 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
     number_retried = False
     force_retry = False
     rounds = 0
+    allow_payment = _explicit_buy(sentence)
+    mentioned = _mentioned_products(sentence)
+    if mentioned and not allow_payment:
+        _seed_stock(messages, mentioned[:3])
     try:
         while rounds < MAX_ROUNDS or force_retry:
             force_retry = False
             rounds += 1
             if rounds > MAX_ROUNDS + 1:
                 break
-            text, calls = await _complete(messages)
+            text, calls = await _complete(messages, allow_payment=allow_payment)
             if not calls:
-                if not nudged and not used:
+                blob_now = _tool_blob(messages)
+                grounded = bool(_amounts(text) & _amounts(blob_now)) or (
+                    "موجود" in text and '"stock"' in blob_now
+                )
+                if not nudged and not used and not grounded:
                     hinted = await intent_hint(sentence)
                     if hinted:
                         nudged = hinted
@@ -659,6 +747,16 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
             )
             for call in calls:
                 used.append(call["name"])
+                if call["name"] == "payment_link" and not allow_payment:
+                    result = {"ok": False, "error": "مشتری خرید را نخواسته"}
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": call["id"],
+                            "content": json.dumps(result, ensure_ascii=False),
+                        }
+                    )
+                    continue
                 try:
                     result = await run_tool(call["name"], call["arguments"], thread=thread)
                 except Exception as exc:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -30,6 +31,7 @@ ARVAN_HOST_SUFFIX = "arvancloudai.ir"
 CLOUD_PRIMARY_TIMEOUT = 120
 PRIMARY_CLOUD_TIMEOUT = 10
 FALLBACK_CLOUD_TIMEOUT = 45
+INBOX_HOP_TIMEOUT = 4.0
 DEFAULT_SHOP_CLOUD_MODEL = "DeepSeek-V4-Pro"
 DEFAULT_STUDIO_CLOUD_MODEL = "Gemini-3.1-Flash-Lite-Preview"
 GPU1_LOCAL = frozenset(
@@ -830,6 +832,56 @@ async def _tools_once(
     return _tool_result(route, payload if isinstance(payload, dict) else {}, counts)
 
 
+async def _inbox_tools(
+    *,
+    messages: list[dict],
+    tools: list[dict],
+    temperature: float,
+    max_tokens: int,
+    surface: str,
+) -> dict:
+    local = _local_default_route(surface)
+    hops = [local]
+    cloud = route_for_surface(surface)
+    if cloud.get("kind") == "cloud" and cloud.get("url") != local.get("url"):
+        hops.append(cloud)
+    fallback = _fallback_cloud_route()
+    if fallback and all(str(fallback.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+        hops.append(fallback)
+    last_exc: Exception | None = None
+    for index, hop in enumerate(hops):
+        try:
+            return await asyncio.wait_for(
+                _tools_once(
+                    hop,
+                    messages=messages,
+                    tools=tools,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=INBOX_HOP_TIMEOUT,
+                    surface=surface,
+                ),
+                timeout=INBOX_HOP_TIMEOUT,
+            )
+        except Exception as exc:
+            last_exc = exc
+            # The shop cloud model does not finish inside this budget. Waiting
+            # for it after the local hop already used its four seconds only
+            # stacks another timeout.
+            if isinstance(exc, TimeoutError):
+                raise
+            if index == len(hops) - 1:
+                raise
+            nxt = hops[index + 1]
+            _emit_cloud_fallback(
+                surface=surface,
+                reason=_classify_llm_error(exc),
+                requested=str(hop.get("model") or ""),
+                used=str(nxt.get("model") or ""),
+            )
+    raise last_exc or RuntimeError("llm")
+
+
 async def complete_tools(
     *,
     messages: list[dict],
@@ -839,8 +891,22 @@ async def complete_tools(
     timeout: float | None = None,
     surface: str = "router",
 ) -> dict:
-    """Tool-call round. Router stays cloud-first. Inbox uses the same chain, then the always-on 9b."""
+    """Tool-call round. Router stays cloud-first. Inbox leads with the always-on 9b.
+
+    The shop cloud model did not return an inbox tool call or a final sentence
+    inside four seconds. Inbox therefore starts on the local 9b, and only if
+    that hop fails quickly tries the configured cloud, then a second cloud, each
+    capped at four seconds. A local timeout is not followed by the slower cloud.
+    """
     route = route_for_surface(surface)
+    if surface == "inbox":
+        return await _inbox_tools(
+            messages=messages,
+            tools=tools,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            surface=surface,
+        )
     if route.get("kind") != "cloud":
         if surface == "router":
             raise RuntimeError("router_requires_cloud")

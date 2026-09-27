@@ -67,8 +67,11 @@ class InboxAgentTests(unittest.TestCase):
         self.claims_complete = AsyncMock(return_value={"claims": []})
         self.claims_patch = patch("app.services.llm.complete_json", self.claims_complete)
         self.claims_patch.start()
+        self.edge_patch = patch("app.services.arvan_dns_service.edge_dry", return_value=False)
+        self.edge_patch.start()
 
     def tearDown(self) -> None:
+        self.edge_patch.stop()
         self.claims_patch.stop()
         self.dir.cleanup()
         inbox_agent_service.clear_intent_cache()
@@ -410,6 +413,47 @@ class InboxAgentTests(unittest.TestCase):
             reply = asyncio.run(inbox_agent_service.answer("هست؟"))
         self.assertEqual(reply, inbox_agent_service.CLAIMS_LINE)
         self.claims_complete.assert_not_called()
+
+    def test_dry_edge_mock_gateway_returns_a_fake_pay_link(self) -> None:
+        payloads = [
+            _chat(calls=[_call("payment_link", {"product": "کفش چرم", "qty": 1})]),
+            _chat(content="لینک پرداخت اینجاست."),
+        ]
+
+        async def no_hint(_text: str) -> str:
+            return ""
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
+            "app.services.inbox_agent_service.intent_hint", no_hint
+        ), patch("app.services.arvan_dns_service.edge_dry", return_value=True), patch(
+            "app.services.pay_service.create_order", new=AsyncMock()
+        ) as create:
+            storefront_service.add_product(title="کفش چرم", price=4000000, stock=2, sku="c")
+            reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت کفش را بفرست"))
+        self.assertIn("dry-mock.invalid", reply or "")
+        self.assertNotIn("zarinpal", reply or "")
+        create.assert_not_called()
+
+    def test_multi_product_message_does_not_open_payment(self) -> None:
+        payloads = [
+            _chat(calls=[_call("payment_link", {"product": "کفش", "qty": 1})]),
+            _chat(content="هر دو کالا موجود است."),
+        ]
+        pay = AsyncMock()
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
+            "app.services.inbox_agent_service.tool_payment_link", pay
+        ):
+            storefront_service.add_product(title="کفش چرم مشکی", price=4000000, stock=2, sku="c")
+            storefront_service.add_product(title="کمربند چرم", price=900000, stock=5, sku="b")
+            reply = asyncio.run(inbox_agent_service.answer("هم کفش می‌خواهم هم کمربند"))
+        self.assertIn("موجود", reply or "")
+        self.assertNotEqual(reply, inbox_agent_service.HANDOFF_LINE)
+        pay.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -745,5 +745,69 @@ class Gpu1GuardTests(unittest.TestCase):
         self.assertEqual(asyncio.run(_ensure_gpu1("qwen3.5-9b")), "qwen3.5-9b")
 
 
+class InboxHopTests(unittest.TestCase):
+    def _client(self, seen: list, *, fail_local: bool = False):
+        class Client:
+            def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+                self.timeout = timeout
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                seen.append({"url": url, "timeout": self.timeout, "model": (json or {}).get("model")})
+                if fail_local and "127.0.0.1:9292" in url:
+                    raise httpx.TimeoutException("late")
+                request = httpx.Request("POST", url)
+                return httpx.Response(
+                    200,
+                    json={"choices": [{"message": {"content": "سلام"}}]},
+                    request=request,
+                )
+
+        return Client
+
+    def _run(self, seen: list, *, fail_local: bool = False) -> dict:
+        with patch("app.services.llm.settings") as settings, patch(
+            "app.services.llm_routing_service.get", return_value=None
+        ), patch("app.services.llm.httpx.AsyncClient", self._client(seen, fail_local=fail_local)), patch(
+            "app.services.llm.emit_later"
+        ):
+            _apply_settings(
+                settings,
+                _route_settings(
+                    cloud_llm_url="https://ai.example/v1",
+                    cloud_llm_model="GPT-OSS-120B",
+                    cloud_llm_token="cloud-token",
+                ),
+            )
+            return asyncio.run(
+                complete_tools(messages=[{"role": "user", "content": "سلام"}], tools=[], surface="inbox")
+            )
+
+    def test_inbox_starts_on_the_local_model_within_four_seconds(self) -> None:
+        seen: list = []
+        out = self._run(seen)
+        self.assertEqual(out["text"], "سلام")
+        self.assertEqual(len(seen), 1)
+        self.assertIn("127.0.0.1:9292", seen[0]["url"])
+        self.assertEqual(seen[0]["model"], "qwen3.5-9b")
+        self.assertEqual(seen[0]["timeout"], 4)
+        self.assertNotIn("cloud-token", str(seen))
+
+    def test_inbox_uses_the_cloud_hop_only_after_local_fails(self) -> None:
+        seen: list = []
+        out = self._run(seen, fail_local=True)
+        self.assertEqual(out["text"], "سلام")
+        self.assertEqual(len(seen), 2)
+        self.assertIn("127.0.0.1:9292", seen[0]["url"])
+        self.assertIn("ai.example", seen[1]["url"])
+        self.assertEqual(seen[1]["model"], "GPT-OSS-120B")
+        self.assertEqual(seen[1]["timeout"], 4)
+
+
 if __name__ == "__main__":
     unittest.main()
