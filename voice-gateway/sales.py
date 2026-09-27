@@ -295,6 +295,51 @@ def _plan_sentence(plan: dict) -> str:
     return " ".join(bits)
 
 
+def price_spoken_line(heard: str) -> str | None:
+    """One short sentence from the catalog. None when the catalog is down."""
+    catalog = plan_catalog()
+    if not catalog:
+        return None
+    plans = {
+        str(plan.get("id") or ""): plan
+        for plan in (catalog.get("plans") or [])
+        if isinstance(plan, dict)
+    }
+
+    def pay(plan: dict) -> int:
+        try:
+            price = int(plan.get("price") or 0)
+            listed = int(plan.get("listPrice") or 0)
+        except (TypeError, ValueError):
+            return 0
+        return price or listed
+
+    def fits(text: str) -> bool:
+        return len(text.split()) <= 18
+
+    blob = heard or ""
+    if "مکس" in blob:
+        amount = pay(plans.get("promax") or {})
+        words = toman_words(amount)
+        if not words:
+            return None
+        line = f"پرو مکس با تخفیف سایت {words} تومانه. ساخت وبسایت رایگانه."
+        if not fits(line):
+            line = f"پرو مکس {words} تومانه."
+        return line
+    amount = pay(plans.get("pro") or {})
+    words = toman_words(amount)
+    if not words:
+        return None
+    line = f"پرو {words} تومانه. ساخت وبسایت رایگانه."
+    promax = pay(plans.get("promax") or {})
+    if promax:
+        both = f"پرو {words} تومانه. پرو مکس {toman_words(promax)} تومانه."
+        if fits(both):
+            line = both
+    return line if fits(line) else f"پرو {words} تومانه."
+
+
 def price_clause() -> str:
     catalog = plan_catalog()
     if not catalog:
@@ -608,6 +653,12 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             return TurnPlan(kind="hold", signals=signals)
         state.greeted = True
         state.stage = "discover"
+        if signals.price:
+            priced = price_spoken_line(heard)
+            if priced:
+                state.stage = "cta"
+                return TurnPlan(kind="address", line=priced, signals=signals)
+            return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
         return TurnPlan(kind="hello", line=HELLO_LINE, signals=signals)
     if signals.bye:
         line = BYE_LINE if (state.refused_cta or not state.linked) else CLOSE_LINE
@@ -616,6 +667,12 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     if signals.wrong:
         return TurnPlan(kind="close", line=BYE_LINE, hangup=True, signals=signals)
+    if signals.price:
+        priced = price_spoken_line(heard)
+        state.stage = "cta"
+        if priced:
+            return TurnPlan(kind="address", line=priced, signals=signals)
+        return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
     fixed = objection_line(signals, heard)
     if fixed:
         state.stage = "confirm"

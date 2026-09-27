@@ -679,6 +679,28 @@ class SalesTest(unittest.TestCase):
         self.assertIn("نهصد و هشتاد و نه هزار و هشتصد", line)
         self.assertIn("تخفیف سایت", line)
 
+    def test_price_question_speaks_the_catalog_amount(self) -> None:
+        state = SalesState()
+        hello = plan_turn(state, "سلام")
+        self.assertEqual(hello.kind, "hello")
+        note_spoken(state, HELLO_LINE)
+        asked = plan_turn(state, "هزینه‌ش چقدره گرون نباشه")
+        self.assertEqual(asked.kind, "address")
+        self.assertIn("یک میلیون و چهارصد و چهارده هزار", asked.line or "")
+        self.assertIn("رایگان", asked.line or "")
+        self.assertLessEqual(len((asked.line or "").split()), 18)
+        promax = plan_turn(SalesState(greeted=True, stage="discover"), "پرو مکس چقدر است")
+        self.assertIn("یک میلیون و نهصد و سی و یک هزار", promax.line or "")
+        self.assertLessEqual(len((promax.line or "").split()), 18)
+
+        def down():
+            raise OSError("down")
+
+        set_plans_fetcher(down)
+        missed = plan_turn(SalesState(greeted=True, stage="discover"), "قیمت پرو چقدره")
+        self.assertNotIn("تومان", missed.line or "")
+        self.assertIn("کُر", missed.line or "")
+
     def test_sim_command_never_looks_like_a_dial(self) -> None:
         self.assertEqual(parse_sim_command("SIM"), ("", ""))
         self.assertEqual(parse_sim_command("SIM bag_shop کیف"), ("bag_shop", "کیف"))
