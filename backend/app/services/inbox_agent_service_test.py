@@ -231,6 +231,7 @@ class InboxAgentTests(unittest.TestCase):
                 inbox_agent_service.answer("قیمت چقدر است؟", thread=created["thread"])
             )
             shown = inbox_service.get_thread(created["thread"]["id"])
+            waiting = inbox_service.list_threads(status_filter="pending")
         self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
         self.assertNotIn("5555555", reply or "")
         reminder = seen[1]["body"]["messages"][-1]["content"]
@@ -238,6 +239,8 @@ class InboxAgentTests(unittest.TestCase):
         self.assertNotIn("5555555", reminder)
         self.assertTrue(shown["thread"]["paused"])
         self.assertEqual(shown["thread"]["handoffReason"], "عدد نامجاز")
+        self.assertGreaterEqual(shown["thread"]["unread"], 1)
+        self.assertTrue(any(row.get("handoffReason") == "عدد نامجاز" for row in waiting["threads"]))
 
     def test_rebuilt_amount_can_use_the_tool_number(self) -> None:
         payloads = [
@@ -281,6 +284,25 @@ class InboxAgentTests(unittest.TestCase):
         self.assertIn("https://battery.example", reply or "")
         self.assertIn("https://api.sozan-core.ir/p/abc", reply or "")
         self.assertNotIn("joahr-froshi", reply or "")
+
+    def test_fake_url_is_removed_when_the_shop_has_no_address(self) -> None:
+        from app.state_store import write_json
+
+        payloads = [_chat(content="سایت https://example.com/fake را باز کن.")]
+
+        async def no_hint(_text: str) -> str:
+            return ""
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
+            "app.services.inbox_agent_service.intent_hint", no_hint
+        ):
+            write_json("shop.json", {"url": "", "slug": "", "port": 0, "domain": ""})
+            reply = asyncio.run(inbox_agent_service.answer("لینک سایت"))
+        self.assertIn("باز کن", reply or "")
+        self.assertNotIn("example.com", reply or "")
+        self.assertNotIn("http", reply or "")
 
     def test_real_claims_guard_keeps_a_clean_reply_and_replaces_a_fake_one(self) -> None:
         seen: list = []

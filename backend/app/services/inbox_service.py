@@ -196,9 +196,10 @@ def list_threads(*, q: str = "", platform: str = "", status_filter: str = "") ->
         summary = _summary(row)
         if wanted and summary["platform"] != wanted:
             continue
-        if filt == "unread" and not summary["unread"]:
+        waiting = bool(summary.get("handoffReason"))
+        if filt == "unread" and not summary["unread"] and not waiting:
             continue
-        if filt == "pending" and not summary["pending"]:
+        if filt == "pending" and not summary["pending"] and not waiting:
             continue
         if needle:
             blob = f"{summary['sender']} {summary['lastText']} {summary['platformLabel']}"
@@ -354,6 +355,7 @@ def mark_handoff(thread_id: str, reason: str) -> None:
             return
         thread["paused"] = True
         thread["handoff"] = {"reason": reason, "at": int(time.time())}
+        thread["lastReadAt"] = 0
         thread["updatedAt"] = int(time.time())
         _save(data)
 

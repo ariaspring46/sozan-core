@@ -343,9 +343,23 @@ def _shop_url() -> str:
     return live_url(_shop()).strip().rstrip("/")
 
 
+def _public_shop_url() -> str:
+    """A real storefront address. Localhost and an empty shop are not one."""
+    url = _shop_url()
+    if not url.startswith(("http://", "https://")):
+        return ""
+    host = url.split("://", 1)[-1].split("/", 1)[0].split("@")[-1].split(":")[0].lower()
+    if host in {"localhost", "127.0.0.1", "0.0.0.0"}:
+        return ""
+    return url
+
+
 def _fix_links(reply: str, pay_urls: list[str]) -> str:
-    """Keep this shop's address and this turn's payment links. Replace anything else."""
-    shop = _shop_url()
+    """Keep this shop's address and this turn's payment links. Anything else goes.
+
+    When the shop has no public address yet, a made-up URL is removed.
+    """
+    shop = _public_shop_url()
     allowed = {shop} if shop else set()
     for url in pay_urls:
         cleaned = url.strip().rstrip("/")
@@ -359,7 +373,9 @@ def _fix_links(reply: str, pay_urls: list[str]) -> str:
             return raw
         return shop
 
-    return _URL.sub(repl, reply).strip()
+    text = _URL.sub(repl, reply)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
 
 
 def _hand_off(thread: dict | None, reason: str) -> str:

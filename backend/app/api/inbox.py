@@ -30,6 +30,10 @@ class ThreadPatchIn(BaseModel):
     paused: bool | None = None
 
 
+class DryReplyIn(BaseModel):
+    text: str = Field(min_length=1, max_length=800)
+
+
 @router.get("")
 async def list_inbox(
     q: str = Query(default="", max_length=200),
@@ -59,6 +63,18 @@ async def inbox_settings(body: SettingsIn, _user=Depends(require_permission("cam
         return inbox_service.save_auto_reply(body.autoReply)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.post("/dry-reply")
+async def inbox_dry_reply(body: DryReplyIn, _user=Depends(require_permission("campaigns:write"))):
+    """Score the sales agent on the parallel dry API. Never delivers a message."""
+    from app.services.arvan_dns_service import edge_dry
+    from app.services.inbox_agent_service import answer
+
+    if not edge_dry():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+    reply = await answer(body.text, thread={"sender": "آزمون"})
+    return {"text": reply or ""}
 
 
 @router.get("/{thread_id}")
