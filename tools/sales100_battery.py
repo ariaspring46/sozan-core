@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -93,6 +94,14 @@ def _post_dry(base: str, token: str, text: str) -> str:
     return str(payload.get("text") or "")
 
 
+def _p95(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = max(0, min(len(ordered) - 1, int(round(0.95 * (len(ordered) - 1)))))
+    return ordered[index]
+
+
 def score_live(cases: list[dict], *, base: str, token: str, out_dir: Path, runs: int = 2) -> int:
     if not _health_is_dry(base):
         print("parallel API must be edge-dry")
@@ -101,24 +110,50 @@ def score_live(cases: list[dict], *, base: str, token: str, out_dir: Path, runs:
     raw_path = out_dir / "sales100-raw.jsonl"
     raw_path.write_text("", encoding="utf-8")
     by_id: dict[str, list[bool]] = {}
+    notes: dict[str, str] = {}
+    elapsed_ms: list[float] = []
     for run_index in range(1, runs + 1):
         for case in cases:
+            started = time.perf_counter()
             try:
                 reply = _post_dry(base, token, str(case.get("user") or ""))
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
                 reply = ""
+            elapsed_ms.append((time.perf_counter() - started) * 1000)
             ok, note = judge_reply(case, reply)
             by_id.setdefault(str(case["id"]), []).append(ok)
+            if not ok:
+                notes[str(case["id"])] = note
             with raw_path.open("a", encoding="utf-8") as handle:
                 handle.write(
                     json.dumps(
-                        {"id": case["id"], "run": run_index, "pass": ok, "note": note},
+                        {
+                            "id": case["id"],
+                            "category": case.get("category") or "",
+                            "run": run_index,
+                            "pass": ok,
+                            "note": note,
+                            "ms": round(elapsed_ms[-1]),
+                        },
                         ensure_ascii=False,
                     )
                     + "\n"
                 )
     passed = sum(1 for case in cases if by_id.get(str(case["id"])) == [True] * runs)
-    print(f"sales100 live {passed}/{len(cases)}")
+    failed = [case_id for case_id, row in by_id.items() if row != [True] * runs]
+    summary = {
+        "passed": passed,
+        "n": len(cases),
+        "runs": runs,
+        "p95ms": round(_p95(elapsed_ms)),
+        "failed": failed,
+        "notes": {case_id: notes.get(case_id, "") for case_id in failed},
+    }
+    (out_dir / "sales100-result.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps(summary, ensure_ascii=False))
     return 0 if passed == len(cases) else 1
 
 
