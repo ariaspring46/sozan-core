@@ -207,6 +207,11 @@ def commission_toman(amount: int, bps: int | None = None) -> int:
 def resolve_sale_gateway(row: dict | None = None) -> dict:
     current = row if isinstance(row, dict) else {}
     gateway = str(current.get("paymentGateway") or "mock").strip().lower()
+    if gateway == "mock":
+        from app.services.arvan_dns_service import edge_dry
+
+        if edge_dry():
+            return {"id": "mock", "owner": "dry", "dry": True, "commissionBps": 0, "sandbox": False}
     own_merchant = str(current.get("paymentMerchantId") or "").strip()
     hub = str(env.zarinpal_merchant_id or "").strip()
     if gateway == "zarinpal" and own_merchant and own_merchant != hub and (not _MERCHANT.pattern or bool(_MERCHANT.match(own_merchant))):
