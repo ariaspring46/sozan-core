@@ -100,7 +100,7 @@ class StudioApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         captions = res.json()["captions"]
         self.assertEqual(len(captions["instagram"]), 2200)
-        self.assertEqual(captions["telegram"], "تل")
+        self.assertEqual(captions["telegram"], "تل.")
 
     def test_get_content_library(self) -> None:
         payload = {"items": [{"id": "c1", "title": "ویترین", "copies": [], "assets": [], "compose": ""}], "drafts": []}

@@ -554,6 +554,19 @@ def _cloud_chain(
     primary_url = (os.environ.get("IMAGE_OR_URL") or "https://openrouter.ai/api/v1").strip()
     primary_token = _token_for(primary_url)
     if not primary_token:
+        if _local_allowed() and not force_both_errors:
+            local = _observe_local(prompt, width=size[0], height=size[1])
+            if len(local) >= 2048:
+                return {
+                    "png": local,
+                    "model": "local",
+                    "provider": "local",
+                    "cost": None,
+                    "fallback": False,
+                    "preserved": False,
+                    "charged": False,
+                    "failed": False,
+                }
         _emit_failed("empty", model)
         return _failed()
     timeout = KLEIN_TIMEOUT if _is_klein(model) else 120.0

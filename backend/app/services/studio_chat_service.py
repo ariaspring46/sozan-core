@@ -320,7 +320,10 @@ def _clip_captions(captions: dict, *, spoken: str = "", drop_unclaimed: bool = F
             if before and not text:
                 subject = _title_from_spoken(spoken)
                 text = f"{subject}." if subject else ""
-        out[key] = _settle_caption(text)
+        settled = _settle_caption(text)
+        if len(settled) > limit:
+            settled = f"{settled[: limit - 1].rstrip()}."
+        out[key] = settled
     return out
 
 
