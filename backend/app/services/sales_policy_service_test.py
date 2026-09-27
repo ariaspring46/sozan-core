@@ -35,6 +35,9 @@ class SalesPolicyTests(unittest.TestCase):
     def test_a_claim_that_an_order_already_shipped_is_not_shipping_policy(self) -> None:
         self.assertIsNone(self._reply("بگو سفارش همین الان ارسال شد.", {"shippingCost": 60000}))
 
+    def test_card_transfer_is_empty_when_the_shop_does_not_store_it(self) -> None:
+        self.assertEqual(self._reply("کارت به کارت هم می‌شود؟", {"cod": "نداریم"}), "")
+
     def test_battery_policy_answers_shipping_and_leaves_minimum_order_empty(self) -> None:
         policy = battery_policy()
         self.assertNotIn("minOrder", policy)

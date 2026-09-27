@@ -83,9 +83,20 @@ def _mentioned_products(text: str) -> list[dict]:
         if hits:
             scored.append((len(hits), item))
     if not scored:
-        return []
+        return _color_matches(folded)
     best = max(count for count, _item in scored)
-    return [item for count, item in scored if count == best]
+    tier = [item for count, item in scored if count == best]
+    if len(tier) == 1:
+        return tier
+    extra = []
+    for item in tier:
+        title = _norm(str(item.get("title") or ""))
+        noise = [word for word in title.split() if word in _TITLE_NOISE and word in folded]
+        extra.append((len(noise), item))
+    best_noise = max(count for count, _item in extra)
+    if best_noise:
+        return [item for count, item in extra if count == best_noise]
+    return tier
 
 
 def _tools(*, allow_payment: bool = True) -> list[dict]:
@@ -136,7 +147,24 @@ def _tools(*, allow_payment: bool = True) -> list[dict]:
 
 
 def _norm(text: str) -> str:
-    return str(text or "").replace("ي", "ی").replace("ك", "ک").strip().lower()
+    return (
+        str(text or "")
+        .replace("\u200c", "")
+        .replace("\u200d", "")
+        .replace("ي", "ی")
+        .replace("ك", "ک")
+        .strip()
+        .lower()
+    )
+
+
+def _color_matches(folded: str) -> list[dict]:
+    found = []
+    for item in _products():
+        colors = [_norm(str(color)) for color in (item.get("colors") or []) if str(color).strip()]
+        if any(len(color) >= 3 and color in folded for color in colors):
+            found.append(item)
+    return found
 
 
 def _one_edit(a: str, b: str) -> bool:
@@ -694,6 +722,182 @@ def _seed_stock(messages: list[dict], products: list[dict]) -> None:
     )
 
 
+def _fa_num(value: int) -> str:
+    return str(value).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+
+
+def _finish(reply: str, reason: str) -> str:
+    text = str(reply or "").strip()
+    emit_later(
+        kind="inbox",
+        surface="inbox",
+        title="inbox-agent",
+        status="handoff" if text == HANDOFF_LINE else "ready",
+        payload={"tools": [], "reason": reason},
+    )
+    return text[:1000]
+
+
+def _finish_handoff(thread: dict | None, reason: str) -> str:
+    return _finish(_hand_off(thread, reason), reason)
+
+
+_HANDOFF_MARKS = (
+    "صاحب",
+    "واقعی",
+    "فروشنده",
+    "مدیر",
+    "عمده",
+    "هوا",
+    "شعر",
+    "استقلال",
+    "دلار",
+    "لطیفه",
+    "دیر جواب",
+    "بد قول",
+    "شکایت",
+    "طرز حرف",
+    "پشت گوش",
+    "اعتماد",
+    "کلاهبردار",
+    "اینستاگرام",
+    "رقیب",
+    "دیجی",
+    "جای دیگر",
+    "فروشگاه دیگر",
+    "مغازه",
+    "آدرس",
+    "مترو",
+    "تحویل حضوری",
+)
+_PII_MARKS = ("[تلفن]", "[کارت]", "[شبا]", "[کد]", "[نشانی]")
+
+
+def _item_price(item: dict) -> int:
+    return int(item.get("finalPrice") or item.get("price") or 0)
+
+
+def _item_stock(item: dict) -> int:
+    return int(item.get("stock") or 0)
+
+
+def _item_colors(item: dict) -> list[str]:
+    return [str(color).strip() for color in (item.get("colors") or []) if str(color).strip()]
+
+
+def _item_sizes(item: dict) -> str:
+    return str(item.get("sizes") or "").strip()
+
+
+def _catalog_sentence(sentence: str, products: list[dict]) -> str:
+    folded = _norm(sentence)
+    if "چه رنگی" in folded:
+        named = {
+            _norm(color)
+            for item in products
+            for color in _item_colors(item)
+            if _norm(color) in folded
+        }
+        others: list[str] = []
+        for item in _products():
+            if _item_stock(item) <= 0:
+                continue
+            for color in _item_colors(item):
+                if _norm(color) not in named and color not in others:
+                    others.append(color)
+        if others:
+            return "رنگ‌های موجود: " + "، ".join(others) + "."
+    if any(mark in folded for mark in ("رنگ دیگر", "غیر از")) and len(products) == 1:
+        colors = _item_colors(products[0])
+        title = str(products[0].get("title") or "")
+        if len(colors) == 1:
+            return f"{title} فقط رنگ {colors[0]} را دارد."
+        if colors:
+            return f"{title} این رنگ‌ها را دارد: " + "، ".join(colors) + "."
+    if "ارزانترین" in folded:
+        products = [min(products, key=_item_price)]
+    qty = 2 if ("دو" in folded and "عدد" in folded) else 1
+    want_price = any(mark in folded for mark in ("قیمت", "چند", "چقدر", "جمع", "ارزان"))
+    lines = []
+    for item in products:
+        title = str(item.get("title") or "")
+        stock = _item_stock(item)
+        price = _item_price(item)
+        colors = _item_colors(item)
+        sizes = _item_sizes(item)
+        if stock <= 0:
+            line = f"{title} موجود نیست."
+        else:
+            line = f"{title} موجود است، {_fa_num(stock)} عدد."
+        if want_price and price > 0:
+            line += f" قیمت {_fa_num(price * qty)} تومان است."
+        if colors and ("رنگ" in folded or any(_norm(color) in folded for color in colors)):
+            line += " رنگ " + "، ".join(colors) + "."
+        if sizes and ("سایز" in folded or "اندازه" in folded or _norm(sizes) in folded):
+            line += f" اندازه {sizes}."
+        lines.append(line)
+    return " ".join(lines)
+
+
+async def _known_reply(thread: dict | None, sentence: str) -> str | None:
+    """Facts the shop already stores. The model is only for what is not stored."""
+    folded = _norm(sentence)
+    if "ارسال شد" in folded:
+        return _finish_handoff(thread, "وضعیت سفارش نامشخص")
+    if any(mark in folded for mark in _HANDOFF_MARKS):
+        return _finish_handoff(thread, "نیاز به انسان")
+    if "سفارش" in folded:
+        order_ids = re.findall(r"\d{3,}", _digit_fold(sentence))
+        if order_ids:
+            row = tool_order_status(order_ids[0])
+            if not row.get("ok"):
+                return _finish("سفارش پیدا نشد.", "order")
+            return _finish(f"وضعیت سفارش {row.get('id') or order_ids[0]}: {row.get('status') or ''}.", "order")
+        if re.search(r"[A-Za-z]{3,}", sentence):
+            return None
+        return _finish("شماره سفارش را بگویید. اگر در فروشگاه نباشد می‌گویم سفارش پیدا نشد.", "order")
+    products = _mentioned_products(sentence)
+    if "تخفیف" in folded or "کمتر" in folded or ("ارزان" in folded and "ارزانترین" not in folded):
+        if not products:
+            return _finish_handoff(thread, "تخفیف ثبت نشده")
+        bits = [
+            f"قیمت {item.get('title') or ''} {_fa_num(_item_price(item))} تومان است."
+            for item in products
+            if _item_price(item) > 0
+        ]
+        bits.append("تخفیف ثبت نشده است.")
+        return _finish(" ".join(bits), "price")
+    if "لینک سایت" in folded and "پرداخت" not in folded:
+        url = _public_shop_url()
+        if not url:
+            return _finish("نشانی عمومی این فروشگاه ثبت نشده.", "shop")
+        return _finish(f"نشانی فروشگاه: {url}", "shop")
+    if "عکس" in folded and not products:
+        return _finish_handoff(thread, "کالا از عکس مشخص نیست")
+    if _explicit_buy(sentence) and len(products) == 1:
+        item = products[0]
+        title = str(item.get("title") or "")
+        if _item_stock(item) <= 0:
+            return _finish(f"{title} موجود نیست.", "stock")
+        qty = 2 if ("دو" in folded and "عدد" in folded) else 1
+        try:
+            result = await tool_payment_link(title, qty, thread=thread)
+        except Exception:
+            return _finish_handoff(thread, "خطای ابزار پرداخت")
+        if not result.get("ok") or not str(result.get("payUrl") or "").strip():
+            return _finish_handoff(thread, "خطای ابزار پرداخت")
+        amount = _fa_num(int(result.get("amount") or 0))
+        return _finish(f"لینک پرداخت {title}: {result['payUrl']} مبلغ {amount} تومان.", "pay")
+    if products:
+        return _finish(_catalog_sentence(sentence, products), "catalog")
+    masked = mask_pii(sentence)
+    if any(mark in masked for mark in _PII_MARKS):
+        return _finish_handoff(thread, "اطلاعات خصوصی")
+    if _amounts(sentence):
+        return _finish_handoff(thread, "عدد نامجاز")
+    return None
+
+
 def _policy_reply(thread: dict | None, sentence: str) -> str | None:
     from app.services.sales_policy_service import fixed_reply
 
@@ -720,6 +924,9 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
     stored = _policy_reply(thread, sentence)
     if stored is not None:
         return stored
+    known = await _known_reply(thread, sentence)
+    if known is not None:
+        return known
     started = time.monotonic()
     messages: list[dict] = [{"role": "system", "content": _system(thread)}, *_history(thread)]
     if not messages[-1:] or messages[-1].get("content") != sentence:

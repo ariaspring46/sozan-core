@@ -155,6 +155,10 @@ def fixed_reply(text: str) -> str | None:
     if not folded:
         return None
     policy = get_policy()
+    if "کارت به کارت" in folded:
+        if "کارت به کارت" in _norm(policy.get("cod") or ""):
+            return _cod(policy)
+        return ""
     if "پرداخت در محل" in folded or "درب منزل" in folded:
         return _cod(policy)
     if "حداقل خرید" in folded:

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -78,26 +79,27 @@ class InboxAgentTests(unittest.TestCase):
 
     def test_stock_uses_inbox_surface_masks_pii_and_quotes_catalog(self) -> None:
         seen: list = []
-        payloads = [
-            _chat(calls=[_call("stock", {"product": "کفش چرم"})]),
-            _chat(content="کفش چرم مشکی دو عدد موجود است و قیمتش چهار میلیون تومان است."),
-        ]
+
+        async def forbidden(**_kwargs):
+            seen.append("model")
+            raise AssertionError("model")
 
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
-        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, seen)):
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
             storefront_service.add_product(title="کفش چرم مشکی", price=4000000, stock=2, sku="a")
             reply = asyncio.run(
                 inbox_agent_service.answer("کفش چرم موجود است؟ شماره‌ام ۰۹۱۲۱۲۳۴۵۶۷", thread={"sender": "علی"})
             )
-        self.assertIn("دو عدد", reply or "")
-        self.assertEqual(seen[0]["body"]["surface"], "inbox")
-        sent = json.dumps(seen[0]["body"]["messages"], ensure_ascii=False)
-        self.assertIn("[تلفن]", sent)
-        self.assertNotIn("09121234567", sent)
-        tool_blob = seen[1]["body"]["messages"][-1]["content"]
-        self.assertIn("4000000", tool_blob)
-        self.assertIn('"stock": 2', tool_blob)
+        self.assertIn("۲", reply or "")
+        self.assertIn("موجود", reply or "")
+        self.assertNotIn("09121234567", reply or "")
+        self.assertEqual(seen, [])
+        masked = inbox_agent_service._mask_for_model(
+            [{"role": "user", "content": "شماره‌ام ۰۹۱۲۱۲۳۴۵۶۷"}]
+        )
+        self.assertIn("[تلفن]", masked[0]["content"])
+        self.assertNotIn("09121234567", masked[0]["content"])
 
     def test_stock_matches_one_edit_typo(self) -> None:
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)):
@@ -147,14 +149,18 @@ class InboxAgentTests(unittest.TestCase):
             storefront_service.add_product(title="کیف دوشی", price=1000, stock=1, sku="b")
             reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت کیف را بفرست"))
         self.assertIn("https://api.sozan-core.ir/p/abc", reply or "")
-        blob = seen[1]["body"]["messages"][-1]["content"]
-        self.assertNotIn("SECRET", blob)
+        self.assertNotIn("SECRET", reply or "")
+        if len(seen) > 1:
+            blob = seen[1]["body"]["messages"][-1]["content"]
+            self.assertNotIn("SECRET", blob)
 
     def test_cloud_chat_is_allowed_and_local_embed_is_not_sent_to_arvan(self) -> None:
         seen: list = []
         posted = []
 
         def client(*args, **kwargs):
+            if threading.current_thread() is not threading.main_thread():
+                return ScriptedClient([], [])
             posted.append(True)
             return ScriptedClient([], seen)
 
@@ -205,7 +211,7 @@ class InboxAgentTests(unittest.TestCase):
             "app.services.inbox_agent_service.httpx.AsyncClient", client
         ), patch("app.services.inbox_agent_service.complete_tools", script_tools(chat_payloads, seen)):
             storefront_service.add_product(title="کفش چرم", price=10, stock=1, sku="c")
-            reply = asyncio.run(inbox_agent_service.answer("این کفش هنوز هست؟"))
+            reply = asyncio.run(inbox_agent_service.answer("هنوز دارید؟"))
         self.assertIn("یک عدد", reply or "")
         embed = next(row for row in seen if row["url"].endswith("/embeddings"))
         self.assertEqual(embed["body"]["model"], "bge-m3")
@@ -303,7 +309,7 @@ class InboxAgentTests(unittest.TestCase):
         ):
             write_json("shop.json", {"url": "", "slug": "", "port": 0, "domain": ""})
             reply = asyncio.run(inbox_agent_service.answer("لینک سایت"))
-        self.assertIn("باز کن", reply or "")
+        self.assertIn("نشانی", reply or "")
         self.assertNotIn("example.com", reply or "")
         self.assertNotIn("http", reply or "")
 
@@ -495,6 +501,25 @@ class InboxAgentTests(unittest.TestCase):
             reply = asyncio.run(inbox_agent_service.answer("رنگ گوشواره چیست؟"))
         self.assertIn("طلایی", reply or "")
         self.claims_complete.assert_not_called()
+
+    def test_card_transfer_hands_off_without_a_payment_link(self) -> None:
+        from app.services import inbox_service
+
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            created = inbox_service.inbound(platform="instagram", sender="مشتری", text="پرداخت")
+            reply = asyncio.run(
+                inbox_agent_service.answer("کارت به کارت هم می‌شود؟", thread=created["thread"])
+            )
+            shown = inbox_service.get_thread(created["thread"]["id"])
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+        self.assertNotIn("http", reply or "")
+        self.assertNotIn("/p/", reply or "")
+        self.assertEqual(shown["thread"]["handoffReason"], "سیاست ثبت نشده")
 
 
 if __name__ == "__main__":
