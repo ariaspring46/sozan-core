@@ -33,13 +33,35 @@ def _pick(raw: Path, needles: tuple[str, ...]) -> list[Path]:
     return matched or files
 
 
+def _packaged_logo_bytes() -> set[bytes]:
+    from app.config import settings
+
+    blobs: set[bytes] = set()
+    for name in ("logo.png", "logo-mark.png"):
+        path = settings.brand_path / name
+        if path.is_file():
+            blobs.add(path.read_bytes())
+    return blobs
+
+
+def _seller_logo(root: Path) -> Path | None:
+    """Seller upload only. The packaged Sozan mark is not a shop logo."""
+    packaged = _packaged_logo_bytes()
+    for name in ("logo.png", "logo-mark.png"):
+        path = root / name
+        if not path.is_file():
+            continue
+        if path.read_bytes() in packaged:
+            continue
+        return path
+    return None
+
+
 def _shop_brand() -> tuple[Path | None, str]:
     from app.state_store import brand_dir
 
     root = brand_dir()
-    mark = root / "logo-mark.png"
-    logo = root / "logo.png"
-    logo_path = mark if mark.is_file() else logo if logo.is_file() else None
+    logo_path = _seller_logo(root)
     about = ""
     profile = root / "profile.json"
     if profile.is_file():

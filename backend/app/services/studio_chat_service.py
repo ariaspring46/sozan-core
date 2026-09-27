@@ -221,11 +221,11 @@ def _repair_rewrite(captions: dict, subject: str = "") -> dict:
 
 def progress_clause(*, image: bool, video: bool) -> str:
     if image and video:
-        return "در حال ساخت تصویر و ویدیو است."
+        return "عکس و ویدیو در حال ساخته شدن است. معمولاً حدود یک دقیقه."
     if image:
-        return "در حال ساخت تصویر است."
+        return "عکس در حال ساخته شدن است. معمولاً حدود یک دقیقه."
     if video:
-        return "در حال ساخت ویدیو است."
+        return "ویدیو در حال ساخته شدن است. معمولاً حدود یک دقیقه."
     return ""
 
 
@@ -244,6 +244,9 @@ def _strip_progress(text: str) -> str:
         "در حال ساخت تصویر است",
         "در حال ساخت ویدیو است.",
         "در حال ساخت ویدیو است",
+        "عکس و ویدیو در حال ساخته شدن است. معمولاً حدود یک دقیقه.",
+        "عکس در حال ساخته شدن است. معمولاً حدود یک دقیقه.",
+        "ویدیو در حال ساخته شدن است. معمولاً حدود یک دقیقه.",
     ):
         cleaned = cleaned.replace(sentence, " ")
     return re.sub(r"\s{2,}", " ", cleaned).strip()
@@ -629,6 +632,8 @@ def _draft_item(row: dict) -> dict | None:
         "copies": copies,
         "assets": assets,
         "compose": status,
+        "composeStage": str((row.get("compose") or {}).get("stage") or "") if isinstance(row.get("compose"), dict) else "",
+        "startedAt": (row.get("compose") or {}).get("startedAt") or 0 if isinstance(row.get("compose"), dict) else 0,
     }
 
 
@@ -759,17 +764,23 @@ async def _write_hashtags(spoken: str, into_id: str) -> dict:
 
 def content_library(campaigns: list) -> dict:
     expire_stale_compose(600)
-    compose_by: dict[str, str] = {}
+    compose_by: dict[str, dict] = {}
     drafts: list[dict] = []
     rows = [row for row in _messages() if isinstance(row, dict)]
     for row in rows:
         if not isinstance(row, dict) or row.get("role") == "user":
             continue
         cid = str(row.get("campaignId") or "")
-        status = _compose_status(row)
+        compose = row.get("compose") if isinstance(row.get("compose"), dict) else {}
+        status = str(compose.get("status") or "")
         if cid and status:
-            if status == "running" or compose_by.get(cid) != "running":
-                compose_by[cid] = status
+            previous = compose_by.get(cid) or {}
+            if status == "running" or previous.get("status") != "running":
+                compose_by[cid] = {
+                    "status": status,
+                    "stage": str(compose.get("stage") or ""),
+                    "startedAt": compose.get("startedAt") or 0,
+                }
         if not cid:
             draft = _draft_item(row)
             if draft:
@@ -779,7 +790,8 @@ def content_library(campaigns: list) -> dict:
         cid = str(_attr(campaign, "id") or "")
         copies = _copy_rows(_attr(campaign, "copies", []))
         assets = _asset_rows(_attr(campaign, "assets", []))
-        status = compose_by.get(cid, "")
+        meta = compose_by.get(cid) or {}
+        status = str(meta.get("status") or "")
         if not copies and not assets and not status:
             continue
         title = str(_attr(campaign, "title") or "").strip() or "بدون عنوان"
@@ -790,6 +802,8 @@ def content_library(campaigns: list) -> dict:
                 "copies": copies,
                 "assets": assets,
                 "compose": status,
+                "composeStage": str(meta.get("stage") or ""),
+                "startedAt": meta.get("startedAt") or 0,
             }
         )
     seen = {str(item.get("id") or "") for item in items}
@@ -869,7 +883,7 @@ def begin_placeholder() -> str:
         "role": "assistant",
         "text": "در حال ساخت.",
         "at": int(time.time()),
-        "compose": {"status": "running", "startedAt": time.time(), "jobId": ident},
+        "compose": {"status": "running", "stage": "photo", "startedAt": time.time(), "jobId": ident},
     }
     with tenant_file_lock("studio"):
         rows = _messages()
@@ -910,6 +924,17 @@ def _update_message(message_id: str, fn) -> dict | None:
         fn(target)
         _save(rows)
         return {"messages": rows, "row": target}
+
+
+def mark_compose_stage(message_id: str, stage: str) -> None:
+    def apply(row: dict) -> None:
+        compose = row.get("compose") if isinstance(row.get("compose"), dict) else {}
+        if compose.get("status") != "running":
+            return
+        compose["stage"] = stage
+        row["compose"] = compose
+
+    _update_message(message_id, apply)
 
 
 def set_compose(message_id: str, compose: dict) -> None:
@@ -975,7 +1000,8 @@ def touch_compose_start(message_id: str, job_id: str) -> None:
             return
         if compose.get("status") != "running":
             return
-        compose["startedAt"] = time.time()
+        compose.setdefault("stage", "photo")
+        compose.setdefault("startedAt", time.time())
         row["compose"] = compose
 
     _update_message(message_id, apply)

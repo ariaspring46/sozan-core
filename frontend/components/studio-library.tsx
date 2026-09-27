@@ -12,12 +12,18 @@ type LibraryItem = {
   title: string;
   assets: AssetRow[];
   compose?: string;
+  composeStage?: string;
+  startedAt?: number;
 };
 
-function composeLabel(status?: string) {
-  if (status === "running") return "در حال ساخت";
-  if (status === "failed") return "ساخت کامل نشد";
-  return "";
+function composeLabel(item: LibraryItem, now: number) {
+  if (item.compose === "failed") return "ساخت کامل نشد";
+  if (item.compose !== "running") return "";
+  const started = Number(item.startedAt || 0);
+  const elapsed = started > 0 ? Math.max(0, Math.round(now / 1000 - started)) : 0;
+  const clock = elapsed ? ` · ${elapsed.toLocaleString("fa-IR")} ثانیه` : "";
+  if (item.composeStage === "layout") return `چیدن متن${clock}`;
+  return `ساخت عکس، حدود یک دقیقه${clock}`;
 }
 
 function isPicture(asset: AssetRow) {
@@ -40,9 +46,9 @@ function onShelf(item: LibraryItem) {
   return mediaOf(item).length > 0 || item.compose === "running" || item.compose === "failed";
 }
 
-function LibraryCard({ item }: { item: LibraryItem }) {
+function LibraryCard({ item, now }: { item: LibraryItem; now: number }) {
   const media = mediaOf(item);
-  const status = composeLabel(item.compose);
+  const status = composeLabel(item, now);
   return (
     <article className="space-y-3 rounded-2xl border border-line bg-paper p-4">
       <div className="flex items-center justify-between gap-3">
@@ -90,8 +96,14 @@ export function StudioLibrary() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [load]);
 
+  const [now, setNow] = useState(() => Date.now());
   const shown = [...items, ...drafts].filter(onShelf);
   const live = shown.some((item) => item.compose === "running");
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [live]);
 
   useEffect(() => {
     if (!live) return;
@@ -120,7 +132,7 @@ export function StudioLibrary() {
         />
       ) : null}
       {shown.map((item) => (
-        <LibraryCard key={item.id} item={item} />
+        <LibraryCard key={item.id} item={item} now={now} />
       ))}
     </div>
   );

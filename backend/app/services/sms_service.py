@@ -9,13 +9,13 @@ PROVIDERS = (
         "id": "kavenegar",
         "label": "کاوه نگار",
         "docs": "https://kavenegar.com/rest.html",
-        "help": "از پنل کاوه نگار کلید API و نام الگوی Verify Lookup را بردار. الگو باید قبل از ارسال در پنل تأیید شده باشد.",
+        "help": "از پنل کاوه‌نگار کلید و نام الگوی پیامک را بردار. الگو باید قبلاً در همان پنل تأیید شده باشد.",
     },
     {
         "id": "smsir",
-        "label": "SMS.ir",
+        "label": "سامانهٔ پیامک",
         "docs": "https://sms.ir/rest-api/",
-        "help": "از پنل SMS.ir کلید API و شناسه عددی قالب ارسال سریع (verify) را بردار.",
+        "help": "از پنل سامانهٔ پیامک، کلید و شناسهٔ عددی قالب را بردار.",
     },
 )
 
@@ -28,7 +28,7 @@ async def send_otp(*, provider: str, api_key: str, template_id: str, token_name:
     key = api_key.strip()
     template = template_id.strip()
     if not key or not template:
-        raise ValueError("کلید API و شناسه قالب پیامک را در تنظیمات بیشتر بگذار.")
+        raise ValueError("کلید پیامک و شناسهٔ قالب را در تنظیمات بیشتر بگذار.")
     receptor = normalize_phone(phone)
     kind = (provider or "kavenegar").strip().lower()
     if kind == "smsir":
@@ -50,7 +50,7 @@ async def _kavenegar(*, key: str, template: str, receptor: str, code: str) -> No
     payload = _json(response)
     status = ((payload.get("return") or {}) if isinstance(payload.get("return"), dict) else {}).get("status")
     if response.status_code >= 400 or (status not in (None, 200)):
-        raise ValueError("کاوه نگار پیامک را نفرستاد. کلید API و نام قالب را در پنل بررسی کن.")
+        raise ValueError("کاوه‌نگار پیامک را نفرستاد. کلید و نام قالب را در پنل کاوه‌نگار بررسی کن.")
 
 
 def smsir_mobile(phone: str) -> str:
@@ -91,7 +91,7 @@ async def _smsir(*, key: str, template: str, token_name: str, mobile: str, code:
     try:
         template_id = int(template)
     except ValueError as exc:
-        raise ValueError("شناسه قالب SMS.ir باید عدد باشد.") from exc
+        raise ValueError("شناسهٔ قالب پیامک باید عدد باشد.") from exc
     payload_mobile = smsir_mobile(mobile)
     async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
         response = await client.post(
@@ -109,7 +109,7 @@ async def _smsir(*, key: str, template: str, token_name: str, mobile: str, code:
         detail = str(payload.get("message") or "").strip()
         if detail and len(detail) < 80:
             raise ValueError(detail)
-        raise ValueError("SMS.ir پیامک را نفرستاد. کلید API و شناسه قالب را در پنل بررسی کن.")
+        raise ValueError("پیامک فرستاده نشد. کلید و شناسهٔ قالب را در تنظیمات بررسی کن.")
 
 
 def _json(response: httpx.Response) -> dict:

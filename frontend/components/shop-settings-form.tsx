@@ -196,7 +196,7 @@ export function ShopSettingsForm() {
                   : form.paymentGateway === "idpay"
                     ? form.paymentApiKeySet || form.paymentApiKey
                       ? "کلید آیدی‌پی آماده است."
-                      : "کلید API آیدی‌پی را بگذار."
+                      : "کلید آیدی‌پی را بگذار."
                     : "فروش آنلاین خاموش است؛ فروش دستی ثبت می‌شود."}
               </p>
               {form.paymentGateway === "zarinpal" && !form.paymentMerchantFromHub ? (
@@ -210,12 +210,12 @@ export function ShopSettingsForm() {
                 </Field>
               ) : null}
               {form.paymentGateway === "idpay" ? (
-                <Field label="کلید API آیدی‌پی">
+                <Field label="کلید آیدی‌پی">
                   <Input
                     dir="ltr"
                     type="password"
                     autoComplete="off"
-                    placeholder={form.paymentApiKeySet ? "کلید ذخیره شده؛ برای عوض کردن کلید جدید بزن" : "X-API-KEY"}
+                    placeholder={form.paymentApiKeySet ? "کلید ذخیره شده؛ برای عوض کردن کلید جدید بزن" : "کلید آیدی‌پی"}
                     value={form.paymentApiKey || ""}
                     onChange={(event) => setForm({ ...form, paymentApiKey: event.target.value })}
                   />
@@ -232,7 +232,7 @@ export function ShopSettingsForm() {
                   <Field label="آدرس بازگشت بعد از پرداخت">
                     <Input
                       dir="ltr"
-                      placeholder="https://shop.example.com/pay/verify"
+                      placeholder="https://shop.example.com/pay/back"
                       value={form.paymentCallbackUrl}
                       onChange={(event) => setForm({ ...form, paymentCallbackUrl: event.target.value })}
                     />
@@ -244,7 +244,7 @@ export function ShopSettingsForm() {
                       checked={form.paymentSandbox}
                       onChange={(event) => setForm({ ...form, paymentSandbox: event.target.checked })}
                     />
-                    درگاه آزمایشی (sandbox)
+                    درگاه آزمایشی
                   </label>
                 </>
               ) : null}
@@ -256,7 +256,7 @@ export function ShopSettingsForm() {
             <Card className="space-y-3">
               <h2 className="font-bold">درگاه پیامک</h2>
               {form.smsFromHub ? (
-                <p className="text-sm text-signal">ورود پنل با پیامک SMS.ir هاب سوزان ارسال می‌شود.</p>
+                <p className="text-sm text-signal">ورود پنل با پیامک سوزان فرستاده می‌شود.</p>
               ) : null}
               <label className="flex min-h-11 items-center gap-2 text-sm">
                 <input
@@ -268,7 +268,7 @@ export function ShopSettingsForm() {
                 پیامک آزمایشی (کد روی صفحه ورود)
               </label>
               {form.mockSms ? (
-                <p className="text-sm text-muted">ورود بدون پیامک واقعی است. برای کاوه نگار یا SMS.ir تیک را بردار.</p>
+                <p className="text-sm text-muted">ورود بدون پیامک واقعی است. برای پیامک واقعی تیک را بردار.</p>
               ) : (
                 <>
                   <Field label="درگاه">
@@ -293,7 +293,7 @@ export function ShopSettingsForm() {
                       ) : null}
                     </p>
                   ) : null}
-                  <Field label="کلید API">
+                  <Field label="کلید پیامک">
                     <Input
                       dir="ltr"
                       type="password"
@@ -303,16 +303,16 @@ export function ShopSettingsForm() {
                           ? "کلید هاب فعال است؛ برای عوض کردن کلید فروشگاه را بزن"
                           : form.smsApiKeySet
                             ? "کلید ذخیره شده؛ برای عوض کردن کلید جدید بزن"
-                            : "API Key"
+                            : "کلید را اینجا بگذار"
                       }
                       value={form.smsApiKey || ""}
                       onChange={(event) => setForm({ ...form, smsApiKey: event.target.value })}
                     />
                   </Field>
-                  <Field label={form.smsProvider === "smsir" ? "شناسه قالب (Template ID)" : "نام الگوی Verify Lookup"}>
+                  <Field label={form.smsProvider === "smsir" ? "شناسهٔ قالب پیامک" : "نام الگوی پیامک"}>
                     <Input
                       dir="ltr"
-                      placeholder={form.smsProvider === "smsir" ? "123456" : "verify"}
+                      placeholder={form.smsProvider === "smsir" ? "۱۲۳۴۵۶" : "نام الگو"}
                       value={form.smsTemplateId}
                       onChange={(event) => setForm({ ...form, smsTemplateId: event.target.value })}
                     />

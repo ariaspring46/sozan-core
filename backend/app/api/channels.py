@@ -73,7 +73,7 @@ async def instagram_connect_start(_user=Depends(require_permission("campaigns:wr
     try:
         phone = current_tenant()
         if not sendbox_service.configured():
-            raise ValueError("اتصال رسمی BoxAPI در سوزان تنظیم نشده.")
+            raise ValueError("اتصال اینستاگرام در سوزان هنوز تنظیم نشده.")
         return await sendbox_service.start_instagram(phone=phone)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
