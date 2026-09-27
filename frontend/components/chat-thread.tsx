@@ -28,7 +28,7 @@ export type ChatMsg = {
   attachments?: StudioAttachment[];
   captions?: StudioCaptions;
   published?: Record<string, number>;
-  compose?: { status?: string; error?: string; jobId?: string };
+  compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number };
   delivered?: boolean;
   status?: string;
   error?: string;
@@ -50,6 +50,23 @@ export function sanitizeShopText(text: string, enabled?: boolean) {
 }
 
 const WAIT_LINES = ["دارم فکر می‌کنم…", "یک لحظه…", "جواب را می‌چینم…"];
+
+function composeWaitLabel(compose: NonNullable<ChatMsg["compose"]>, now: number): string {
+  const started = Number(compose.startedAt || 0);
+  const elapsed = started > 0 ? Math.max(0, Math.round(now / 1000 - started)) : 0;
+  const clock = elapsed ? ` ${elapsed.toLocaleString("fa-IR")} ثانیه گذشته.` : "";
+  if (compose.stage === "layout") return `متن روی عکس چیده می‌شود. چند ثانیه.${clock}`;
+  return `عکس در حال ساخته شدن است. معمولاً حدود یک دقیقه.${clock}`;
+}
+
+function ComposeWait({ compose }: { compose: NonNullable<ChatMsg["compose"]> }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return <WaitSignal label={composeWaitLabel(compose, now)} />;
+}
 
 function WaitSignal({ label }: { label: string }) {
   return (
@@ -394,9 +411,7 @@ export function ChatThread({
                     </div>
                   </div>
                 ) : null}
-                {msg.compose?.status === "running" ? (
-                  <WaitSignal label="در حال ساخت تصویر و ویدیو…" />
-                ) : null}
+                {msg.compose?.status === "running" ? <ComposeWait compose={msg.compose} /> : null}
                 {msg.compose?.status === "failed" ? (
                   <div className="mt-2">
                     <p className="text-[11px] text-danger" role="alert">{msg.compose.error || "ساخت تصویر نشد"}</p>

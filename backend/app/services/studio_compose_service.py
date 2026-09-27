@@ -88,7 +88,7 @@ def start(
     job_id = str(uuid4())
     studio_chat_service.set_compose(
         message_id,
-        {"status": "running", "startedAt": time.time(), "jobId": job_id},
+        {"status": "running", "stage": "photo", "startedAt": time.time(), "jobId": job_id},
     )
     emit_later(
         kind="studio",
@@ -234,6 +234,7 @@ async def _run(
                         turn_id=message_id,
                         payload={"jobId": job_id, "bytes": len(png)},
                     )
+                studio_chat_service.mark_compose_stage(message_id, "layout")
                 await campaigns.compose(cid)
                 attachments = studio_chat_service.copy_outputs(await campaigns.preview_outputs(cid))
                 if not attachments:

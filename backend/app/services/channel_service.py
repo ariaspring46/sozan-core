@@ -10,8 +10,8 @@ SPECS = {
     "instagram": {
         "id": "instagram",
         "label": "اینستاگرام",
-        "docs": "https://boxapi.ir/docs/instagram/dm/webhook/",
-        "help": "اینستاگرام را با ورود رسمی BoxAPI وصل کن تا دایرکت مشتری بیاید. رمز را در فرم سوزان نگذار. اسکن ویترین عمومی با نام کاربری جداست.",
+        "docs": "",
+        "help": "اینستاگرام را با ورود رسمی وصل کن تا دایرکت مشتری بیاید. رمز را در فرم سوزان نگذار. اسکن ویترین عمومی با نام کاربری جداست.",
         "handleLabel": "نام کاربری صفحه",
         "handlePlaceholder": "@shop",
         "fields": [],
@@ -24,7 +24,7 @@ SPECS = {
         "handleLabel": "نام کاربری بات",
         "handlePlaceholder": "@shop_bot",
         "fields": [
-            {"key": "botToken", "label": "توکن بات (BotFather)", "secret": True, "required": False},
+            {"key": "botToken", "label": "توکن بات تلگرام", "secret": True, "required": False},
             {"key": "postTarget", "label": "مقصد پست (مثلاً @myshop یا شناسه کانال)", "secret": False, "required": False},
         ],
     },
@@ -32,13 +32,13 @@ SPECS = {
         "id": "whatsapp",
         "label": "واتساپ",
         "docs": "https://developers.facebook.com/docs/whatsapp/cloud-api/get-started",
-        "help": "واتساپ فید عمومی ندارد. از Meta Cloud API، Phone Number ID و توکن System User با whatsapp_business_messaging را بگذار. پست استودیو به شماره مقصدی که اینجا ثبت می‌کنی ارسال می‌شود (خارج از پنجرهٔ ۲۴ساعته معمولاً به قالب تأییدشده نیاز دارد).",
+        "help": "واتساپ فید عمومی ندارد. شناسهٔ شماره، شناسهٔ حساب کسب‌وکار و توکن دائمی را از پنل واتساپ بردار. پست استودیو به شمارهٔ مقصدی که اینجا ثبت می‌کنی می‌رود.",
         "handleLabel": "شماره نمایشی کسب‌وکار",
         "handlePlaceholder": "98912…",
         "fields": [
-            {"key": "phoneNumberId", "label": "Phone Number ID", "secret": False, "required": True},
-            {"key": "wabaId", "label": "WhatsApp Business Account ID", "secret": False, "required": False},
-            {"key": "accessToken", "label": "توکن دائمی Cloud API", "secret": True, "required": True},
+            {"key": "phoneNumberId", "label": "شناسهٔ شماره", "secret": False, "required": True},
+            {"key": "wabaId", "label": "شناسهٔ حساب کسب‌وکار", "secret": False, "required": False},
+            {"key": "accessToken", "label": "توکن دائمی واتساپ", "secret": True, "required": True},
             {"key": "postTarget", "label": "شماره مقصد ارسال (با کد کشور، مثل 98912…)", "secret": False, "required": False},
         ],
     },
@@ -67,7 +67,7 @@ SPECS = {
 }
 
 PLATFORMS = {key: spec["label"] for key, spec in SPECS.items()}
-IG_RECONNECT = "این پیج را دوباره با ورود رسمی BoxAPI وصل کن."
+IG_RECONNECT = "این پیج را دوباره با ورود رسمی وصل کن."
 IG_STUDIO_WAIT = "انتشار پست اینستاگرام از استودیو هنوز برای این اتصال آماده نیست."
 
 

@@ -78,4 +78,4 @@ class ChannelsWebhookTests(unittest.TestCase):
         with patch("app.api.channels.sendbox_service.configured", return_value=False):
             res = self._auth().get("/channels/instagram/connect")
         self.assertEqual(res.status_code, 400)
-        self.assertIn("BoxAPI", res.json()["detail"])
+        self.assertIn("اتصال اینستاگرام", res.json()["detail"])
