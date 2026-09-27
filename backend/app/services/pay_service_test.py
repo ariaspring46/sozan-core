@@ -69,6 +69,29 @@ class ShopPayB1Tests(unittest.TestCase):
         self.assertEqual(products[second["id"]]["stock"], 3)
         self.assertEqual(saved["lines"], [{"productId": first["id"], "qty": 2}, {"productId": second["id"], "qty": 1}])
 
+    def test_dry_mock_order_does_not_call_the_gateway(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                product = storefront_service.add_product(title="انگشتر", price=2500000, stock=3, sku="ring")["product"]
+                called = AsyncMock(side_effect=AssertionError("gateway"))
+                with patch("app.services.arvan_dns_service.edge_dry", return_value=True), patch.object(
+                    payment_service, "zarinpal_request", new=called
+                ), patch.object(payment_service, "idpay_request", new=called):
+                    order = asyncio.run(
+                        pay_service.create_order(title="انگشتر", amount=2500000, product_id=product["id"])
+                    )
+        self.assertTrue(str(order["payUrl"]).startswith("https://dry-mock.invalid/p/"))
+        called.assert_not_called()
+
+    def test_mock_outside_edge_dry_still_opens_the_hub_gateway(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                ctx = _gateway()
+                with ctx[0], ctx[1], ctx[2], patch("app.services.arvan_dns_service.edge_dry", return_value=False):
+                    order = asyncio.run(pay_service.create_order(title="سفارش", amount=1000))
+        self.assertIn("zarinpal.com", str(order.get("startPayUrl") or ""))
+        self.assertFalse(str(order.get("payUrl") or "").startswith("https://dry-mock.invalid/"))
+
     def test_shop_paid_empty_ref_does_not_match_other_pending(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):

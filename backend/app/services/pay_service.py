@@ -200,6 +200,16 @@ async def create_order(
         "at": int(time()),
         "phone": phone,
     }
+    if route.get("dry"):
+        url = f"https://dry-mock.invalid/p/{order_id}"
+        row["authority"] = order_id
+        row["startPayUrl"] = url
+        orders = _orders()
+        orders.append(row)
+        _save_orders(orders)
+        out = public_order(row)
+        out["payUrl"] = url
+        return out
     if route["id"] == "idpay":
         paid = await payment_service.idpay_request(
             amount_toman=total,

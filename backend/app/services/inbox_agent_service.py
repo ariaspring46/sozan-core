@@ -260,22 +260,56 @@ async def _post(path: str, body: dict) -> dict:
     return payload
 
 
+def _agent_body(messages: list[dict], model: str) -> dict:
+    body = {
+        "model": model,
+        "temperature": 0.3,
+        "max_tokens": 500,
+        "messages": messages,
+        "tools": _tools(),
+        "tool_choice": "auto",
+    }
+    if model == AGENT_MODEL:
+        body["chat_template_kwargs"] = {"enable_thinking": False, "thinking": False}
+        body["reasoning_format"] = "none"
+    return body
+
+
+async def _post_inbox_cloud(messages: list[dict], primary: Exception) -> dict:
+    from app.services.llm import inbox_cloud_route
+
+    route = inbox_cloud_route()
+    url = str((route or {}).get("url") or "")
+    token = str((route or {}).get("token") or "")
+    model = str((route or {}).get("model") or "")
+    if not url or not token or not model or _cloud_base(url):
+        raise primary
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
+    async with httpx.AsyncClient(timeout=TIMEOUT, trust_env=False, proxy=None) as client:
+        res = await client.post(f"{url}/chat/completions", json=_agent_body(messages, model), headers=headers)
+        res.raise_for_status()
+        payload = res.json()
+    if not isinstance(payload, dict):
+        raise RuntimeError("inbox_bad_json")
+    return payload
+
+
 async def _complete(messages: list[dict]) -> tuple[str, list[dict]]:
-    payload = await _post(
-        "/chat/completions",
-        {
-            "model": AGENT_MODEL,
-            "temperature": 0.3,
-            "max_tokens": 500,
-            "messages": messages,
-            "tools": _tools(),
-            "tool_choice": "auto",
-            "chat_template_kwargs": {"enable_thinking": False, "thinking": False},
-            "reasoning_format": "none",
-        },
-    )
-    _emit_usage(surface="inbox", model=AGENT_MODEL, payload=payload)
+    model = AGENT_MODEL
+    try:
+        payload = await _post("/chat/completions", _agent_body(messages, model))
+    except Exception as exc:
+        payload = await _post_inbox_cloud(messages, exc)
+        model = str(inbox_cloud_model() or model)
+    _emit_usage(surface="inbox", model=model, payload=payload)
     return _calls_from(payload)
+
+
+def inbox_cloud_model() -> str:
+    from app.services.llm import inbox_cloud_route
+
+    route = inbox_cloud_route()
+    return str((route or {}).get("model") or "")
 
 
 def _vectors_of(payload: dict, count: int) -> list[list[float]]:

@@ -224,6 +224,11 @@ def _auth_scheme(value: object) -> str:
     return _str_setting(value, "Bearer") or "Bearer"
 
 
+def inbox_cloud_route() -> dict | None:
+    """Same cloud hop already configured for chat. Inbox tries local 9b first."""
+    return _shop_cloud_route(source="inbox")
+
+
 def _shop_cloud_route(*, source: str = "default") -> dict | None:
     url = _str_setting(settings.cloud_llm_url).rstrip("/")
     token = _cloud_token()

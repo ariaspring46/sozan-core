@@ -40,6 +40,25 @@ class WalletPayTests(unittest.TestCase):
         self.assertEqual(route["commissionBps"], 200)
         self.assertEqual(route["merchant"], HUB)
 
+    def test_dry_mock_gateway_does_not_use_the_hub(self) -> None:
+        with patch("app.services.arvan_dns_service.edge_dry", return_value=True), patch.object(
+            payment_service.env, "payments_enabled", False
+        ), patch.object(payment_service.env, "zarinpal_merchant_id", HUB):
+            route = payment_service.resolve_sale_gateway({"paymentGateway": "mock"})
+        self.assertEqual(route["id"], "mock")
+        self.assertTrue(route["dry"])
+        self.assertNotIn("merchant", route)
+
+    def test_mock_outside_edge_dry_stays_on_the_hub(self) -> None:
+        with patch("app.services.arvan_dns_service.edge_dry", return_value=False), patch.object(
+            payment_service.env, "payments_enabled", True
+        ), patch.object(payment_service.env, "zarinpal_merchant_id", HUB), patch.object(
+            payment_service.env, "commission_bps", 200
+        ):
+            route = payment_service.resolve_sale_gateway({"paymentGateway": "mock"})
+        self.assertEqual(route["owner"], "hub")
+        self.assertEqual(route["id"], "zarinpal")
+
     def test_resolve_own_idpay(self) -> None:
         with patch.object(payment_service.env, "zarinpal_merchant_id", HUB):
             route = payment_service.resolve_sale_gateway(
