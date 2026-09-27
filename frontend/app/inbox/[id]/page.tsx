@@ -14,6 +14,7 @@ type Thread = {
   sender: string;
   pending?: boolean;
   paused?: boolean;
+  handoffReason?: string;
 };
 
 type InboxSnap = { thread: Thread; messages: ChatMsg[]; autoReply?: string };
@@ -129,6 +130,9 @@ export default function InboxThreadPage() {
           >
             {thread?.paused ? "پاسخ خودکار این گفتگو خاموش است · روشن کن" : "پاسخ خودکار این گفتگو را خاموش کن"}
           </button>
+          {thread?.handoffReason ? (
+            <p className="text-xs text-warm">سپرده به فروشنده · {thread.handoffReason}</p>
+          ) : null}
         </div>
       }
     >

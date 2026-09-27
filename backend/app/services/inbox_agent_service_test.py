@@ -3,7 +3,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 
@@ -31,6 +31,17 @@ def _call(name: str, arguments: dict, call_id: str = "c1") -> dict:
     }
 
 
+def script_tools(payloads: list[dict], seen: list):
+    async def fake(**kwargs):
+        seen.append({"url": "tools", "body": kwargs})
+        payload = payloads.pop(0)
+        message = ((payload.get("choices") or [{}])[0].get("message") or {})
+        _text, calls = inbox_agent_service._calls_from(payload)
+        return {"text": str(message.get("content") or ""), "tool_calls": calls}
+
+    return fake
+
+
 class ScriptedClient:
     def __init__(self, payloads: list[dict], seen: list):
         self.payloads = payloads
@@ -53,34 +64,34 @@ class InboxAgentTests(unittest.TestCase):
         self.dir = tempfile.TemporaryDirectory()
         self.root = Path(self.dir.name)
         inbox_agent_service.clear_intent_cache()
+        self.claims_complete = AsyncMock(return_value={"claims": []})
+        self.claims_patch = patch("app.services.llm.complete_json", self.claims_complete)
+        self.claims_patch.start()
 
     def tearDown(self) -> None:
+        self.claims_patch.stop()
         self.dir.cleanup()
         inbox_agent_service.clear_intent_cache()
 
-    def test_stock_uses_local_9b_and_quotes_catalog(self) -> None:
+    def test_stock_uses_inbox_surface_masks_pii_and_quotes_catalog(self) -> None:
         seen: list = []
         payloads = [
             _chat(calls=[_call("stock", {"product": "کفش چرم"})]),
             _chat(content="کفش چرم مشکی دو عدد موجود است و قیمتش چهار میلیون تومان است."),
         ]
 
-        def client(*args, **kwargs):
-            self.assertIsNone(kwargs.get("proxy"))
-            self.assertFalse(kwargs.get("trust_env"))
-            return ScriptedClient(payloads, seen)
-
-        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch.object(
-            settings, "local_llm_url", "http://127.0.0.1:9292/v1"
-        ), patch("app.services.inbox_agent_service.emit_later"), patch(
-            "app.services.inbox_agent_service.httpx.AsyncClient", client
-        ):
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, seen)):
             storefront_service.add_product(title="کفش چرم مشکی", price=4000000, stock=2, sku="a")
-            reply = asyncio.run(inbox_agent_service.answer("کفش چرم موجود است؟", thread={"sender": "علی"}))
+            reply = asyncio.run(
+                inbox_agent_service.answer("کفش چرم موجود است؟ شماره‌ام ۰۹۱۲۱۲۳۴۵۶۷", thread={"sender": "علی"})
+            )
         self.assertIn("دو عدد", reply or "")
-        self.assertEqual(seen[0]["body"]["model"], "qwen3.5-9b")
-        self.assertTrue(seen[0]["url"].startswith("http://127.0.0.1:9292/v1/"))
-        self.assertNotIn("arvan", seen[0]["url"])
+        self.assertEqual(seen[0]["body"]["surface"], "inbox")
+        sent = json.dumps(seen[0]["body"]["messages"], ensure_ascii=False)
+        self.assertIn("[تلفن]", sent)
+        self.assertNotIn("09121234567", sent)
         tool_blob = seen[1]["body"]["messages"][-1]["content"]
         self.assertIn("4000000", tool_blob)
         self.assertIn('"stock": 2', tool_blob)
@@ -100,12 +111,11 @@ class InboxAgentTests(unittest.TestCase):
             _chat(content="این شماره سفارش را در فروشگاه پیدا نکردم."),
         ]
 
-        def client(*args, **kwargs):
-            return ScriptedClient(payloads, seen)
-
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
-        ), patch("app.services.inbox_agent_service.httpx.AsyncClient", client):
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, seen)), patch(
+            "app.services.inbox_agent_service.intent_hint", return_value=""
+        ):
             reply = asyncio.run(inbox_agent_service.answer("سفارش nope کجاست؟"))
         self.assertIn("پیدا نکردم", reply or "")
         self.assertIn("سفارش پیدا نشد", seen[1]["body"]["messages"][-1]["content"])
@@ -126,12 +136,9 @@ class InboxAgentTests(unittest.TestCase):
                 "apiKey": "SECRET-KEY",
             }
 
-        def client(*args, **kwargs):
-            return ScriptedClient(payloads, seen)
-
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
-        ), patch("app.services.inbox_agent_service.httpx.AsyncClient", client), patch(
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, seen)), patch(
             "app.services.pay_service.create_order", new=fake_order
         ):
             storefront_service.add_product(title="کیف دوشی", price=1000, stock=1, sku="b")
@@ -140,24 +147,36 @@ class InboxAgentTests(unittest.TestCase):
         blob = seen[1]["body"]["messages"][-1]["content"]
         self.assertNotIn("SECRET", blob)
 
-    def test_arvan_base_is_refused(self) -> None:
+    def test_cloud_chat_is_allowed_and_local_embed_is_not_sent_to_arvan(self) -> None:
+        seen: list = []
         posted = []
 
         def client(*args, **kwargs):
             posted.append(True)
-            return ScriptedClient([], [])
+            return ScriptedClient([], seen)
+
+        async def fake_tools(**kwargs):
+            seen.append(kwargs)
+            return {"text": "سلام، کدام کالا را می‌خواهید؟", "tool_calls": []}
 
         with patch.object(settings, "local_llm_url", "https://api.arvancloudai.ir/v1"), patch(
             "app.services.inbox_agent_service.emit_later"
-        ), patch("app.services.inbox_agent_service.httpx.AsyncClient", client):
+        ), patch("app.services.inbox_agent_service.httpx.AsyncClient", client), patch(
+            "app.services.inbox_agent_service.complete_tools", fake_tools
+        ):
             reply = asyncio.run(inbox_agent_service.answer("سلام، موجود است این کالا؟"))
-        self.assertIsNone(reply)
+        self.assertIn("کدام", reply or "")
         self.assertEqual(posted, [])
+        self.assertEqual(seen[0]["surface"], "inbox")
 
     def test_embed_nudge_stays_on_local_bge(self) -> None:
         seen: list = []
-        payloads = [
+        chat_payloads = [
             _chat(content="بگذارید بررسی کنم و برگردم خدمتتان."),
+            _chat(calls=[_call("stock", {"product": "کفش"})]),
+            _chat(content="کفش چرم یک عدد در انبار است."),
+        ]
+        embed_payloads = [
             {
                 "data": [
                     {"index": 0, "embedding": [1.0, 0.0]},
@@ -172,25 +191,133 @@ class InboxAgentTests(unittest.TestCase):
                 ]
             },
             {"data": [{"index": 0, "embedding": [1.0, 0.0]}]},
-            _chat(calls=[_call("stock", {"product": "کفش"})]),
-            _chat(content="کفش چرم یک عدد در انبار است."),
         ]
 
         def client(*args, **kwargs):
-            return ScriptedClient(payloads, seen)
+            return ScriptedClient(embed_payloads, seen)
 
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch.object(
             settings, "local_llm_url", "http://127.0.0.1:9292/v1"
         ), patch("app.services.inbox_agent_service.emit_later"), patch(
             "app.services.inbox_agent_service.httpx.AsyncClient", client
-        ):
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(chat_payloads, seen)):
             storefront_service.add_product(title="کفش چرم", price=10, stock=1, sku="c")
             reply = asyncio.run(inbox_agent_service.answer("این کفش هنوز هست؟"))
         self.assertIn("یک عدد", reply or "")
         embed = next(row for row in seen if row["url"].endswith("/embeddings"))
         self.assertEqual(embed["body"]["model"], "bge-m3")
         self.assertNotIn("arvan", embed["url"])
-        self.assertTrue(any("ابزار stock" in str(row["body"]) for row in seen))
+        self.assertTrue(any("ابزار stock" in str(row.get("body")) for row in seen))
+
+    def test_invented_amount_is_rebuilt_once_then_handed_off(self) -> None:
+        seen: list = []
+        payloads = [
+            _chat(content="قیمت ۵۵۵۵۵۵۵ تومان است."),
+            _chat(content="باز هم ۵۵۵۵۵۵۵."),
+        ]
+
+        async def no_hint(_text: str) -> str:
+            return ""
+
+        from app.services import inbox_service
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, seen)), patch(
+            "app.services.inbox_agent_service.intent_hint", no_hint
+        ):
+            created = inbox_service.inbound(platform="instagram", sender="مشتری", text="قیمت؟")
+            reply = asyncio.run(
+                inbox_agent_service.answer("قیمت چقدر است؟", thread=created["thread"])
+            )
+            shown = inbox_service.get_thread(created["thread"]["id"])
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+        self.assertNotIn("5555555", reply or "")
+        reminder = seen[1]["body"]["messages"][-1]["content"]
+        self.assertIn("رد شد", reminder)
+        self.assertNotIn("5555555", reminder)
+        self.assertTrue(shown["thread"]["paused"])
+        self.assertEqual(shown["thread"]["handoffReason"], "عدد نامجاز")
+
+    def test_rebuilt_amount_can_use_the_tool_number(self) -> None:
+        payloads = [
+            _chat(calls=[_call("stock", {"product": "کفش"})]),
+            _chat(content="قیمت ۵۵۵۵۵۵۵ تومان است."),
+            _chat(content="قیمت ۴۰۰۰۰۰۰ تومان است."),
+        ]
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])):
+            storefront_service.add_product(title="کفش چرم", price=4000000, stock=2, sku="n")
+            reply = asyncio.run(inbox_agent_service.answer("قیمت کفش؟"))
+        self.assertIn("۴۰۰۰۰۰۰", reply or "")
+        self.assertNotIn("5555555", reply or "")
+        self.assertNotEqual(reply, inbox_agent_service.HANDOFF_LINE)
+
+    def test_foreign_shop_link_is_replaced_and_payment_link_stays(self) -> None:
+        from app.state_store import write_json
+
+        payloads = [
+            _chat(calls=[_call("payment_link", {"product": "کیف", "qty": 1})]),
+            _chat(content="سایت https://joahr-froshi.sozan-core.ir را ببین."),
+        ]
+
+        async def fake_order(**kwargs):
+            return {
+                "title": "کیف",
+                "amount": 1000,
+                "payUrl": "https://api.sozan-core.ir/p/abc",
+            }
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
+            "app.services.pay_service.create_order", new=fake_order
+        ):
+            write_json("shop.json", {"url": "https://battery.example", "slug": "sales-battery"})
+            storefront_service.add_product(title="کیف دوشی", price=1000, stock=1, sku="k")
+            reply = asyncio.run(inbox_agent_service.answer("لینک سایت و پرداخت"))
+        self.assertIn("https://battery.example", reply or "")
+        self.assertIn("https://api.sozan-core.ir/p/abc", reply or "")
+        self.assertNotIn("joahr-froshi", reply or "")
+
+    def test_real_claims_guard_keeps_a_clean_reply_and_replaces_a_fake_one(self) -> None:
+        seen: list = []
+
+        async def fake_json(system, user, *, surface="llm", max_tokens=700):
+            seen.append({"surface": surface, "user": user})
+            if "طبیعی" in user:
+                return {"claims": ["طبیعی"]}
+            return {"claims": []}
+
+        self.claims_complete.side_effect = fake_json
+        payloads = [
+            _chat(content="سلام، در خدمتم"),
+            _chat(content="کفش چرم موجود است."),
+            _chat(content="این چرم طبیعی است. شماره ۰۹۱۲۰۰۰۰۰۰۰"),
+        ]
+
+        async def no_hint(_text: str) -> str:
+            return ""
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.intent_hint", no_hint):
+            storefront_service.add_product(title="کفش چرم", price=10, stock=1, sku="c")
+            with patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads[:1], [])):
+                greeting = asyncio.run(inbox_agent_service.answer("سلام"))
+            self.assertEqual(greeting, "سلام، در خدمتم")
+            self.assertEqual(seen, [])
+            with patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads[1:2], [])):
+                clean = asyncio.run(inbox_agent_service.answer("کفش هست؟"))
+            with patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads[2:], [])):
+                fake = asyncio.run(inbox_agent_service.answer("جنس چیست؟"))
+        self.assertIn("چرم", clean or "")
+        self.assertEqual(fake, inbox_agent_service.CLAIMS_LINE)
+        self.assertEqual(seen[-1]["surface"], "inbox")
+        self.assertNotIn("09120000000", seen[-1]["user"])
+        self.assertIn("[تلفن]", seen[-1]["user"])
 
 
 if __name__ == "__main__":

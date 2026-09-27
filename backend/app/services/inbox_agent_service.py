@@ -1,28 +1,32 @@
-"""Local direct-message agent.
+"""Direct-message sales agent.
 
-Customer text stays on the home llama-swap (qwen3.5-9b). It never uses the
-Arvan route. Stock, order status, and payment links come from existing
-services. Local bge-m3 only nudges a tool when the model answered with none.
+Chat goes through llm.py on the inbox surface (cloud chain, then the always-on
+9b). Customer text is masked before that call and is not written to observe.
+Stock, order status, and payment links still come from the shop's own data.
+Local bge-m3 only nudges a tool when the model answered with none.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 
 import httpx
 
 from app.config import settings
-from app.services.llm import ARVAN_HOST_SUFFIX, LLM_BAD_JSON, _emit_usage, _persian_enough, spoken_model_reply
+from app.services.llm import ARVAN_HOST_SUFFIX, LLM_BAD_JSON, complete_tools, spoken_model_reply
 from app.services.observe_client import emit_later
 from app.services.persian_text import guard_output
+from app.services.pii_mask import mask_pii
 from app.services.router_embed import cosine
 
 log = logging.getLogger("sozan.inbox.agent")
 
 AGENT_MODEL = "qwen3.5-9b"
 EMBED_MODEL = "bge-m3"
-MAX_ROUNDS = 3
+MAX_ROUNDS = 4
+INBOX_TIMEOUT = 20
 TIMEOUT = 45.0
 INTENT_THRESHOLD = 0.75
 INTENT_SAMPLES = {
@@ -260,22 +264,162 @@ async def _post(path: str, body: dict) -> dict:
     return payload
 
 
-async def _complete(messages: list[dict]) -> tuple[str, list[dict]]:
-    payload = await _post(
-        "/chat/completions",
-        {
-            "model": AGENT_MODEL,
-            "temperature": 0.3,
-            "max_tokens": 500,
-            "messages": messages,
-            "tools": _tools(),
-            "tool_choice": "auto",
-            "chat_template_kwargs": {"enable_thinking": False, "thinking": False},
-            "reasoning_format": "none",
-        },
+def _mask_for_model(messages: list[dict]) -> list[dict]:
+    safe = []
+    for msg in messages:
+        if str(msg.get("role") or "") == "user":
+            safe.append({**msg, "content": mask_pii(str(msg.get("content") or ""))})
+        else:
+            safe.append(msg)
+    return safe
+
+
+def _digit_fold(text: str) -> str:
+    return str(text or "").translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
+
+
+def _amounts(text: str) -> set[str]:
+    folded = _digit_fold(text)
+    found = set(re.findall(r"\d{4,}", folded))
+    found.update(re.findall(r"\d+(?:\.\d+)?\s*٪", folded))
+    found.update(re.findall(r"\d+(?:\.\d+)?\s*%", folded))
+    return found
+
+
+def _tool_blob(messages: list[dict]) -> str:
+    return "\n".join(str(msg.get("content") or "") for msg in messages if msg.get("role") == "tool")
+
+
+def _numbers_ok(reply: str, tool_blob: str) -> bool:
+    return not (_amounts(reply) - _amounts(tool_blob))
+
+
+def _number_reminder(tool_blob: str) -> str:
+    allowed = sorted(_amounts(tool_blob))
+    if not allowed:
+        return (
+            "پیام قبلی رد شد. در خروجی ابزار این نوبت هیچ قیمت، مبلغ یا درصدی نیست. "
+            "جواب را از نو بنویس و هیچ عدد قیمت یا درصدی نیاور."
+        )
+    shown = "، ".join(allowed)
+    return (
+        "پیام قبلی رد شد. فقط این عددها در خروجی ابزار این نوبت هستند و باید عیناً بیایند: "
+        f"{shown}. جواب را از نو بنویس و عدد دیگری نیاور."
     )
-    _emit_usage(surface="inbox", model=AGENT_MODEL, payload=payload)
-    return _calls_from(payload)
+
+
+_CLAIM_MARKS = (
+    "اصیل",
+    "طبیعی",
+    "مقاوم",
+    "حکاکی",
+    "ضمانت",
+    "ارسال",
+    "قیمت",
+    "موجود",
+    "چرم",
+    "طلا",
+    "نقره",
+    "جیب",
+    "قابل تنظیم",
+    "دوام",
+    "اصالت",
+    "جنس",
+)
+_URL = re.compile(r"https?://[^\s<>\"']+")
+HANDOFF_LINE = "همکارم به‌زودی جواب می‌دهد"
+CLAIMS_LINE = "اجازه بدهید دقیق چک کنم و برگردم."
+
+
+def _looks_like_claim(text: str) -> bool:
+    if any(mark in text for mark in _CLAIM_MARKS):
+        return True
+    return bool(re.search(r"اصل(?!ا)", text))
+
+
+def _shop_url() -> str:
+    from app.services.shop_service import _shop, live_url
+
+    return live_url(_shop()).strip().rstrip("/")
+
+
+def _fix_links(reply: str, pay_urls: list[str]) -> str:
+    """Keep this shop's address and this turn's payment links. Replace anything else."""
+    shop = _shop_url()
+    allowed = {shop} if shop else set()
+    for url in pay_urls:
+        cleaned = url.strip().rstrip("/")
+        if cleaned:
+            allowed.add(cleaned)
+
+    def repl(match: re.Match) -> str:
+        raw = match.group(0).rstrip(".,،);؛")
+        bare = raw.rstrip("/")
+        if bare in allowed or any(bare == item or bare.startswith(item + "/") for item in allowed):
+            return raw
+        return shop
+
+    return _URL.sub(repl, reply).strip()
+
+
+def _hand_off(thread: dict | None, reason: str) -> str:
+    thread_id = str((thread or {}).get("id") or "").strip()
+    if thread_id:
+        from app.services.inbox_service import mark_handoff
+
+        mark_handoff(thread_id, reason)
+    return HANDOFF_LINE
+
+
+async def _inbox_claims_complete(system: str, user: str, **_kwargs) -> dict:
+    from app.services.llm import complete_json
+
+    return await complete_json(system, user, surface="inbox", max_tokens=400)
+
+
+async def _claims(text: str, facts: str) -> str:
+    if not facts.strip() and not _looks_like_claim(text):
+        return text
+    try:
+        from app.services.claims_guard import check
+    except ImportError:
+        return text
+    try:
+        hits = await check(mask_pii(text), facts, complete=_inbox_claims_complete)
+    except Exception:
+        log.warning("claims guard skipped")
+        return text
+    if hits:
+        return CLAIMS_LINE
+    return text
+
+
+async def _complete(messages: list[dict]) -> tuple[str, list[dict]]:
+    result = await complete_tools(
+        messages=_mask_for_model(messages),
+        tools=_tools(),
+        temperature=0.3,
+        max_tokens=500,
+        timeout=INBOX_TIMEOUT,
+        surface="inbox",
+    )
+    calls = []
+    for call in result.get("tool_calls") or []:
+        if not isinstance(call, dict) or not call.get("name"):
+            continue
+        args = call.get("arguments")
+        calls.append(
+            {
+                "id": str(call.get("id") or "call"),
+                "name": str(call.get("name")),
+                "arguments": args if isinstance(args, dict) else {},
+            }
+        )
+    raw = str(result.get("text") or "").strip()
+    # A shop address is Latin. Judge the Persian around it, and keep the address for the link guard.
+    judged = spoken_model_reply(_URL.sub("نشانی", raw))
+    text = "" if judged == LLM_BAD_JSON["reply"] else raw
+    return text, calls
 
 
 def _vectors_of(payload: dict, count: int) -> list[list[float]]:
@@ -319,7 +463,7 @@ async def intent_hint(text: str) -> str:
                 saved[name] = vectors[cursor : cursor + len(rows)]
                 cursor += len(rows)
             _SAMPLE_VECTORS = saved
-        query = (await _embed([sentence[:500]]))[0]
+        query = (await _embed([mask_pii(sentence[:500])]))[0]
     except Exception:
         log.warning("inbox intent embed skipped")
         return ""
@@ -344,7 +488,7 @@ def clear_intent_cache() -> None:
 def _history(thread: dict | None) -> list[dict]:
     rows = (thread or {}).get("messages") or []
     messages = []
-    for msg in rows[-8:]:
+    for msg in rows[-12:]:
         text = str(msg.get("text") or "").strip()
         if not text:
             continue
@@ -386,17 +530,21 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
     sentence = str(customer_text or "").strip()
     if not sentence:
         return None
-    if _cloud_base(local_base()):
-        emit_later(kind="inbox", surface="inbox", title="inbox-agent", status="refused", payload={"errorClass": "cloud"})
-        return None
     messages: list[dict] = [{"role": "system", "content": _system(thread)}, *_history(thread)]
     if not messages[-1:] or messages[-1].get("content") != sentence:
         messages.append({"role": "user", "content": sentence[:800]})
     nudged = ""
     used: list[str] = []
     pay_urls: list[str] = []
+    number_retried = False
+    force_retry = False
+    rounds = 0
     try:
-        for _round in range(MAX_ROUNDS):
+        while rounds < MAX_ROUNDS or force_retry:
+            force_retry = False
+            rounds += 1
+            if rounds > MAX_ROUNDS + 1:
+                break
             text, calls = await _complete(messages)
             if not calls:
                 if not nudged and not used:
@@ -410,7 +558,25 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                             }
                         )
                         continue
+                blob = _tool_blob(messages)
                 reply = guard_output(text)
+                if not _numbers_ok(mask_pii(reply), blob):
+                    if not number_retried:
+                        number_retried = True
+                        force_retry = True
+                        messages.append({"role": "system", "content": _number_reminder(blob)})
+                        continue
+                    reply = _hand_off(thread, "عدد نامجاز")
+                    emit_later(
+                        kind="inbox",
+                        surface="inbox",
+                        title="inbox-agent",
+                        status="handoff",
+                        payload={"tools": used, "reason": "numbers"},
+                    )
+                    return reply
+                reply = _fix_links(reply, pay_urls)
+                reply = await _claims(reply, blob)
                 for url in pay_urls:
                     if url and url not in reply:
                         reply = f"{reply}\n{url}".strip()

@@ -144,7 +144,7 @@ class RouteSurfaceTests(unittest.TestCase):
     def test_six_surfaces_without_cloud_stay_local(self) -> None:
         expected = {
             "voice": "qwen3.8-27b",
-            "inbox": "qwen3.8-27b",
+            "inbox": "qwen3.5-9b",
             "shop": "ornith-1.5-35b",
             "shop-edit": "ornith-1.5-35b",
             "studio": "qwen3.5-9b",
@@ -188,8 +188,19 @@ class RouteSurfaceTests(unittest.TestCase):
         self.assertNotIn("studio-secret", str(studio["url"]))
         self.assertEqual(voice["kind"], "local")
         self.assertEqual(voice["model"], "qwen3.8-27b")
-        self.assertEqual(inbox["kind"], "local")
-        self.assertEqual(inbox["model"], "qwen3.8-27b")
+        self.assertEqual(inbox["kind"], "cloud")
+        self.assertEqual(inbox["model"], "DeepSeek-V4-Pro")
+        self.assertEqual(inbox["url"], "https://api.arvancloudai.ir/v1")
+
+    def test_inbox_ignores_a_gpu1_local_override(self) -> None:
+        with patch("app.services.llm.settings") as settings, patch(
+            "app.services.llm_routing_service.get",
+            return_value={"kind": "local", "model": "qwen3.8-27b"},
+        ):
+            _apply_settings(settings, _route_settings())
+            route = route_for_surface("inbox")
+        self.assertEqual(route["kind"], "local")
+        self.assertEqual(route["model"], "qwen3.5-9b")
 
     def test_shop_cloud_does_not_move_studio(self) -> None:
         extra = {
