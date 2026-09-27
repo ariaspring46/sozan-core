@@ -1242,6 +1242,8 @@ class Gateway:
         tags: set[str] = set()
         prompt_n = 0
         first_token_s = 0.0
+        cost = 0.0
+        model_name = ""
         played = False
         retry_heard = ""
         gen = self.brain.sales_stream(plan.cue, cancel)
@@ -1271,6 +1273,8 @@ class Gateway:
                 )
                 prompt_n = int(bit.get("prompt_n") or prompt_n)
                 first_token_s = float(bit.get("first_token_s") or first_token_s)
+                cost = float(bit.get("cost") or cost)
+                model_name = str(bit.get("model") or model_name)
         except Exception:
             log.warning("sales stream turn failed", exc_info=True)
         finally:
@@ -1306,6 +1310,8 @@ class Gateway:
                         )
                         prompt_n = int(bit.get("prompt_n") or prompt_n)
                         first_token_s = float(bit.get("first_token_s") or first_token_s)
+                        cost = float(bit.get("cost") or cost)
+                        model_name = str(bit.get("model") or model_name)
                 except Exception:
                     log.warning("sales stream retry failed", exc_info=True)
                 finally:
@@ -1340,17 +1346,26 @@ class Gateway:
             state.interrupted = spoken_parts[0]
         note_spoken(state, spoken)
         took = time.monotonic() - started
+        usage = getattr(self.brain, "last_usage", None) or {}
+        if usage.get("cost"):
+            cost = float(usage.get("cost") or 0)
+        if usage.get("prompt"):
+            prompt_n = int(usage.get("prompt") or prompt_n)
         hangup = plan.hangup or "end" in tags or sales_ended(heard, spoken)
         log.info(
-            "sales llm=%.2f first_token=%.2f first_audio=%.2f prompt_n=%s kind=%s line=%s",
+            "sales llm=%.2f first_token=%.2f first_audio=%.2f prompt_n=%s cost=%.6f model=%s kind=%s line=%s",
             took,
             first_token_s,
             first_audio,
             prompt_n,
+            cost,
+            model_name or "-",
             plan.kind,
             spoken,
         )
-        self._log_sales_turn(heard, plan.kind, spoken, first_token_s, first_audio, state.gifted, hangup)
+        self._log_sales_turn(
+            heard, plan.kind, spoken, first_token_s, first_audio, state.gifted, hangup, cost, model_name
+        )
         if spoken in FIXED_SALES_LINES:
             log.warning("sales model repeated a fixed line")
         self._last_kind = "meaning"
@@ -1374,6 +1389,8 @@ class Gateway:
         first_audio: float,
         gift: bool,
         hangup: bool,
+        cost: float = 0.0,
+        model_name: str = "",
     ) -> None:
         row = {
             "ts": time.time(),
@@ -1385,6 +1402,8 @@ class Gateway:
             "gift": bool(gift),
             "hangup": bool(hangup),
             "sim": self._sim_call,
+            "cost": round(float(cost or 0), 6),
+            "model": model_name,
         }
         log.info("sales turn %s", json.dumps(row, ensure_ascii=False))
         append_turn_log(row)

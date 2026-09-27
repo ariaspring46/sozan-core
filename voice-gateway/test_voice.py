@@ -24,6 +24,7 @@ from audio_codec import (
 )
 from brain import (
     clarify,
+    chat_completions_url,
     echo_should_block,
     is_ack,
     is_carrier_text,
@@ -38,6 +39,8 @@ from brain import (
     looks_like_echo,
     looks_like_speech,
     should_hold_fragment,
+    mask_messages,
+    sales_request_body,
     speakable,
     usable_request,
     wants_bye,
@@ -588,6 +591,30 @@ class SalesTest(unittest.TestCase):
         self.assertNotRegex(speakable("مخصوص پیج‌های اینstagram فروشیه."), r"[A-Za-z]")
         self.assertIn("اسمم", speakable("اسمن سوزان."))
         self.assertIn("یاسمن", speakable("یاسمن آمد."))
+        masked = mask_messages(
+            "https://openrouter.ai/api/v1",
+            [{"role": "user", "content": "شماره من 09120000000 است"}],
+        )
+        self.assertNotIn("0912", masked[0]["content"])
+        self.assertIn("شماره", masked[0]["content"])
+        cloud = sales_request_body(
+            "https://openrouter.ai/api/v1",
+            "anthropic/claude-haiku-4.5",
+            [{"role": "system", "content": "تو سوزانی"}, *masked],
+        )
+        self.assertEqual(cloud["temperature"], 0.6)
+        self.assertEqual(cloud["max_tokens"], 70)
+        self.assertEqual(cloud["provider"]["sort"], "latency")
+        self.assertEqual(cloud["reasoning"]["effort"], "none")
+        self.assertEqual(cloud["messages"][0]["content"][0]["cache_control"]["type"], "ephemeral")
+        local = sales_request_body(
+            "http://127.0.0.1:19292/v1",
+            "ornith-phone",
+            [{"role": "user", "content": "سلام"}],
+        )
+        self.assertEqual(local["max_tokens"], 120)
+        self.assertNotIn("provider", local)
+        self.assertTrue(chat_completions_url("http://127.0.0.1:19292/v1").endswith("/chat/completions"))
         quiet = b"\x00" * 320
         noisy = mix_shop_noise(quiet)
         self.assertEqual(len(noisy), 320)

@@ -77,6 +77,92 @@ def llm_is_local(url: str) -> bool:
     return host in {"127.0.0.1", "localhost"}
 
 
+_DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+_PHONE = re.compile(r"(?:\+98|0098|0)9\d{9}|\b9\d{9}\b")
+_EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_CARD = re.compile(r"\b(?:\d[ -]?){16}\b")
+
+
+def mask_private(text: str) -> str:
+    blob = _PHONE.sub("شماره", text or "")
+    blob = _EMAIL.sub("ایمیل", blob)
+    return _CARD.sub("کارت", blob)
+
+
+def mask_messages(url: str, messages: list[dict]) -> list[dict]:
+    if llm_is_local(url):
+        return messages
+    masked: list[dict] = []
+    for msg in messages:
+        content = msg.get("content")
+        if isinstance(content, str):
+            content = mask_private(content)
+        masked.append({**msg, "content": content})
+    return masked
+
+
+def _cache_system(model: str, messages: list[dict]) -> list[dict]:
+    if "anthropic/" not in (model or "") and "claude" not in (model or ""):
+        return messages
+    out: list[dict] = []
+    for msg in messages:
+        content = msg.get("content")
+        if msg.get("role") == "system" and isinstance(content, str):
+            out.append(
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": content,
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ],
+                }
+            )
+        else:
+            out.append(msg)
+    return out
+
+
+def sales_request_body(
+    url: str,
+    model: str,
+    messages: list[dict],
+    *,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+) -> dict:
+    local = llm_is_local(url)
+    body: dict = {
+        "model": model,
+        "messages": messages if local else _cache_system(model, messages),
+        "temperature": 0.7 if local else 0.6,
+        "max_tokens": 120 if local else 70,
+        "stream": True,
+        "stop": ["\n"],
+    }
+    if max_tokens is not None:
+        body["max_tokens"] = max_tokens
+    if temperature is not None:
+        body["temperature"] = temperature
+    if local:
+        body["cache_prompt"] = True
+        body["id_slot"] = 0
+        body["presence_penalty"] = 0.3
+    else:
+        body["provider"] = {"sort": "latency"}
+        body["reasoning"] = {"effort": "none", "exclude": True}
+        body["usage"] = {"include": True}
+    return body
+
+
+def open_llm(url: str, req: urllib.request.Request, timeout: float):
+    if llm_is_local(url):
+        return urllib.request.urlopen(req, timeout=timeout)
+    return _DIRECT.open(req, timeout=timeout)
+
+
 def speakable(text: str, sentences: int = 1) -> str:
     cleaned = THINK.sub("", text or "")
     cleaned = FENCE.sub("", cleaned)
@@ -584,6 +670,7 @@ class Brain:
         self.history: list[dict[str, str]] = []
         self.sales_system = ""
         self.last_sales_stats: dict[str, float | int] = {}
+        self.last_usage: dict[str, float | int] = {}
         self._meanings: MeaningIndex | None = None
         self._phrases: MeaningIndex | None = None
         self._stt_lock = threading.Lock()
@@ -611,6 +698,8 @@ class Brain:
         return any(str(row.get("model") or "") == self.llm_model for row in rows)
 
     def wait_until_ready(self, timeout: float = 180) -> None:
+        if not llm_is_local(self.llm_url):
+            return
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             if self.health():
@@ -749,31 +838,28 @@ class Brain:
 
     def warm_sales(self, system: str, greeting: str) -> None:
         self.start_sales(system, greeting)
+        messages = mask_messages(
+            self.llm_url,
+            [
+                {"role": "system", "content": system},
+                {"role": "assistant", "content": greeting},
+            ],
+        )
         payload = dumps(
-            {
-                "model": self.llm_model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "assistant", "content": greeting},
-                ],
-                "temperature": 0.0,
-                "max_tokens": 1,
-                "cache_prompt": True,
-                "id_slot": 0,
-            }
+            sales_request_body(self.llm_url, self.llm_model, messages, max_tokens=1, temperature=0.0)
         ).encode("utf-8")
         req = urllib.request.Request(
             self.llm_url,
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers=self._sales_headers(self.llm_url),
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=60) as res:
+            with open_llm(self.llm_url, req, 20) as res:
                 res.read()
             log.info("sales prefix warm")
-        except Exception:
-            log.warning("sales prefix warm failed", exc_info=True)
+        except Exception as exc:
+            log.warning("sales prefix warm failed %s", type(exc).__name__)
 
     def _load_fast_stt(self):
         root = os.environ.get(
@@ -942,20 +1028,25 @@ class Brain:
             self.llm_fallback_url != self.llm_url or self.llm_fallback_model != self.llm_model
         )
 
-    def _sales_payload(self, url: str, model: str, messages: list[dict[str, str]]) -> bytes:
-        body: dict[str, object] = {
-            "model": model,
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 120,
-            "stream": True,
-            "stop": ["\n"],
-        }
-        if llm_is_local(url):
-            body["cache_prompt"] = True
-            body["id_slot"] = 0
-            body["presence_penalty"] = 0.3
-        return dumps(body).encode("utf-8")
+    def _bench(self) -> bool:
+        return os.environ.get("LLM_BENCH", "").strip().lower() in {"1", "true", "yes"}
+
+    def _hops(self) -> list[tuple[str, str]]:
+        hops = [(self.llm_url, self.llm_model)]
+        if self._bench():
+            return hops
+        if self._can_fallback():
+            hops.append((self.llm_fallback_url, self.llm_fallback_model))
+        local = (
+            chat_completions_url(os.environ.get("LLM_LOCAL_URL", "http://127.0.0.1:19292/v1")),
+            os.environ.get("LLM_LOCAL_MODEL", "ornith-phone"),
+        )
+        if local not in hops:
+            hops.append(local)
+        return hops
+
+    def _sales_payload(self, url: str, model: str, messages: list[dict]) -> bytes:
+        return dumps(sales_request_body(url, model, messages)).encode("utf-8")
 
     def _sales_headers(self, url: str) -> dict[str, str]:
         headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
@@ -970,30 +1061,24 @@ class Brain:
         text = (cue or "").strip() or "شروع تماس"
         self.history.append({"role": "user", "content": text})
         system = self.sales_system or ""
-        messages = [{"role": "system", "content": system}, *self.history]
+        messages = mask_messages(
+            self.llm_url,
+            [{"role": "system", "content": system}, *self.history],
+        )
         spoke = False
-        try:
-            for bit in self._sales_events(self.llm_url, self.llm_model, messages, cancel, started):
-                if str(bit.get("sentence") or "").strip():
-                    spoke = True
-                yield bit
-        except Exception as exc:
-            log.warning("sales stream failed %s", type(exc).__name__)
-        if spoke or (cancel is not None and cancel.is_set()):
-            return
-        if self._can_fallback():
-            log.info("sales llm fallback")
+        hops = self._hops()
+        for index, (url, model) in enumerate(hops):
+            if index:
+                log.info("sales llm fallback")
             try:
-                for bit in self._sales_events(
-                    self.llm_fallback_url, self.llm_fallback_model, messages, cancel, started
-                ):
+                for bit in self._sales_events(url, model, messages, cancel, started):
                     if str(bit.get("sentence") or "").strip():
                         spoke = True
                     yield bit
             except Exception as exc:
-                log.warning("sales fallback failed %s", type(exc).__name__)
-        if spoke:
-            return
+                log.warning("sales stream failed %s", type(exc).__name__)
+            if spoke or (cancel is not None and cancel.is_set()):
+                return
         elapsed = time.monotonic() - started
         self.last_sales_stats = {
             "first_token_s": elapsed,
@@ -1010,25 +1095,55 @@ class Brain:
             "elapsed_s": elapsed,
         }
 
-    def _sales_events(self, url: str, model: str, messages: list[dict[str, str]], cancel, started: float):
+    def _sales_events(self, url: str, model: str, messages: list[dict], cancel, started: float):
         from sales import stream_tail, take_ready_sentences
 
-        timeout = float(os.environ.get("LLM_TIMEOUT_S", "4"))
+        timeout = float(os.environ.get("LLM_TIMEOUT_S", "8"))
         req = urllib.request.Request(
             url,
-            data=self._sales_payload(url, model, messages),
+            data=self._sales_payload(url, model, mask_messages(url, messages)),
             headers=self._sales_headers(url),
             method="POST",
         )
         first_token_s = 0.0
         prompt_n = 0
         predicted_n = 0
+        usage_cost = 0.0
         buf = ""
         raw = ""
         sent_count = 0
-        with urllib.request.urlopen(req, timeout=timeout) as res:
+
+        def take_usage(body: dict) -> None:
+            nonlocal prompt_n, predicted_n, usage_cost
+            timings = body.get("timings") or {}
+            if isinstance(timings, dict):
+                prompt_n = int(timings.get("prompt_n") or prompt_n)
+                predicted_n = int(timings.get("predicted_n") or predicted_n)
+            usage = body.get("usage") or {}
+            if not isinstance(usage, dict) or not usage:
+                return
+            prompt_n = int(usage.get("prompt_tokens") or prompt_n)
+            predicted_n = int(usage.get("completion_tokens") or predicted_n)
+            if usage.get("cost") is not None:
+                usage_cost = float(usage.get("cost") or 0)
+            self.last_usage = {"cost": usage_cost, "prompt": prompt_n, "completion": predicted_n}
+
+        def pack(sentence: str) -> dict:
+            return {
+                "sentence": sentence,
+                "raw": raw,
+                "first_token_s": first_token_s,
+                "prompt_n": prompt_n,
+                "predicted_n": predicted_n,
+                "elapsed_s": time.monotonic() - started,
+                "cost": usage_cost,
+                "model": model,
+            }
+
+        with open_llm(url, req, timeout) as res:
             leftover = b""
-            while True:
+            finished = False
+            while not finished:
                 if cancel is not None and cancel.is_set():
                     break
                 chunk = res.read(256)
@@ -1042,16 +1157,15 @@ class Brain:
                         continue
                     data = decoded[5:].strip()
                     if not data or data == "[DONE]":
-                        leftover = b""
+                        finished = True
                         break
                     try:
                         body = loads(data)
                     except Exception:
                         continue
-                    timings = body.get("timings") or {}
-                    if isinstance(timings, dict):
-                        prompt_n = int(timings.get("prompt_n") or prompt_n)
-                        predicted_n = int(timings.get("predicted_n") or predicted_n)
+                    take_usage(body)
+                    if sent_count >= 2:
+                        continue
                     delta = ((body.get("choices") or [{}])[0].get("delta") or {})
                     piece = str(delta.get("content") or "")
                     if not piece:
@@ -1063,37 +1177,18 @@ class Brain:
                     ready, buf = take_ready_sentences(buf)
                     for sentence in ready:
                         sent_count += 1
-                        yield {
-                            "sentence": sentence,
-                            "raw": raw,
-                            "first_token_s": first_token_s,
-                            "prompt_n": prompt_n,
-                            "predicted_n": predicted_n,
-                            "elapsed_s": time.monotonic() - started,
-                        }
+                        yield pack(sentence)
                         if sent_count >= 2:
-                            self.last_sales_stats = {
-                                "first_token_s": first_token_s,
-                                "prompt_n": prompt_n,
-                                "predicted_n": predicted_n,
-                                "elapsed_s": time.monotonic() - started,
-                            }
-                            return
-        tail = stream_tail(buf)
-        if tail and sent_count < 2:
-            yield {
-                "sentence": tail,
-                "raw": raw,
-                "first_token_s": first_token_s,
-                "prompt_n": prompt_n,
-                "predicted_n": predicted_n,
-                "elapsed_s": time.monotonic() - started,
-            }
+                            break
+        tail = stream_tail(buf) if sent_count < 2 else ""
+        if tail:
+            yield pack(tail)
         self.last_sales_stats = {
             "first_token_s": first_token_s,
             "prompt_n": prompt_n,
             "predicted_n": predicted_n,
             "elapsed_s": time.monotonic() - started,
+            "cost": usage_cost,
         }
 
     def synthesize(self, text: str) -> tuple[bytes, float]:
