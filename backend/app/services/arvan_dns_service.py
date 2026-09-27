@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from urllib.parse import urlparse
 
@@ -29,6 +30,10 @@ def _headers() -> dict[str, str]:
 
 def enabled() -> bool:
     return bool((settings.arvan_api_key or "").strip() and zone())
+
+
+def edge_dry() -> bool:
+    return os.environ.get("SOZAN_EDGE_DRY", "").strip().lower() in {"1", "true", "yes"}
 
 
 def public_host(slug: str) -> str:
@@ -186,6 +191,8 @@ def ensure_origin_record(domain: str, name: str = "@") -> dict:
 def ensure_shop_record(slug: str) -> dict:
     name = _label(slug)
     ip = _origin_ip()
+    if edge_dry():
+        return {"ok": True, "dry": True, "host": public_host(name), "name": name}
     if not enabled():
         return {"ok": False, "error": "کلید ابرآروان روی سرور نیست."}
     if not name:
@@ -214,6 +221,8 @@ def ensure_app_records() -> dict:
 def start_cname_setup(domain: str, slug: str = "") -> dict:
     host = hostname(domain)
     target = public_host(slug).rstrip(".")
+    if edge_dry():
+        return {"ok": True, "dry": True, "host": host, "target": target}
     if not enabled():
         return {"ok": False, "error": "کلید ابرآروان روی سرور نیست."}
     if not host:
