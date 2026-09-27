@@ -135,12 +135,25 @@ const FAQS = [
   },
 ] as const;
 
-function PlanCard({ plan, start, until }: { plan: PublicPlan; start: string; until: string }) {
+function PlanCard({
+  plan,
+  start,
+  until,
+  paymentReady,
+}: {
+  plan: PublicPlan;
+  start: string;
+  until: string;
+  paymentReady: boolean;
+}) {
   const featured = plan.id === "pro";
   const discounted = plan.listPrice > plan.price && plan.price > 0;
+  const paymentLater = plan.checkout === "open" && !paymentReady;
   const action =
-    plan.checkout === "soon" ? (
-      <span className="mt-auto inline-flex h-12 items-center justify-center rounded-full border border-line/80 px-6 text-sm text-ink/50">به‌زودی</span>
+    plan.checkout === "soon" || paymentLater ? (
+      <span className="mt-auto inline-flex h-12 items-center justify-center rounded-full border border-line/80 px-4 text-center text-sm text-ink/50">
+        {paymentLater ? "پرداخت به‌زودی فعال می‌شود" : "به‌زودی"}
+      </span>
     ) : (
       <a
         href={start}
@@ -625,7 +638,13 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             </div>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {plans.map((plan) => (
-                <PlanCard key={plan.id} plan={plan} start={start} until={catalog?.discountUntilLabel || ""} />
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  start={start}
+                  until={catalog?.discountUntilLabel || ""}
+                  paymentReady={catalog?.paymentReady === true}
+                />
               ))}
             </div>
             {plans.length === 0 ? (

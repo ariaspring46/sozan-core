@@ -11,6 +11,7 @@ export type PublicPlan = {
 
 export type PublicCatalog = {
   discountUntilLabel: string;
+  paymentReady: boolean;
   plans: PublicPlan[];
 };
 
@@ -21,7 +22,11 @@ export async function loadPublicPlans(): Promise<PublicCatalog | null> {
     if (!response.ok) return null;
     const body = (await response.json()) as Partial<PublicCatalog>;
     if (!Array.isArray(body.plans)) return null;
-    return { discountUntilLabel: body.discountUntilLabel || "", plans: body.plans };
+    return {
+      discountUntilLabel: body.discountUntilLabel || "",
+      paymentReady: body.paymentReady === true,
+      plans: body.plans,
+    };
   } catch {
     return null;
   }

@@ -206,6 +206,24 @@ class WalletPayTests(unittest.TestCase):
                 )
         self.assertEqual(out, "سلام")
 
+    def test_attach_pay_link_says_payment_later_without_merchant(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with (
+                patch.object(settings, "state_dir", raw),
+                patch.object(payment_service.env, "zarinpal_merchant_id", ""),
+                tenant_scope("09135409482"),
+            ):
+                created = storefront_service.add_product(title="کیف چرم", price=250000, stock=1, sku="kif")
+                product = created["product"]
+                text = asyncio.run(
+                    pay_service.attach_pay_link(
+                        "این کیف موجود است.",
+                        {"productId": product["id"], "amount": 250000, "title": "کیف چرم"},
+                    )
+                )
+        self.assertIn(payment_service.PAYMENT_LATER, text)
+        self.assertNotIn("http", text)
+
     def test_zarinpal_callback_credits_wallet(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):

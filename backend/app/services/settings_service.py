@@ -103,7 +103,7 @@ def public_settings() -> dict:
     tenant_merchant = bool(str(raw.get("paymentMerchantId") or "").strip())
     out["paymentMerchantFromHub"] = hub_merchant and not tenant_merchant
     out["billing"] = {
-        "ready": hub_merchant or tenant_merchant,
+        "ready": hub_merchant,
         "gateway": "zarinpal",
     }
     from app.services import wallet_service

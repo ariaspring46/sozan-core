@@ -78,6 +78,8 @@ def apply_phone_coupon(plan_id: str, amount: int, code: str | None) -> tuple[int
     raw = (code or "").strip()
     if not raw:
         return full, None, full
+    if not payment_service.merchant_id():
+        raise ValueError(payment_service.PAYMENT_LATER)
     if str(plan_id or "").strip().lower() not in {"pro", "promax", "ultra"}:
         raise ValueError("این کد تخفیف معتبر نیست")
     wanted = normalize_coupon(raw)
@@ -163,7 +165,7 @@ async def start_subscription(plan_id: str, *, phone: str, code: str | None = Non
             "subscription": plan_service.snapshot(),
         }
     if not payment_service.merchant_id():
-        raise ValueError("درگاه زرین‌پال هاب هنوز تنظیم نشده.")
+        raise ValueError(payment_service.PAYMENT_LATER)
     paid = await payment_service.zarinpal_request(
         amount_toman=amount,
         description=f"اشتراک {spec['label']} سوزان",

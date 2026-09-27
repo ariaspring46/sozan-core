@@ -30,6 +30,9 @@ GATEWAYS = (
 _MERCHANT = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
+PAYMENT_LATER = "پرداخت به‌زودی فعال می‌شود"
+
+
 def merchant_id(row: dict | None = None) -> str:
     current = str((row or {}).get("paymentMerchantId") or "").strip()
     if current:
@@ -214,7 +217,7 @@ def resolve_sale_gateway(row: dict | None = None) -> dict:
             "sandbox": current.get("paymentSandbox") is True,
         }
     if not hub:
-        raise ValueError("درگاه سوزان هنوز تنظیم نشده.")
+        raise ValueError(PAYMENT_LATER)
     return {
         "id": "zarinpal",
         "owner": "hub",

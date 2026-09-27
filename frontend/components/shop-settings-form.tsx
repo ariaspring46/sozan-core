@@ -404,7 +404,7 @@ export function ShopSettingsForm() {
                   ) : null}
                   {pickedPlan && pickedPlan !== form.plan && pickedSpec?.purchasable !== false ? (
                     <div className="space-y-2">
-                      {confirmPay && pickedPlan !== "free" ? (
+                      {confirmPay && pickedPlan !== "free" && form.billing?.ready ? (
                         <div className="space-y-2">
                           <Input
                             value={couponCode}
@@ -441,7 +441,7 @@ export function ShopSettingsForm() {
                             ? `موجودی کیف ${money(form.walletAvailable || 0)} تومان است و اشتراک ${pickedSpec?.label} از کیف کم می‌شود.`
                             : form.billing?.ready
                               ? `بعد از تأیید به زرین‌پال می‌روی و اشتراک ${pickedSpec?.label} فعال می‌شود.`
-                              : "درگاه زرین‌پال هاب هنوز تنظیم نشده."}
+                              : "پرداخت به‌زودی فعال می‌شود"}
                         </p>
                       ) : null}
                       <div className="flex flex-wrap gap-2">
@@ -475,7 +475,10 @@ export function ShopSettingsForm() {
                               "/billing/subscribe",
                               {
                                 method: "POST",
-                                body: JSON.stringify({ plan: pickedPlan, code: couponCode.trim() }),
+                                body: JSON.stringify({
+                                  plan: pickedPlan,
+                                  code: form.billing?.ready ? couponCode.trim() : "",
+                                }),
                               },
                             )
                               .then((data) => {
@@ -495,7 +498,15 @@ export function ShopSettingsForm() {
                               .finally(() => setBusy(false));
                           }}
                         >
-                          {pickedPlan === "free" ? "فعال‌سازی رایگان" : confirmPay ? (walletCovers ? "پرداخت از کیف" : "پرداخت با زرین‌پال") : "پرداخت و فعال‌سازی"}
+                          {pickedPlan === "free"
+                            ? "فعال‌سازی رایگان"
+                            : !walletCovers && !form.billing?.ready
+                              ? "پرداخت به‌زودی فعال می‌شود"
+                              : confirmPay
+                                ? walletCovers
+                                  ? "پرداخت از کیف"
+                                  : "پرداخت با زرین‌پال"
+                                : "پرداخت و فعال‌سازی"}
                         </Button>
                         <Button
                           variant="ghost"

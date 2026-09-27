@@ -272,6 +272,10 @@ async def attach_pay_link(
             channel=channel,
             thread_id=thread_id,
         )
+    except ValueError as exc:
+        if str(exc) == payment_service.PAYMENT_LATER and payment_service.PAYMENT_LATER not in text:
+            return f"{text}\n{payment_service.PAYMENT_LATER}"[:1000]
+        return text
     except Exception:
         return text
     url = str(order.get("payUrl") or "").strip()

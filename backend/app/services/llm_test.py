@@ -625,6 +625,96 @@ class OpenRouterCutoverTests(unittest.TestCase):
         self.assertEqual(titles, ["timeout"])
         self.assertEqual(len(seen), 2)
 
+    def test_unauthorized_then_next_provider(self) -> None:
+        seen: list[dict] = []
+
+        class DeniedThenOk:
+            def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+                self.timeout = timeout
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                seen.append({"url": url, "auth": (headers or {}).get("Authorization")})
+                request = httpx.Request("POST", url)
+                if "openrouter.ai" in url:
+                    response = httpx.Response(401, request=request)
+                    raise httpx.HTTPStatusError("denied", request=request, response=response)
+                return httpx.Response(
+                    200,
+                    json={
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": "",
+                                    "tool_calls": [
+                                        {"id": "c1", "function": {"name": "ask_user", "arguments": "{}"}}
+                                    ],
+                                }
+                            }
+                        ]
+                    },
+                    request=request,
+                )
+
+        with tempfile.TemporaryDirectory() as raw, patch.dict(
+            os.environ,
+            {
+                "open_router_api_token": "",
+                "CLOUD_LLM_FALLBACK_URL": "",
+                "CLOUD_LLM_FALLBACK_MODEL": "",
+                "CLOUD_LLM_FALLBACK_TOKEN": "",
+                "CLOUD_LLM_FALLBACK_AUTH": "",
+            },
+        ), patch("app.services.llm.settings") as settings, patch(
+            "app.state_store.settings"
+        ) as state_settings, patch(
+            "app.services.llm_routing_service.get", return_value=None
+        ), patch("app.services.llm.httpx.AsyncClient", DeniedThenOk), patch(
+            "app.services.llm.emit_later"
+        ), patch("app.services.llm._ensure_gpu1", new=AsyncMock(side_effect=lambda model: model)):
+            state_settings.state_path = Path(raw)
+            _apply_settings(
+                settings,
+                _route_settings(
+                    cloud_llm_url="https://openrouter.ai/api/v1",
+                    cloud_llm_model="deepseek/deepseek-v4.1-flash",
+                    cloud_llm_token="should-not-use",
+                    open_router_api_token="or-from-settings",
+                    cloud_llm_fallback_url="https://api.arvancloudai.ir/v1",
+                    cloud_llm_fallback_model="GPT-OSS-120B",
+                    cloud_llm_fallback_token="arvan-from-settings",
+                ),
+            )
+            out = asyncio.run(complete_tools(messages=[{"role": "user", "content": "hi"}], tools=[{"type": "function"}]))
+        self.assertEqual(out["tool_calls"][0]["name"], "ask_user")
+        self.assertIn("openrouter.ai", seen[0]["url"])
+        self.assertIn("arvancloudai.ir", seen[1]["url"])
+        self.assertEqual(seen[0]["auth"], "Bearer or-from-settings")
+        self.assertEqual(seen[1]["auth"], "Bearer arvan-from-settings")
+        self.assertEqual(len(seen), 2)
+
+    def test_provider_auth_alert_once_per_hour(self) -> None:
+        from app.services.llm import note_provider_denied
+
+        emitted: list[str] = []
+
+        def emit(**kwargs):
+            if kwargs.get("title") == "provider-auth":
+                emitted.append(str((kwargs.get("payload") or {}).get("code") or ""))
+
+        with tempfile.TemporaryDirectory() as raw, patch("app.state_store.settings") as state_settings, patch(
+            "app.services.llm.emit_later", new=emit
+        ):
+            state_settings.state_path = Path(raw)
+            note_provider_denied("https://openrouter.ai/api/v1", 401)
+            note_provider_denied("https://openrouter.ai/api/v1", 401)
+        self.assertEqual(emitted, ["401"])
+
 
 class ChatFailReportTests(unittest.TestCase):
     def test_timeout_classifies_and_emits_chat_failed(self) -> None:

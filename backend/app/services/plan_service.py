@@ -199,6 +199,8 @@ def _card(item: dict, now: datetime | None = None) -> dict:
 
 
 def public_catalog(now: datetime | None = None) -> dict:
+    from app.services.payment_service import merchant_id
+
     until = discount_until()
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None:
@@ -209,6 +211,7 @@ def public_catalog(now: datetime | None = None) -> dict:
         "discountUntil": until.isoformat() if active and until else None,
         "discountUntilLabel": shamsi_label(until) if active and until else "",
         "plans": [_card(item, moment) for item in PLANS.values()],
+        "paymentReady": bool(merchant_id()),
     }
 
 

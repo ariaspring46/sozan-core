@@ -150,4 +150,6 @@ async def favicon():
 
 @app.get("/health")
 async def health():
-    return {"ok": True}
+    from app.services.payment_service import merchant_id
+
+    return {"ok": True, "paymentReady": bool(merchant_id())}

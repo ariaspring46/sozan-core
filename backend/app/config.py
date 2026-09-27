@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     cloud_llm_token: str = Field(default="", validation_alias=AliasChoices("CLOUD_LLM_TOKEN", "OLLAMA_API_KEY"))
     cloud_llm_auth: str = "Bearer"
     cloud_llm_proxy: str = ""
+    open_router_api_token: str = ""
+    cloud_llm_fallback_url: str = ""
+    cloud_llm_fallback_model: str = ""
+    cloud_llm_fallback_token: str = ""
+    cloud_llm_fallback_auth: str = "Bearer"
     studio_cloud_url: str = ""
     studio_cloud_model: str = "Gemini-3.1-Flash-Lite-Preview"
     studio_cloud_token: str = Field(default="", validation_alias=AliasChoices("STUDIO_CLOUD_TOKEN", "GEMINI_API_KEY"))
