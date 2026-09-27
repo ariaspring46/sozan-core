@@ -1246,7 +1246,7 @@ class Gateway:
         retry_heard = ""
         gen = self.brain.sales_stream(plan.cue, cancel)
         try:
-            for bit in gen:
+            for bit in self._ahead_sales(gen, cancel, generation):
                 if generation != self._call_generation or cancel.is_set():
                     break
                 extra = self._pending_heard(session)
@@ -1286,8 +1286,9 @@ class Gateway:
                 spoken_parts = []
                 raw_all = ""
                 tags = set()
+                retry_gen = self.brain.sales_stream(plan.cue, cancel)
                 try:
-                    for bit in self.brain.sales_stream(plan.cue, cancel):
+                    for bit in self._ahead_sales(retry_gen, cancel, generation):
                         sentence, raw_all, tags, spoken_parts, generated, played, first_audio, first_token_s, prompt_n = (
                             self._sales_play_bit(
                                 session,
@@ -1307,6 +1308,8 @@ class Gateway:
                         first_token_s = float(bit.get("first_token_s") or first_token_s)
                 except Exception:
                     log.warning("sales stream retry failed", exc_info=True)
+                finally:
+                    retry_gen.close()
         session.play(b"", end=True)
         generated_text = " ".join(generated).strip()
         spoken = " ".join(spoken_parts).strip()
@@ -1409,6 +1412,8 @@ class Gateway:
         generated.append(sentence)
         if not text:
             return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
+        if played_flag is not None:
+            played_flag["on"] = True
         if generation != self._call_generation or session._speech or session.last_was_barge:
             return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
         pcm = self._voice.get(text)
@@ -1425,6 +1430,34 @@ class Gateway:
             log.info("say kind=meaning tts=%.2f line=%s", tts_s, text)
         spoken_parts.append(text)
         return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
+
+    def _ahead_sales(self, gen, cancel: threading.Event, generation: int):
+        """Keep reading tokens while Piper builds the sentence already queued."""
+        bits: queue.Queue = queue.Queue()
+        done = threading.Event()
+
+        def pump() -> None:
+            try:
+                for bit in gen:
+                    if cancel.is_set() or generation != self._call_generation:
+                        break
+                    bits.put(bit)
+            except Exception:
+                log.warning("sales stream turn failed", exc_info=True)
+            finally:
+                bits.put(None)
+                done.set()
+
+        threading.Thread(target=pump, name="sales-tokens", daemon=True).start()
+        try:
+            while True:
+                bit = bits.get()
+                if bit is None:
+                    break
+                yield bit
+        finally:
+            cancel.set()
+            done.wait(timeout=5)
 
     def _speak_more(self, session: RtpSession, generation: int, line: str) -> None:
         pcm = self._voice.get(line)

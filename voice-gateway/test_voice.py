@@ -89,6 +89,7 @@ from sales import (
     take_ready_sentences,
     toman_words,
     too_alike,
+    stream_tail,
     wait_line,
     wants_address,
     plan_catalog,
@@ -536,7 +537,11 @@ class SalesTest(unittest.TestCase):
         self.assertIn("تکرار نکن", note)
         self.assertIn("کار این نوبت", note)
         long = "چه خوب مشتری‌ها دیگه لازم نیست دونه به دونه آدرس و شماره بگیرند و همه چیز ثبت می‌شود در فروشگاه."
-        self.assertLessEqual(len(shorten_reply(long).split()), 18)
+        self.assertTrue(shorten_reply(long).endswith("فروشگاه."))
+        self.assertGreater(len(shorten_reply(long).split()), 18)
+        self.assertEqual(shorten_reply(" ".join(["کلمه"] * 22)), "")
+        self.assertEqual(stream_tail("و اون پیش"), "")
+        self.assertEqual(stream_tail("سلام، تمام شد."), "سلام، تمام شد.")
         self.assertNotIn("شماره بگیرید", guard_reply("مشتری‌ها باید شماره بگیرید از همه.", "چی کار می‌کنی"))
         self.assertIn("پیجتون", formalize_you("فقط اسم پیجت رو می‌نویسی"))
         self.assertIn("برید", formalize_you("برو sozan-core.ir"))
@@ -554,6 +559,17 @@ class SalesTest(unittest.TestCase):
         note_spoken(pitched, "چه خوب، کیف می‌فروشید.")
         forced = plan_turn(pitched, "چجوری کار می‌کنه از کجا باید شروع کنم")
         self.assertEqual(forced.kind, "address")
+        asked_job = SalesState()
+        plan_turn(asked_job, "سلام")
+        note_spoken(asked_job, HELLO_LINE)
+        note_spoken(asked_job, "اسمم سوزانه.")
+        job = plan_turn(asked_job, "چه کارایی رو انجام میدی")
+        self.assertEqual(job.kind, "model")
+        where = plan_turn(asked_job, "پیجام کجا باید وارد کنم")
+        self.assertEqual(where.kind, "address")
+        self.assertEqual(where.line, ADDRESS_LINE)
+        hard = plan_turn(asked_job, "از اون سخت سیباز باشه")
+        self.assertEqual(hard.kind, "model")
         worried = SalesState()
         plan_turn(worried, "سلام")
         note_spoken(worried, HELLO_LINE)
@@ -568,6 +584,10 @@ class SalesTest(unittest.TestCase):
         self.assertNotIn("رزرو", guard_reply("مشتری‌هاتون می‌تونن مستقیم از سایت رزرو کنن.", "آرایشگاه"))
         self.assertNotIn("کً", speakable("ساختنش کًلاً رایگانه 👌"))
         self.assertNotIn("👌", speakable("ساختنش کًلاً رایگانه 👌"))
+        self.assertIn("اینستاگرام", speakable("مخصوص پیج‌های اینstagram فروشیه."))
+        self.assertNotRegex(speakable("مخصوص پیج‌های اینstagram فروشیه."), r"[A-Za-z]")
+        self.assertIn("اسمم", speakable("اسمن سوزان."))
+        self.assertIn("یاسمن", speakable("یاسمن آمد."))
         quiet = b"\x00" * 320
         noisy = mix_shop_noise(quiet)
         self.assertEqual(len(noisy), 320)

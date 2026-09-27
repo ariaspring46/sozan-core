@@ -12,6 +12,7 @@ import threading
 import time
 import array
 import urllib.error
+import urllib.parse
 import urllib.request
 import wave
 from json import dumps, loads
@@ -62,6 +63,20 @@ _ACK = {
 }
 
 
+def chat_completions_url(url: str) -> str:
+    root = (url or "").strip().rstrip("/")
+    if not root:
+        return ""
+    if root.endswith("/chat/completions"):
+        return root
+    return root + "/chat/completions"
+
+
+def llm_is_local(url: str) -> bool:
+    host = urllib.parse.urlparse(url).hostname or ""
+    return host in {"127.0.0.1", "localhost"}
+
+
 def speakable(text: str, sentences: int = 1) -> str:
     cleaned = THINK.sub("", text or "")
     cleaned = FENCE.sub("", cleaned)
@@ -74,6 +89,14 @@ def speakable(text: str, sentences: int = 1) -> str:
     cleaned = re.sub(r"(?i)sozan-core", "سوزان، خط تیره، کُر", cleaned)
     cleaned = re.sub(r"(?i)(?<![A-Za-z])ir(?![A-Za-z])", "آی‌آر", cleaned)
     cleaned = re.sub(r"https?://\S+", "", cleaned)
+    cleaned = re.sub(r"(?i)instagram", "اینستاگرام", cleaned)
+    cleaned = re.sub(r"(?i)این\s*stagram", "اینستاگرام", cleaned)
+    cleaned = re.sub(r"(?i)telegram", "تلگرام", cleaned)
+    cleaned = re.sub(r"(?i)whatsapp", "واتساپ", cleaned)
+    cleaned = re.sub(r"(?i)website", "وبسایت", cleaned)
+    cleaned = re.sub(r"(?i)\bok\b", "اوکی", cleaned)
+    cleaned = re.sub(r"(?<![\u0600-\u06FF])اسمن(?![\u0600-\u06FF])", "اسمم", cleaned)
+    cleaned = re.sub(r"[A-Za-z]{2,}", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     if not cleaned:
         return ""
@@ -546,10 +569,14 @@ class Brain:
         self.espeak_data = os.environ.get(
             "ESPEAK_DATA", os.path.expanduser("~/.final-27b/bin/espeak-ng-data")
         )
-        self.llm_url = os.environ.get("LLM_URL", "http://127.0.0.1:9219/v1/chat/completions").rstrip("/")
-        if not self.llm_url.endswith("/chat/completions"):
-            self.llm_url = self.llm_url + "/chat/completions"
-        self.llm_model = os.environ.get("LLM_MODEL", "sozan-voice")
+        self.llm_url = chat_completions_url(
+            os.environ.get("LLM_URL", "http://127.0.0.1:19292/v1")
+        )
+        self.llm_model = os.environ.get("LLM_MODEL", "ornith-phone")
+        self.llm_fallback_url = chat_completions_url(
+            os.environ.get("LLM_FALLBACK_URL", "http://127.0.0.1:19292/v1")
+        )
+        self.llm_fallback_model = os.environ.get("LLM_FALLBACK_MODEL", "ornith-phone")
         self.embed_url = os.environ.get("EMBED_URL", "http://127.0.0.1:19292/v1/embeddings")
         self.embed_model = os.environ.get("EMBED_MODEL", "bge-m3")
         self.embed_min = float(os.environ.get("EMBED_MIN", "0.62"))
@@ -910,31 +937,87 @@ class Brain:
         self.commit_assistant(spoken)
         return spoken, time.monotonic() - started
 
-    def sales_stream(self, cue: str, cancel: threading.Event | None = None):
-        from sales import take_ready_sentences
+    def _can_fallback(self) -> bool:
+        return bool(self.llm_fallback_url) and (
+            self.llm_fallback_url != self.llm_url or self.llm_fallback_model != self.llm_model
+        )
 
+    def _sales_payload(self, url: str, model: str, messages: list[dict[str, str]]) -> bytes:
+        body: dict[str, object] = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 120,
+            "stream": True,
+            "stop": ["\n"],
+        }
+        if llm_is_local(url):
+            body["cache_prompt"] = True
+            body["id_slot"] = 0
+            body["presence_penalty"] = 0.3
+        return dumps(body).encode("utf-8")
+
+    def _sales_headers(self, url: str) -> dict[str, str]:
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+        if not llm_is_local(url):
+            key = os.environ.get("LLM_API_KEY", "").strip()
+            if key:
+                headers["Authorization"] = "Bearer " + key
+        return headers
+
+    def sales_stream(self, cue: str, cancel: threading.Event | None = None):
         started = time.monotonic()
         text = (cue or "").strip() or "شروع تماس"
         self.history.append({"role": "user", "content": text})
         system = self.sales_system or ""
         messages = [{"role": "system", "content": system}, *self.history]
-        payload = dumps(
-            {
-                "model": self.llm_model,
-                "messages": messages,
-                "temperature": 0.7,
-                "max_tokens": 70,
-                "stream": True,
-                "cache_prompt": True,
-                "id_slot": 0,
-                "presence_penalty": 0.3,
-                "stop": ["\n"],
-            }
-        ).encode("utf-8")
+        spoke = False
+        try:
+            for bit in self._sales_events(self.llm_url, self.llm_model, messages, cancel, started):
+                if str(bit.get("sentence") or "").strip():
+                    spoke = True
+                yield bit
+        except Exception as exc:
+            log.warning("sales stream failed %s", type(exc).__name__)
+        if spoke or (cancel is not None and cancel.is_set()):
+            return
+        if self._can_fallback():
+            log.info("sales llm fallback")
+            try:
+                for bit in self._sales_events(
+                    self.llm_fallback_url, self.llm_fallback_model, messages, cancel, started
+                ):
+                    if str(bit.get("sentence") or "").strip():
+                        spoke = True
+                    yield bit
+            except Exception as exc:
+                log.warning("sales fallback failed %s", type(exc).__name__)
+        if spoke:
+            return
+        elapsed = time.monotonic() - started
+        self.last_sales_stats = {
+            "first_token_s": elapsed,
+            "prompt_n": 0,
+            "predicted_n": 0,
+            "elapsed_s": elapsed,
+        }
+        yield {
+            "sentence": "",
+            "raw": "",
+            "first_token_s": elapsed,
+            "prompt_n": 0,
+            "predicted_n": 0,
+            "elapsed_s": elapsed,
+        }
+
+    def _sales_events(self, url: str, model: str, messages: list[dict[str, str]], cancel, started: float):
+        from sales import stream_tail, take_ready_sentences
+
+        timeout = float(os.environ.get("LLM_TIMEOUT_S", "4"))
         req = urllib.request.Request(
-            self.llm_url,
-            data=payload,
-            headers={"Content-Type": "application/json", "Accept": "text/event-stream"},
+            url,
+            data=self._sales_payload(url, model, messages),
+            headers=self._sales_headers(url),
             method="POST",
         )
         first_token_s = 0.0
@@ -943,79 +1026,60 @@ class Brain:
         buf = ""
         raw = ""
         sent_count = 0
-        try:
-            with urllib.request.urlopen(req, timeout=4) as res:
-                leftover = b""
-                while True:
-                    if cancel is not None and cancel.is_set():
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            leftover = b""
+            while True:
+                if cancel is not None and cancel.is_set():
+                    break
+                chunk = res.read(256)
+                if not chunk:
+                    break
+                leftover += chunk
+                while b"\n" in leftover:
+                    line, leftover = leftover.split(b"\n", 1)
+                    decoded = line.decode("utf-8", errors="replace").strip()
+                    if not decoded.startswith("data:"):
+                        continue
+                    data = decoded[5:].strip()
+                    if not data or data == "[DONE]":
+                        leftover = b""
                         break
-                    chunk = res.read(256)
-                    if not chunk:
-                        break
-                    leftover += chunk
-                    while b"\n" in leftover:
-                        line, leftover = leftover.split(b"\n", 1)
-                        decoded = line.decode("utf-8", errors="replace").strip()
-                        if not decoded.startswith("data:"):
-                            continue
-                        data = decoded[5:].strip()
-                        if not data or data == "[DONE]":
-                            leftover = b""
-                            break
-                        try:
-                            body = loads(data)
-                        except Exception:
-                            continue
-                        timings = body.get("timings") or {}
-                        if isinstance(timings, dict):
-                            prompt_n = int(timings.get("prompt_n") or prompt_n)
-                            predicted_n = int(timings.get("predicted_n") or predicted_n)
-                        delta = ((body.get("choices") or [{}])[0].get("delta") or {})
-                        piece = str(delta.get("content") or "")
-                        if not piece:
-                            continue
-                        if not first_token_s and piece.strip():
-                            first_token_s = time.monotonic() - started
-                        raw += piece
-                        buf += piece
-                        ready, buf = take_ready_sentences(buf)
-                        for sentence in ready:
-                            sent_count += 1
-                            yield {
-                                "sentence": sentence,
-                                "raw": raw,
+                    try:
+                        body = loads(data)
+                    except Exception:
+                        continue
+                    timings = body.get("timings") or {}
+                    if isinstance(timings, dict):
+                        prompt_n = int(timings.get("prompt_n") or prompt_n)
+                        predicted_n = int(timings.get("predicted_n") or predicted_n)
+                    delta = ((body.get("choices") or [{}])[0].get("delta") or {})
+                    piece = str(delta.get("content") or "")
+                    if not piece:
+                        continue
+                    if not first_token_s and piece.strip():
+                        first_token_s = time.monotonic() - started
+                    raw += piece
+                    buf += piece
+                    ready, buf = take_ready_sentences(buf)
+                    for sentence in ready:
+                        sent_count += 1
+                        yield {
+                            "sentence": sentence,
+                            "raw": raw,
+                            "first_token_s": first_token_s,
+                            "prompt_n": prompt_n,
+                            "predicted_n": predicted_n,
+                            "elapsed_s": time.monotonic() - started,
+                        }
+                        if sent_count >= 2:
+                            self.last_sales_stats = {
                                 "first_token_s": first_token_s,
                                 "prompt_n": prompt_n,
                                 "predicted_n": predicted_n,
                                 "elapsed_s": time.monotonic() - started,
                             }
-                            if sent_count >= 2:
-                                self.last_sales_stats = {
-                                    "first_token_s": first_token_s,
-                                    "prompt_n": prompt_n,
-                                    "predicted_n": predicted_n,
-                                    "elapsed_s": time.monotonic() - started,
-                                }
-                                return
-        except Exception:
-            log.warning("sales stream failed", exc_info=True)
-            if not raw:
-                yield {
-                    "sentence": "",
-                    "raw": "",
-                    "first_token_s": time.monotonic() - started,
-                    "prompt_n": prompt_n,
-                    "predicted_n": predicted_n,
-                    "elapsed_s": time.monotonic() - started,
-                }
-                self.last_sales_stats = {
-                    "first_token_s": time.monotonic() - started,
-                    "prompt_n": prompt_n,
-                    "predicted_n": predicted_n,
-                    "elapsed_s": time.monotonic() - started,
-                }
-                return
-        tail = buf.strip()
+                            return
+        tail = stream_tail(buf)
         if tail and sent_count < 2:
             yield {
                 "sentence": tail,

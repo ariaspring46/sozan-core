@@ -112,6 +112,10 @@ _ADDRESS_HINTS = (
     "اسم سایتتو",
     "پنل کجا",
     "کجا وارد",
+    "وارد کنم",
+    "وارد بشم",
+    "وارد شم",
+    "شروع کنم",
     "واتساپ",
     "واتسپ",
     "واتساب",
@@ -555,7 +559,7 @@ def read_signals(heard: str) -> Signals:
     agree = any(part in blob for part in ("باشه", "چشم", "اوکی", "میرم", "می‌رم", "باز کردم", "زدم ورود", "آره میام"))
     robot = any(part in blob for part in ("ربات", "هوش مصنوعی", "ماشینی", "واقعی هستی"))
     has_site = any(part in blob for part in ("سایت دارم", "سایتم هست", "وبسایت دارم"))
-    cant = any(part in blob for part in ("بلد نیست", "نمی‌دونم", "نمیدونم", "سخت"))
+    cant = any(part in blob for part in ("بلد نیست", "نمی‌دونم", "نمیدونم", "سخته", "سختِ"))
     time = any(part in blob for part in ("وقت ندار", "سرم شلوغ", "طول می‌کشه", "طول میکشه"))
     refuse = any(part in blob for part in ("نمیخوام", "نمی‌خوام", "لازم نیست", "ولش کن"))
     wrong = any(
@@ -686,19 +690,6 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             state.stage = "confirm"
         else:
             state.stage = "cta"
-            return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
-    if state.turns >= 2 and not state.linked:
-        state.stage = "cta"
-        blocked = (
-            signals.price
-            or signals.later
-            or signals.trust
-            or signals.cant
-            or signals.has_site
-            or signals.robot
-            or signals.source
-        )
-        if not blocked:
             return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
     return TurnPlan(
         kind="model",
@@ -901,6 +892,18 @@ def guard_reply(reply: str, heard: str) -> str:
     return shorten_reply(" ".join(kept).strip())
 
 
+def sentence_done(text: str) -> bool:
+    return bool(re.search(r"[.!?؟]$", (text or "").strip()))
+
+
+def stream_tail(buf: str) -> str:
+    """Only a finished sentence may be spoken after the token stream stops."""
+    tail = (buf or "").strip()
+    if tail and sentence_done(tail):
+        return tail
+    return ""
+
+
 def shorten_reply(text: str, limit: int = 18) -> str:
     blob = re.sub(r"\s+", " ", text or "").strip()
     if not blob:
@@ -910,14 +913,19 @@ def shorten_reply(text: str, limit: int = 18) -> str:
     count = 0
     for part in parts:
         words = part.split()
-        if count and count + len(words) > limit:
+        if not words:
+            continue
+        # Never cut a sentence in the middle and invent a period.
+        if not sentence_done(part):
+            if len(words) > 8:
+                break
+        elif not count and len(words) > 28:
             break
-        if not count and len(words) > limit:
-            kept.append(" ".join(words[:limit]).rstrip("،,") + ".")
+        elif count and count + len(words) > limit:
             break
         kept.append(part)
         count += len(words)
-        if count >= 12:
+        if count >= 12 and sentence_done(part):
             break
     return " ".join(kept).strip()
 
