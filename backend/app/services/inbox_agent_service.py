@@ -1,21 +1,31 @@
 """Direct-message sales agent.
 
-Chat goes through llm.py on the inbox surface (cloud chain, then the always-on
-9b). Customer text is masked before that call and is not written to observe.
-Stock, order status, and payment links still come from the shop's own data.
-Local bge-m3 only nudges a tool when the model answered with none.
+Chat goes through llm.py on the inbox surface: cloud first, and the home 9b
+only after those clouds fail. Customer text is masked before that call and is
+not written to observe. Shipping, returns, and shop policy are copied from the
+stored policy, not from the model. Stock, order status, and payment links still
+come from the shop's own data. Local bge-m3 only nudges a tool when the model
+answered with none.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
+import time
 
 import httpx
 
 from app.config import settings
-from app.services.llm import ARVAN_HOST_SUFFIX, LLM_BAD_JSON, complete_tools, spoken_model_reply
+from app.services.llm import (
+    ARVAN_HOST_SUFFIX,
+    INBOX_TURN_BUDGET,
+    LLM_BAD_JSON,
+    complete_tools,
+    spoken_model_reply,
+)
 from app.services.observe_client import emit_later
 from app.services.persian_text import guard_output
 from app.services.pii_mask import mask_pii
@@ -26,7 +36,6 @@ log = logging.getLogger("sozan.inbox.agent")
 AGENT_MODEL = "qwen3.5-9b"
 EMBED_MODEL = "bge-m3"
 MAX_ROUNDS = 4
-INBOX_TIMEOUT = 4
 DRY_PAY_HOST = "dry-mock.invalid"
 _BUY_MARKS = (
     "لینک پرداخت",
@@ -508,13 +517,13 @@ async def _claims(text: str, facts: str) -> str:
     return text
 
 
-async def _complete(messages: list[dict], *, allow_payment: bool) -> tuple[str, list[dict]]:
+async def _complete(messages: list[dict], *, allow_payment: bool, timeout: float) -> tuple[str, list[dict]]:
     result = await complete_tools(
         messages=_mask_for_model(messages),
         tools=_tools(allow_payment=allow_payment),
         temperature=0.3,
         max_tokens=500,
-        timeout=INBOX_TIMEOUT,
+        timeout=timeout,
         surface="inbox",
     )
     calls = []
@@ -641,25 +650,77 @@ def _system(thread: dict | None) -> str:
     ).strip()
 
 
-def _seed_stock(messages: list[dict], products: list[dict]) -> None:
+def _catalog_line(item: dict) -> str:
+    title = str(item.get("title") or "")
+    row = tool_stock(title)
+    colors = [str(color).strip() for color in (item.get("colors") or []) if str(color).strip()]
+    sizes = str(item.get("sizes") or "").strip()
+    products = row.get("products") if isinstance(row.get("products"), list) else []
+    for product in products:
+        if isinstance(product, dict):
+            product["colors"] = colors
+            product["sizes"] = sizes
+    return json.dumps(row, ensure_ascii=False)
+
+
+def _catalog_facts(reply: str) -> str:
+    """Color, material words in the title, and size, so a matching reply skips the claims model."""
+    folded = _norm(reply).replace("\u200c", "")
     lines = []
-    for item in products:
+    for item in _products():
         title = str(item.get("title") or "")
-        lines.append(json.dumps(tool_stock(title), ensure_ascii=False))
+        colors = [str(color).strip() for color in (item.get("colors") or []) if str(color).strip()]
+        sizes = str(item.get("sizes") or "").strip()
+        words = [word for word in _norm(title).replace("\u200c", "").split() if len(word) >= 3]
+        keys = words + [_norm(color).replace("\u200c", "") for color in colors]
+        if sizes:
+            keys.append(_norm(sizes).replace("\u200c", ""))
+        if any(key and key in folded for key in keys):
+            lines.append(
+                json.dumps({"title": title, "colors": colors, "sizes": sizes}, ensure_ascii=False)
+            )
+    return "\n".join(lines)
+
+
+def _seed_stock(messages: list[dict], products: list[dict]) -> None:
+    lines = [_catalog_line(item) for item in products]
     messages.append(
         {
             "role": "system",
             "content": "موجودی این کالاها از کاتالوگ آمده است.\n"
             + "\n".join(lines)
-            + "\nجواب را از همین عددها بنویس و ابزار پرداخت را صدا نزن.",
+            + "\nجواب را از همین عددها، رنگ‌ها و اندازه‌ها بنویس و ابزار پرداخت را صدا نزن.",
         }
     )
+
+
+def _policy_reply(thread: dict | None, sentence: str) -> str | None:
+    from app.services.sales_policy_service import fixed_reply
+
+    fixed = fixed_reply(sentence)
+    if fixed is None:
+        return None
+    reply = guard_output(fixed) if fixed.strip() else ""
+    if not reply.strip():
+        reply = _hand_off(thread, "سیاست ثبت نشده")
+    emit_later(
+        kind="inbox",
+        surface="inbox",
+        title="inbox-agent",
+        status="handoff" if reply == HANDOFF_LINE else "ready",
+        payload={"tools": [], "reason": "policy"},
+    )
+    return reply[:1000]
 
 
 async def answer(customer_text: str, thread: dict | None = None) -> str | None:
     sentence = str(customer_text or "").strip()
     if not sentence:
         return None
+    stored = _policy_reply(thread, sentence)
+    if stored is not None:
+        return stored
+    started = time.monotonic()
     messages: list[dict] = [{"role": "system", "content": _system(thread)}, *_history(thread)]
     if not messages[-1:] or messages[-1].get("content") != sentence:
         messages.append({"role": "user", "content": sentence[:800]})
@@ -679,7 +740,18 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
             rounds += 1
             if rounds > MAX_ROUNDS + 1:
                 break
-            text, calls = await _complete(messages, allow_payment=allow_payment)
+            left = INBOX_TURN_BUDGET - (time.monotonic() - started)
+            if left < 1:
+                reply = _hand_off(thread, "مهلت مدل")
+                emit_later(
+                    kind="inbox",
+                    surface="inbox",
+                    title="inbox-agent",
+                    status="handoff",
+                    payload={"tools": used, "reason": "مهلت مدل"},
+                )
+                return reply
+            text, calls = await _complete(messages, allow_payment=allow_payment, timeout=left)
             if not calls:
                 blob_now = _tool_blob(messages)
                 grounded = bool(_amounts(text) & _amounts(blob_now)) or (
@@ -714,7 +786,19 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                     )
                     return reply
                 reply = _fix_links(reply, pay_urls)
-                reply = await _claims(reply, blob)
+                facts = "\n".join(part for part in (blob, _catalog_facts(reply)) if part)
+                left = INBOX_TURN_BUDGET - (time.monotonic() - started)
+                if left < 1:
+                    reply = _hand_off(thread, "مهلت مدل")
+                    emit_later(
+                        kind="inbox",
+                        surface="inbox",
+                        title="inbox-agent",
+                        status="handoff",
+                        payload={"tools": used, "reason": "مهلت مدل"},
+                    )
+                    return reply
+                reply = await asyncio.wait_for(_claims(reply, facts), timeout=left)
                 for url in pay_urls:
                     if url and url not in reply:
                         reply = f"{reply}\n{url}".strip()

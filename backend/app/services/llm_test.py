@@ -746,7 +746,7 @@ class Gpu1GuardTests(unittest.TestCase):
 
 
 class InboxHopTests(unittest.TestCase):
-    def _client(self, seen: list, *, fail_local: bool = False):
+    def _client(self, seen: list, *, fail_cloud: bool = False):
         class Client:
             def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
                 self.timeout = timeout
@@ -759,7 +759,7 @@ class InboxHopTests(unittest.TestCase):
 
             async def post(self, url, json=None, headers=None):
                 seen.append({"url": url, "timeout": self.timeout, "model": (json or {}).get("model")})
-                if fail_local and "127.0.0.1:9292" in url:
+                if fail_cloud and "ai.example" in url:
                     raise httpx.TimeoutException("late")
                 request = httpx.Request("POST", url)
                 return httpx.Response(
@@ -770,10 +770,10 @@ class InboxHopTests(unittest.TestCase):
 
         return Client
 
-    def _run(self, seen: list, *, fail_local: bool = False) -> dict:
+    def _run(self, seen: list, *, fail_cloud: bool = False) -> dict:
         with patch("app.services.llm.settings") as settings, patch(
             "app.services.llm_routing_service.get", return_value=None
-        ), patch("app.services.llm.httpx.AsyncClient", self._client(seen, fail_local=fail_local)), patch(
+        ), patch("app.services.llm.httpx.AsyncClient", self._client(seen, fail_cloud=fail_cloud)), patch(
             "app.services.llm.emit_later"
         ):
             _apply_settings(
@@ -788,25 +788,30 @@ class InboxHopTests(unittest.TestCase):
                 complete_tools(messages=[{"role": "user", "content": "سلام"}], tools=[], surface="inbox")
             )
 
-    def test_inbox_starts_on_the_local_model_within_four_seconds(self) -> None:
+    def _chats(self, seen: list) -> list:
+        return [row for row in seen if str(row.get("url") or "").endswith("/chat/completions")]
+
+    def test_inbox_starts_on_the_cloud_within_fifteen_seconds(self) -> None:
         seen: list = []
         out = self._run(seen)
+        chats = self._chats(seen)
         self.assertEqual(out["text"], "سلام")
-        self.assertEqual(len(seen), 1)
-        self.assertIn("127.0.0.1:9292", seen[0]["url"])
-        self.assertEqual(seen[0]["model"], "qwen3.5-9b")
-        self.assertEqual(seen[0]["timeout"], 4)
-        self.assertNotIn("cloud-token", str(seen))
+        self.assertEqual(len(chats), 1)
+        self.assertIn("ai.example", chats[0]["url"])
+        self.assertEqual(chats[0]["model"], "GPT-OSS-120B")
+        self.assertEqual(chats[0]["timeout"], 15)
+        self.assertNotIn("9292", chats[0]["url"])
 
-    def test_inbox_uses_the_cloud_hop_only_after_local_fails(self) -> None:
+    def test_inbox_uses_the_local_model_only_after_the_cloud_fails(self) -> None:
         seen: list = []
-        out = self._run(seen, fail_local=True)
+        out = self._run(seen, fail_cloud=True)
+        chats = self._chats(seen)
         self.assertEqual(out["text"], "سلام")
-        self.assertEqual(len(seen), 2)
-        self.assertIn("127.0.0.1:9292", seen[0]["url"])
-        self.assertIn("ai.example", seen[1]["url"])
-        self.assertEqual(seen[1]["model"], "GPT-OSS-120B")
-        self.assertEqual(seen[1]["timeout"], 4)
+        self.assertEqual(len(chats), 2)
+        self.assertIn("ai.example", chats[0]["url"])
+        self.assertIn("127.0.0.1:9292", chats[1]["url"])
+        self.assertEqual(chats[1]["model"], "qwen3.5-9b")
+        self.assertEqual(chats[1]["timeout"], 15)
 
 
 if __name__ == "__main__":

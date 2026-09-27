@@ -455,6 +455,47 @@ class InboxAgentTests(unittest.TestCase):
         self.assertNotEqual(reply, inbox_agent_service.HANDOFF_LINE)
         pay.assert_not_called()
 
+    def test_shipping_uses_the_stored_policy_without_the_model(self) -> None:
+        from app.state_store import write_json
+
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            write_json("sales-policy.json", {"shippingMethod": "پست پیشتاز", "shippingCost": 60000})
+            reply = asyncio.run(inbox_agent_service.answer("ارسال به شهرستان چقدر است؟"))
+        self.assertIn("۶۰۰۰۰", reply or "")
+        self.assertIn("پست پیشتاز", reply or "")
+
+    def test_unset_return_policy_hands_off_without_the_model(self) -> None:
+        from app.services import inbox_service
+
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            created = inbox_service.inbound(platform="instagram", sender="مشتری", text="مرجوع")
+            reply = asyncio.run(inbox_agent_service.answer("مهلت مرجوعی چند روز است؟", thread=created["thread"]))
+            shown = inbox_service.get_thread(created["thread"]["id"])
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+        self.assertEqual(shown["thread"]["handoffReason"], "سیاست ثبت نشده")
+
+    def test_catalog_color_skips_the_claims_model(self) -> None:
+        payloads = [_chat(content="رنگش طلایی است.")]
+        self.claims_complete.reset_mock()
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])):
+            storefront_service.add_product(title="گوشواره", price=10, stock=2, sku="g", colors=["طلایی"])
+            reply = asyncio.run(inbox_agent_service.answer("رنگ گوشواره چیست؟"))
+        self.assertIn("طلایی", reply or "")
+        self.claims_complete.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,7 +31,8 @@ ARVAN_HOST_SUFFIX = "arvancloudai.ir"
 CLOUD_PRIMARY_TIMEOUT = 120
 PRIMARY_CLOUD_TIMEOUT = 10
 FALLBACK_CLOUD_TIMEOUT = 45
-INBOX_HOP_TIMEOUT = 4.0
+INBOX_HOP_TIMEOUT = 15.0
+INBOX_TURN_BUDGET = 30.0
 DEFAULT_SHOP_CLOUD_MODEL = "DeepSeek-V4-Pro"
 DEFAULT_STUDIO_CLOUD_MODEL = "Gemini-3.1-Flash-Lite-Preview"
 GPU1_LOCAL = frozenset(
@@ -832,6 +833,21 @@ async def _tools_once(
     return _tool_result(route, payload if isinstance(payload, dict) else {}, counts)
 
 
+def _inbox_hops(surface: str) -> list[dict]:
+    """Cloud chain first. The home 9b is only the last hop, and only if time remains."""
+    hops: list[dict] = []
+    cloud = route_for_surface(surface)
+    if cloud.get("kind") == "cloud" and cloud.get("url"):
+        hops.append(cloud)
+    fallback = _fallback_cloud_route()
+    if fallback and all(str(fallback.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+        hops.append(fallback)
+    local = _local_default_route(surface)
+    if all(str(local.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+        hops.append(local)
+    return hops or [local]
+
+
 async def _inbox_tools(
     *,
     messages: list[dict],
@@ -839,17 +855,16 @@ async def _inbox_tools(
     temperature: float,
     max_tokens: int,
     surface: str,
+    budget: float,
 ) -> dict:
-    local = _local_default_route(surface)
-    hops = [local]
-    cloud = route_for_surface(surface)
-    if cloud.get("kind") == "cloud" and cloud.get("url") != local.get("url"):
-        hops.append(cloud)
-    fallback = _fallback_cloud_route()
-    if fallback and all(str(fallback.get("url") or "") != str(hop.get("url") or "") for hop in hops):
-        hops.append(fallback)
+    deadline = time.monotonic() + max(0.0, budget)
+    hops = _inbox_hops(surface)
     last_exc: Exception | None = None
     for index, hop in enumerate(hops):
+        left = deadline - time.monotonic()
+        if left < 1:
+            break
+        hop_timeout = min(INBOX_HOP_TIMEOUT, left)
         try:
             return await asyncio.wait_for(
                 _tools_once(
@@ -858,18 +873,13 @@ async def _inbox_tools(
                     tools=tools,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    timeout=INBOX_HOP_TIMEOUT,
+                    timeout=hop_timeout,
                     surface=surface,
                 ),
-                timeout=INBOX_HOP_TIMEOUT,
+                timeout=hop_timeout,
             )
         except Exception as exc:
             last_exc = exc
-            # The shop cloud model does not finish inside this budget. Waiting
-            # for it after the local hop already used its four seconds only
-            # stacks another timeout.
-            if isinstance(exc, TimeoutError):
-                raise
             if index == len(hops) - 1:
                 raise
             nxt = hops[index + 1]
@@ -879,7 +889,7 @@ async def _inbox_tools(
                 requested=str(hop.get("model") or ""),
                 used=str(nxt.get("model") or ""),
             )
-    raise last_exc or RuntimeError("llm")
+    raise last_exc or TimeoutError("inbox")
 
 
 async def complete_tools(
@@ -891,12 +901,11 @@ async def complete_tools(
     timeout: float | None = None,
     surface: str = "router",
 ) -> dict:
-    """Tool-call round. Router stays cloud-first. Inbox leads with the always-on 9b.
+    """Tool-call round. Router and inbox are cloud-first.
 
-    The shop cloud model did not return an inbox tool call or a final sentence
-    inside four seconds. Inbox therefore starts on the local 9b, and only if
-    that hop fails quickly tries the configured cloud, then a second cloud, each
-    capped at four seconds. A local timeout is not followed by the slower cloud.
+    Inbox uses the same cloud chain (routing override, shop cloud, fallback cloud)
+    and calls the home 9b only after those clouds fail. Each hop is about 15
+    seconds, inside the budget the caller still has for this turn.
     """
     route = route_for_surface(surface)
     if surface == "inbox":
@@ -906,6 +915,7 @@ async def complete_tools(
             temperature=temperature,
             max_tokens=max_tokens,
             surface=surface,
+            budget=INBOX_TURN_BUDGET if timeout is None else timeout,
         )
     if route.get("kind") != "cloud":
         if surface == "router":
