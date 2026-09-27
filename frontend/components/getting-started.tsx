@@ -32,7 +32,7 @@ export function GettingStarted() {
       api<{ shop?: { status?: string; publicHost?: string; url?: string } }>("/shop").catch(() => ({ shop: undefined })),
       api<unknown[]>("/campaigns").catch(() => [] as unknown[]),
       api<{ autoReply?: string }>("/inbox?status=unread").catch(() => ({ autoReply: "" })),
-      api<Record<string, string | number>>("/settings/sales-policy").catch(() => ({})),
+      api<Record<string, string | number>>("/settings/sales-policy").catch(() => ({}) as Record<string, string | number>),
     ]).then(([channels, catalog, shop, campaigns, inbox, policy]) => {
       if (cancelled) return;
       const products = catalog.products || [];
