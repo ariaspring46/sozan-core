@@ -13,6 +13,8 @@ EnvironmentFile=/home/ubuntu/sozan-core/.env
 ExecStart=/home/ubuntu/sozan-core/backend/.venv/bin/python -m app.worker
 Restart=on-failure
 RestartSec=4
+MemoryMax=3G
+MemorySwapMax=0
 
 [Install]
 WantedBy=multi-user.target

@@ -22,11 +22,48 @@ _COMPOSE_TASKS: set[asyncio.Task] = set()
 _COMPOSE_THREADS: set[threading.Thread] = set()
 
 
-def _generate_still_locked(prompt: str, width: int, height: int, on_acquired=None) -> bytes:
+def queued_outputs(*, has_image: bool) -> tuple[bool, bool]:
+    return bool(has_image), bool(has_image)
+
+
+def _generate_still_locked(
+    prompt: str,
+    width: int,
+    height: int,
+    on_acquired=None,
+    source: bytes | None = None,
+    edit: bool = False,
+    subject: str = "",
+    edit_kind: str = "",
+) -> bytes:
     with _still_lock:
         if on_acquired:
             on_acquired()
-        return generate_still(prompt, width=width, height=height)
+        from app.services.plan_service import current_plan_id
+
+        return generate_still(
+            prompt,
+            width=width,
+            height=height,
+            edit=edit,
+            plan=current_plan_id(),
+            source=source,
+            subject=subject,
+            edit_kind=edit_kind,
+        )
+
+
+def _media_bytes(media: dict | None) -> bytes:
+    if not media or str(media.get("kind") or "") != "image":
+        return b""
+    try:
+        from app.services import chat_media_service
+
+        path = chat_media_service.resolve(str(media.get("name") or ""))
+        data = path.read_bytes()
+    except Exception:
+        return b""
+    return data if len(data) >= 32 else b""
 
 
 def _svc(session) -> CampaignService:
@@ -40,6 +77,11 @@ def start(
     media: dict | None = None,
     title: str = "",
     image_prompt: str = "",
+    width: int = 1080,
+    height: int = 1080,
+    edit: bool = False,
+    edit_kind: str = "",
+    subject: str = "",
 ) -> str:
     from app.services import studio_chat_service
 
@@ -68,6 +110,11 @@ def start(
         "image_prompt": image_prompt,
         "job_id": job_id,
         "started": time.time(),
+        "width": width,
+        "height": height,
+        "edit": edit,
+        "edit_kind": edit_kind,
+        "subject": subject,
     }
     try:
         loop = asyncio.get_running_loop()
@@ -81,6 +128,15 @@ def start(
     return job_id
 
 
+async def drain() -> None:
+    tasks = [task for task in list(_COMPOSE_TASKS) if not task.done()]
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    for thread in list(_COMPOSE_THREADS):
+        if thread.is_alive():
+            await asyncio.to_thread(thread.join, 600)
+
+
 async def _run(
     *,
     tenant: str,
@@ -91,6 +147,11 @@ async def _run(
     image_prompt: str,
     job_id: str,
     started: float,
+    width: int = 1080,
+    height: int = 1080,
+    edit: bool = False,
+    edit_kind: str = "",
+    subject: str = "",
 ) -> None:
     from app.services import studio_chat_service
 
@@ -99,19 +160,69 @@ async def _run(
             async with SessionLocal() as session:
                 campaigns = _svc(session)
                 cid = UUID(campaign_id)
-                attached = await studio_chat_service.attach_still(campaigns, cid, media)
-                raw_ok = attached
-                if not raw_ok:
-                    prompt = (image_prompt or "").strip()
-                    if not prompt:
-                        raise RuntimeError("still-failed")
+                source = _media_bytes(media)
+                prompt = (image_prompt or "").strip()
 
-                    def _touch() -> None:
-                        studio_chat_service.touch_compose_start(message_id, job_id)
+                def _touch() -> None:
+                    studio_chat_service.touch_compose_start(message_id, job_id)
 
-                    png = await asyncio.to_thread(_generate_still_locked, prompt, 1080, 1080, _touch)
+                save = False
+                png = b""
+                scene = (edit_kind or "") == "scene"
+                if source and not scene:
+                    png = await asyncio.to_thread(
+                        _generate_still_locked,
+                        prompt or "soft studio surface",
+                        width,
+                        height,
+                        _touch,
+                        source,
+                        False,
+                        subject,
+                        "background",
+                    )
+                    save = True
+                elif source and scene:
+                    png = await asyncio.to_thread(
+                        _generate_still_locked,
+                        prompt or "keep the same product",
+                        width,
+                        height,
+                        _touch,
+                        source,
+                        True,
+                        subject,
+                        "scene",
+                    )
+                    save = True
+                else:
+                    attached = await studio_chat_service.attach_still(campaigns, cid, media)
+                    if not attached:
+                        if not prompt:
+                            raise RuntimeError("still-failed")
+                        png = await asyncio.to_thread(
+                            _generate_still_locked,
+                            prompt,
+                            width,
+                            height,
+                            _touch,
+                            None,
+                            False,
+                            subject,
+                            "",
+                        )
+                        save = True
+                if save:
                     if len(png) < 2048:
+                        from app.services.image_provider_service import last_error
+
+                        if last_error == "subject":
+                            raise RuntimeError("subject-failed")
                         raise RuntimeError("still-failed")
+                    from app.services import image_provider_service
+
+                    if image_provider_service.last_closeup:
+                        studio_chat_service.append_note(message_id, studio_chat_service.CLOSEUP_PHOTO)
                     await campaigns.save_raw(cid, "feed.png", png)
                     emit_later(
                         kind="studio",
@@ -144,8 +255,14 @@ async def _run(
             detail = "تصویر خام"
             if isinstance(exc, HTTPException):
                 detail = str(exc.detail or detail)
-            if "still-failed" in str(exc) or "تصویر خام" in detail:
-                error = "کپشن ذخیره شد. ساخت تصویر نشد؛ یک عکس پیوست کن یا دوباره بساز."
+            if "subject-failed" in str(exc):
+                from app.services.image_provider_service import SUBJECT_FAIL
+
+                error = SUBJECT_FAIL
+            elif "still-failed" in str(exc) or "تصویر خام" in detail:
+                from app.services.image_provider_service import FAIL_TEXT
+
+                error = FAIL_TEXT
             else:
                 error = "کپشن ذخیره شد؛ ساخت تصویر و ویدیو کامل نشد. از صفحهٔ کمپین دوباره بساز."
             studio_chat_service.finish_compose(

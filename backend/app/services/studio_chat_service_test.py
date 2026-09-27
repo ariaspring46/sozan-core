@@ -79,6 +79,31 @@ class StudioChatTests(unittest.TestCase):
         self.assertTrue(studio_chat_service._is_greeting("سلام، چطوری"))
         self.assertFalse(studio_chat_service._is_greeting("پست اینستاگرام بساز"))
 
+    def test_formal_revision_does_not_start_a_new_image(self) -> None:
+        campaigns = FakeCampaigns()
+        prior = [
+            {
+                "id": "old",
+                "role": "assistant",
+                "text": "پست آماده شد.",
+                "campaignId": "c-old",
+                "captions": {"instagram": "کپشن", "telegram": "کپشن", "whatsapp": "کپشن"},
+            }
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw), prior)
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(return_value={"reply": "کپشن رسمی‌تر شد.", "instagram": "کپشن رسمی", "telegram": "کپشن رسمی", "whatsapp": "کپشن رسمی"}),
+            ), patch("app.services.studio_compose_service.start") as started, patch(
+                "app.services.image_provider_service.generate_still"
+            ) as still:
+                result = asyncio.run(studio_chat_service.chat("رسمی‌تر کن", campaigns))
+        started.assert_not_called()
+        still.assert_not_called()
+        self.assertEqual(campaigns.created, 0)
+        self.assertIn("رسمی", result["messages"][-1]["text"])
+
     def test_image_starts_background_compose(self) -> None:
         campaigns = FakeCampaigns()
         with tempfile.TemporaryDirectory() as raw:
@@ -115,10 +140,10 @@ class StudioChatTests(unittest.TestCase):
                 )
         self.assertEqual(campaigns.created, 1)
         self.assertEqual(campaigns.composed, 0)
-        self.assertEqual(campaigns.kwargs.get("whatsapp_caption"), "پیام واتساپ")
+        self.assertEqual(campaigns.kwargs.get("whatsapp_caption"), "پیام واتساپ.")
         self.assertTrue(started.called)
         assistant = result["messages"][-1]
-        self.assertEqual(assistant["captions"]["whatsapp"], "پیام واتساپ")
+        self.assertEqual(assistant["captions"]["whatsapp"], "پیام واتساپ.")
         self.assertIn("در حال ساخت", assistant["text"])
 
     def test_llm_error_emits_failed(self) -> None:
@@ -161,7 +186,7 @@ class StudioChatTests(unittest.TestCase):
                 result = asyncio.run(
                     studio_chat_service.regenerate(message_id=message_id, part="caption", campaigns=campaigns)
                 )
-        self.assertEqual(result["messages"][0]["captions"]["instagram"], "اینستا تازه")
+        self.assertEqual(result["messages"][0]["captions"]["instagram"], "اینستا تازه.")
 
     def test_question_without_captions_skips_campaign(self) -> None:
         campaigns = FakeCampaigns()
@@ -339,8 +364,16 @@ class StudioChatTests(unittest.TestCase):
             "telegram": "کپشن تلگرام",
             "whatsapp": "پیام واتساپ",
             "compose": False,
+            "imagePrompt": "a black leather shoe on a plain background, no text",
         }
-        completer = AsyncMock(side_effect=[first, second])
+        async def complete(*_args, **_kwargs):
+            complete.n += 1
+            if complete.n == 1:
+                return first
+            return second
+
+        complete.n = 0
+        completer = AsyncMock(side_effect=complete)
         with tempfile.TemporaryDirectory() as raw:
             patches = self._patches(Path(raw))
             with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
@@ -348,12 +381,12 @@ class StudioChatTests(unittest.TestCase):
                 new=completer,
             ):
                 result = asyncio.run(studio_chat_service.chat(long_ask, campaigns))
-        self.assertEqual(completer.await_count, 2)
+        self.assertGreaterEqual(completer.await_count, 2)
         self.assertGreaterEqual(completer.await_args_list[0].kwargs["max_tokens"], 1600)
         self.assertGreater(completer.await_args_list[1].kwargs["max_tokens"], completer.await_args_list[0].kwargs["max_tokens"])
         self.assertEqual(campaigns.created, 1)
         self.assertNotIn("خوانا نداد", result["messages"][-1]["text"])
-        self.assertEqual(result["messages"][-1]["captions"]["instagram"], "کپشن اینستاگرام برای ویترین چرم")
+        self.assertEqual(result["messages"][-1]["captions"]["instagram"], "کپشن اینستاگرام برای ویترین چرم.")
 
     def test_content_library_shows_message_missing_from_campaign_list(self) -> None:
         rows = [
@@ -395,7 +428,7 @@ class StudioChatTests(unittest.TestCase):
                 "whatsapp": "سلام",
             }
         )
-        self.assertEqual(out["instagram"], "انگشتر فیروزه")
+        self.assertEqual(out["instagram"], "انگشتر فیروزه.")
         self.assertNotIn("#", out["instagram"])
         bare = studio_chat_service._clip_captions(
             {
@@ -450,8 +483,8 @@ class StudioChatTests(unittest.TestCase):
             {"imagePrompt": "product photo of a turquoise pendant"},
             "برای گردنبند فیروزه یک پست بساز",
         )
-        self.assertIn("گردنبند فیروزه", prompt)
-        self.assertNotIn("pendant", prompt)
+        self.assertIn("turquoise pendant", prompt)
+        self.assertNotIn("گردنبند", prompt)
 
     def test_caption_rewrite_applies_instruction_without_compose(self) -> None:
         campaigns = FakeCampaigns()
@@ -520,7 +553,7 @@ class StudioChatTests(unittest.TestCase):
                 "role": "assistant",
                 "text": "پست",
                 "campaignId": str(campaigns.last_id),
-                "imagePrompt": "product photo of انگشتر فیروزه, studio light, no text, no logos, no people",
+                "imagePrompt": "product photo of a turquoise ring, studio light, no text, no logos, no people",
                 "captions": {"instagram": "انگشتر", "telegram": "انگشتر", "whatsapp": "انگشتر"},
             }
         ]
@@ -530,7 +563,98 @@ class StudioChatTests(unittest.TestCase):
                 "app.services.studio_compose_service.start", return_value="job"
             ) as started:
                 asyncio.run(studio_chat_service.regenerate(message_id=message_id, part="image", campaigns=campaigns))
-        self.assertIn("انگشتر فیروزه", started.call_args.kwargs["image_prompt"])
+        self.assertIn("turquoise ring", started.call_args.kwargs["image_prompt"])
+        self.assertNotRegex(started.call_args.kwargs["image_prompt"], r"[\u0600-\u06FF]")
+
+    def test_incomplete_caption_keeps_the_last_full_sentence(self) -> None:
+        out = studio_chat_service._clip_captions(
+            {
+                "instagram": "جملهٔ اول تمام شد. همین حالا",
+                "telegram": "کوتاه",
+                "whatsapp": "کوتاه",
+            },
+            spoken="برای انگشتر نقره یک پست بساز",
+        )
+        self.assertEqual(out["instagram"], "جملهٔ اول تمام شد.")
+        self.assertEqual(out["telegram"], "کوتاه.")
+
+    def test_caption_drops_a_product_from_an_earlier_request(self) -> None:
+        rows = [{"role": "user", "text": "برای کیف چرمی استوری بساز"}]
+        with patch("app.services.studio_chat_service._messages", return_value=rows):
+            out = studio_chat_service._clip_captions(
+                {
+                    "instagram": "انگشتر نقره نماد است. کیف چرمی نیز همراه است.",
+                    "telegram": "انگشتر نقره.",
+                    "whatsapp": "انگشتر نقره.",
+                },
+                spoken="عکس همین کالا را روی پس‌زمینهٔ تمیز بگذار",
+                drop_unclaimed=True,
+            )
+        self.assertNotIn("کیف چرمی", out["instagram"])
+        self.assertIn("انگشتر", out["instagram"])
+
+    def test_prompt_fields_and_unclaimed_sales_lines_leave(self) -> None:
+        raw = "کیف چرمی آماده است. جنس: چرم طبیعی با دوخت دقیق زاویه: نمای روبرو پس‌زمینه: میز چوبی قابل سفارش."
+        out = studio_chat_service._clip_captions(
+            {"instagram": raw, "telegram": raw, "whatsapp": raw},
+            spoken="برای کیف چرمی استوری بساز",
+            drop_unclaimed=True,
+        )
+        self.assertNotIn("جنس:", out["instagram"])
+        self.assertNotIn("زاویه:", out["instagram"])
+        self.assertNotIn("پس‌زمینه:", out["instagram"])
+        self.assertNotIn("چرم طبیعی", out["instagram"])
+        self.assertNotIn("قابل سفارش", out["instagram"])
+        self.assertIn("کیف چرمی", out["instagram"])
+        kept = studio_chat_service._repair_rewrite(
+            {
+                "instagram": "این انگشتر نقره برای استفادهٔ روزمره مناسب است.",
+                "telegram": "این انگشتر نقره رسمی‌تر معرفی شد.",
+                "whatsapp": "سلام.",
+            }
+        )
+        self.assertNotIn("سلام", kept["whatsapp"])
+        self.assertIn("انگشتر", kept["whatsapp"])
+
+    def test_hashtags_do_not_start_an_image(self) -> None:
+        campaigns = FakeCampaigns()
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw))
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_chat_service.complete_json",
+                new=AsyncMock(
+                    return_value={
+                        "reply": "هشتگ‌ها آماده شد.",
+                        "instagram": "#گردنبند #نقره #زیورآلات #هدیه #استایل #اکسسوری",
+                        "telegram": "",
+                        "whatsapp": "",
+                    }
+                ),
+            ), patch("app.services.studio_compose_service.start") as started:
+                result = asyncio.run(studio_chat_service.chat("هشتگ فارسی برای گردنبند", campaigns))
+        started.assert_not_called()
+        self.assertEqual(campaigns.created, 0)
+        caption = result["messages"][-1]["captions"]["instagram"]
+        self.assertGreaterEqual(caption.count("#"), 5)
+        self.assertIn("#گردنبند", caption)
+        self.assertNotIn("نقره", caption)
+
+    def test_hashtag_roots_are_balanced(self) -> None:
+        raw = [
+            "#گردنبند",
+            "#گردنبند_شیک",
+            "#گردنبند_خاص",
+            "#گردنبند_دخترانه",
+            "#گردنبند_مجلسی",
+            "#گردنبند_هدیه",
+            "#گردنبند_روزمره",
+            "#فروشگاه",
+            "#فروشگاه_گردنبند",
+            "#اکسسوری_گردنبند",
+        ]
+        kept = studio_chat_service._balance_roots(raw)
+        self.assertGreaterEqual(len(kept), 5)
+        self.assertFalse(studio_chat_service._repeated_root(kept))
 
 
 if __name__ == "__main__":
