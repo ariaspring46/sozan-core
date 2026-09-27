@@ -33,6 +33,16 @@ _MERCHANT = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-
 PAYMENT_LATER = "پرداخت به‌زودی فعال می‌شود"
 
 
+def payments_enabled() -> bool:
+    return bool(env.payments_enabled)
+
+
+def hub_payments_open() -> bool:
+    if not payments_enabled():
+        return False
+    return bool(merchant_id())
+
+
 def merchant_id(row: dict | None = None) -> str:
     current = str((row or {}).get("paymentMerchantId") or "").strip()
     if current:
@@ -216,7 +226,7 @@ def resolve_sale_gateway(row: dict | None = None) -> dict:
             "commissionBps": 0,
             "sandbox": current.get("paymentSandbox") is True,
         }
-    if not hub:
+    if not hub or not payments_enabled():
         raise ValueError(PAYMENT_LATER)
     return {
         "id": "zarinpal",
@@ -248,8 +258,11 @@ def public_status(row: dict) -> dict:
         own = bool(str(row.get("paymentMerchantId") or "").strip()) and str(row.get("paymentMerchantId") or "").strip() != str(env.zarinpal_merchant_id or "").strip()
         if own:
             hint = "مرچنت شخصی زرین‌پال؛ فروش آنلاین کمیسیون ندارد."
-        elif ready:
+        elif payments_enabled() and ready:
             hint = "بدون مرچنت شخصی، فروش روی درگاه سوزان با ۲٪ کمیسیون است."
+        elif not payments_enabled():
+            ready = False
+            hint = PAYMENT_LATER
         else:
             hint = "مرچنت‌آیدی زرین‌پال را بگذار."
     elif gateway == "idpay":

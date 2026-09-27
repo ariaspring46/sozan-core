@@ -17,6 +17,7 @@ SECRET = "pay-secret"
 
 def _gateway():
     return (
+        patch.object(payment_service.env, "payments_enabled", True),
         patch.object(payment_service.env, "zarinpal_merchant_id", HUB),
         patch.object(
             payment_service,
@@ -44,7 +45,7 @@ class ShopPayB1Tests(unittest.TestCase):
                 first = storefront_service.add_product(title="کیف", price=1000, stock=5, sku="bag")["product"]
                 second = storefront_service.add_product(title="کفش", price=2000, stock=4, sku="shoe")["product"]
                 ctx = _gateway()
-                with ctx[0], ctx[1], ctx[2]:
+                with ctx[0], ctx[1], ctx[2], ctx[3]:
                     order = asyncio.run(
                         pay_service.shop_checkout(
                             slug=SLUG,

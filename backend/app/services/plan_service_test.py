@@ -59,6 +59,7 @@ class PlanPriceTests(unittest.TestCase):
                 self.assertEqual(after["discountUntilLabel"], "")
                 with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
                     with (
+                        patch.object(payment_service.env, "payments_enabled", True),
                         patch.object(plan_service, "effective_price", return_value=pro["price"]),
                         patch.object(payment_service, "merchant_id", return_value="11111111-1111-1111-1111-111111111111"),
                         patch.object(
@@ -86,6 +87,7 @@ class PlanPriceTests(unittest.TestCase):
                 patch.object(settings, "state_dir", raw),
                 tenant_scope("09129900007"),
                 patch.object(plan_service, "discount_until", return_value=now + timedelta(days=7)),
+                patch.object(payment_service.env, "payments_enabled", True),
                 patch.object(payment_service, "merchant_id", return_value="11111111-1111-1111-1111-111111111111"),
             ):
                 self.assertEqual(billing_service.apply_phone_coupon("pro", 1_414_000, "SOZAN30")[0], 989_800)
@@ -150,3 +152,26 @@ class PlanPriceTests(unittest.TestCase):
                 with self.assertRaises(ValueError) as blocked:
                     asyncio.run(billing_service.start_subscription("pro", phone="09129900007"))
                 self.assertEqual(str(blocked.exception), payment_service.PAYMENT_LATER)
+
+    def test_payments_switch_closes_checkout_while_merchant_stays(self) -> None:
+        now = datetime(2026, 9, 27, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as raw:
+            with (
+                patch.object(settings, "phone_coupon_code", "SOZAN30"),
+                patch.object(settings, "phone_coupon_percent", 30),
+                patch.object(settings, "state_dir", raw),
+                patch.object(plan_service, "discount_until", return_value=now + timedelta(days=7)),
+                patch.object(payment_service.env, "payments_enabled", False),
+                patch.object(payment_service.env, "zarinpal_merchant_id", "11111111-1111-1111-1111-111111111111"),
+                patch.object(payment_service, "merchant_id", return_value="11111111-1111-1111-1111-111111111111"),
+                tenant_scope("09129900007"),
+            ):
+                self.assertIs(plan_service.public_catalog(now)["paymentReady"], False)
+                with self.assertRaises(ValueError) as caught:
+                    billing_service.preview_coupon("pro", "SOZAN30")
+                self.assertEqual(str(caught.exception), payment_service.PAYMENT_LATER)
+                with self.assertRaises(ValueError) as blocked:
+                    asyncio.run(billing_service.start_subscription("pro", phone="09129900007"))
+                self.assertEqual(str(blocked.exception), payment_service.PAYMENT_LATER)
+                with self.assertRaises(ValueError):
+                    payment_service.resolve_sale_gateway({"paymentGateway": "mock"})

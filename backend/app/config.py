@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     sms_ir_token_name: str = "Code"
     zarinpal_merchant_id: str = ""
     zarinpal_amount_unit: str = "rial"
+    payments_enabled: bool = True
     telegram_bot_token: str = ""
     telegram_bot_handle: str = ""
     telegram_post_target: str = ""

@@ -31,9 +31,9 @@ class WalletPayTests(unittest.TestCase):
         self.assertEqual(route["merchant"], OWN)
 
     def test_resolve_hub_when_no_own_merchant(self) -> None:
-        with patch.object(payment_service.env, "zarinpal_merchant_id", HUB), patch.object(
-            payment_service.env, "commission_bps", 200
-        ):
+        with patch.object(payment_service.env, "payments_enabled", True), patch.object(
+            payment_service.env, "zarinpal_merchant_id", HUB
+        ), patch.object(payment_service.env, "commission_bps", 200):
             route = payment_service.resolve_sale_gateway({"paymentGateway": "mock"})
         self.assertEqual(route["owner"], "hub")
         self.assertEqual(route["id"], "zarinpal")
@@ -170,6 +170,7 @@ class WalletPayTests(unittest.TestCase):
                 )
                 product = created["product"]
                 with (
+                    patch.object(payment_service.env, "payments_enabled", True),
                     patch.object(payment_service.env, "zarinpal_merchant_id", HUB),
                     patch.object(
                         payment_service,
