@@ -192,6 +192,10 @@ def _atomic_text(path: Path, text: str) -> None:
 
 
 def _write_shop_upstream(shop: dict) -> None:
+    from app.services import arvan_dns_service
+
+    if arvan_dns_service.edge_dry():
+        return
     from app.state_store import current_tenant, iter_tenants, read_json, tenant_scope
 
     dest = _shop_map_path()

@@ -150,6 +150,7 @@ async def favicon():
 
 @app.get("/health")
 async def health():
+    from app.services.arvan_dns_service import edge_dry
     from app.services.payment_service import hub_payments_open
 
-    return {"ok": True, "paymentReady": bool(hub_payments_open())}
+    return {"ok": True, "paymentReady": bool(hub_payments_open()), "edgeDry": edge_dry()}
