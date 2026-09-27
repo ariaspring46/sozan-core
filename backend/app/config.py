@@ -29,8 +29,12 @@ class Settings(BaseSettings):
     plan_price_pro: int = 1_414_000
     plan_price_promax: int = 2_414_000
     plan_price_ultra: int = 3_843_000
-    plan_discount_percent: int = 30
+    plan_discount_percent: int = 0
+    plan_discount_percents: str = '{"pro":0,"promax":20,"ultra":30}'
     plan_discount_until: str = ""
+    phone_coupon_code: str = "SOZAN30"
+    phone_coupon_percent: int = 30
+    phone_coupon_until: str = ""
     commission_bps: int = 200
     sms_overage_toman: int = 200
     sms_quota_free: int = 50

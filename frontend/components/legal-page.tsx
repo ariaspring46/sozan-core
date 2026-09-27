@@ -34,13 +34,16 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
         <div className="mt-8 space-y-4 text-sm leading-8 text-ink/80">{children}</div>
       </main>
       <footer className="border-t border-line/40">
-        <nav className="mx-auto flex max-w-3xl flex-wrap gap-x-5 gap-y-2 px-5 py-8 text-xs text-ink/65">
+        <nav className="mx-auto flex max-w-3xl flex-wrap gap-x-5 gap-y-2 px-5 pt-8 text-xs text-ink/65">
           {LINKS.map((item) => (
             <a key={item.href} href={item.href} className="hover:text-warm">
               {item.label}
             </a>
           ))}
         </nav>
+        <p className="mx-auto max-w-3xl px-5 py-4 text-center text-[11px] leading-6 text-ink/55">
+          ساخته شده توسط شرکت گهر شبکه کارمانیا
+        </p>
       </footer>
     </div>
   );

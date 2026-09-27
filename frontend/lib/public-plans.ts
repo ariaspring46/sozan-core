@@ -3,6 +3,7 @@ export type PublicPlan = {
   label: string;
   listPrice: number;
   price: number;
+  discountPercent?: number;
   features: string[];
   checkout: string;
   purchasable: boolean;

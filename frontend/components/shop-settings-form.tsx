@@ -51,6 +51,7 @@ type StudioSettings = {
       sites: number;
       priceToman?: number;
       listPrice?: number;
+      discountPercent?: number;
       purchasable?: boolean;
       smsQuota?: number;
       features: string[];
@@ -66,6 +67,8 @@ export function ShopSettingsForm() {
   const [notice, setNotice] = useState("");
   const [pickedPlan, setPickedPlan] = useState("");
   const [confirmPay, setConfirmPay] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponAmount, setCouponAmount] = useState<number | null>(null);
   const [plansOpen, setPlansOpen] = useState(false);
 
   useEffect(() => {
@@ -386,6 +389,7 @@ export function ShopSettingsForm() {
                             <span className="mx-1 line-through">{money(plan.listPrice)}</span>
                           ) : null}
                           {plan.priceToman ? ` · ${money(plan.priceToman)} تومان در ماه` : " · رایگان"}
+                          {plan.discountPercent ? ` · ٪${money(plan.discountPercent)} تخفیف` : ""}
                           {plan.purchasable === false ? " · به‌زودی" : ""}
                           {plan.smsQuota ? ` · ${money(plan.smsQuota)} پیامک` : ""}
                         </p>
@@ -400,6 +404,37 @@ export function ShopSettingsForm() {
                   ) : null}
                   {pickedPlan && pickedPlan !== form.plan && pickedSpec?.purchasable !== false ? (
                     <div className="space-y-2">
+                      {confirmPay && pickedPlan !== "free" ? (
+                        <div className="space-y-2">
+                          <Input
+                            value={couponCode}
+                            placeholder="کد تخفیف"
+                            onChange={(event) => {
+                              setCouponCode(event.target.value);
+                              setCouponAmount(null);
+                            }}
+                          />
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            disabled={busy || !couponCode.trim()}
+                            onClick={() => {
+                              setBusy(true);
+                              setError("");
+                              void api<{ amount: number }>("/billing/coupon-preview", {
+                                method: "POST",
+                                body: JSON.stringify({ plan: pickedPlan, code: couponCode.trim() }),
+                              })
+                                .then((data) => setCouponAmount(data.amount))
+                                .catch((err) => setError(err instanceof Error ? err.message : "این کد تخفیف معتبر نیست"))
+                                .finally(() => setBusy(false));
+                            }}
+                          >
+                            اعمال کد
+                          </Button>
+                          {couponAmount != null ? <p className="text-sm">با کد: {money(couponAmount)} تومان</p> : null}
+                        </div>
+                      ) : null}
                       {confirmPay && pickedPlan !== "free" ? (
                         <p className="text-sm text-muted">
                           {walletCovers
@@ -440,7 +475,7 @@ export function ShopSettingsForm() {
                               "/billing/subscribe",
                               {
                                 method: "POST",
-                                body: JSON.stringify({ plan: pickedPlan }),
+                                body: JSON.stringify({ plan: pickedPlan, code: couponCode.trim() }),
                               },
                             )
                               .then((data) => {

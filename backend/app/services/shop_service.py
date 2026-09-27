@@ -1817,7 +1817,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
                 shop = _refresh_job(_shop())
                 reply = str(result.get("reply") or "").strip() or "تغییر را روی همین صفحه اعمال می‌کنم."
                 if result.get("patched") and result.get("needsRebuild", True) and "بیلد" not in reply:
-                    reply = reply.rstrip(". ") + " تغییر در کادر است؛ وقتی آماده بودی بیلد بزن."
+                    reply = reply.rstrip(". ") + " تغییر در کادر است؛ هر وقت آماده بودی «انتشار تغییرات» را بزن."
             assistant = {
                 "id": str(uuid4()),
                 "role": "assistant",

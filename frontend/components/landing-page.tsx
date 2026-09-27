@@ -164,6 +164,7 @@ function PlanCard({ plan, start, until }: { plan: PublicPlan; start: string; unt
       <div className="mt-4">
         {discounted ? <p className="text-sm text-ink/40 line-through">{money(plan.listPrice)} تومان</p> : null}
         <p className="landing-display text-2xl">{plan.price > 0 ? `${money(plan.price)} تومان` : "رایگان"}</p>
+        {plan.discountPercent ? <p className="mt-1 text-xs text-warm">٪{money(plan.discountPercent)} تخفیف</p> : null}
         <p className="mt-1 text-xs text-warm">{plan.price > 0 ? "ماهانه" : "بدون پرداخت"}</p>
         {discounted && until ? <p className="mt-1 text-xs text-ink/60">تا {until}</p> : null}
       </div>
@@ -691,6 +692,11 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             <div dangerouslySetInnerHTML={{ __html: ENAMAD_SEAL }} />
             <span className="text-[11px] leading-5 text-ink/45">دارای نماد<br />اعتماد الکترونیکی</span>
           </div>
+        </div>
+        <div className="border-t border-line/30">
+          <p className="mx-auto max-w-6xl px-5 py-4 text-center text-[11px] leading-6 text-ink/55 sm:px-8">
+            ساخته شده توسط شرکت گهر شبکه کارمانیا
+          </p>
         </div>
       </footer>
     </div>

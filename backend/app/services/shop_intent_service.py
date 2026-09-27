@@ -175,6 +175,28 @@ def _wants_hero(text: str, colors: dict) -> bool:
     return False
 
 
+def _pinned_write(text: str, target: str, view_path: str) -> list[dict] | None:
+    written = write_intent(text)
+    quoted = _quoted(text)
+    cta = CTA_RE.search(text)
+    if cta:
+        label = cta.group(1).strip().strip("«»\"'")
+        if not label:
+            return None
+        actions = [{"type": "set_brand", "fields": {"ctaLabelFa": label}}]
+        if target:
+            actions.append({"type": "replace_text", "find": target, "replace": label})
+        return actions
+    value = written or (quoted if target else "")
+    if not value:
+        return None
+    if target:
+        return [{"type": "replace_text", "find": target, "replace": value}]
+    if view_path.rstrip("/") == "/products":
+        return [{"type": "replace_text", "find": "", "replace": value, "heading": True}]
+    return [{"type": "set_brand", "fields": {"name": value}}]
+
+
 def classify_actions(prompt: str, view_target: str = "", view_path: str = "") -> list[dict]:
     text = (prompt or "").strip()
     target = (view_target or "").strip()
@@ -188,6 +210,9 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
         return [{"type": "greet"}]
     if wants_revert(text):
         return [{"type": "revert"}]
+    pinned = _pinned_write(text, target, view_path)
+    if pinned is not None:
+        return pinned
     actions: list[dict] = []
     if HIDE_PRICE_RE.search(text):
         actions.append({"type": "hide_prices"})

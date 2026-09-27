@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -86,8 +87,28 @@ def list_price(plan_id: str) -> int:
     return 0
 
 
-def discount_percent() -> int:
-    return max(0, min(90, int(env.plan_discount_percent or 0)))
+_DEFAULT_PERCENTS = {"pro": 0, "promax": 20, "ultra": 30}
+
+
+def discount_percents() -> dict[str, int]:
+    raw = str(env.plan_discount_percents or "").strip()
+    parsed: dict[str, int] = {}
+    if raw:
+        try:
+            loaded = json.loads(raw)
+        except json.JSONDecodeError:
+            loaded = {}
+        if isinstance(loaded, dict):
+            for key, value in loaded.items():
+                try:
+                    parsed[str(key).strip().lower()] = max(0, min(90, int(value)))
+                except (TypeError, ValueError):
+                    continue
+    return parsed or dict(_DEFAULT_PERCENTS)
+
+
+def discount_percent(plan_id: str) -> int:
+    return int(discount_percents().get(str(plan_id or "").strip().lower(), 0))
 
 
 def discount_until() -> datetime | None:
@@ -108,7 +129,7 @@ def effective_price(plan_id: str, now: datetime | None = None) -> int:
     if listed <= 0:
         return 0
     until = discount_until()
-    percent = discount_percent()
+    percent = discount_percent(plan_id)
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
@@ -171,6 +192,7 @@ def _card(item: dict, now: datetime | None = None) -> dict:
         "period": "monthly",
         "smsQuota": int(item.get("smsQuota") or 0),
         "features": list(item["features"]),
+        "discountPercent": discount_percent(plan_id) if price < listed else 0,
         "purchasable": purchasable(plan_id),
         "checkout": "soon" if plan_id == "ultra" else ("free" if price <= 0 else "open"),
     }
@@ -181,9 +203,9 @@ def public_catalog(now: datetime | None = None) -> dict:
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
-    active = bool(until and moment < until and discount_percent())
+    active = bool(until and moment < until and any(discount_percent(item["id"]) for item in PLANS.values()))
     return {
-        "discountPercent": discount_percent() if active else 0,
+        "discountPercent": 0,
         "discountUntil": until.isoformat() if active and until else None,
         "discountUntilLabel": shamsi_label(until) if active and until else "",
         "plans": [_card(item, moment) for item in PLANS.values()],
