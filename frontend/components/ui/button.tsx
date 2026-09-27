@@ -12,7 +12,7 @@ export function Button({
         "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-medium disabled:opacity-50",
         variant === "ghost"
           ? "border border-line bg-paper text-ink hover:bg-canvas"
-          : "bg-accent text-onAccent hover:bg-warm",
+          : "bg-accentStrong text-onAccent hover:bg-accent",
         className,
       )}
       {...props}

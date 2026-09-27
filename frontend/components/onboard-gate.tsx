@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { api, getOnboarded, getToken, setOnboarded } from "@/lib/api";
+import { ApiError, api, getOnboarded, getToken, setOnboarded } from "@/lib/api";
 
-const PUBLIC = new Set(["/login", "/onboard", "/"]);
+const PUBLIC = new Set(["/login", "/onboard", "/", "/about", "/contact", "/terms", "/refund"]);
 
 function isPublicPath(pathname: string) {
   return PUBLIC.has(pathname) || pathname === "/p" || pathname.startsWith("/p/");
@@ -27,6 +27,8 @@ export function OnboardGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const publicPath = isPublicPath(pathname);
   const [ok, setOk] = useState(publicPath);
+  const [offline, setOffline] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     if (isPublicPath(pathname)) {
@@ -48,15 +50,36 @@ export function OnboardGate({ children }: { children: React.ReactNode }) {
         setOnboarded(true);
         setOk(true);
       })
-      .catch(() => {
-        router.replace("/login");
+      .catch((err) => {
+        // فقط نشست نامعتبر (۴۰۱) یعنی خروج؛ خطای موقت شبکه یا سرور کاربر را بیرون نمی‌اندازد.
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!getOnboarded()) setOffline(true);
       });
-  }, [pathname, router]);
+  }, [pathname, router, retry]);
 
   if (!ok) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-canvas">
-        <p className="text-sm text-muted">در حال بارگذاری…</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
+        {offline ? (
+          <>
+            <p className="text-sm text-ink">اتصال به سوزان برقرار نشد.</p>
+            <button
+              type="button"
+              className="min-h-11 rounded-xl bg-accent px-4 text-sm font-bold text-onAccent"
+              onClick={() => {
+                setOffline(false);
+                setRetry((value) => value + 1);
+              }}
+            >
+              دوباره
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-muted">در حال بارگذاری…</p>
+        )}
       </div>
     );
   }

@@ -1,27 +1,30 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: ["selector", '[data-theme="dark"]'],
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        ink: "#F3EEE6",
-        muted: "#B4B0A8",
-        paper: "#3A3A40",
-        canvas: "#2F2F33",
-        surface: "#3A3A40",
-        line: "#52525A",
-        accent: "#C45C26",
-        onAccent: "#FFF6EE",
-        warm: "#E8A87C",
-        signal: "#7EB8B0",
-        danger: "#E06B63",
+        ink: "rgb(var(--c-ink) / <alpha-value>)",
+        muted: "rgb(var(--c-muted) / <alpha-value>)",
+        paper: "rgb(var(--c-paper) / <alpha-value>)",
+        canvas: "rgb(var(--c-canvas) / <alpha-value>)",
+        surface: "rgb(var(--c-surface) / <alpha-value>)",
+        line: "rgb(var(--c-line) / <alpha-value>)",
+        accent: "rgb(var(--c-accent) / <alpha-value>)",
+        accentStrong: "rgb(var(--c-accentStrong) / <alpha-value>)",
+        field: "rgb(var(--c-field) / <alpha-value>)",
+        onAccent: "rgb(var(--c-onAccent) / <alpha-value>)",
+        warm: "rgb(var(--c-warm) / <alpha-value>)",
+        signal: "rgb(var(--c-signal) / <alpha-value>)",
+        danger: "rgb(var(--c-danger) / <alpha-value>)",
       },
       fontFamily: {
         vazir: ["Vazirmatn", "sans-serif"],
         sozan: ["Estedad", "Tahoma", "sans-serif"],
       },
       boxShadow: {
-        card: "0 1px 2px rgb(0 0 0 / 28%), 0 10px 28px rgb(0 0 0 / 22%)",
+        card: "var(--shadow-card)",
       },
     },
   },
