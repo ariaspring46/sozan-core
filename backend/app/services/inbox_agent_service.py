@@ -1,7 +1,7 @@
-"""Local direct-message agent.
+"""Direct-message agent.
 
-Customer text stays on the home llama-swap (qwen3.5-9b). It never uses the
-Arvan route. Stock, order status, and payment links come from existing
+The chat cloud is the first hop. The home 9b is only the last hop, and Arvan
+is never used. Stock, order status, and payment links come from existing
 services. Local bge-m3 only nudges a tool when the model answered with none.
 """
 
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 import httpx
 
@@ -260,22 +261,63 @@ async def _post(path: str, body: dict) -> dict:
     return payload
 
 
+def _agent_body(messages: list[dict], model: str) -> dict:
+    body = {
+        "model": model,
+        "temperature": 0.3,
+        "max_tokens": 500,
+        "messages": messages,
+        "tools": _tools(),
+        "tool_choice": "auto",
+    }
+    if model == AGENT_MODEL:
+        body["chat_template_kwargs"] = {"enable_thinking": False, "thinking": False}
+        body["reasoning_format"] = "none"
+    return body
+
+
+def _cloud_body(messages: list[dict], model: str) -> dict:
+    body = _agent_body(messages, model)
+    provider = os.environ.get("INBOX_CLOUD_PROVIDER", "").strip()
+    if provider:
+        body["provider"] = {"order": [provider], "allow_fallbacks": True}
+    return body
+
+
+async def _post_route(route: dict, messages: list[dict]) -> dict:
+    if str(route.get("kind") or "") == "local" or not route.get("token"):
+        return await _post("/chat/completions", _agent_body(messages, AGENT_MODEL))
+    url = str(route.get("url") or "")
+    if not url or _cloud_base(url):
+        raise RuntimeError("inbox_cloud_refused")
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {route.get('token')}"}
+    async with httpx.AsyncClient(timeout=15, trust_env=False, proxy=None) as client:
+        res = await client.post(
+            f"{url}/chat/completions",
+            json=_cloud_body(messages, str(route.get("model") or "")),
+            headers=headers,
+        )
+        res.raise_for_status()
+        payload = res.json()
+    if not isinstance(payload, dict):
+        raise RuntimeError("inbox_bad_json")
+    return payload
+
+
 async def _complete(messages: list[dict]) -> tuple[str, list[dict]]:
-    payload = await _post(
-        "/chat/completions",
-        {
-            "model": AGENT_MODEL,
-            "temperature": 0.3,
-            "max_tokens": 500,
-            "messages": messages,
-            "tools": _tools(),
-            "tool_choice": "auto",
-            "chat_template_kwargs": {"enable_thinking": False, "thinking": False},
-            "reasoning_format": "none",
-        },
-    )
-    _emit_usage(surface="inbox", model=AGENT_MODEL, payload=payload)
-    return _calls_from(payload)
+    from app.services.llm import inbox_hops
+
+    last: Exception | None = None
+    for route in inbox_hops():
+        try:
+            payload = await _post_route(route, messages)
+        except Exception as exc:
+            last = exc
+            continue
+        model = AGENT_MODEL if str(route.get("kind") or "") == "local" or not route.get("token") else str(route.get("model") or AGENT_MODEL)
+        _emit_usage(surface="inbox", model=model, payload=payload)
+        return _calls_from(payload)
+    raise last or RuntimeError("inbox")
 
 
 def _vectors_of(payload: dict, count: int) -> list[list[float]]:

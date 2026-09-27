@@ -167,6 +167,13 @@ class FixedOtpTests(unittest.TestCase):
         for item in self.patches:
             item.stop()
 
+    def test_lab_phone_does_not_send_sms(self) -> None:
+        with patch.object(auth_service.sms_service, "send_otp", new=AsyncMock()) as send:
+            out = asyncio.run(self.svc.send_otp("09120000991"))
+        send.assert_not_called()
+        self.assertEqual(out, {"ok": True})
+        self.assertNotIn("otp:09120000991", self.redis.store)
+
     def test_send_uses_fixed_code_and_skips_sms(self) -> None:
         with patch.object(auth_service.sms_service, "send_otp", new=AsyncMock()) as send:
             out = asyncio.run(self.svc.send_otp("09129900001"))

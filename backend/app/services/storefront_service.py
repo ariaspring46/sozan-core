@@ -482,12 +482,13 @@ def list_sales() -> dict:
     return {"sales": rows}
 
 
-def add_sale(*, title: str, amount: int, customer: str, channel: str) -> dict:
+def add_sale(*, title: str, amount: int, customer: str, channel: str, source: str = "manual") -> dict:
     title = title.strip()
     if not title:
         raise ValueError("شرح فروش را بنویس")
     if amount < 0:
         raise ValueError("مبلغ منفی نمی‌شود")
+    origin = "gateway" if str(source or "").strip().lower() == "gateway" else "manual"
     row = {
         "id": str(uuid4()),
         "title": title,
@@ -495,6 +496,7 @@ def add_sale(*, title: str, amount: int, customer: str, channel: str) -> dict:
         "customer": customer.strip() or "مشتری",
         "channel": channel.strip() or "فروشگاه",
         "status": "paid",
+        "source": origin,
         "at": int(time.time()),
     }
     rows = _list("sales.json")

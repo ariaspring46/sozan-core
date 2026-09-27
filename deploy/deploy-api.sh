@@ -18,7 +18,7 @@ fi
 
 LOCAL="$(git rev-parse "$COMMIT")"
 echo "deploy ${LOCAL}"
-git archive "$COMMIT" backend tools/qa_battery.py deploy/sozan-worker.service deploy/sozan-battery.service deploy/sozan-battery.timer deploy/sozan-backup.sh deploy/sozan-backup.service deploy/sozan-backup.timer \
+git archive "$COMMIT" backend tools/qa_battery.py tools/lab_session.py deploy/sozan-worker.service deploy/sozan-battery.service deploy/sozan-battery.timer deploy/sozan-backup.sh deploy/sozan-backup.service deploy/sozan-backup.timer \
   | ssh -o ConnectTimeout=15 "$HOST" "cd ${REMOTE} && tar -x"
 ssh -o ConnectTimeout=15 "$HOST" "SUITE_DIR=\$(mktemp -d /tmp/sozan-suite.XXXXXX) && cd ${REMOTE}/backend && PYTHONPATH=${REMOTE}/backend STATE_DIR=\$SUITE_DIR .venv/bin/python -m unittest discover -s app -p '*_test.py' -q; status=\$?; rm -rf \$SUITE_DIR; exit \$status"
 ssh -o ConnectTimeout=15 "$HOST" "printf '%s\n' '${LOCAL}' > ${REMOTE}/DEPLOYED_COMMIT"

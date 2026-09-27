@@ -23,11 +23,19 @@ class Settings(BaseSettings):
     sms_ir_token_name: str = "Code"
     zarinpal_merchant_id: str = ""
     zarinpal_amount_unit: str = "rial"
+    payments_enabled: bool = True
     telegram_bot_token: str = ""
     telegram_bot_handle: str = ""
     telegram_post_target: str = ""
-    plan_price_pro: int = 490000
-    plan_price_promax: int = 1490000
+    plan_price_pro: int = 1_414_000
+    plan_price_promax: int = 2_414_000
+    plan_price_ultra: int = 3_843_000
+    plan_discount_percent: int = 0
+    plan_discount_percents: str = '{"pro":0,"promax":20,"ultra":30}'
+    plan_discount_until: str = ""
+    phone_coupon_code: str = "SOZAN30"
+    phone_coupon_percent: int = 30
+    phone_coupon_until: str = ""
     commission_bps: int = 200
     sms_overage_toman: int = 200
     sms_quota_free: int = 50
@@ -50,6 +58,11 @@ class Settings(BaseSettings):
     cloud_llm_token: str = Field(default="", validation_alias=AliasChoices("CLOUD_LLM_TOKEN", "OLLAMA_API_KEY"))
     cloud_llm_auth: str = "Bearer"
     cloud_llm_proxy: str = ""
+    open_router_api_token: str = ""
+    cloud_llm_fallback_url: str = ""
+    cloud_llm_fallback_model: str = ""
+    cloud_llm_fallback_token: str = ""
+    cloud_llm_fallback_auth: str = "Bearer"
     studio_cloud_url: str = ""
     studio_cloud_model: str = "Gemini-3.1-Flash-Lite-Preview"
     studio_cloud_token: str = Field(default="", validation_alias=AliasChoices("STUDIO_CLOUD_TOKEN", "GEMINI_API_KEY"))

@@ -99,6 +99,7 @@ class StudioComposeTests(unittest.TestCase):
                 )
             )
         self.assertEqual(finish.call_args.kwargs["status"], "failed")
+        self.assertIn("ساخت تصویر الان ممکن نیست", finish.call_args.kwargs["error"])
         titles = [call.kwargs.get("title") for call in emit.call_args_list]
         self.assertIn("compose-failed", titles)
 

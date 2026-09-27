@@ -1,6 +1,6 @@
 import unittest
 
-from app.services.shop_intent_service import catalog_add, classify_actions, page_kind_from_text
+from app.services.shop_intent_service import _price_toman, catalog_add, classify_actions, page_kind_from_text
 
 
 class ShopIntentClassifyTests(unittest.TestCase):
@@ -29,6 +29,17 @@ class ShopIntentClassifyTests(unittest.TestCase):
         header = classify_actions('عنوان هدر را «زعفران قائنات» کن')
         self.assertEqual(header[0]["type"], "set_header")
         self.assertEqual(header[0]["logoFa"], "زعفران قائنات")
+        self.assertEqual(classify_actions("قیمت را نشان بده")[0]["type"], "show_prices")
+        gold = classify_actions("بنویس «انگشتر طلایی»", view_target="تیتر فعلی")
+        self.assertEqual([row["type"] for row in gold], ["replace_text"])
+        self.assertEqual(gold[0]["replace"], "انگشتر طلایی")
+        wiped = classify_actions("بنویس «حذف کیف چرم»", view_target="تیتر فعلی")
+        self.assertEqual([row["type"] for row in wiped], ["replace_text"])
+        hidden = classify_actions("بنویس «قیمت را پنهان کن»", view_target="تیتر فعلی")
+        self.assertEqual([row["type"] for row in hidden], ["replace_text"])
+        button = classify_actions("متن دکمه را عوض کن «طلایی»")
+        self.assertEqual([row["type"] for row in button], ["set_brand"])
+        self.assertEqual(button[0]["fields"]["ctaLabelFa"], "طلایی")
         self.assertEqual(classify_actions("قیمت را پنهان کن")[0]["type"], "hide_prices")
         self.assertEqual(classify_actions("قیمت‌ها را مخفی کن")[0]["type"], "hide_prices")
         self.assertEqual(classify_actions("درباره ما اضافه کن")[0]["type"], "create_page")
@@ -42,6 +53,19 @@ class ShopIntentClassifyTests(unittest.TestCase):
         missing = classify_actions("رنگ را زرشکی کن و تیتر «این تیتر روی صفحه نیست» را عوض کن")
         self.assertEqual([row["type"] for row in missing], ["set_colors", "replace_text"])
         self.assertEqual(missing[1]["find"], "این تیتر روی صفحه نیست")
+
+    def test_spoken_prices(self) -> None:
+        self.assertEqual(_price_toman("۴۵۰ هزار"), 450_000)
+        self.assertEqual(_price_toman("۴۵۰ هزار تومن"), 450_000)
+        self.assertEqual(_price_toman("۱ میلیون و ۲۰۰"), 1_200_000)
+        self.assertEqual(_price_toman("۱ میلیون و ۲۰۰ هزار"), 1_200_000)
+        self.assertEqual(_price_toman("۱٫۲ میلیون"), 1_200_000)
+        self.assertEqual(_price_toman("1.2 میلیون"), 1_200_000)
+        self.assertEqual(_price_toman("۴۵۰ت"), 450_000)
+        self.assertEqual(_price_toman("۴۵۰ تومان"), 450)
+        bracelet = catalog_add("دستبند چرم را با قیمت ۴۵۰ هزار تومان اضافه کن")
+        self.assertEqual(bracelet["price"], 450_000)
+        self.assertEqual(bracelet["title"], "دستبند چرم")
 
     def test_shoe_sentence_with_persian_price_is_catalog_add(self) -> None:
         added = classify_actions("کفش چرم مشکی را اضافه کن، قیمت ۴٬۸۰۰٬۰۰۰ تومان")

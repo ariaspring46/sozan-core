@@ -1,0 +1,14 @@
+[
+  {"id": "fresh-01", "kind": "fresh", "size": "post", "subject": "silver ring", "prompt": "silver ring on a cream surface, soft studio light, no text, no logos"},
+  {"id": "fresh-02", "kind": "fresh", "size": "post", "subject": "leather bag", "prompt": "brown leather bag on a light wooden table, soft light, no text, no logos"},
+  {"id": "fresh-03", "kind": "fresh", "size": "post", "subject": "turquoise necklace", "prompt": "a long turquoise bead necklace laid flat in one large oval that fills most of the frame, dozens of beads, a visible clasp, not a bracelet, not a small loop, cream cloth, studio light, no text, no logos"},
+  {"id": "fresh-04", "kind": "fresh", "size": "story", "subject": "shop window", "prompt": "empty glass shop window at dusk, nothing on display, no products inside, no people, vertical frame, no text, no logos"},
+  {"id": "product-01", "kind": "product", "file": "after_klein_ring.png", "subject": "silver ring", "prompt": "pale warm marble surface, soft light from the upper left, no text"},
+  {"id": "product-02", "kind": "product", "file": "after_klein_bag.png", "subject": "leather wallet", "prompt": "light oak wood surface, soft light from the upper left, no text"},
+  {"id": "product-03", "kind": "product", "file": "after_klein_necklace.png", "subject": "purple gemstone pendant", "prompt": "cream linen cloth, soft light from the upper left, no text"},
+  {"id": "edit-01", "kind": "edit", "edit_kind": "scene", "plan": "promax", "file": "after_klein_ring.png", "subject": "silver ring", "prompt": "Place this exact silver ring inside an open gift box covered in navy velvet. The box exterior and interior are dark navy velvet, not metal and not silver. Keep the ring's shape, silver color, and details. No text."},
+  {"id": "edit-02", "kind": "edit", "edit_kind": "background", "plan": "pro", "file": "after_klein_ring.png", "subject": "silver ring", "prompt": "pale warm marble surface, soft light from the upper left, no text"},
+  {"id": "revise-01", "kind": "revise", "text": "رسمی‌تر کن"},
+  {"id": "fallback-01", "kind": "fallback", "mode": "retry", "size": "post", "subject": "silver ring", "prompt": "silver ring on a cream surface, soft studio light, no text"},
+  {"id": "fallback-02", "kind": "fallback", "mode": "fail", "size": "post", "prompt": "silver ring on a cream surface, soft studio light, no text"}
+]

@@ -31,14 +31,33 @@ class WalletPayTests(unittest.TestCase):
         self.assertEqual(route["merchant"], OWN)
 
     def test_resolve_hub_when_no_own_merchant(self) -> None:
-        with patch.object(payment_service.env, "zarinpal_merchant_id", HUB), patch.object(
-            payment_service.env, "commission_bps", 200
-        ):
+        with patch.object(payment_service.env, "payments_enabled", True), patch.object(
+            payment_service.env, "zarinpal_merchant_id", HUB
+        ), patch.object(payment_service.env, "commission_bps", 200):
             route = payment_service.resolve_sale_gateway({"paymentGateway": "mock"})
         self.assertEqual(route["owner"], "hub")
         self.assertEqual(route["id"], "zarinpal")
         self.assertEqual(route["commissionBps"], 200)
         self.assertEqual(route["merchant"], HUB)
+
+    def test_dry_mock_gateway_does_not_use_the_hub(self) -> None:
+        with patch("app.services.arvan_dns_service.edge_dry", return_value=True), patch.object(
+            payment_service.env, "payments_enabled", False
+        ), patch.object(payment_service.env, "zarinpal_merchant_id", HUB):
+            route = payment_service.resolve_sale_gateway({"paymentGateway": "mock"})
+        self.assertEqual(route["id"], "mock")
+        self.assertTrue(route["dry"])
+        self.assertNotIn("merchant", route)
+
+    def test_mock_outside_edge_dry_stays_on_the_hub(self) -> None:
+        with patch("app.services.arvan_dns_service.edge_dry", return_value=False), patch.object(
+            payment_service.env, "payments_enabled", True
+        ), patch.object(payment_service.env, "zarinpal_merchant_id", HUB), patch.object(
+            payment_service.env, "commission_bps", 200
+        ):
+            route = payment_service.resolve_sale_gateway({"paymentGateway": "mock"})
+        self.assertEqual(route["owner"], "hub")
+        self.assertEqual(route["id"], "zarinpal")
 
     def test_resolve_own_idpay(self) -> None:
         with patch.object(payment_service.env, "zarinpal_merchant_id", HUB):
@@ -170,6 +189,7 @@ class WalletPayTests(unittest.TestCase):
                 )
                 product = created["product"]
                 with (
+                    patch.object(payment_service.env, "payments_enabled", True),
                     patch.object(payment_service.env, "zarinpal_merchant_id", HUB),
                     patch.object(
                         payment_service,
@@ -205,6 +225,24 @@ class WalletPayTests(unittest.TestCase):
                     pay_service.attach_pay_link("سلام", {"productId": product["id"], "amount": 0})
                 )
         self.assertEqual(out, "سلام")
+
+    def test_attach_pay_link_says_payment_later_without_merchant(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with (
+                patch.object(settings, "state_dir", raw),
+                patch.object(payment_service.env, "zarinpal_merchant_id", ""),
+                tenant_scope("09135409482"),
+            ):
+                created = storefront_service.add_product(title="کیف چرم", price=250000, stock=1, sku="kif")
+                product = created["product"]
+                text = asyncio.run(
+                    pay_service.attach_pay_link(
+                        "این کیف موجود است.",
+                        {"productId": product["id"], "amount": 250000, "title": "کیف چرم"},
+                    )
+                )
+        self.assertIn(payment_service.PAYMENT_LATER, text)
+        self.assertNotIn("http", text)
 
     def test_zarinpal_callback_credits_wallet(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -263,7 +301,7 @@ class WalletPayTests(unittest.TestCase):
                 request.assert_not_called()
                 self.assertEqual(
                     wallet_service.get()["available"],
-                    2_000_000 - int(plan_service.PLANS["pro"]["priceToman"]),
+                    2_000_000 - plan_service.effective_price("pro"),
                 )
 
     def test_withdraw_roundtrip(self) -> None:

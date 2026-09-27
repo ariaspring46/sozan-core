@@ -192,6 +192,10 @@ def _atomic_text(path: Path, text: str) -> None:
 
 
 def _write_shop_upstream(shop: dict) -> None:
+    from app.services import arvan_dns_service
+
+    if arvan_dns_service.edge_dry():
+        return
     from app.state_store import current_tenant, iter_tenants, read_json, tenant_scope
 
     dest = _shop_map_path()
@@ -1817,7 +1821,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
                 shop = _refresh_job(_shop())
                 reply = str(result.get("reply") or "").strip() or "تغییر را روی همین صفحه اعمال می‌کنم."
                 if result.get("patched") and result.get("needsRebuild", True) and "بیلد" not in reply:
-                    reply = reply.rstrip(". ") + " تغییر در کادر است؛ وقتی آماده بودی بیلد بزن."
+                    reply = reply.rstrip(". ") + " تغییر در کادر است؛ هر وقت آماده بودی «انتشار تغییرات» را بزن."
             assistant = {
                 "id": str(uuid4()),
                 "role": "assistant",

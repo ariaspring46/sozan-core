@@ -11,19 +11,19 @@ const CODE_LINES = [
 export function LoginCoderScene() {
   return (
     <div className="login-coder-scene pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
-      <div className="login-code-drift login-code-drift-a absolute right-[6%] top-[8%] rounded-lg border border-line/40 bg-paper/15 px-3 py-2 font-mono text-[10px] text-warm/70 sm:text-xs">
+      <div dir="ltr" className="login-code-drift login-code-drift-a absolute right-[6%] top-[8%] rounded-lg border border-line/40 bg-paper/15 px-3 py-2 font-mono text-[10px] text-warm/70 sm:text-xs">
         {CODE_LINES[0]}
       </div>
-      <div className="login-code-drift login-code-drift-b absolute left-[5%] top-[14%] rounded-lg border border-line/30 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/80 sm:text-xs">
+      <div dir="ltr" className="login-code-drift login-code-drift-b absolute left-[5%] top-[14%] rounded-lg border border-line/30 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/80 sm:text-xs">
         {CODE_LINES[1]}
       </div>
-      <div className="login-code-drift login-code-drift-c absolute right-[8%] bottom-[14%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-accent/50 sm:text-xs">
+      <div dir="ltr" className="login-code-drift login-code-drift-c absolute right-[8%] bottom-[14%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-accent/50 sm:text-xs">
         {CODE_LINES[2]}
       </div>
-      <div className="login-code-drift login-code-drift-d absolute left-[7%] bottom-[10%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-warm/60 sm:text-xs">
+      <div dir="ltr" className="login-code-drift login-code-drift-d absolute left-[7%] bottom-[10%] rounded-lg border border-line/25 bg-paper/10 px-3 py-2 font-mono text-[10px] text-warm/60 sm:text-xs">
         {CODE_LINES[3]}
       </div>
-      <div className="login-code-drift login-code-drift-e absolute right-[22%] top-[22%] hidden rounded-lg border border-line/20 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/70 sm:block sm:text-xs">
+      <div dir="ltr" className="login-code-drift login-code-drift-e absolute right-[22%] top-[22%] hidden rounded-lg border border-line/20 bg-paper/10 px-3 py-2 font-mono text-[10px] text-muted/70 sm:block sm:text-xs">
         {CODE_LINES[4]}
       </div>
 
@@ -33,7 +33,7 @@ export function LoginCoderScene() {
           <rect x="78" y="118" width="124" height="58" rx="10" fill="#3A3A40" stroke="#52525A" strokeWidth="1.5" />
           <rect x="88" y="128" width="104" height="38" rx="6" fill="#2F2F33" stroke="#C45C26" strokeOpacity="0.4" />
           <g className="login-code-typing">
-            <text x="96" y="146" fill="#E8A87C" fontSize="9" fontFamily="ui-monospace, monospace" opacity="0.9">
+            <text x="96" y="146" direction="ltr" unicodeBidi="isolate" fill="#E8A87C" fontSize="9" fontFamily="ui-monospace, monospace" opacity="0.9">
               build_shop()
             </text>
             <rect x="168" y="138" width="2" height="12" fill="#C45C26" className="login-cursor-blink" />

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ChannelAlert } from "@/components/channel-alert";
+import { GettingStarted } from "@/components/getting-started";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
 import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
 import { api } from "@/lib/api";
@@ -26,6 +28,20 @@ function welcomeLines(brand: string) {
     "تغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.",
   ];
 }
+
+/** نمونه‌جمله‌هایی که سوزان واقعاً انجام می‌دهد؛ در چت خالی تایپ می‌شوند. */
+const CHAT_HINTS = [
+  "برای انگشتر نقره یک پست اینستاگرام بساز",
+  "رنگ دکمه‌های فروشگاه را زرشکی کن",
+  "حس فروشگاه را لوکس و خلوت کن",
+  "یک بخش درباره ما به سایت اضافه کن",
+  "برای تخفیف یلدا پست بساز",
+  "دایرکت‌های اینستاگرام را خودکار جواب بده",
+  "دستبند چرم را با قیمت ۴۵۰٬۰۰۰ تومان اضافه کن",
+  "دامنهٔ فروشگاه من چیه؟",
+  "اینستاگرام وصل هست یا نه؟",
+  "تو چه کارهایی می‌توانی بکنی؟",
+];
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -195,10 +211,11 @@ export default function ChatPage() {
     <AppShell
       header={
         <div className="flex min-w-0 items-center gap-2">
-          <div className="min-w-0 flex-1">
+          <div className="shrink-0">
             <p className="text-sm text-muted">گفتگو</p>
-            <h1 className="text-lg font-bold">سوزان</h1>
+            <h1 className="whitespace-nowrap text-lg font-bold">سوزان</h1>
           </div>
+          <div className="min-w-0 flex-1" />
           {threads.length ? (
             <label className="sr-only" htmlFor="sozan-thread">
               گفتگوها
@@ -207,7 +224,7 @@ export default function ChatPage() {
           {threads.length ? (
             <select
               id="sozan-thread"
-              className="max-w-[9rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink"
+              className="min-w-0 max-w-[8rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink sm:max-w-[14rem]"
               value={threadId}
               onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
             >
@@ -229,6 +246,8 @@ export default function ChatPage() {
       }
     >
       <div className="sozan-chat flex h-full flex-col">
+        <ChannelAlert />
+        <GettingStarted />
         {error ? (
           <p className="px-4 pt-3 text-sm text-danger" role="alert">
             {error}
@@ -246,6 +265,7 @@ export default function ChatPage() {
             pendingText={pending}
             welcome
             welcomeLines={welcomeLines(brand)}
+            hints={CHAT_HINTS}
             placeholder="به سوزان بگو…"
             persona="سوزان"
             showTime

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { ChannelAlert } from "@/components/channel-alert";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { api } from "@/lib/api";
@@ -175,40 +176,59 @@ export default function InboxPage() {
     <AppShell
       header={
         <div>
-          <p className="text-sm text-muted">چت کاربران</p>
-          <h1 className="text-lg font-bold">پیام از همه کانال‌ها</h1>
+          <p className="text-sm text-muted">صندوق</p>
+          <h1 className="text-lg font-bold">پیام مشتری‌ها</h1>
         </div>
       }
     >
       <div className="h-full space-y-3 overflow-y-auto p-4">
-        <div className="flex gap-1 rounded-2xl border border-line/70 bg-paper p-1">
-          {MODES.map((mode) => {
-            const locked = RANK[mode.id] > RANK[autoReplyMax || ""];
-            const active = autoReply === mode.id;
-            return (
-              <button
-                key={mode.id || "off"}
-                type="button"
-                disabled={saving || locked}
-                title={locked ? `در پلن ${mode.id === "send" ? "پرو مکس" : "پرو"}` : undefined}
-                onClick={() => void setMode(mode.id)}
-                className={cn(
-                  "min-h-10 flex-1 rounded-xl px-2 text-xs",
-                  active ? "bg-accent text-onAccent" : "text-muted",
-                  locked && "opacity-40",
-                )}
-              >
-                {mode.label}
-              </button>
-            );
-          })}
-        </div>
-        {planLabel ? (
-          <p className="text-[11px] text-muted">
-            سقف پلن {planLabel}
-            {autoReplyMax === "send" ? " · ارسال خودکار" : autoReplyMax === "draft" ? " · پیش‌نویس" : " · پاسخ دستی"}
+        <ChannelAlert inset={false} />
+        <section aria-label="پاسخ به دایرکت" className="space-y-2 rounded-2xl border border-line/70 bg-paper p-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold">پاسخ سوزان به دایرکت</h2>
+            {planLabel ? <span className="text-[11px] text-muted">پلن {planLabel}</span> : null}
+          </div>
+          <div className="flex gap-1 rounded-xl bg-canvas p-1" role="radiogroup" aria-label="حالت پاسخ">
+            {MODES.map((mode) => {
+              const locked = RANK[mode.id] > RANK[autoReplyMax || ""];
+              const active = autoReply === mode.id;
+              return (
+                <button
+                  key={mode.id || "off"}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  disabled={saving || locked}
+                  title={locked ? `در پلن ${mode.id === "send" ? "پرو مکس" : "پرو"}` : undefined}
+                  onClick={() => void setMode(mode.id)}
+                  className={cn(
+                    "min-h-10 flex-1 rounded-lg px-2 text-xs",
+                    active ? "bg-accentStrong font-bold text-onAccent" : "text-muted",
+                    locked && "opacity-40",
+                  )}
+                >
+                  {mode.label}
+                  {locked ? " 🔒" : ""}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs leading-6 text-muted">
+            {autoReply === "send"
+              ? "سوزان خودش جواب مشتری را می‌فرستد."
+              : autoReply === "draft"
+                ? "سوزان جواب را می‌نویسد؛ تو با یک لمس می‌فرستی."
+                : "جواب‌ها را خودت می‌نویسی."}
+            {autoReplyMax !== "send" ? (
+              <>
+                {" "}
+                <Link href="/more/settings" className="text-warm underline-offset-4 hover:underline">
+                  {autoReplyMax === "draft" ? "ارسال خودکار در پرو مکس" : "پیش‌نویس و ارسال خودکار در پلن‌های پولی"}
+                </Link>
+              </>
+            ) : null}
           </p>
-        ) : null}
+        </section>
         {!dmSync ? (
           <Card>
             <p className="text-sm">همگام‌سازی دایرکت در این پلن خاموش است. پیام‌های جدید از اینستاگرام و تلگرام نمی‌آیند.</p>
@@ -220,7 +240,7 @@ export default function InboxPage() {
             onClick={() => void syncNow()}
             className="min-h-11 w-full rounded-2xl border border-line/80 bg-paper px-3 text-sm text-warm disabled:opacity-50"
           >
-            {syncing ? "در حال همگام‌سازی…" : "همگام‌سازی پیام‌ها"}
+            {syncing ? "در حال گرفتن پیام‌های تازه…" : "گرفتن پیام‌های تازه"}
           </button>
         )}
         {syncNote ? <p className="text-sm text-muted">{syncNote}</p> : null}
@@ -239,7 +259,7 @@ export default function InboxPage() {
               onClick={() => setFilter(item.id)}
               className={cn(
                 "min-h-9 rounded-full px-3 text-xs",
-                filter === item.id ? "bg-accent text-onAccent" : "border border-line/70 text-muted",
+                filter === item.id ? "bg-accentStrong text-onAccent" : "border border-line/70 text-muted",
               )}
             >
               {item.label}
@@ -252,7 +272,7 @@ export default function InboxPage() {
               onClick={() => setPlatform(item.id)}
               className={cn(
                 "min-h-9 rounded-full px-3 text-xs",
-                platform === item.id ? "bg-accent text-onAccent" : "border border-line/70 text-muted",
+                platform === item.id ? "bg-accentStrong text-onAccent" : "border border-line/70 text-muted",
               )}
             >
               {item.label}
@@ -278,7 +298,7 @@ export default function InboxPage() {
               q || filter || platform ? undefined : (
                 <Link
                   href="/more/channels"
-                  className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent"
+                  className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm text-onAccent"
                 >
                   وصل کردن کانال
                 </Link>
@@ -298,11 +318,11 @@ export default function InboxPage() {
                     <div className="mt-0.5 flex items-center gap-2">
                       <p className="font-medium">{thread.sender}</p>
                       {thread.unread ? (
-                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] text-onAccent">
-                          {thread.unread}
+                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accentStrong px-1.5 text-[11px] text-onAccent">
+                          {Number(thread.unread).toLocaleString("fa-IR")}
                         </span>
                       ) : null}
-                      {thread.paused ? <span className="text-[11px] text-warm">پاسخ دستی</span> : null}
+                      {thread.paused ? <span className="text-[11px] text-warm">پاسخ خودکار متوقف</span> : null}
                     </div>
                     <p className="truncate text-sm text-muted">{preview(thread)}</p>
                     {thread.lastRole === "draft" ? (

@@ -45,7 +45,18 @@ type StudioSettings = {
     sitesUsed: number;
     sitesLimit: number;
     features: string[];
-    plans: { id: string; label: string; sites: number; priceToman?: number; smsQuota?: number; features: string[] }[];
+    plans: {
+      id: string;
+      label: string;
+      sites: number;
+      priceToman?: number;
+      listPrice?: number;
+      discountPercent?: number;
+      purchasable?: boolean;
+      smsQuota?: number;
+      features: string[];
+    }[];
+    discountUntilLabel?: string;
   };
 };
 
@@ -56,6 +67,8 @@ export function ShopSettingsForm() {
   const [notice, setNotice] = useState("");
   const [pickedPlan, setPickedPlan] = useState("");
   const [confirmPay, setConfirmPay] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponAmount, setCouponAmount] = useState<number | null>(null);
   const [plansOpen, setPlansOpen] = useState(false);
 
   useEffect(() => {
@@ -372,21 +385,63 @@ export function ShopSettingsForm() {
                         </p>
                         <p className="text-xs text-muted">
                           {plan.sites === 1 ? "یک وب‌سایت" : plan.sites === 0 ? "وب‌سایت نامحدود" : `تا ${plan.sites} وب‌سایت`}
-                          {plan.priceToman ? ` · ${money(plan.priceToman)} تومان` : " · رایگان"}
-                          {plan.smsQuota ? ` · ${plan.smsQuota} پیامک` : ""}
+                          {plan.listPrice && plan.priceToman && plan.listPrice > plan.priceToman ? (
+                            <span className="mx-1 line-through">{money(plan.listPrice)}</span>
+                          ) : null}
+                          {plan.priceToman ? ` · ${money(plan.priceToman)} تومان در ماه` : " · رایگان"}
+                          {plan.discountPercent ? ` · ٪${money(plan.discountPercent)} تخفیف` : ""}
+                          {plan.purchasable === false ? " · به‌زودی" : ""}
+                          {plan.smsQuota ? ` · ${money(plan.smsQuota)} پیامک` : ""}
                         </p>
                       </button>
                     );
                   })}
-                  {pickedPlan && pickedPlan !== form.plan ? (
+                  {form.subscription.discountUntilLabel ? (
+                    <p className="text-xs text-muted">تخفیف تا {form.subscription.discountUntilLabel}</p>
+                  ) : null}
+                  {pickedPlan && pickedPlan !== form.plan && pickedSpec?.purchasable === false ? (
+                    <Button disabled>به‌زودی</Button>
+                  ) : null}
+                  {pickedPlan && pickedPlan !== form.plan && pickedSpec?.purchasable !== false ? (
                     <div className="space-y-2">
+                      {confirmPay && pickedPlan !== "free" && form.billing?.ready ? (
+                        <div className="space-y-2">
+                          <Input
+                            value={couponCode}
+                            placeholder="کد تخفیف"
+                            onChange={(event) => {
+                              setCouponCode(event.target.value);
+                              setCouponAmount(null);
+                            }}
+                          />
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            disabled={busy || !couponCode.trim()}
+                            onClick={() => {
+                              setBusy(true);
+                              setError("");
+                              void api<{ amount: number }>("/billing/coupon-preview", {
+                                method: "POST",
+                                body: JSON.stringify({ plan: pickedPlan, code: couponCode.trim() }),
+                              })
+                                .then((data) => setCouponAmount(data.amount))
+                                .catch((err) => setError(err instanceof Error ? err.message : "این کد تخفیف معتبر نیست"))
+                                .finally(() => setBusy(false));
+                            }}
+                          >
+                            اعمال کد
+                          </Button>
+                          {couponAmount != null ? <p className="text-sm">با کد: {money(couponAmount)} تومان</p> : null}
+                        </div>
+                      ) : null}
                       {confirmPay && pickedPlan !== "free" ? (
                         <p className="text-sm text-muted">
                           {walletCovers
                             ? `موجودی کیف ${money(form.walletAvailable || 0)} تومان است و اشتراک ${pickedSpec?.label} از کیف کم می‌شود.`
                             : form.billing?.ready
                               ? `بعد از تأیید به زرین‌پال می‌روی و اشتراک ${pickedSpec?.label} فعال می‌شود.`
-                              : "درگاه زرین‌پال هاب هنوز تنظیم نشده."}
+                              : "پرداخت به‌زودی فعال می‌شود"}
                         </p>
                       ) : null}
                       <div className="flex flex-wrap gap-2">
@@ -420,7 +475,10 @@ export function ShopSettingsForm() {
                               "/billing/subscribe",
                               {
                                 method: "POST",
-                                body: JSON.stringify({ plan: pickedPlan }),
+                                body: JSON.stringify({
+                                  plan: pickedPlan,
+                                  code: form.billing?.ready ? couponCode.trim() : "",
+                                }),
                               },
                             )
                               .then((data) => {
@@ -440,7 +498,15 @@ export function ShopSettingsForm() {
                               .finally(() => setBusy(false));
                           }}
                         >
-                          {pickedPlan === "free" ? "فعال‌سازی رایگان" : confirmPay ? (walletCovers ? "پرداخت از کیف" : "پرداخت با زرین‌پال") : "پرداخت و فعال‌سازی"}
+                          {pickedPlan === "free"
+                            ? "فعال‌سازی رایگان"
+                            : !walletCovers && !form.billing?.ready
+                              ? "پرداخت به‌زودی فعال می‌شود"
+                              : confirmPay
+                                ? walletCovers
+                                  ? "پرداخت از کیف"
+                                  : "پرداخت با زرین‌پال"
+                                : "پرداخت و فعال‌سازی"}
                         </Button>
                         <Button
                           variant="ghost"

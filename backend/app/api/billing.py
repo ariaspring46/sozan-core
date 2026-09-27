@@ -8,14 +8,35 @@ from app.services import billing_service
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 
+@router.get("/plans")
+async def public_plans():
+    from app.services import plan_service
+
+    return plan_service.public_catalog()
+
+
 class SubscribeIn(BaseModel):
     plan: str = Field(min_length=2, max_length=16)
+    code: str = ""
+
+
+class CouponPreviewIn(BaseModel):
+    plan: str = Field(min_length=2, max_length=16)
+    code: str = Field(min_length=1, max_length=40)
+
+
+@router.post("/coupon-preview")
+async def coupon_preview(body: CouponPreviewIn, _user=Depends(require_permission("campaigns:write"))):
+    try:
+        return billing_service.preview_coupon(body.plan, body.code)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.post("/subscribe")
 async def subscribe(body: SubscribeIn, user=Depends(require_permission("campaigns:write"))):
     try:
-        return await billing_service.start_subscription(body.plan, phone=user.phone)
+        return await billing_service.start_subscription(body.plan, phone=user.phone, code=body.code)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 

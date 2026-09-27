@@ -137,6 +137,7 @@ def public_order(row: dict) -> dict:
         "amount": int(row.get("amount") or 0),
         "status": row.get("status") or "pending",
         "channel": row.get("channel") or "",
+        "at": int(row.get("at") or 0),
         "payUrl": public_pay_url(str(row.get("id") or "")),
         "startPayUrl": row.get("startPayUrl") or "",
     }
@@ -199,6 +200,16 @@ async def create_order(
         "at": int(time()),
         "phone": phone,
     }
+    if route.get("dry"):
+        url = f"https://dry-mock.invalid/p/{order_id}"
+        row["authority"] = order_id
+        row["startPayUrl"] = url
+        orders = _orders()
+        orders.append(row)
+        _save_orders(orders)
+        out = public_order(row)
+        out["payUrl"] = url
+        return out
     if route["id"] == "idpay":
         paid = await payment_service.idpay_request(
             amount_toman=total,
@@ -271,6 +282,10 @@ async def attach_pay_link(
             channel=channel,
             thread_id=thread_id,
         )
+    except ValueError as exc:
+        if str(exc) == payment_service.PAYMENT_LATER and payment_service.PAYMENT_LATER not in text:
+            return f"{text}\n{payment_service.PAYMENT_LATER}"[:1000]
+        return text
     except Exception:
         return text
     url = str(order.get("payUrl") or "").strip()
@@ -354,6 +369,7 @@ def _mark_paid(row: dict, *, ref_id: str) -> None:
         amount=amount,
         customer=str(row.get("customer") or "مشتری"),
         channel=str(row.get("channel") or "دایرکت"),
+        source="gateway",
     )
     for line in _stock_lines(row):
         product_id = str(line["productId"])

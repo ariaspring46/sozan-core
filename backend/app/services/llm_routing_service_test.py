@@ -1,4 +1,5 @@
 import asyncio
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -97,7 +98,9 @@ class ImageProviderTests(unittest.TestCase):
 
         with patch("app.services.llm_routing_service.get", return_value={}), patch(
             "app.services.image_provider_service.httpx.Client", FakeClient
-        ), patch("app.services.image_provider_service.observe_base", return_value="http://127.0.0.1:9292"):
+        ), patch("app.services.image_provider_service.observe_base", return_value="http://127.0.0.1:9292"), patch.dict(
+            os.environ, {"IMAGE_LOCAL": "1"}
+        ):
             png = image_provider_service.generate_still("mug")
         self.assertGreaterEqual(len(png), 2048)
 

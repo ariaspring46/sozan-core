@@ -186,6 +186,7 @@ function ShopLivePreview({
   onViewPath,
   onViewTarget,
   seekPath,
+  clearPick = 0,
 }: {
   href: string;
   build: BuildLive | null;
@@ -198,8 +199,9 @@ function ShopLivePreview({
   onBuild?: () => void;
   onRetry?: () => void;
   onViewPath?: (path: string) => void;
-  onViewTarget?: (text: string) => void;
+  onViewTarget?: (text: string, tag?: string) => void;
   seekPath?: string;
+  clearPick?: number;
 }) {
   const host = shopHostLabel(href);
   const [path, setPath] = useState("/");
@@ -260,12 +262,16 @@ function ShopLivePreview({
       if (picked || tag) {
         const label = picked ? (tag ? `${tag} · ${picked}` : picked) : tag;
         setPick(label);
-        onViewTarget?.(picked || tag);
+        onViewTarget?.(picked || tag, tag);
       }
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, [href, onViewPath, onViewTarget]);
+
+  useEffect(() => {
+    if (clearPick) setPick("");
+  }, [clearPick]);
 
   useEffect(() => {
     if (!seekPath || seekPath === "/" || pendingBuild > 0) return;
@@ -317,8 +323,8 @@ function ShopLivePreview({
                 (pendingBuild > 0 || failed) && !(overlay && !failed) ? "bg-accent text-onAccent" : "text-muted",
               )}
             >
-              بیلد
-              {pendingBuild > 0 ? ` ${pendingBuild.toLocaleString("fa-IR")}` : ""}
+              {failed ? "ساخت دوباره" : "انتشار تغییرات"}
+              {pendingBuild > 0 ? ` (${pendingBuild.toLocaleString("fa-IR")})` : ""}
             </button>
           ) : null}
           <IconBtn label={phone ? "نمایش دسکتاپ" : "نمایش موبایل"} active={phone} onClick={() => setPhone((value) => !value)}>
@@ -331,7 +337,8 @@ function ShopLivePreview({
             href={href.replace(/\/$/, "") + (path.split("?")[0] || "/")}
             target="_blank"
             rel="noreferrer"
-            aria-label="تب جدید"
+            aria-label="باز کردن ویترین در تب جدید"
+            title="باز کردن ویترین در تب جدید"
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-warm hover:bg-canvas"
           >
             <ExternalLink size={14} />
@@ -353,11 +360,11 @@ function ShopLivePreview({
   );
 
   if (!open) {
-    return <section className="mx-4 mt-3 shrink-0 overflow-hidden rounded-3xl border border-accent/25 bg-paper shadow-card">{bar}</section>;
+    return <section className="shrink-0 overflow-hidden rounded-2xl border border-accent/25 bg-paper shadow-card">{bar}</section>;
   }
 
   return (
-    <section className="relative mx-3 mt-2 flex h-[min(38dvh,20rem)] min-h-[11rem] shrink-0 flex-col overflow-hidden rounded-3xl border border-accent/25 bg-paper shadow-card sm:mx-4 sm:mt-3 sm:h-[min(46dvh,26rem)] lg:h-[min(58%,32rem)]">
+    <section className="relative flex min-h-[10rem] flex-1 flex-col sm:min-h-[14rem] overflow-hidden rounded-2xl border border-accent/25 bg-paper shadow-card">
       {bar}
       <div className="flex shrink-0 gap-1 border-b border-line/60 px-2 py-1">
         {PAGES.map((page) => (
@@ -558,6 +565,7 @@ export function ShopLiveBuild({
   onViewPath,
   onViewTarget,
   seekPath,
+  clearPick = 0,
 }: {
   build: BuildLive | null;
   href?: string;
@@ -568,8 +576,9 @@ export function ShopLiveBuild({
   onBuild?: () => void;
   onRetry?: () => void;
   onViewPath?: (path: string) => void;
-  onViewTarget?: (text: string) => void;
+  onViewTarget?: (text: string, tag?: string) => void;
   seekPath?: string;
+  clearPick?: number;
 }) {
   const status = build?.status || "";
   const live = status === "running" || status === "queued";
@@ -602,6 +611,7 @@ export function ShopLiveBuild({
         onViewPath={onViewPath}
         onViewTarget={onViewTarget}
         seekPath={seekPath}
+        clearPick={clearPick}
       />
     );
   }

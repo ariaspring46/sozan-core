@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import time
 from pathlib import Path
 from uuid import UUID, uuid4
 
 from app.services.campaign_service import CampaignService
+from app.services.claims_guard import check as _claim_check
 from app.services.llm import complete_json
 from app.services.observe_client import emit_later
 from app.services.persian_text import guard_output, sanitize_persian
@@ -14,10 +16,16 @@ from app.services.tenant_lock import tenant_file_lock
 from app.state_store import read_json, write_json
 
 STUDIO_SYSTEM = """تو استودیوی محتوای سوزان هستی. فقط یک شیء JSON برگردان؛ متن بیرون JSON ننویس.
-کلیدها فقط این‌هاست: reply, instagram, telegram, whatsapp.
-reply خلاصهٔ فارسی همان پست است. نام فیلد یا «متن فارسی» ننویس.
-عنوان، دکمه، و تصمیم ساخت عکس را ننویس. ادعا، جنس، و موجودی را فقط اگر در دستور کاربر آمده بنویس.
-اگر کاربر پست، استوری، ریلز یا کپشن خواست هر سه کپشن را فارسی و بدون هشتگ لاتین پر کن.
+کلیدها فقط این‌هاست: reply, instagram, telegram, whatsapp, imagePrompt, editKind.
+کپشن را مشتری می‌خواند. در کپشن از ساخت عکس، زاویه، پس‌زمینه و آماده شدن عکس حرف نزن. آن حرف فقط مال reply است.
+ویژگی کالا (جنس، اجزا، اندازه، دوام، اصالت، موجودی، ارسال، ضمانت، قیمت) را فقط اگر در حرف فروشنده یا کاتالوگ آمده بنویس. حس و سبک آزاد است.
+اگر اسم کالا معلوم است و کاربر پست، استوری، ریلز، کپشن یا عکس خواست، هر سه کپشن را فارسی، دربارهٔ خود کالا، و بدون هشتگ لاتین پر کن.
+اگر اسم کالا معلوم نیست، هر سه کپشن را خالی بگذار.
+هر کپشن را با جملهٔ کامل و نقطه تمام کن. فقط دربارهٔ کالای همین درخواست بنویس.
+اسم کالا باید در هر سه کپشن بیاید.
+imagePrompt یک جملهٔ انگلیسی است و ویژگی نگفته را در آن نیاور. اگر کالا گردنبند است بنویس full necklace laid out in a long loop. واژهٔ فارسی ممنوع.
+editKind یکی از background، scene، none است. background یعنی فقط پس‌زمینه عوض شود. scene یعنی کالا داخل صحنهٔ تازه برود، مثل جعبه یا دست یا کنار شیء دیگر.
+جملهٔ «در حال ساخت» را ننویس؛ کد آن را اضافه می‌کند.
 instagram حدود ۲۵۰ تا ۴۰۰ کاراکتر، telegram حداکثر ۴۰۰، whatsapp حداکثر ۲۸۰."""
 STUB_COPY = frozenset({"متن فارسی", "تیتر کوتاه", "title", "reply", "cta", "subtitle", "کمپین جدید", "ببین"})
 
@@ -108,6 +116,15 @@ def _save(rows: list[dict]) -> None:
 
 _CLAIM_WORDS = ("خالص", "طلا", "الماس", "یاقوت", "عیار", "پلاتین", "برلیان")
 _FLUFF = ("کیفیت بالا", "منحصر به فرد")
+_SALES_CLAIMS = ("چرم طبیعی", "قابل سفارش", "ارسال رایگان", "ضمانت", "قیمت مناسب")
+_HASHTAG_GUARDED = ("طلا", "الماس", "یاقوت", "پلاتین", "برلیان", "نقره", "چرم", "ابریشم", "فیروزه", "طبیعی", "ضمانت", "رایگان", "پرفروش", "دستساز", "دست‌ساز", "لاکچری", "فانتزی", "بدل", "بدلی")
+_BACKSTAGE = ("عکس", "تصویر", "پس‌زمینه", "پس زمینه", "آماده شد", "آماده می‌کنیم", "آماده ميكنيم", "زاویه", "زاويه")
+ASK_NAME = "اسم کالا و یکی دو ویژگی‌اش را بگو تا کپشن بنویسم."
+SAMPLE_PHOTO = "این عکس نمونه است، نه عکس کالای خودت؛ عکس کالا را بفرست تا روی پس‌زمینهٔ تازه بنشانمش."
+CLOSEUP_PHOTO = "برای کیفیت بهتر، عکسی نزدیک‌تر از کالا بفرست."
+_PROMPT_FIELD = re.compile(
+    r"(?:جنس|زاویه|پس‌زمینه|پس زمینه|رنگ|نور)\s*[:：]\s*.*?(?=(?:جنس|زاویه|پس‌زمینه|پس زمینه|رنگ|نور)\s*[:：]|[.!?؟\n]|$)"
+)
 
 
 def _strip_latin_tags(text: str) -> str:
@@ -145,14 +162,207 @@ def _drop_unclaimed(text: str, spoken: str, allowed: str = "") -> str:
     return ""
 
 
+def _drop_prompt_fields(text: str) -> str:
+    cleaned = _PROMPT_FIELD.sub(" ", text or "")
+    return re.sub(r"\s{2,}", " ", cleaned).strip(" ،")
+
+
+def _drop_sales_claims(text: str, spoken: str, allowed: str = "") -> str:
+    source = _claim_source(spoken, allowed)
+    cleaned = text or ""
+    for claim in _SALES_CLAIMS:
+        if claim in cleaned and claim not in source:
+            cleaned = cleaned.replace(claim, " ")
+    return re.sub(r"\s{2,}", " ", cleaned).strip(" ،")
+
+
+def _thin_caption(text: str) -> bool:
+    value = (text or "").strip()
+    if not value:
+        return True
+    bare = value.strip(" .!؟")
+    if _is_greeting(bare):
+        return True
+    return len(bare.split()) < 4
+
+
+def _captions_unchanged(captions: dict, old: dict) -> bool:
+    for key in ("instagram", "telegram", "whatsapp"):
+        if str(captions.get(key) or "").strip() != str(old.get(key) or "").strip():
+            return False
+    return True
+
+
+def _keep_changed_captions(captions: dict, old: dict, subject: str) -> dict:
+    """A rewrite that came back empty or without the product name keeps the new sentences and adds the name."""
+    if _captions_unchanged(captions, old):
+        return captions
+    name = (subject or "").strip()
+    out: dict = {}
+    for key in ("instagram", "telegram", "whatsapp"):
+        text = str(captions.get(key) or "").strip()
+        if not text:
+            text = str(old.get(key) or "").strip()
+        if name and text and name not in text:
+            text = f"{name}. {text}"
+        out[key] = text
+    return out
+
+
+def _repair_rewrite(captions: dict, subject: str = "") -> dict:
+    bodies = [str(captions.get(key) or "") for key in ("instagram", "telegram", "whatsapp")]
+    best = max(bodies, key=len) if bodies else ""
+    if _thin_caption(best):
+        return captions
+    if subject and subject not in best:
+        return captions
+    return {key: (best if _thin_caption(str(value or "")) else value) for key, value in captions.items()}
+
+
+def progress_clause(*, image: bool, video: bool) -> str:
+    if image and video:
+        return "در حال ساخت تصویر و ویدیو است."
+    if image:
+        return "در حال ساخت تصویر است."
+    if video:
+        return "در حال ساخت ویدیو است."
+    return ""
+
+
+def _drop_video_sentences(text: str) -> str:
+    parts = re.split(r"(?<=[.!?؟])\s+", text or "")
+    kept = [part for part in parts if part.strip() and "ویدیو" not in part and "ویدئو" not in part]
+    return re.sub(r"\s{2,}", " ", " ".join(kept)).strip()
+
+
+def _strip_progress(text: str) -> str:
+    cleaned = text or ""
+    for sentence in (
+        "در حال ساخت تصویر و ویدیو است.",
+        "در حال ساخت تصویر و ویدیو است",
+        "در حال ساخت تصویر است.",
+        "در حال ساخت تصویر است",
+        "در حال ساخت ویدیو است.",
+        "در حال ساخت ویدیو است",
+    ):
+        cleaned = cleaned.replace(sentence, " ")
+    return re.sub(r"\s{2,}", " ", cleaned).strip()
+
+
+def _named_product(spoken: str) -> str:
+    subject = _title_from_spoken(spoken)
+    if not subject or subject in {"کالا", "کالای پیوست‌شده", "عکس", "تصویر"}:
+        return ""
+    if any(mark in subject for mark in ("همین کالا", "این کالا", "همین عکس", "این عکس", "پس‌زمینه", "پس زمینه")):
+        return ""
+    return subject
+
+
+def _unnamed_product_request(spoken: str) -> bool:
+    if not any(mark in (spoken or "") for mark in ("همین کالا", "این کالا", "همین عکس", "این عکس")):
+        return False
+    return not _named_product(spoken)
+
+
+def _has_backstage(text: str) -> bool:
+    return any(word in (text or "") for word in _BACKSTAGE)
+
+
+def _drop_backstage(text: str) -> str:
+    parts = re.split(r"(?<=[.!?؟\n])\s+", text or "")
+    kept = [part for part in parts if part.strip() and not _has_backstage(part)]
+    return re.sub(r"\s{2,}", " ", " ".join(kept)).strip()
+
+
+def _missing_subject(captions: dict, subject: str) -> bool:
+    words = [word for word in (subject or "").split() if len(word) > 1]
+    if not words:
+        return False
+    for key in ("instagram", "telegram", "whatsapp"):
+        text = str(captions.get(key) or "")
+        if any(word not in text for word in words):
+            return True
+    return False
+
+
+def _facts_text(spoken: str, extra: str = "") -> str:
+    return f"{spoken or ''}\n{extra or ''}".strip()
+
+
+def _drop_claim_sentences(text: str, claims: list[str]) -> str:
+    parts = re.split(r"(?<=[.!?؟\n])\s+", text or "")
+    kept = [part for part in parts if part.strip() and not any(claim and claim in part for claim in claims)]
+    return re.sub(r"\s{2,}", " ", " ".join(kept)).strip()
+
+
+def _edit_kind(parsed: dict, spoken: str, has_media: bool) -> str:
+    kind = str((parsed or {}).get("editKind") or "").strip().lower()
+    if kind in {"background", "scene", "none"}:
+        return "" if kind == "none" else kind
+    if not has_media:
+        return ""
+    if any(mark in (spoken or "") for mark in ("جعبه", "روی دست", "کادو", "مخمل")):
+        return "scene"
+    return "background"
+
+
 def _clip_captions(captions: dict, *, spoken: str = "", drop_unclaimed: bool = False, allowed: str = "") -> dict:
     out = {}
     for key, limit in CAPTION_LIMITS.items():
         text = sanitize_persian(_strip_latin_tags(_real_copy(captions.get(key), limit=limit)), limit=limit)
+        text = _drop_prompt_fields(text)
+        text = _drop_sales_claims(text, spoken, allowed)
         if drop_unclaimed:
             text = _drop_unclaimed(text, spoken, allowed)
-        out[key] = text
+        if spoken:
+            before = text
+            text = _drop_foreign(text, spoken)
+            if before and not text:
+                subject = _title_from_spoken(spoken)
+                text = f"{subject}." if subject else ""
+        settled = _settle_caption(text)
+        if len(settled) > limit:
+            settled = f"{settled[: limit - 1].rstrip()}."
+        out[key] = settled
     return out
+
+
+def _settle_caption(text: str) -> str:
+    value = (text or "").strip()
+    if not value:
+        return ""
+    if re.search(r"[.!?؟]$", value):
+        return value
+    marks = [item.start() for item in re.finditer(r"[.!?؟]", value)]
+    if marks:
+        return value[: marks[-1] + 1].strip()
+    return f"{value}."
+
+
+def _foreign_subjects(spoken: str) -> list[str]:
+    from app.services.turn_parse import parse_turn
+
+    current = spoken or ""
+    found: list[str] = []
+    for row in _messages():
+        if not isinstance(row, dict) or row.get("role") != "user":
+            continue
+        subject = parse_turn(str(row.get("text") or "")).subject
+        if len(subject) < 3 or subject in current or subject in found:
+            continue
+        found.append(subject)
+    return found
+
+
+def _drop_foreign(text: str, spoken: str) -> str:
+    cleaned = text or ""
+    for subject in _foreign_subjects(spoken):
+        if subject not in cleaned:
+            continue
+        parts = re.split(r"(?<=[.!؟\n])\s+", cleaned)
+        kept = [part for part in parts if subject not in part]
+        cleaned = re.sub(r"\s{2,}", " ", " ".join(kept)).strip()
+    return cleaned
 
 
 def _catalog_blob() -> str:
@@ -232,8 +442,90 @@ def _local_post(spoken: str) -> dict:
 
 
 def _image_prompt(parsed: dict, spoken: str) -> str:
-    subject = _title_from_spoken(spoken) or "product"
-    return f"product photo of {subject}, studio light, no text, no logos, no people"
+    raw = str((parsed or {}).get("imagePrompt") or "").strip()
+    if raw and not re.search(r"[\u0600-\u06FF]", raw):
+        return raw[:800]
+    return "studio product photograph, soft light, plain background, no text, no logos, no people"
+
+
+def _hashtag_only(spoken: str) -> bool:
+    text = spoken or ""
+    if "هشتگ" not in text:
+        return False
+    return not any(mark in text for mark in ("پست", "استوری", "ریلز", "کپشن", "عکس", "تصویر"))
+
+
+def _hashtag_list(text: str, spoken: str = "") -> list[str]:
+    found = re.findall(r"#[\u0600-\u06FF0-9_‌]+", text or "")
+    banned = [word for word in _HASHTAG_GUARDED if word not in (spoken or "")]
+    uniq: list[str] = []
+    for tag in found:
+        if tag in uniq or any(word in tag for word in banned):
+            continue
+        uniq.append(tag)
+    return uniq[:10]
+
+
+def _tag_root(tag: str) -> str:
+    return tag.lstrip("#").replace("\u200c", "").split("_")[0]
+
+
+def _repeated_root(tags: list[str]) -> bool:
+    roots = [_tag_root(tag) for tag in tags if tag]
+    if len(roots) < 2:
+        return False
+    top = max(roots.count(root) for root in set(roots))
+    return top > len(roots) / 2
+
+
+def _balance_roots(tags: list[str]) -> list[str]:
+    kept = [tag for tag in tags if tag]
+    while _repeated_root(kept):
+        roots = [_tag_root(tag) for tag in kept]
+        dominant = max(set(roots), key=roots.count)
+        for index in range(len(kept) - 1, -1, -1):
+            if _tag_root(kept[index]) == dominant:
+                del kept[index]
+                break
+        else:
+            break
+    return kept
+
+
+def _normalize_hashtags(text: str, spoken: str = "") -> str:
+    return " ".join(_hashtag_list(text, spoken))
+
+
+def _guard_subject(spoken: str) -> str:
+    if _unnamed_product_request(spoken):
+        return ""
+    return _named_product(spoken) or _title_from_spoken(spoken)
+
+
+def _captions_of(parsed: dict, old: dict | None = None, *, spoken: str, allowed: str) -> dict:
+    previous = old or {}
+    return _clip_captions(
+        {
+            "instagram": parsed.get("instagram") or previous.get("instagram"),
+            "telegram": parsed.get("telegram") or previous.get("telegram"),
+            "whatsapp": parsed.get("whatsapp") or previous.get("whatsapp") or parsed.get("telegram") or previous.get("instagram"),
+        },
+        spoken=spoken,
+        drop_unclaimed=True,
+        allowed=allowed,
+    )
+
+
+def _caption_backstage(captions: dict) -> bool:
+    return any(_has_backstage(str(captions.get(key) or "")) for key in ("instagram", "telegram", "whatsapp"))
+
+
+def _needs_caption_retry(parsed: dict) -> bool:
+    for key in ("instagram", "telegram", "whatsapp"):
+        raw = str((parsed or {}).get(key) or "").strip()
+        if len(raw) >= 80 and not re.search(r"[.!?؟]$", raw):
+            return True
+    return False
 
 
 def _real_copy(text: object, *, limit: int = 400) -> str:
@@ -251,34 +543,11 @@ def _studio_prompt(spoken: str, *, media: dict | None) -> str:
         cfg = get_settings() or {}
     except Exception:
         cfg = {}
-    goods = []
-    try:
-        from app.services.storefront_service import list_products
-
-        for item in (list_products().get("products") or [])[:8]:
-            title = _catalog_title(item.get("title") or "")
-            if title:
-                goods.append(title)
-    except Exception:
-        goods = []
-    history = []
-    for row in _messages()[-10:]:
-        role = "کاربر" if row.get("role") == "user" else "استودیو"
-        text = str(row.get("text") or "").strip()
-        if not text:
-            continue
-        if text.startswith("بگو برای اینستاگرام"):
-            continue
-        if role == "استودیو" and "چه پستی" in text and not row.get("captions"):
-            continue
-        history.append(f"{role}: {text[:240]}")
-    history = history[-6:]
     blob = (
         f"درخواست همین جمله: {spoken}\n"
         f"فروشگاه: {cfg.get('storeName') or 'فروشگاه'}\n"
         f"شعار: {cfg.get('storeTagline') or ''}\n"
-        f"کالاها: {', '.join(goods) or 'ویترین فروشگاه'}\n"
-        f"گفتگو:\n{chr(10).join(history) or spoken}"
+        "فقط دربارهٔ همین جمله بنویس. کالای پیام‌های قبلی را نام نبر.\n"
     )
     if media:
         blob += f"\nپیوست: {media.get('kind')}"
@@ -363,19 +632,129 @@ def _draft_item(row: dict) -> dict | None:
     }
 
 
-STUDIO_JSON_TOKENS = 1600
+STUDIO_JSON_TOKENS = 2400
+HASHTAG_SYSTEM = """فقط یک شیء JSON با کلیدهای reply, instagram, telegram, whatsapp.
+کاربر فقط هشتگ خواسته. instagram را با ۵ تا ۱۰ هشتگ فارسی پر کن؛ هر کدام با # شروع شود و با فاصله جدا شوند.
+ترکیب: خود کالا، سبکِ گفته‌شده، کاربرد اگر گفته شده (مثل هدیه)، و نام فروشگاه.
+چندکلمه‌ای را با زیرخط بنویس، مثل #گردنبند_شیک.
+ریشه یعنی کلمهٔ قبل از زیرخط. #گردنبند_شیک ریشهٔ گردنبند است.
+حداکثر نیمی از هشتگ‌ها با نام کالا شروع شوند. بقیه با سبک، کاربرد یا نام فروشگاه شروع شوند، مثل #استایل_روزمره #هدیه #فروشگاه.
+telegram و whatsapp همان هشتگ‌ها باشند. جملهٔ تبلیغاتی و عکس ننویس.
+reply یک جملهٔ کامل فارسی باشد.
+جنس، فلز، و نوع (فانتزی، بدل) را در هشتگ نیاور مگر اینکه کاربر همان را گفته باشد."""
 
 
-async def _studio_json(prompt: str) -> dict:
-    parsed = await complete_json(STUDIO_SYSTEM, prompt, surface="studio", max_tokens=STUDIO_JSON_TOKENS)
+async def _outside_claims(text: str, facts: str) -> list[str]:
+    return await _claim_check(text, facts, complete=complete_json)
+
+
+async def _purge_text(text: str, facts: str) -> str:
+    claims = await _outside_claims(text, facts)
+    if not claims:
+        return text
+    return _drop_claim_sentences(text, claims)
+
+
+async def _studio_json(prompt: str, max_tokens: int = STUDIO_JSON_TOKENS) -> dict:
+    parsed = await complete_json(STUDIO_SYSTEM, prompt, surface="studio", max_tokens=max_tokens)
     if parsed.get("error") != "llm_bad_json":
         return parsed
     return await complete_json(
         STUDIO_SYSTEM,
         f"{prompt}\nفقط یک شیء JSON برگردان، بدون توضیح.",
         surface="studio",
-        max_tokens=STUDIO_JSON_TOKENS + 600,
+        max_tokens=max_tokens + 600,
     )
+
+
+async def _ensure_english_prompt(parsed: dict, spoken: str, facts: str = "") -> dict:
+    raw = str((parsed or {}).get("imagePrompt") or "").strip()
+    if raw and not re.search(r"[\u0600-\u06FF]", raw):
+        return parsed
+    follow = await complete_json(
+        "فقط JSON با کلید imagePrompt. یک جملهٔ انگلیسی. ویژگی‌ای که در facts نیست ننویس. اگر کالا گردنبند است بنویس full necklace laid out in a long loop. واژهٔ فارسی ممنوع.",
+        f"{spoken}\nfacts:\n{facts}",
+        surface="studio",
+        max_tokens=220,
+    )
+    text = str(follow.get("imagePrompt") or "").strip()
+    updated = dict(parsed or {})
+    if text and not re.search(r"[\u0600-\u06FF]", text):
+        updated["imagePrompt"] = text
+    else:
+        updated["imagePrompt"] = _image_prompt({}, spoken)
+    return updated
+
+
+def _pad_hashtags(tags: str, spoken: str) -> str:
+    found = _hashtag_list(tags, spoken)
+    subject = ""
+    for word in ("گردنبند", "انگشتر", "گوشواره", "دستبند", "آویز", "کیف", "کفش"):
+        if word in (spoken or ""):
+            subject = word
+            break
+    extras = [subject, "زیورآلات", "اکسسوری", "استایل", "هدیه", "مد"]
+    for word in extras:
+        if not word:
+            continue
+        tag = f"#{word}"
+        if tag not in found and not any(banned in tag for banned in _HASHTAG_GUARDED if banned not in (spoken or "")):
+            found.append(tag)
+        if len(found) >= 5 and not _repeated_root(found):
+            break
+    return " ".join(found[:8])
+
+
+async def _write_hashtags(spoken: str, into_id: str) -> dict:
+    shop = ""
+    try:
+        from app.services.settings_service import get_settings
+
+        shop = str((get_settings() or {}).get("storeName") or "")
+    except Exception:
+        shop = ""
+    prompt = f"{spoken}\nنام فروشگاه: {shop or 'فروشگاه'}"
+    def _tags_of(payload: dict) -> str:
+        if payload.get("error"):
+            return ""
+        listed = _balance_roots(_hashtag_list(_normalize_hashtags(str(payload.get("instagram") or ""), spoken), spoken))
+        return " ".join(listed)
+
+    parsed = await complete_json(HASHTAG_SYSTEM, prompt, surface="studio", max_tokens=900)
+    tags = _tags_of(parsed)
+    if tags.count("#") < 5 or _repeated_root(_hashtag_list(tags, spoken)):
+        parsed = await complete_json(HASHTAG_SYSTEM, prompt, surface="studio", max_tokens=900)
+        tags = _tags_of(parsed)
+    facts = _facts_text(spoken, _catalog_blob())
+    before_purge = tags
+    tags = " ".join(_balance_roots(_hashtag_list(_normalize_hashtags(await _purge_text(tags, facts), spoken), spoken)))
+    if tags.count("#") < 5 and before_purge.count("#") >= 5:
+        tags = before_purge
+    if tags.count("#") < 5:
+        tags = _pad_hashtags(tags, spoken)
+    if tags.count("#") < 5 or _repeated_root(_hashtag_list(tags, spoken)):
+        reply = "هشتگ‌ها را نتوانستم بنویسم. دوباره بگو."
+        captions = {"instagram": "", "telegram": "", "whatsapp": ""}
+    else:
+        captions = {"instagram": tags, "telegram": tags, "whatsapp": tags}
+        reply = _settle_caption(str(parsed.get("reply") or "هشتگ‌ها آماده شد.")) or "هشتگ‌ها آماده شد."
+    assistant = {
+        "id": str(uuid4()),
+        "role": "assistant",
+        "text": reply or "هشتگ‌ها آماده شد.",
+        "at": int(time.time()),
+        "captions": captions,
+    }
+    rows = _put_assistant(assistant, into_id)
+    emit_later(
+        kind="chat",
+        surface="studio",
+        title="studio-assistant",
+        conversation_id="studio",
+        turn_id=assistant["id"],
+        payload={"role": "assistant", "text": assistant["text"], "id": assistant["id"]},
+    )
+    return {"messages": rows, "campaignId": ""}
 
 
 def content_library(campaigns: list) -> dict:
@@ -568,12 +947,23 @@ def finish_compose(
             row["mediaKind"] = attachments[0]["kind"]
             row["mediaName"] = attachments[0]["name"]
         if status == "ready":
-            text = str(row.get("text") or "")
-            if "در حال ساخت" in text:
-                row["text"] = text.replace(" در حال ساخت تصویر و ویدیو است.", "").replace("در حال ساخت تصویر و ویدیو است.", "").strip()
+            row["text"] = _strip_progress(str(row.get("text") or ""))
 
     updated = _update_message(message_id, apply)
     return bool(updated) and not skipped
+
+
+def append_note(message_id: str, sentence: str) -> None:
+    note = (sentence or "").strip()
+    if not note:
+        return
+
+    def apply(row: dict) -> None:
+        text = str(row.get("text") or "")
+        if note not in text:
+            row["text"] = f"{text} {note}".strip()
+
+    _update_message(message_id, apply)
 
 
 def touch_compose_start(message_id: str, job_id: str) -> None:
@@ -627,7 +1017,10 @@ async def _rewrite_existing(
 ) -> dict:
     old = prior.get("captions") if isinstance(prior.get("captions"), dict) else {}
     campaign_id = str(prior.get("campaignId") or "")
-    allowed = _catalog_blob()
+    prior_blob = " ".join(str(old.get(key) or "") for key in ("instagram", "telegram", "whatsapp"))
+    allowed = f"{_catalog_blob()} {prior_blob}"
+    saved = str(prior.get("subject") or "")
+    facts = _facts_text(f"{prior.get('facts') or ''}\n{spoken}", _catalog_blob())
     parsed: dict = {}
     try:
         parsed = await asyncio.wait_for(
@@ -635,36 +1028,72 @@ async def _rewrite_existing(
                 STUDIO_SYSTEM,
                 (
                     "همین پست را با دستور کاربر بازنویس. عکس نساز. compose را false کن. "
-                    "عنوان و تصویر را عوض نکن.\n"
+                    "هر سه کانال را با جملهٔ کامل بازنویس؛ هیچ‌کدام فقط «سلام» نباشد.\n"
+                    f"اسم کالا «{saved}» باید در هر سه کانال باشد.\n"
                     f"دستور: {spoken}\n"
+                    f"facts:\n{facts}\n"
                     f"کپشن اینستاگرام: {old.get('instagram') or ''}\n"
                     f"تلگرام: {old.get('telegram') or ''}\n"
                     f"واتساپ: {old.get('whatsapp') or ''}"
                 ),
                 surface="studio",
-                max_tokens=700,
+                max_tokens=STUDIO_JSON_TOKENS,
             ),
-            timeout=40,
+            timeout=90,
         )
     except Exception:
         parsed = {"error": "timeout"}
     if parsed.get("error"):
-        captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True, allowed=allowed)
+        captions = {
+            "instagram": str(old.get("instagram") or ""),
+            "telegram": str(old.get("telegram") or ""),
+            "whatsapp": str(old.get("whatsapp") or ""),
+        }
         reply = "کپشن همان پست ماند. دوباره کوتاه‌تر بگو."
     else:
-        captions = _clip_captions(
-            {
-                "instagram": parsed.get("instagram") or old.get("instagram"),
-                "telegram": parsed.get("telegram") or old.get("telegram"),
-                "whatsapp": parsed.get("whatsapp") or old.get("whatsapp") or parsed.get("telegram") or old.get("instagram"),
-            },
-            spoken=spoken,
-            drop_unclaimed=True,
-            allowed=allowed,
-        )
+        captions = _captions_of(parsed, old, spoken=spoken, allowed=allowed)
         if not captions["instagram"]:
             captions = _clip_captions(old, spoken=spoken, drop_unclaimed=True, allowed=allowed)
         reply = _real_copy(parsed.get("reply"), limit=400) or "کپشن همان پست عوض شد."
+        if saved and _missing_subject(captions, saved):
+            again = await complete_json(
+                STUDIO_SYSTEM,
+                f"بازنویسی را تکرار کن. اسم «{saved}» باید در هر سه کانال باشد.\nدستور: {spoken}\nfacts:\n{facts}",
+                surface="studio",
+                max_tokens=STUDIO_JSON_TOKENS,
+            )
+            if not again.get("error"):
+                captions = _captions_of(again, old, spoken=spoken, allowed=allowed)
+                reply = _real_copy(again.get("reply"), limit=400) or reply
+    reply = _drop_sales_claims(_drop_prompt_fields(reply), spoken, allowed)
+    captions = _repair_rewrite(captions, saved)
+    captions = _keep_changed_captions(captions, old, saved)
+    captions = {key: _settle_caption(_drop_backstage(str(value or ""))) for key, value in captions.items()}
+    captions = _repair_rewrite(captions, saved)
+    captions = _keep_changed_captions(captions, old, saved)
+    claims = await _outside_claims("\n".join([reply, *captions.values()]), facts)
+    if claims:
+        reply = _drop_claim_sentences(reply, claims)
+        captions = {key: _settle_caption(_drop_claim_sentences(str(value or ""), claims)) for key, value in captions.items()}
+        captions = _repair_rewrite(captions, saved)
+    captions = _keep_changed_captions(captions, old, saved)
+    if _captions_unchanged(captions, old) and not parsed.get("error"):
+        again = await complete_json(
+            STUDIO_SYSTEM,
+            (
+                "کپشن‌ها را رسمی‌تر کن و متن را عوض کن. همان جمله‌های قبلی را تکرار نکن. عکس نساز.\n"
+                f"اسم «{saved}» در هر سه کانال باشد.\nدستور: {spoken}"
+            ),
+            surface="studio",
+            max_tokens=STUDIO_JSON_TOKENS,
+        )
+        if not again.get("error"):
+            captions = _keep_changed_captions(
+                _captions_of(again, old, spoken=spoken, allowed=allowed),
+                old,
+                saved,
+            )
+            reply = _real_copy(again.get("reply"), limit=400) or reply
     reply = guard_output(reply)
 
     def apply(row: dict) -> None:
@@ -741,6 +1170,8 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
             payload={"role": "assistant", "text": assistant["text"], "id": assistant["id"]},
         )
         return {"messages": rows, "campaignId": ""}
+    if _hashtag_only(spoken):
+        return await _write_hashtags(spoken, into_id)
     preferred = ""
     try:
         from app.services.router_service import thread_campaign_id
@@ -753,7 +1184,14 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         return await _rewrite_existing(spoken, prior, campaigns, into_id=into_id)
     prompt = _studio_prompt(spoken, media=media)
     parsed = await _studio_json(prompt)
-    named = any(mark in spoken for mark in ("انگشتر", "گردنبند", "گوشواره", "آویز", "فیروزه", "کفش", "پیراهن"))
+    if _needs_caption_retry(parsed):
+        parsed = await _studio_json(
+            f"{prompt}\nهر کپشن را با نقطه تمام کن.",
+            max_tokens=STUDIO_JSON_TOKENS + 800,
+        )
+    named = any(mark in spoken for mark in ("انگشتر", "گردنبند", "گوشواره", "آویز", "فیروزه", "کفش", "پیراهن", "کیف", "دستبند"))
+    if parsed.get("error") and named:
+        parsed = await _studio_json(prompt)
     if parsed.get("error") and (_revises_caption(spoken) or not named):
         reply = str(parsed.get("reply") or "مدل پاسخ نداد. پیام را دوباره بفرست.").strip()
         assistant = {
@@ -780,27 +1218,62 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
     title = "" if _no_overlay_text(spoken) else _title_from_spoken(spoken)
     subtitle = ""
     cta = ""
-    captions = _clip_captions(
-        {
-            "instagram": parsed.get("instagram"),
-            "telegram": parsed.get("telegram"),
-            "whatsapp": parsed.get("whatsapp") or parsed.get("telegram") or parsed.get("instagram"),
-        },
-        spoken=spoken,
-        drop_unclaimed=True,
-        allowed=allowed,
-    )
+    captions = _captions_of(parsed, spoken=spoken, allowed=allowed)
+    has_media = bool(media and media.get("kind") == "image")
+    subject_name = _named_product(spoken)
+    facts = _facts_text(spoken, allowed)
+    if _unnamed_product_request(spoken) and not has_media:
+        captions = {key: "" for key in captions}
+    elif _caption_backstage(captions):
+        parsed = await _studio_json(f"{prompt}\nدر کپشن از عکس، تصویر، پس‌زمینه، زاویه و آماده شدن عکس حرف نزن.")
+        captions = _captions_of(parsed, spoken=spoken, allowed=allowed)
+        if _caption_backstage(captions):
+            captions = {key: _settle_caption(_drop_backstage(str(value or ""))) for key, value in captions.items()}
+    if subject_name and any(_thin_caption(str(captions.get(key) or "")) for key in ("instagram", "telegram", "whatsapp")):
+        again = await _studio_json(
+            f"{prompt}\nهر سه کپشن را با دست‌کم دو جملهٔ کامل بنویس و اسم «{subject_name}» در هر کدام باشد. "
+            f"ویژگی را فقط از facts بنویس.\nfacts:\n{facts}"
+        )
+        if not again.get("error"):
+            parsed = again
+            captions = _captions_of(parsed, spoken=spoken, allowed=allowed)
     reply = _real_copy(parsed.get("reply"), limit=400)
     if not reply:
         reply = captions["instagram"][:180] or captions["telegram"][:180] or captions["whatsapp"][:180]
-    reply = guard_output(reply)
+    reply = guard_output(_drop_sales_claims(_drop_prompt_fields(reply), spoken, allowed))
+    if _unnamed_product_request(spoken) and not has_media and ASK_NAME not in reply:
+        reply = f"{reply} {ASK_NAME}".strip()
     image_prompt = _image_prompt(parsed, spoken)
     slug = f"c{uuid4().hex[:12]}"
     campaign_id = ""
     attachments: list[dict] = []
     has_copy = bool(captions["instagram"] or captions["telegram"] or captions["whatsapp"])
-    has_media = bool(media and media.get("kind") == "image")
     want_compose = has_media or has_copy
+    if want_compose:
+        parsed = await _ensure_english_prompt(parsed, spoken, facts)
+        image_prompt = _image_prompt(parsed, spoken)
+        blob = "\n".join([reply, image_prompt, *[str(captions.get(key) or "") for key in captions]])
+        claims = await _outside_claims(blob, facts)
+        if claims:
+            reply = guard_output(_drop_claim_sentences(reply, claims))
+            image_prompt = _drop_claim_sentences(image_prompt, claims)
+            captions = {
+                key: _settle_caption(_drop_claim_sentences(str(value or ""), claims)) for key, value in captions.items()
+            }
+        if subject_name and (_missing_subject(captions, subject_name) or not any(captions.values())):
+            parsed = await _studio_json(
+                f"{prompt}\nاسم «{subject_name}» در هر سه کپشن باشد. ویژگی را فقط از facts بنویس.\nfacts:\n{facts}"
+            )
+            captions = _captions_of(parsed, spoken=spoken, allowed=allowed)
+            claims = await _outside_claims("\n".join(str(captions.get(key) or "") for key in captions), facts)
+            if claims:
+                captions = {
+                    key: _settle_caption(_drop_claim_sentences(str(value or ""), claims)) for key, value in captions.items()
+                }
+        if _caption_backstage(captions):
+            captions = {key: _settle_caption(_drop_backstage(str(value or ""))) for key, value in captions.items()}
+        captions = _repair_rewrite(captions, subject_name)
+        has_copy = bool(captions["instagram"] or captions["telegram"] or captions["whatsapp"])
     if not has_copy and not want_compose:
         assistant = {
             "id": str(uuid4()),
@@ -835,14 +1308,24 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         attachments = _fallback_attachment(media)
     if not reply:
         reply = f"کمپین «{title}» آماده شد." if campaign_id else "کپشن را نوشتم؛ کمپین ذخیره نشد."
+    reply = _strip_progress(reply)
+    if want_compose and campaign_id and not has_media and subject_name and SAMPLE_PHOTO not in reply:
+        reply = f"{reply} {SAMPLE_PHOTO}".strip()
     if want_compose and campaign_id:
-        reply = f"{reply} در حال ساخت تصویر و ویدیو است."
+        image_queued, video_queued = studio_compose_service.queued_outputs(has_image=True)
+        if not video_queued:
+            reply = _drop_video_sentences(reply)
+        clause = progress_clause(image=image_queued, video=video_queued)
+        if clause:
+            reply = f"{reply} {clause}".strip()
     assistant = {
         "id": str(uuid4()),
         "role": "assistant",
         "text": reply,
         "at": int(time.time()),
         "captions": captions,
+        "subject": subject_name,
+        "facts": facts,
         **({"campaignId": campaign_id} if campaign_id else {}),
         **({"attachments": attachments} if attachments else {}),
         **({"imagePrompt": image_prompt} if image_prompt else {}),
@@ -852,13 +1335,21 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         assistant["mediaName"] = attachments[0]["name"]
     rows = _put_assistant(assistant, into_id)
     if want_compose and campaign_id:
+        story = any(mark in spoken for mark in ("استوری", "ریلز"))
         studio_compose_service.start(
             message_id=assistant["id"],
             campaign_id=campaign_id,
             media=media,
             title=title,
             image_prompt=image_prompt,
+            width=1080,
+            height=1920 if story else 1080,
+            edit=_edit_kind(parsed, spoken, has_media) == "scene",
+            edit_kind=_edit_kind(parsed, spoken, has_media),
+            subject=_guard_subject(spoken),
         )
+        if os.environ.get("SOZAN_WORKER") == "1":
+            await studio_compose_service.drain()
         with tenant_file_lock("studio"):
             rows = _messages()
     emit_later(
@@ -983,7 +1474,9 @@ async def regenerate(*, message_id: str, part: str, campaigns: CampaignService, 
             raise ValueError("کمپین این پست نیست")
         if media and str(media.get("kind") or "") == "image":
             await _attach_still(campaigns, UUID(campaign_id), media)
-        prompt = str(target.get("imagePrompt") or "").strip() or _image_prompt({}, str(target.get("text") or ""))
+        prompt = str(target.get("imagePrompt") or "").strip()
+        if not prompt or re.search(r"[\u0600-\u06FF]", prompt):
+            prompt = _image_prompt({}, "")
         studio_compose_service.start(
             message_id=ident,
             campaign_id=campaign_id,

@@ -140,7 +140,10 @@ def _proxy_for_url(url: str) -> str | None:
 
 
 def _openrouter_token() -> str:
-    return os.environ.get("open_router_api_token", "").strip()
+    named = os.environ.get("open_router_api_token", "").strip()
+    if named:
+        return named
+    return _str_setting(getattr(settings, "open_router_api_token", ""))
 
 
 def _route_token(url: str, explicit: str) -> str:
@@ -177,12 +180,23 @@ def _decorate_cloud_body(body: dict, route: dict) -> None:
 
 
 def _fallback_cloud_route() -> dict | None:
-    url = os.environ.get("CLOUD_LLM_FALLBACK_URL", "").strip().rstrip("/")
-    model = os.environ.get("CLOUD_LLM_FALLBACK_MODEL", "").strip()
-    token = os.environ.get("CLOUD_LLM_FALLBACK_TOKEN", "").strip()
+    url = os.environ.get("CLOUD_LLM_FALLBACK_URL", "").strip() or _str_setting(
+        getattr(settings, "cloud_llm_fallback_url", "")
+    )
+    model = os.environ.get("CLOUD_LLM_FALLBACK_MODEL", "").strip() or _str_setting(
+        getattr(settings, "cloud_llm_fallback_model", "")
+    )
+    token = os.environ.get("CLOUD_LLM_FALLBACK_TOKEN", "").strip() or _str_setting(
+        getattr(settings, "cloud_llm_fallback_token", "")
+    )
     if not url or not model or not token:
         return None
-    auth = os.environ.get("CLOUD_LLM_FALLBACK_AUTH", "").strip() or "Bearer"
+    url = url.rstrip("/")
+    auth = (
+        os.environ.get("CLOUD_LLM_FALLBACK_AUTH", "").strip()
+        or _str_setting(getattr(settings, "cloud_llm_fallback_auth", ""))
+        or "Bearer"
+    )
     return {
         "kind": "cloud",
         "url": url,
@@ -208,6 +222,27 @@ def _emit_cloud_fallback(*, surface: str, reason: str, requested: str, used: str
 
 def _auth_scheme(value: object) -> str:
     return _str_setting(value, "Bearer") or "Bearer"
+
+
+def inbox_cloud_route() -> dict | None:
+    """Chat cloud, used as the first inbox hop."""
+    return _shop_cloud_route(source="inbox")
+
+
+def inbox_hops() -> list[dict]:
+    """Cloud first. The home 9b is only the last hop."""
+    hops: list[dict] = []
+    cloud = inbox_cloud_route()
+    if cloud and cloud.get("url"):
+        hops.append(cloud)
+    fallback = _fallback_cloud_route()
+    if fallback and all(str(fallback.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+        hops.append(fallback)
+    local = _local_default_route("inbox")
+    local["model"] = "qwen3.5-9b"
+    if all(str(local.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+        hops.append(local)
+    return hops or [local]
 
 
 def _shop_cloud_route(*, source: str = "default") -> dict | None:
@@ -451,6 +486,38 @@ async def _ensure_gpu1(model: str) -> str:
     return pick
 
 
+def note_provider_denied(url: str, code: int) -> None:
+    """One observe event per provider and status each hour. No secrets."""
+    if code not in {401, 402}:
+        return
+    host = _host_of(url) or "cloud"
+    from datetime import datetime, timezone
+
+    hour = datetime.now(timezone.utc).strftime("%Y%m%d%H")
+    key = f"{host}:{code}"
+    try:
+        from app.state_store import read_json, write_json
+
+        stored = read_json("llm-provider-alert.json", {}, shared=True)
+        if not isinstance(stored, dict):
+            stored = {}
+        if str(stored.get(key) or "") == hour:
+            return
+        stored[key] = hour
+        write_json("llm-provider-alert.json", stored, shared=True)
+    except Exception:
+        log.warning("provider auth alert skipped")
+        return
+    emit_later(
+        kind="llm",
+        title="provider-auth",
+        surface="llm",
+        status="failed",
+        stage=f"http-{code}",
+        payload={"host": host, "code": code},
+    )
+
+
 def _classify_llm_error(exc: Exception) -> str:
     if isinstance(exc, httpx.TimeoutException):
         return "timeout"
@@ -656,6 +723,9 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
             )
         except Exception as exc:
             last_exc = exc
+            denied = int(getattr(getattr(exc, "response", None), "status_code", 0) or 0)
+            if denied in {401, 402}:
+                note_provider_denied(str(hop.get("url") or ""), denied)
             if final_hop:
                 raise
             nxt = _local_default_route(surface) if index == len(hops) - 1 else hops[index + 1][0]
@@ -860,6 +930,9 @@ async def complete_tools(
             )
         except Exception as exc:
             last_exc = exc
+            denied = int(getattr(getattr(exc, "response", None), "status_code", 0) or 0)
+            if denied in {401, 402}:
+                note_provider_denied(str(hop.get("url") or ""), denied)
             if index == len(hops) - 1 and not allow_local:
                 raise
             nxt = _local_default_route("router") if index == len(hops) - 1 else hops[index + 1][0]

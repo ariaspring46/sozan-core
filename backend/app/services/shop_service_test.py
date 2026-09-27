@@ -139,7 +139,7 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 "preview": {"colors": {"primary": "#B42318"}},
             }
             result = asyncio.run(shop_service.chat("میخواهم رنگ آن قرمز باشد"))
-        self.assertIn("بیلد", result["assistant"]["text"])
+        self.assertIn("انتشار تغییرات", result["assistant"]["text"])
         self.assertEqual(result["preview"]["colors"]["primary"], "#B42318")
         self.assertTrue(result["patched"])
         answer.assert_not_called()

@@ -9,6 +9,7 @@ import { ChatAttach } from "@/components/chat-attach";
 import { SozanMark } from "@/components/sozan-mark";
 import { StudioPublishCard, type PublishPayload, type PublishTarget, type StudioAttachment, type StudioCaptions } from "@/components/studio-publish";
 import { formatWhen } from "@/lib/digits";
+import { TypingHints } from "@/components/typing-hints";
 
 export type ChatMsg = {
   id: string;
@@ -83,6 +84,7 @@ export function ChatThread({
   sanitize = false,
   welcome = false,
   welcomeLines,
+  hints,
   confirmId = "",
   onConfirm,
   onCancel,
@@ -106,6 +108,8 @@ export function ChatThread({
   sanitize?: boolean;
   welcome?: boolean;
   welcomeLines?: string[];
+  /** جمله‌های راهنما که در چت خالی تایپ می‌شوند و باد می‌بردشان. */
+  hints?: string[];
   confirmId?: string;
   onConfirm?: (confirmId: string) => void;
   onCancel?: (confirmId: string) => void;
@@ -120,6 +124,7 @@ export function ChatThread({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
   const fileRef = useRef<HTMLInputElement>(null);
+  const draftRef = useRef<HTMLTextAreaElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const future = tone === "future";
@@ -220,10 +225,21 @@ export function ChatThread({
         <div className="space-y-3 px-4 py-5">
           {messages.length === 0 && !pendingText ? (
             welcome || welcomeLines ? (
-              <div className="space-y-2 pt-8 text-center text-sm leading-7 text-muted">
-                {(welcomeLines || SHOP_WELCOME).map((line) => (
-                  <p key={line}>{line}</p>
-                ))}
+              <div className="flex min-h-[min(60vh,28rem)] flex-col items-center justify-center gap-6 pt-6">
+                <div className="space-y-1 text-center text-sm leading-7 text-muted">
+                  {(welcomeLines || SHOP_WELCOME).map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+                {hints?.length && !draft.trim() && !busy ? (
+                  <TypingHints
+                    hints={hints}
+                    onPick={(text) => {
+                      setDraft(text);
+                      window.requestAnimationFrame(() => draftRef.current?.focus());
+                    }}
+                  />
+                ) : null}
               </div>
             ) : (
               <p className="pt-10 text-center text-sm leading-7 text-muted">پیام را پایین بنویس.</p>
@@ -501,6 +517,7 @@ export function ChatThread({
             </>
           ) : null}
           <textarea
+            ref={draftRef}
             className="max-h-28 min-h-11 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 outline-none"
             rows={1}
             value={draft}

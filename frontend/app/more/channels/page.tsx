@@ -29,7 +29,7 @@ type Voice = { summary: string; tone: string; sampleReply: string };
 
 const INSTAGRAM_OAUTH_NOTICE: Record<string, string> = {
   ok: "اینستاگرام وصل شد.",
-  exists: "این پیج از قبل در BoxAPI هست. از لیست انتخابش کن.",
+  exists: "این پیج از قبل وصل شده است. از فهرست انتخابش کن.",
   denied: "اجازهٔ اینستاگرام داده نشد.",
   expired: "نشست ورود اینستاگرام تمام شد. دوباره از پنل وصل کن.",
   config: "اتصال اینستاگرام در سوزان هنوز تنظیم نشده.",
@@ -181,7 +181,7 @@ export default function ChannelsPage() {
       );
       if (data.existing?.some((item) => !item.bound)) {
         setExisting(data.existing);
-        setNotice("این پیج از قبل در BoxAPI هست. انتخابش کن.");
+        setNotice("این پیج از قبل وصل شده است. انتخابش کن.");
         return;
       }
       if (data.existing?.some((item) => item.bound)) {
@@ -190,7 +190,7 @@ export default function ChannelsPage() {
         return;
       }
       if (data.url) window.location.href = data.url;
-      else setError("نشانی ورود رسمی BoxAPI نیامد.");
+      else setError("صفحهٔ ورود اینستاگرام باز نشد. دوباره امتحان کن.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
@@ -258,7 +258,7 @@ export default function ChannelsPage() {
     >
       <div className="h-full space-y-4 overflow-y-auto p-4">
         <p className="text-sm text-muted">
-          اینستاگرام را با ورود رسمی BoxAPI وصل کن. اگر بات سوزان روی هاب باشد، برای تلگرام فقط مقصد کانال را بگذار. پست استودیو برای تلگرام به کانالی که بات ادمین آن است می‌رود.
+          اینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.
         </p>
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         {notice ? <p className="text-sm text-signal">{notice}</p> : null}
@@ -278,13 +278,13 @@ export default function ChannelsPage() {
             ) : null}
             {spec?.help ? <p className="text-xs leading-6 text-muted">{spec.help}</p> : null}
             {spec?.docs ? (
-              <a className="inline-block text-xs text-warm" href={spec.docs} target="_blank" rel="noreferrer">
+              <a className="block text-xs text-warm" href={spec.docs} target="_blank" rel="noreferrer">
                 اسناد اتصال {spec.label}
               </a>
             ) : null}
             {spec?.id === "instagram" && spec.sendboxConfigured ? (
-              <Button type="button" disabled={busy} onClick={() => void startInstagram()}>
-                ورود رسمی BoxAPI
+              <Button type="button" className="w-full" disabled={busy} onClick={() => void startInstagram()}>
+                ورود با اینستاگرام
               </Button>
             ) : null}
             {existing.filter((item) => !item.bound).map((item) => (
@@ -312,7 +312,7 @@ export default function ChannelsPage() {
               </Button>
             ))}
             {spec?.id === "instagram" && spec.oauth && !spec.sendboxConfigured ? (
-              <p className="text-xs text-warm">ورود رسمی BoxAPI وقتی اتصال سوزان در سرور تنظیم شود روشن می‌شود.</p>
+              <p className="text-xs text-warm">ورود با اینستاگرام به‌زودی روشن می‌شود.</p>
             ) : null}
             <Field label={spec?.handleLabel || "شناسه حساب"}>
               <Input
@@ -385,8 +385,8 @@ export default function ChannelsPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     {account.platform === "instagram" && account.needsReconnect ? (
-                      <Button variant="ghost" disabled={busy} onClick={() => void startInstagram()}>
-                        ورود رسمی BoxAPI
+                      <Button disabled={busy} onClick={() => void startInstagram()}>
+                        اتصال دوباره
                       </Button>
                     ) : null}
                     {account.platform === "telegram" ? (

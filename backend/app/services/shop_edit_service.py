@@ -1001,7 +1001,7 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
     else:
         text = "تغییر روی همین صفحه اعمال شد." if ok else "این تغییر روی این صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
     if ok and frame_only and "کادر" not in text:
-        text = f"{text} تغییر در کادر است؛ وقتی آماده بودی بیلد بزن."
+        text = f"{text} تغییر در کادر است؛ هر وقت آماده بودی «انتشار تغییرات» را بزن."
     return unify_edit_fail(text)
 
 

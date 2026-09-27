@@ -23,7 +23,7 @@ PAGE_HINTS = (
     ("contact", ("تماس با ما", "تماس", "ارتباط", "contact")),
     ("story", ("داستان برند", "قصه ما", "داستان", "قصه", "story")),
 )
-SHOW_PRICE_RE = re.compile(r"قیمت‌?ها?\s*(?:را\s*)?(?:نشان|بذار|بگذار|بزن)|با\s*قیمت")
+SHOW_PRICE_RE = re.compile(r"قیمت(?:‌?ها)?\s*(?:را\s*)?(?:نشان|بذار|بگذار|بزن)|با\s*قیمت")
 HIDE_PRICE_RE = re.compile(
     r"قیمت\s*نزن|بدون قیمت|قیمت\s*نذار|قیمت\s*نگذار|پنهان.{0,12}قیمت|قیمت.{0,12}پنهان|مخفی.{0,16}قیمت|قیمت.{0,16}مخفی"
 )
@@ -61,7 +61,24 @@ CLARIFY_PAGE = "کدام صفحه را بسازم: درباره ما، تماس�
 
 
 def _price_toman(text: str) -> int:
-    raw = (text or "").translate(FA_DIGIT).replace("٬", "")
+    raw = (text or "").translate(FA_DIGIT).replace("٬", "").replace("\u066c", "").replace("\u066b", ".")
+    raw = raw.replace("تومن", "تومان")
+    million = re.search(r"(\d+(?:[./]\d+)?)\s*میلیون(?:\s*و\s*(\d+))?", raw)
+    if million:
+        whole = float(million.group(1).replace("/", "."))
+        extra = int(million.group(2) or 0)
+        amount = int(round(whole * 1_000_000))
+        if extra:
+            amount += extra * 1000 if extra < 1000 else extra
+        return amount
+    thousand = re.search(r"(\d+(?:[./]\d{3})+|\d+(?:[./]\d+)?)\s*هزار", raw)
+    if thousand:
+        token = thousand.group(1)
+        if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", token):
+            return int(re.sub(r"\D", "", token)) * 1000
+        if re.fullmatch(r"\d+[./]\d+", token):
+            return int(round(float(token.replace("/", ".")) * 1000))
+        return int(token) * 1000
     grouped = re.search(r"(\d{1,3}(?:[,.]\d{3})+)", raw)
     if grouped:
         digits = re.sub(r"\D", "", grouped.group(1))
@@ -70,12 +87,15 @@ def _price_toman(text: str) -> int:
     plain = re.search(r"(\d{4,})", raw)
     if plain:
         return int(plain.group(1))
+    short = re.search(r"(?<!\d)(\d{2,4})\s*ت(?!ومان)", raw)
+    if short:
+        return int(short.group(1)) * 1000
     near = re.search(r"(\d{1,9})\s*تومان", raw)
     return int(near.group(1)) if near else 0
 
 
 _TITLE_DROP = frozenset(
-    {"یک", "یه", "را", "کالا", "محصول", "اضافه", "کن", "کنید", "بگذار", "بذار", "عنوان", "تومان"}
+    {"یک", "یه", "را", "کالا", "محصول", "اضافه", "کن", "کنید", "بگذار", "بذار", "عنوان", "تومان", "تومن", "هزار", "میلیون"}
 )
 _TITLE_PUNCT = " ،.,:;؛!؟«»\"'`"
 
@@ -175,6 +195,28 @@ def _wants_hero(text: str, colors: dict) -> bool:
     return False
 
 
+def _pinned_write(text: str, target: str, view_path: str) -> list[dict] | None:
+    written = write_intent(text)
+    quoted = _quoted(text)
+    cta = CTA_RE.search(text)
+    if cta:
+        label = cta.group(1).strip().strip("«»\"'")
+        if not label:
+            return None
+        actions = [{"type": "set_brand", "fields": {"ctaLabelFa": label}}]
+        if target:
+            actions.append({"type": "replace_text", "find": target, "replace": label})
+        return actions
+    value = written or (quoted if target else "")
+    if not value:
+        return None
+    if target:
+        return [{"type": "replace_text", "find": target, "replace": value}]
+    if view_path.rstrip("/") == "/products":
+        return [{"type": "replace_text", "find": "", "replace": value, "heading": True}]
+    return [{"type": "set_brand", "fields": {"name": value}}]
+
+
 def classify_actions(prompt: str, view_target: str = "", view_path: str = "") -> list[dict]:
     text = (prompt or "").strip()
     target = (view_target or "").strip()
@@ -188,6 +230,9 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
         return [{"type": "greet"}]
     if wants_revert(text):
         return [{"type": "revert"}]
+    pinned = _pinned_write(text, target, view_path)
+    if pinned is not None:
+        return pinned
     actions: list[dict] = []
     if HIDE_PRICE_RE.search(text):
         actions.append({"type": "hide_prices"})

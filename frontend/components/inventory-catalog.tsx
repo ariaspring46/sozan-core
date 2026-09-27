@@ -42,6 +42,7 @@ export function InventoryCatalog() {
   const [shop, setShop] = useState<ShopMeta | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
+  const [onlyUnpriced, setOnlyUnpriced] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -78,10 +79,12 @@ export function InventoryCatalog() {
     }
   }, [loading, products, focus, editor]);
 
+  const unpricedCount = products.filter((product) => missingPrice(product)).length;
   const visible = useMemo(() => {
     const needle = query.trim();
     const rows = products.filter((product) => {
       if (category && product.category !== category) return false;
+      if (onlyUnpriced && !missingPrice(product)) return false;
       if (!needle) return true;
       const blob = `${product.title} ${product.category || ""} ${product.subcategory || ""} ${product.sku || ""}`;
       return blob.includes(needle);
@@ -91,7 +94,7 @@ export function InventoryCatalog() {
       const rightGap = Number(missingPhoto(right) || missingPrice(right));
       return rightGap - leftGap;
     });
-  }, [products, query, category]);
+  }, [products, query, category, onlyUnpriced]);
 
   async function bump(id: string, delta: number) {
     setBusy(true);
@@ -115,7 +118,7 @@ export function InventoryCatalog() {
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         {shop?.needsBuild ? (
           <p className="rounded-xl border border-line px-3 py-2 text-sm leading-7">
-            برای نمایش کالاها روی سایت، بیلد بزن{" "}
+            برای نمایش کالاها روی سایت، تغییرات را منتشر کن{" "}
             <Link href="/shop" className="text-warm">
               رفتن به فروشگاه
             </Link>
@@ -124,7 +127,7 @@ export function InventoryCatalog() {
           <p className="rounded-xl bg-canvas px-3 py-2 text-sm leading-7 text-muted">تغییرات همان لحظه روی سایت می‌رود.</p>
         ) : (
           <p className="rounded-xl bg-canvas px-3 py-2 text-sm leading-7 text-muted">
-            فروشگاه هنوز ساخته نشده؛ کالاها بعد از بیلد می‌آیند.
+            فروشگاه هنوز ساخته نشده؛ کالاها بعد از ساختن سایت روی آن می‌آیند.
           </p>
         )}
         {hint ? (
@@ -134,6 +137,21 @@ export function InventoryCatalog() {
               رفتن به فروشگاه
             </Link>
           </p>
+        ) : null}
+        {unpricedCount > 0 ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-sm leading-7">
+            <span>
+              {unpricedCount.toLocaleString("fa-IR")} کالا قیمت ندارد؛ مشتری نمی‌تواند آن‌ها را آنلاین بخرد.
+            </span>
+            <button
+              type="button"
+              className="min-h-9 shrink-0 rounded-lg px-2 text-warm"
+              aria-pressed={onlyUnpriced}
+              onClick={() => setOnlyUnpriced((value) => !value)}
+            >
+              {onlyUnpriced ? "نمایش همه" : "فقط بی‌قیمت‌ها"}
+            </button>
+          </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
           <Input
@@ -150,7 +168,7 @@ export function InventoryCatalog() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={`rounded-full border px-3 py-1 text-sm ${category ? "border-line" : "border-accent bg-accent text-onAccent"}`}
+              className={`rounded-full border px-3 py-1 text-sm ${category ? "border-line" : "border-accentStrong bg-accentStrong text-onAccent"}`}
               onClick={() => setCategory("")}
             >
               همه
@@ -160,7 +178,7 @@ export function InventoryCatalog() {
                 key={item.title}
                 type="button"
                 className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm ${
-                  category === item.title ? "border-accent bg-accent text-onAccent" : "border-line"
+                  category === item.title ? "border-accentStrong bg-accentStrong text-onAccent" : "border-line"
                 }`}
                 onClick={() => setCategory(item.title)}
               >
@@ -183,7 +201,7 @@ export function InventoryCatalog() {
               <div className="flex flex-wrap justify-center gap-2">
                 <Link
                   href="/more/channels"
-                  className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent"
+                  className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm text-onAccent"
                 >
                   وصل کردن کانال
                 </Link>

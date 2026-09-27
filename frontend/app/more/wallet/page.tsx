@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { formatWhen, money, parseNonNegativeInt } from "@/lib/digits";
+import { formatWhen, money, parseNonNegativeInt, toLatinDigits } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
 
 type LedgerRow = { id: string; at: number; kind: string; amount: number; note?: string; orderId?: string };
@@ -86,8 +86,10 @@ export default function WalletPage() {
       setError("مبلغ را با عدد بنویس.");
       return;
     }
-    if (!/^IR\d{24}$/i.test(iban.replace(/\s/g, ""))) {
-      setError("شماره شبا ۲۶ رقم است");
+    const cleanIban = toLatinDigits(iban).replace(/[\s-]/g, "").toUpperCase();
+    const fullIban = /^\d{24}$/.test(cleanIban) ? `IR${cleanIban}` : cleanIban;
+    if (!/^IR\d{24}$/.test(fullIban)) {
+      setError("شبا باید IR و ۲۴ رقم باشد.");
       return;
     }
     setBusy(true);
@@ -96,7 +98,7 @@ export default function WalletPage() {
     try {
       const data = await api<{ wallet: WalletSnap }>("/wallet/withdraw", {
         method: "POST",
-        body: JSON.stringify({ amount: nextAmount, iban, name }),
+        body: JSON.stringify({ amount: nextAmount, iban: fullIban, name }),
       });
       setWallet(data.wallet);
       setAmount("");
@@ -164,7 +166,7 @@ export default function WalletPage() {
             <Card>
               <p className="text-sm leading-7 text-muted">
                 فروش دستی وارد کیف نمی‌شود. اگر مرچنت شخصی داشته باشی پول در حساب خودت می‌ماند و اینجا فقط ثبت می‌شود.
-                درگاه سوزان {wallet.commissionBps / 100}٪ کمیسیون دارد.
+                درگاه سوزان {(wallet.commissionBps / 100).toLocaleString("fa-IR")}٪ کمیسیون دارد.
               </p>
               <p className="mt-2 text-sm text-muted">
                 پیامک این ماه: {money(wallet.smsUsed)} از {money(wallet.smsQuota)}
@@ -178,7 +180,7 @@ export default function WalletPage() {
                   <Input dir="ltr" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value)} />
                 </Field>
                 <Field label="شبا">
-                  <Input dir="ltr" placeholder="IR و ۲۴ رقم" value={iban} onChange={(event) => setIban(event.target.value)} />
+                  <Input dir="ltr" inputMode="text" autoComplete="off" spellCheck={false} placeholder="IR00 0000 0000 0000 0000 0000 00" value={iban} onChange={(event) => setIban(event.target.value)} />
                 </Field>
                 <Field label="نام صاحب حساب">
                   <Input value={name} onChange={(event) => setName(event.target.value)} />

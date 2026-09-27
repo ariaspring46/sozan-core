@@ -15,6 +15,7 @@ class BillingServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
                 with (
+                    patch.object(payment_service.env, "payments_enabled", True),
                     patch.object(payment_service, "merchant_id", return_value="11111111-1111-1111-1111-111111111111"),
                     patch.object(
                         payment_service,
@@ -36,6 +37,7 @@ class BillingServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
                 with (
+                    patch.object(payment_service.env, "payments_enabled", True),
                     patch.object(payment_service, "merchant_id", return_value="11111111-1111-1111-1111-111111111111"),
                     patch.object(
                         payment_service,

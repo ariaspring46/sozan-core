@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { SalesPolicyForm } from "@/components/sales-policy-form";
 import { ShopSettingsForm } from "@/components/shop-settings-form";
 
 export default function MoreSettingsPage() {
@@ -18,7 +19,10 @@ export default function MoreSettingsPage() {
         </div>
       }
     >
-      <ShopSettingsForm />
+      <div className="space-y-4">
+        <SalesPolicyForm />
+        <ShopSettingsForm />
+      </div>
     </AppShell>
   );
 }
