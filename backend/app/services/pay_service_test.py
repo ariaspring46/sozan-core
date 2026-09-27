@@ -59,7 +59,11 @@ class ShopPayB1Tests(unittest.TestCase):
                     url = asyncio.run(pay_service.finish_order(authority="AUTH-CART", ok=True))
                 products = {row["id"]: row for row in storefront_service.list_products()["products"]}
                 saved = pay_service.get_order(str(order["id"]))
+                sales = storefront_service.list_sales()["sales"]
+                shown = pay_service.public_order(saved)
         self.assertIn("pay=ok", url)
+        self.assertEqual(sales[0]["source"], "gateway")
+        self.assertGreater(int(shown["at"]), 0)
         self.assertEqual(products[first["id"]]["stock"], 3)
         self.assertEqual(products[second["id"]]["stock"], 3)
         self.assertEqual(saved["lines"], [{"productId": first["id"], "qty": 2}, {"productId": second["id"], "qty": 1}])

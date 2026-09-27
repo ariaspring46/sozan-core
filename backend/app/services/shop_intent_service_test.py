@@ -29,6 +29,7 @@ class ShopIntentClassifyTests(unittest.TestCase):
         header = classify_actions('عنوان هدر را «زعفران قائنات» کن')
         self.assertEqual(header[0]["type"], "set_header")
         self.assertEqual(header[0]["logoFa"], "زعفران قائنات")
+        self.assertEqual(classify_actions("قیمت را نشان بده")[0]["type"], "show_prices")
         self.assertEqual(classify_actions("قیمت را پنهان کن")[0]["type"], "hide_prices")
         self.assertEqual(classify_actions("قیمت‌ها را مخفی کن")[0]["type"], "hide_prices")
         self.assertEqual(classify_actions("درباره ما اضافه کن")[0]["type"], "create_page")

@@ -137,6 +137,7 @@ def public_order(row: dict) -> dict:
         "amount": int(row.get("amount") or 0),
         "status": row.get("status") or "pending",
         "channel": row.get("channel") or "",
+        "at": int(row.get("at") or 0),
         "payUrl": public_pay_url(str(row.get("id") or "")),
         "startPayUrl": row.get("startPayUrl") or "",
     }
@@ -354,6 +355,7 @@ def _mark_paid(row: dict, *, ref_id: str) -> None:
         amount=amount,
         customer=str(row.get("customer") or "مشتری"),
         channel=str(row.get("channel") or "دایرکت"),
+        source="gateway",
     )
     for line in _stock_lines(row):
         product_id = str(line["productId"])

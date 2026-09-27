@@ -116,6 +116,13 @@ class StorefrontServiceTests(unittest.TestCase):
                     storefront_service.update_product(pid, {"price": 250})
         self.assertTrue(any("bump pending build failed" in line for line in captured.output))
 
+    def test_manual_sale_defaults_source(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", self.root):
+            out = storefront_service.add_sale(title="دستبند", amount=450000, customer="مشتری", channel="فروشگاه")
+            row = out["sale"]
+        self.assertEqual(row["source"], "manual")
+        self.assertGreater(int(row["at"]), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
