@@ -225,8 +225,24 @@ def _auth_scheme(value: object) -> str:
 
 
 def inbox_cloud_route() -> dict | None:
-    """Same cloud hop already configured for chat. Inbox tries local 9b first."""
+    """Chat cloud, used as the first inbox hop."""
     return _shop_cloud_route(source="inbox")
+
+
+def inbox_hops() -> list[dict]:
+    """Cloud first. The home 9b is only the last hop."""
+    hops: list[dict] = []
+    cloud = inbox_cloud_route()
+    if cloud and cloud.get("url"):
+        hops.append(cloud)
+    fallback = _fallback_cloud_route()
+    if fallback and all(str(fallback.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+        hops.append(fallback)
+    local = _local_default_route("inbox")
+    local["model"] = "qwen3.5-9b"
+    if all(str(local.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+        hops.append(local)
+    return hops or [local]
 
 
 def _shop_cloud_route(*, source: str = "default") -> dict | None:

@@ -32,7 +32,8 @@ export function GettingStarted() {
       api<{ shop?: { status?: string; publicHost?: string; url?: string } }>("/shop").catch(() => ({ shop: undefined })),
       api<unknown[]>("/campaigns").catch(() => [] as unknown[]),
       api<{ autoReply?: string }>("/inbox?status=unread").catch(() => ({ autoReply: "" })),
-    ]).then(([channels, catalog, shop, campaigns, inbox]) => {
+      api<Record<string, string | number>>("/settings/sales-policy").catch(() => ({})),
+    ]).then(([channels, catalog, shop, campaigns, inbox, policy]) => {
       if (cancelled) return;
       const products = catalog.products || [];
       const priced = products.filter((row) => Number(row.price) > 0).length;
@@ -65,6 +66,13 @@ export function GettingStarted() {
           hint: "در همین چت بگو برای کدام کالا پست بسازم.",
           href: "/chat",
           done: Array.isArray(campaigns) && campaigns.length > 0,
+        },
+        {
+          id: "policy",
+          title: "ارسال و مرجوعی",
+          hint: "هزینه، زمان، شهرها و شرط مرجوعی را بنویس تا دایرکت خودش جواب بدهد.",
+          href: "/more/settings#shipping",
+          done: Boolean(policy.shippingMethod || policy.shippingDays || policy.returnNote),
         },
         {
           id: "auto",

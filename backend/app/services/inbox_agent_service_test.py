@@ -89,6 +89,9 @@ class InboxAgentTests(unittest.TestCase):
 
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch.object(
             settings, "local_llm_url", "http://127.0.0.1:9292/v1"
+        ), patch(
+            "app.services.llm.inbox_hops",
+            return_value=[{"kind": "local", "url": "http://127.0.0.1:9292/v1", "model": "qwen3.5-9b", "token": ""}],
         ), patch("app.services.inbox_agent_service.emit_later"), patch(
             "app.services.inbox_agent_service.httpx.AsyncClient", client
         ):
@@ -103,29 +106,41 @@ class InboxAgentTests(unittest.TestCase):
         self.assertIn("4000000", tool_blob)
         self.assertIn('"stock": 2', tool_blob)
 
-    def test_local_failure_uses_the_chat_cloud_next(self) -> None:
+    def test_chat_cloud_is_first_and_local_is_last(self) -> None:
         seen: list = []
 
-        def client(*args, **kwargs):
-            return FallbackClient(seen)
+        class CloudFirst:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                seen.append({"url": url, "model": (json or {}).get("model")})
+                if "openrouter.ai" in url:
+                    raise httpx.ConnectError("cloud-down")
+                return _response(_chat(content="از مدل محلی: موجود است."))
 
         route = {
+            "kind": "cloud",
             "url": "https://openrouter.ai/api/v1",
             "token": "test-token",
             "model": "deepseek/deepseek-v4.1-flash",
         }
         with patch.object(settings, "local_llm_url", "http://127.0.0.1:9292/v1"), patch(
-            "app.services.llm.inbox_cloud_route", return_value=route
-        ), patch("app.services.inbox_agent_service.httpx.AsyncClient", client):
+            "app.services.llm.inbox_hops",
+            return_value=[route, {"kind": "local", "url": "http://127.0.0.1:9292/v1", "model": "qwen3.5-9b", "token": ""}],
+        ), patch("app.services.inbox_agent_service.httpx.AsyncClient", lambda *args, **kwargs: CloudFirst()):
             text, calls = asyncio.run(
                 inbox_agent_service._complete([{"role": "user", "content": "موجود است؟"}])
             )
         self.assertEqual(calls, [])
         self.assertIn("موجود است", text)
-        self.assertIn("9292", seen[0]["url"])
-        self.assertEqual(seen[0]["model"], "qwen3.5-9b")
-        self.assertIn("openrouter.ai", seen[1]["url"])
-        self.assertEqual(seen[1]["model"], "deepseek/deepseek-v4.1-flash")
+        self.assertIn("openrouter.ai", seen[0]["url"])
+        self.assertEqual(seen[0]["model"], "deepseek/deepseek-v4.1-flash")
+        self.assertIn("9292", seen[1]["url"])
+        self.assertEqual(seen[1]["model"], "qwen3.5-9b")
 
     def test_local_failure_without_cloud_stays_failed(self) -> None:
         seen: list = []
@@ -134,7 +149,8 @@ class InboxAgentTests(unittest.TestCase):
             return FallbackClient(seen)
 
         with patch.object(settings, "local_llm_url", "http://127.0.0.1:9292/v1"), patch(
-            "app.services.llm.inbox_cloud_route", return_value=None
+            "app.services.llm.inbox_hops",
+            return_value=[{"kind": "local", "url": "http://127.0.0.1:9292/v1", "model": "qwen3.5-9b", "token": ""}],
         ), patch("app.services.inbox_agent_service.httpx.AsyncClient", client):
             with self.assertRaises(httpx.ConnectError):
                 asyncio.run(inbox_agent_service._complete([{"role": "user", "content": "سلام"}]))

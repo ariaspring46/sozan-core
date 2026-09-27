@@ -186,6 +186,29 @@ def _thin_caption(text: str) -> bool:
     return len(bare.split()) < 4
 
 
+def _captions_unchanged(captions: dict, old: dict) -> bool:
+    for key in ("instagram", "telegram", "whatsapp"):
+        if str(captions.get(key) or "").strip() != str(old.get(key) or "").strip():
+            return False
+    return True
+
+
+def _keep_changed_captions(captions: dict, old: dict, subject: str) -> dict:
+    """A rewrite that came back empty or without the product name keeps the new sentences and adds the name."""
+    if _captions_unchanged(captions, old):
+        return captions
+    name = (subject or "").strip()
+    out: dict = {}
+    for key in ("instagram", "telegram", "whatsapp"):
+        text = str(captions.get(key) or "").strip()
+        if not text:
+            text = str(old.get(key) or "").strip()
+        if name and text and name not in text:
+            text = f"{name}. {text}"
+        out[key] = text
+    return out
+
+
 def _repair_rewrite(captions: dict, subject: str = "") -> dict:
     bodies = [str(captions.get(key) or "") for key in ("instagram", "telegram", "whatsapp")]
     best = max(bodies, key=len) if bodies else ""
@@ -660,6 +683,25 @@ async def _ensure_english_prompt(parsed: dict, spoken: str, facts: str = "") -> 
     return updated
 
 
+def _pad_hashtags(tags: str, spoken: str) -> str:
+    found = _hashtag_list(tags, spoken)
+    subject = ""
+    for word in ("گردنبند", "انگشتر", "گوشواره", "دستبند", "آویز", "کیف", "کفش"):
+        if word in (spoken or ""):
+            subject = word
+            break
+    extras = [subject, "زیورآلات", "اکسسوری", "استایل", "هدیه", "مد"]
+    for word in extras:
+        if not word:
+            continue
+        tag = f"#{word}"
+        if tag not in found and not any(banned in tag for banned in _HASHTAG_GUARDED if banned not in (spoken or "")):
+            found.append(tag)
+        if len(found) >= 5 and not _repeated_root(found):
+            break
+    return " ".join(found[:8])
+
+
 async def _write_hashtags(spoken: str, into_id: str) -> dict:
     shop = ""
     try:
@@ -681,7 +723,12 @@ async def _write_hashtags(spoken: str, into_id: str) -> dict:
         parsed = await complete_json(HASHTAG_SYSTEM, prompt, surface="studio", max_tokens=900)
         tags = _tags_of(parsed)
     facts = _facts_text(spoken, _catalog_blob())
+    before_purge = tags
     tags = " ".join(_balance_roots(_hashtag_list(_normalize_hashtags(await _purge_text(tags, facts), spoken), spoken)))
+    if tags.count("#") < 5 and before_purge.count("#") >= 5:
+        tags = before_purge
+    if tags.count("#") < 5:
+        tags = _pad_hashtags(tags, spoken)
     if tags.count("#") < 5 or _repeated_root(_hashtag_list(tags, spoken)):
         reply = "هشتگ‌ها را نتوانستم بنویسم. دوباره بگو."
         captions = {"instagram": "", "telegram": "", "whatsapp": ""}
@@ -1017,31 +1064,33 @@ async def _rewrite_existing(
                 reply = _real_copy(again.get("reply"), limit=400) or reply
     reply = _drop_sales_claims(_drop_prompt_fields(reply), spoken, allowed)
     captions = _repair_rewrite(captions, saved)
-    if saved and _missing_subject(captions, saved):
-        captions = _repair_rewrite(
-            {
-                "instagram": str(old.get("instagram") or ""),
-                "telegram": str(old.get("telegram") or ""),
-                "whatsapp": str(old.get("whatsapp") or ""),
-            },
-            saved,
-        )
+    captions = _keep_changed_captions(captions, old, saved)
     captions = {key: _settle_caption(_drop_backstage(str(value or ""))) for key, value in captions.items()}
     captions = _repair_rewrite(captions, saved)
+    captions = _keep_changed_captions(captions, old, saved)
     claims = await _outside_claims("\n".join([reply, *captions.values()]), facts)
     if claims:
         reply = _drop_claim_sentences(reply, claims)
         captions = {key: _settle_caption(_drop_claim_sentences(str(value or ""), claims)) for key, value in captions.items()}
         captions = _repair_rewrite(captions, saved)
-        if saved and _missing_subject(captions, saved):
-            captions = _repair_rewrite(
-                {
-                    "instagram": str(old.get("instagram") or ""),
-                    "telegram": str(old.get("telegram") or ""),
-                    "whatsapp": str(old.get("whatsapp") or ""),
-                },
+    captions = _keep_changed_captions(captions, old, saved)
+    if _captions_unchanged(captions, old) and not parsed.get("error"):
+        again = await complete_json(
+            STUDIO_SYSTEM,
+            (
+                "کپشن‌ها را رسمی‌تر کن و متن را عوض کن. همان جمله‌های قبلی را تکرار نکن. عکس نساز.\n"
+                f"اسم «{saved}» در هر سه کانال باشد.\nدستور: {spoken}"
+            ),
+            surface="studio",
+            max_tokens=STUDIO_JSON_TOKENS,
+        )
+        if not again.get("error"):
+            captions = _keep_changed_captions(
+                _captions_of(again, old, spoken=spoken, allowed=allowed),
+                old,
                 saved,
             )
+            reply = _real_copy(again.get("reply"), limit=400) or reply
     reply = guard_output(reply)
 
     def apply(row: dict) -> None:
@@ -1170,7 +1219,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
     has_media = bool(media and media.get("kind") == "image")
     subject_name = _named_product(spoken)
     facts = _facts_text(spoken, allowed)
-    if _unnamed_product_request(spoken):
+    if _unnamed_product_request(spoken) and not has_media:
         captions = {key: "" for key in captions}
     elif _caption_backstage(captions):
         parsed = await _studio_json(f"{prompt}\nدر کپشن از عکس، تصویر، پس‌زمینه، زاویه و آماده شدن عکس حرف نزن.")
@@ -1189,7 +1238,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
     if not reply:
         reply = captions["instagram"][:180] or captions["telegram"][:180] or captions["whatsapp"][:180]
     reply = guard_output(_drop_sales_claims(_drop_prompt_fields(reply), spoken, allowed))
-    if _unnamed_product_request(spoken) and ASK_NAME not in reply:
+    if _unnamed_product_request(spoken) and not has_media and ASK_NAME not in reply:
         reply = f"{reply} {ASK_NAME}".strip()
     image_prompt = _image_prompt(parsed, spoken)
     slug = f"c{uuid4().hex[:12]}"

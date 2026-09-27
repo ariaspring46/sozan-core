@@ -19,14 +19,15 @@ PERMISSIONS_BY_ROLE = {
 }
 
 
-def encode_token(user_id: UUID, role: str) -> str:
+def encode_token(user_id: UUID, role: str, ttl_minutes: int | None = None) -> str:
     now = datetime.now(UTC)
+    minutes = settings.jwt_expire_minutes if ttl_minutes is None else int(ttl_minutes)
     payload = {
         "sub": str(user_id),
         "role": role,
         "permissions": sorted(PERMISSIONS_BY_ROLE.get(role, set())),
         "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=settings.jwt_expire_minutes)).timestamp()),
+        "exp": int((now + timedelta(minutes=minutes)).timestamp()),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 

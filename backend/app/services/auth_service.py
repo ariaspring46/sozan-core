@@ -35,6 +35,10 @@ class AuthService:
             phone = normalize_phone(phone_raw)
         except ValueError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+        from app.lab_account import is_lab_phone
+
+        if is_lab_phone(phone):
+            return {"ok": True}
         with tenant_scope(phone):
             overlay = get_settings()
         mock_sms = overlay.get("mockSms")

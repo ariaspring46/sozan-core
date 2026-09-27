@@ -55,3 +55,39 @@ async def patch_settings(
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+class SalesPolicyIn(BaseModel):
+    shippingMethod: str | None = None
+    shippingCost: str | int | None = None
+    shippingDays: str | None = None
+    shippingCities: str | None = None
+    freeShippingFrom: str | int | None = None
+    returnDays: str | int | None = None
+    returnNote: str | None = None
+    returnPayer: str | None = None
+    hours: str | None = None
+    sizeExchange: str | None = None
+    invoice: str | None = None
+    cod: str | None = None
+    minOrder: str | int | None = None
+
+
+@router.get("/sales-policy")
+async def read_sales_policy(_user=Depends(require_permission("campaigns:read"))) -> dict[str, Any]:
+    from app.services.sales_policy_service import public_policy
+
+    return public_policy()
+
+
+@router.put("/sales-policy")
+async def write_sales_policy(
+    body: SalesPolicyIn,
+    _user=Depends(require_permission("campaigns:write")),
+) -> dict[str, Any]:
+    from app.services.sales_policy_service import save_policy
+
+    try:
+        return save_policy(body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
