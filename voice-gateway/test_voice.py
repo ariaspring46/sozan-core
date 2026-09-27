@@ -52,6 +52,7 @@ from main import (
     THINK_WAIT_S,
     THINKING_LINES,
     barge_kind_ready,
+    hold_early_carrier,
     next_varied,
     parse_sim_command,
 )
@@ -252,6 +253,10 @@ class SpeechTest(unittest.TestCase):
         self.assertFalse(looks_like_speech("بیدیدیدیدیدیدیدیدیدیدیدی"))
         self.assertFalse(looks_like_speech("PYM JBZ"))
         self.assertTrue(is_carrier_text("PYM JBZ"))
+        self.assertTrue(hold_early_carrier(True, False, 9))
+        self.assertFalse(hold_early_carrier(True, True, 9))
+        self.assertFalse(hold_early_carrier(True, False, 20))
+        self.assertFalse(hold_early_carrier(False, False, 3))
         self.assertFalse(worth_llm("PYM JBZ"))
         self.assertFalse(worth_llm("سالون"))
         self.assertTrue(worth_llm("حالت خوبه"))

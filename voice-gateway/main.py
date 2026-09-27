@@ -129,6 +129,11 @@ SIM_ARM_S = 30.0
 SIM_DIR = Path("/dev/shm/sozan-sim")
 
 
+def hold_early_carrier(outbound: bool, heard_person: bool, age_s: float) -> bool:
+    """Keep an outbound call up while the trunk plays its announcement."""
+    return bool(outbound) and not heard_person and age_s < 20
+
+
 def parse_sim_command(raw: str) -> tuple[str, str]:
     text = (raw or "").strip()
     if text.upper() == "SIM" or text.upper().startswith("SIM "):
@@ -531,6 +536,8 @@ class Gateway:
         self._audio_at = 0.0
         self._checked_in = False
         self._heard_person = False
+        self._outbound_call = False
+        self._call_started = 0.0
         self._idle_since = 0.0
         self._think_i = 0
         self._nudge_i = 0
@@ -741,6 +748,8 @@ class Gateway:
         self._audio_at = self._spoke_at
         self._checked_in = False
         self._heard_person = False
+        self._outbound_call = bool(outbound)
+        self._call_started = time.monotonic()
         self._idle_since = 0.0
         self._think_i = 0
         self._nudge_i = 0
@@ -843,6 +852,17 @@ class Gateway:
             else:
                 heard = self.brain.clean_heard(text)
             if is_carrier_text(text) or is_carrier_text(heard):
+                # An outbound trunk often answers at once and plays a network
+                # announcement before the person picks up. Dropping on that
+                # first snippet hangs up as they connect.
+                early_outbound = hold_early_carrier(
+                    self._outbound_call,
+                    self._heard_person,
+                    time.monotonic() - self._call_started,
+                )
+                if early_outbound:
+                    log.info("carrier held outbound")
+                    continue
                 log.info("carrier hangup text=%s", heard or text)
                 self._speak(session, generation, BYE_LINE, "bye")
                 session.wait_done(4)
