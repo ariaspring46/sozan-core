@@ -1,0 +1,578 @@
+"""Unit tests for phone audio and SIP digest. No network."""
+
+from __future__ import annotations
+
+import array
+import unittest
+
+from sim_call import mix_shop_noise
+from audio_codec import (
+    PcmJitter,
+    decode_to_pcm16,
+    encode_pcm16,
+    gate_kind,
+    lowpass_pcm16,
+    pcm_similarity,
+    resample_pcm16,
+    rms,
+    rtp_packet,
+    rtp_parse,
+)
+from brain import (
+    clarify,
+    echo_should_block,
+    is_ack,
+    is_carrier_text,
+    is_correction,
+    is_done,
+    is_hello,
+    is_hold,
+    is_howdy,
+    is_repeat,
+    is_stuck,
+    is_who,
+    looks_like_echo,
+    looks_like_speech,
+    should_hold_fragment,
+    speakable,
+    usable_request,
+    wants_bye,
+    worth_llm,
+)
+from heard_bank import heard_rows, should_repair
+from meaning import INTENTS, PHONE_PHRASES, MeaningIndex
+from main import (
+    CURIOUS_LINES,
+    NUDGE_AFTER_S,
+    SALES_HANG_AFTER_S,
+    THINK_WAIT_S,
+    THINKING_LINES,
+    barge_kind_ready,
+    next_varied,
+    parse_sim_command,
+)
+from sales import (
+    ADDRESS_LINE,
+    BYE_LINE,
+    CLOSE_LINE,
+    FIXED_SALES_LINES,
+    HELLO_LINE,
+    MISHEARD_LINE,
+    REPEAT_FREE,
+    SALES_PROBE_LINE,
+    WAIT_BRIGHT,
+    SalesState,
+    ShopCard,
+    fallback_line,
+    finish_spoken,
+    formalize_you,
+    gift_allowed,
+    gift_line,
+    guard_reply,
+    load_campaign,
+    note_spoken,
+    person_started,
+    plan_turn,
+    read_signals,
+    sales_brief,
+    sales_ended,
+    sales_kind,
+    sales_open,
+    shorten_reply,
+    split_sentences,
+    take_ready_sentences,
+    too_alike,
+    wait_line,
+    wants_address,
+)
+from sip import _private_ip, digest_response, normalize_dial, parse_auth_challenge, parse_message
+
+
+class CodecTest(unittest.TestCase):
+    def test_alaw_roundtrip_stays_close(self) -> None:
+        src = array.array("h", [int(8000 * ((i % 40) - 20) / 20) for i in range(160)])
+        encoded = encode_pcm16(src.tobytes(), "pcma")
+        back = array.array("h")
+        back.frombytes(decode_to_pcm16(encoded, "pcma"))
+        err = sum(abs(a - b) for a, b in zip(src, back)) / len(src)
+        self.assertLess(err, 200)
+
+    def test_ulaw_roundtrip(self) -> None:
+        src = array.array("h", [0, 100, -100, 4000, -8000])
+        encoded = encode_pcm16(src.tobytes(), "pcmu")
+        back = array.array("h")
+        back.frombytes(decode_to_pcm16(encoded, "pcmu"))
+        self.assertEqual(len(back), len(src))
+
+    def test_resample_halves_rate(self) -> None:
+        pcm = array.array("h", [100, 200] * 80).tobytes()
+        out = resample_pcm16(pcm, 16000, 8000)
+        self.assertAlmostEqual(len(out) // 2, 80, delta=2)
+
+    def test_rms_and_rtp(self) -> None:
+        pcm = array.array("h", [1000] * 160).tobytes()
+        self.assertGreater(rms(pcm), 500)
+        packet = rtp_packet(1, 160, 99, b"\xd5" * 160, marker=True, pt=8)
+        parsed = rtp_parse(packet)
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        pt, seq, payload = parsed
+        self.assertEqual((pt, seq, len(payload)), (8, 1, 160))
+
+    def test_gate_keeps_syllables_and_drops_a_tone(self) -> None:
+        import math
+
+        tone = array.array("h")
+        for i in range(8000):
+            tone.append(int(8000 * math.sin(2 * math.pi * 440 * i / 8000)))
+        self.assertEqual(gate_kind(tone.tobytes()), "tone")
+        speech = array.array("h")
+        for block in range(6):
+            for i in range(1600):
+                speech.append(int(7000 * math.sin(2 * math.pi * (180 + block * 40) * i / 8000)))
+            speech.extend([0] * 900)
+        self.assertEqual(gate_kind(speech.tobytes()), "speech")
+
+    def test_jitter_waits_and_hides_a_gap(self) -> None:
+        jitter = PcmJitter(depth=3)
+        self.assertEqual(jitter.push(2, b"b"), [])
+        self.assertEqual(jitter.push(1, b"a"), [])
+        ordered = jitter.push(3, b"c")
+        self.assertEqual(ordered, [b"a", b"b", b"c"])
+        self.assertEqual(jitter.push(5, b"e"), [])
+        self.assertEqual(jitter.push(6, b"f"), [])
+        concealed = jitter.push(7, b"g")
+        self.assertEqual(concealed[0], b"c")
+        self.assertEqual(concealed[1:], [b"e", b"f", b"g"])
+        self.assertEqual(jitter.gaps, 1)
+
+
+class DigestTest(unittest.TestCase):
+    def test_rfc2617_vector(self) -> None:
+        got = digest_response(
+            username="Mufasa",
+            password="Circle Of Life",
+            realm="testrealm@host.com",
+            nonce="dcd98b7102dd2f0e8b11d0f600bfb0c093",
+            method="GET",
+            uri="/dir/index.html",
+            qop="auth",
+            nc="00000001",
+            cnonce="0a4f113b",
+        )
+        self.assertEqual(got, "6629fae49393a05397450978507c4ef1")
+
+    def test_parse_invite(self) -> None:
+        raw = (
+            "INVITE sip:673068@phone.telefonchy.com SIP/2.0\r\n"
+            "Via: SIP/2.0/UDP 127.0.0.1:5099;branch=z9hG4bKtest\r\n"
+            "From: <sip:caller@127.0.0.1>;tag=abc\r\n"
+            "To: <sip:673068@phone.telefonchy.com>\r\n"
+            "Call-ID: call-1\r\n"
+            "CSeq: 1 INVITE\r\n"
+            "Contact: <sip:caller@127.0.0.1:5099>\r\n"
+            "Content-Type: application/sdp\r\n"
+            "Content-Length: 0\r\n\r\n"
+        )
+        msg = parse_message(raw.encode())
+        self.assertIsNotNone(msg)
+        assert msg is not None
+        self.assertEqual(msg["headers"]["call-id"][0], "call-1")
+        challenge = parse_auth_challenge(
+            'Digest realm="phone.telefonchy.com", nonce="abc", algorithm=MD5, qop="auth"'
+        )
+        self.assertEqual(challenge["realm"], "phone.telefonchy.com")
+        self.assertEqual(challenge["qop"], "auth")
+
+    def test_private_contact_is_not_advertised(self) -> None:
+        self.assertTrue(_private_ip("192.168.20.200"))
+        self.assertTrue(_private_ip("10.1.1.1"))
+        self.assertFalse(_private_ip("94.183.65.149"))
+
+    def test_normalize_iran_mobile(self) -> None:
+        self.assertEqual(normalize_dial("+989135409482"), "09135409482")
+        self.assertEqual(normalize_dial("۰۹۱۳۵۴۰۹۴۸۲"), "09135409482")
+
+
+class SpeechTest(unittest.TestCase):
+    def test_speakable_keeps_one_sentence(self) -> None:
+        text = speakable("سلام. فروشگاه را از چت بساز. این جملهٔ سوم نباید بیاید.")
+        self.assertIn("سلام", text)
+        self.assertNotIn("بساز", text)
+        self.assertNotIn("سوم", text)
+
+    def test_speech_and_bye(self) -> None:
+        self.assertTrue(looks_like_speech("فروشگاه باز نمی‌شود"))
+        self.assertFalse(looks_like_speech("[BLANK_AUDIO]"))
+        self.assertFalse(looks_like_speech("بییییییی"))
+        self.assertFalse(looks_like_speech("یا"))
+        self.assertFalse(looks_like_speech("از " * 12))
+        self.assertFalse(looks_like_speech("بیدیدیدیدیدیدیدیدیدیدیدی"))
+        self.assertFalse(looks_like_speech("PYM JBZ"))
+        self.assertTrue(is_carrier_text("PYM JBZ"))
+        self.assertFalse(worth_llm("PYM JBZ"))
+        self.assertFalse(worth_llm("سالون"))
+        self.assertTrue(worth_llm("حالت خوبه"))
+        self.assertTrue(is_howdy("حالت خوبه"))
+        self.assertTrue(is_howdy("چطوری"))
+        self.assertTrue(is_howdy("خوبی"))
+        self.assertFalse(is_howdy("فروشگاه ساخته نشد"))
+        self.assertFalse(wants_bye("آقای حافظ"))
+        self.assertTrue(wants_bye("خداحافظ"))
+        self.assertTrue(wants_bye("خدافه"))
+        self.assertTrue(is_hello("سلام"))
+        self.assertTrue(is_hello("الو"))
+        self.assertTrue(is_hello("Allo"))
+        self.assertTrue(is_hello("Allo Allo"))
+        self.assertTrue(is_hello("hello"))
+        self.assertTrue(is_hello("هلو"))
+        self.assertTrue(is_hello("هالو"))
+
+    def test_barge_in_accepts_speech_and_ignores_a_tone(self) -> None:
+        self.assertTrue(barge_kind_ready(180, "speech"))
+        self.assertFalse(barge_kind_ready(160, "speech"))
+        self.assertFalse(barge_kind_ready(400, "tone"))
+        self.assertFalse(barge_kind_ready(400, "music"))
+
+    def test_echo_and_short_turn_helpers(self) -> None:
+        import math
+
+        sine = array.array("h", [int(8000 * math.sin(i / 8)) for i in range(160)]).tobytes()
+        other = array.array("h", [int(8000 * math.sin(i / 3.1)) for i in range(160)]).tobytes()
+        self.assertGreater(pcm_similarity(sine, sine), 0.99)
+        self.assertLess(pcm_similarity(sine, other), 0.6)
+        self.assertFalse(echo_should_block(4))
+        self.assertTrue(echo_should_block(5))
+        self.assertTrue(should_hold_fragment(1, 2))
+        self.assertFalse(should_hold_fragment(0, 2))
+        self.assertTrue(looks_like_echo("", "سلام، سوزانم."))
+        self.assertTrue(looks_like_echo("سلام، سوزانم.", "سلام، سوزانم."))
+        self.assertFalse(looks_like_echo("الو", "سلام، سوزانم."))
+        self.assertTrue(any(name == "الو" for name, _samples in PHONE_PHRASES))
+        rows = heard_rows()
+        self.assertEqual(len(rows), 100)
+        for canonical, train, holdout in rows:
+            self.assertNotIn(holdout, train)
+            self.assertNotEqual(holdout, canonical)
+        self.assertFalse(should_repair("دایرکت چی", "دایرکت اینستاگرام را نمی‌خواند", 0.80))
+        self.assertTrue(should_repair("سودان چیست", "سوزان چیست", 0.80))
+        self.assertFalse(should_repair("گران اس", "گران است", 0.53))
+        self.assertEqual(THINK_WAIT_S, 1.8)
+        self.assertEqual(NUDGE_AFTER_S, 5.0)
+        self.assertEqual(SALES_HANG_AFTER_S, 6.0)
+        self.assertGreaterEqual(len(THINKING_LINES), 4)
+        self.assertGreaterEqual(len(CURIOUS_LINES), 4)
+        self.assertTrue(all(line.endswith("؟") for line in CURIOUS_LINES))
+        self.assertTrue(SALES_PROBE_LINE.endswith("؟"))
+        heard = ""
+        index = 0
+        spoken = []
+        for _ in range(len(CURIOUS_LINES)):
+            heard, index = next_varied(CURIOUS_LINES, index, heard)
+            spoken.append(heard)
+        self.assertEqual(len(spoken), len(set(spoken)))
+        self.assertTrue(is_hello("سلام خوبی"))
+        self.assertFalse(is_hello("سلام گفتم ولی فروشگاه ساخته نشد"))
+        self.assertTrue(is_ack("باشه"))
+        self.assertTrue(is_ack("ممنون"))
+        self.assertFalse(is_ack("باشه فروشگاه"))
+        self.assertTrue(is_repeat("چی گفتی"))
+        self.assertTrue(is_repeat("متوجه نشدم"))
+        self.assertFalse(is_repeat("نشنیدم کد ورود"))
+        self.assertTrue(is_hold("یه لحظه"))
+        self.assertTrue(is_who("اسمت چیه"))
+        self.assertTrue(is_done("فروشگاه درست شد"))
+        self.assertTrue(is_stuck("فایده نداشت"))
+        self.assertTrue(is_correction("نه"))
+        self.assertTrue(wants_bye("ممنون خداحافظ"))
+
+    def test_spoken_lines_are_one_breath(self) -> None:
+        for intent in INTENTS:
+            self.assertTrue(intent.say)
+            self.assertTrue(intent.again)
+            self.assertNotEqual(intent.say, intent.again)
+            self.assertLessEqual(len(intent.say), 90)
+            self.assertNotIn("سی‌نیم", intent.say)
+            self.assertNotIn("تب بیشتر", intent.say)
+
+    def test_presence_and_rms_match(self) -> None:
+        import math
+
+        from audio_codec import match_rms_pcm16, presence_pcm16
+
+        tone = array.array("h")
+        for i in range(2205):
+            tone.append(int(4000 * math.sin(2 * math.pi * 2000 * i / 22050)))
+        boosted = presence_pcm16(tone.tobytes(), 22050, 1200, 3200, 5)
+        self.assertGreater(rms(boosted), rms(tone.tobytes()))
+        quiet = array.array("h", [800] * 8000).tobytes()
+        matched = match_rms_pcm16(quiet, 7300)
+        self.assertGreater(rms(matched), 4000)
+        pcm = array.array("h", [8000, -8000, 0, 4000] * 200).tobytes()
+        out = lowpass_pcm16(pcm, 22050, 3400)
+        self.assertEqual(len(out), len(pcm))
+
+    def test_ffmpeg_phone_chain_is_8k_and_unclipped(self) -> None:
+        import math
+        import os
+
+        from audio_codec import pcm_stats
+        from brain import amplify_pcm16, ffmpeg_bin
+
+        if not ffmpeg_bin():
+            self.skipTest("ffmpeg missing")
+        os.environ["VOICE_CHAIN"] = "ffmpeg"
+        os.environ["VOICE_PITCH"] = "1.0"
+        tone = array.array("h")
+        for i in range(22050):
+            tone.append(int(8000 * math.sin(2 * math.pi * 220 * i / 22050)))
+        out = amplify_pcm16(tone.tobytes(), gain=1.0, src_rate=22050)
+        self.assertAlmostEqual(len(out) // 2, 8000, delta=80)
+        stats = pcm_stats(out, 8000)
+        self.assertEqual(stats["clips"], 0)
+        self.assertGreater(stats["rms"], 1000)
+        self.assertLess(stats["peak"], 32767)
+
+    def test_analyze_tx_reports_a_mid_reply_gap(self) -> None:
+        from audio_codec import analyze_tx_pcm
+
+        speech = array.array("h", [4000] * 8000).tobytes()
+        quiet = array.array("h", [0] * 4000).tobytes()
+        stats = analyze_tx_pcm(speech + quiet + speech, 8000)
+        self.assertGreaterEqual(int(stats["gaps_300ms"]), 1)
+        self.assertGreaterEqual(int(stats["gap_ms_total"]), 300)
+
+    def test_meaning_picks_the_closer_vector(self) -> None:
+        index = MeaningIndex()
+        index.add("explain", "درباره سوزان", [1.0, 0.0])
+        index.add("shop", "فروشگاه", [0.0, 1.0])
+        hit = index.best([0.9, 0.1])
+        self.assertIsNotNone(hit)
+        assert hit is not None
+        self.assertEqual(hit.name, "explain")
+        self.assertGreater(hit.score, 0.9)
+        self.assertFalse(usable_request("موسیقی"))
+        self.assertFalse(usable_request("از اینجا موسیقی"))
+        self.assertFalse(usable_request("با لان"))
+        heard = clarify("میشه دواره سودان با من تازی بزید")
+        self.assertIn("سوزان", heard)
+        self.assertIn("توضیح", heard)
+        self.assertTrue(usable_request(heard))
+
+
+class SalesTest(unittest.TestCase):
+    def test_brief_names_the_shop_and_is_not_a_script(self) -> None:
+        brief = sales_brief(ShopCard("kif_shop", "کیف چرم"))
+        self.assertIn("سوزان هستی", brief)
+        opened = sales_open()
+        self.assertIn("آنلاین‌شاپ", opened)
+        self.assertIn("وبسایت", opened)
+        self.assertIn("استودیو", opened)
+        self.assertIn("sozan-core.ir", opened)
+        self.assertIn("ورود", opened)
+        self.assertIn("شما", opened)
+        self.assertIn("!", opened)
+        self.assertNotIn("…", opened)
+        self.assertIn("kif_shop", brief)
+        self.assertIn("تعریف نکن", brief)
+        self.assertNotIn("پیجت را دیدم", brief)
+        for line in FIXED_SALES_LINES:
+            self.assertNotIn(line, brief)
+        self.assertTrue(sales_ended("ممنون خداحافظ", "چشم"))
+        self.assertTrue(sales_ended("باشه خدا", "سوزانم."))
+        self.assertFalse(sales_ended("سایتم هست", "کنار سایتت می‌ماند."))
+
+    def test_sales_turns_listen_and_guard(self) -> None:
+        self.assertEqual(sales_kind("اسم چیه"), "name")
+        self.assertEqual(sales_kind("کارت چیه سوزان"), "what")
+        self.assertEqual(sales_kind("برای چه مشاغلی به کار می ریزن"), "who")
+        self.assertEqual(sales_kind("هزینه شو چجوری باید پرداخت کنم"), "cost")
+        self.assertEqual(sales_kind("چه کارایی دیگه داری"), "more")
+        self.assertEqual(sales_kind("عکس و فیلمم می سازی"), "studio")
+        self.assertEqual(sales_kind("حالت خوبه سوزان"), "howdy")
+        self.assertEqual(sales_kind("باشه خدا"), "bye")
+        self.assertEqual(sales_kind("به حالت نون من"), "other")
+        self.assertFalse(person_started("به حالت نون من"))
+        self.assertFalse(person_started("چه خوشگله کنار"))
+        self.assertTrue(person_started("بله"))
+        self.assertTrue(person_started("بفرمایید"))
+        self.assertTrue(person_started("سرم شلوغه سریع بگو"))
+        self.assertTrue(person_started("شماره منو از کجا آوردید"))
+        self.assertTrue(person_started("من مغازه ندارم اشتباه گرفتید"))
+        wrong = plan_turn(SalesState(), "من مغازه ندارم اشتباه گرفتید")
+        self.assertEqual(wrong.kind, "close")
+        self.assertEqual(wrong.line, BYE_LINE)
+        refused = SalesState()
+        hello = plan_turn(refused, "سلام")
+        self.assertEqual(hello.kind, "hello")
+        note_spoken(refused, HELLO_LINE)
+        self.assertTrue(refused.greeted)
+        no = plan_turn(refused, "لازم نیست ممنون نمیخوام")
+        self.assertTrue(no.signals.refuse)
+        gone = plan_turn(refused, "خداحافظ")
+        self.assertEqual(gone.line, BYE_LINE)
+        self.assertEqual(sales_kind("جونم سوزن چیه"), "what")
+        self.assertEqual(sales_kind("توی کدوم پنل عکس بفرستم"), "where")
+        self.assertEqual(sales_kind("باشه ممنون خدا"), "bye")
+        self.assertFalse(should_repair("سلام سوزان", "سلام", 0.79))
+        self.assertFalse(should_repair("خب اول سلام کن", "سلام", 0.76))
+        self.assertFalse(should_repair("سوزان حالت چطوره", "سوزان چیست", 0.73))
+        self.assertFalse(should_repair("معرفی کنید", "فقط معرفی کن", 0.77))
+        self.assertNotIn("حسین", guard_reply("حسین، ساختن وبسایت پول نمی‌خواهد.", "هزینه شو چجوری باید پرداخت کنم"))
+        self.assertNotIn("همین تماس", guard_reply("از همین تماس وارد پنل شو.", "چه پنلی"))
+        self.assertFalse(wants_bye("باشه"))
+
+    def test_sales_state_and_gift_rules(self) -> None:
+        import os
+
+        state = SalesState()
+        hold = plan_turn(state, "ترایلی دارم")
+        self.assertEqual(hold.kind, "hold")
+        hello = plan_turn(state, "سلام")
+        self.assertEqual(hello.kind, "hello")
+        self.assertEqual(hello.line, HELLO_LINE)
+        self.assertNotIn("ورود", HELLO_LINE)
+        note_spoken(state, HELLO_LINE)
+        later = plan_turn(state, "من آرایشگاه دارم")
+        self.assertEqual(later.kind, "model")
+        self.assertEqual(state.trade, "آرایشگاه")
+        self.assertTrue(person_started("صحبت کن"))
+        os.environ["GIFT_CODE_SPOKEN"] = "سوزان سی"
+        state.stage = "cta"
+        state.objection = "price"
+        self.assertTrue(gift_allowed(state, read_signals("گرونه")))
+        state.gifted = True
+        self.assertFalse(gift_allowed(state, read_signals("گرونه")))
+        os.environ.pop("GIFT_CODE_SPOKEN", None)
+        self.assertIn("سوزان سی", gift_line())
+        self.assertIn("sozan-core.ir", CLOSE_LINE)
+        self.assertIn("پیجتون", HELLO_LINE)
+        self.assertNotIn("پیجت ", HELLO_LINE)
+        self.assertNotIn("برات ", gift_line())
+        self.assertIn("براتون", gift_line())
+        self.assertNotIn("کور", ADDRESS_LINE)
+        self.assertIn("کُر", ADDRESS_LINE)
+        self.assertIn(ADDRESS_LINE, REPEAT_FREE)
+
+    def test_address_intent_and_fallback(self) -> None:
+        state = SalesState()
+        plan_turn(state, "سلام")
+        note_spoken(state, HELLO_LINE)
+        asked = plan_turn(state, "اسم سایتتون چیه")
+        self.assertEqual(asked.kind, "address")
+        self.assertEqual(asked.line, ADDRESS_LINE)
+        self.assertTrue(wants_address("آدرس سایت چیه"))
+        self.assertTrue(wants_address("از کجا شروع کنم"))
+        self.assertFalse(wants_address("من اصلاً بلد نیستم سایت بسازم سخت نیست"))
+        self.assertFalse(wants_address("از کجا اعتماد کنم درست کار می‌کنه"))
+        self.assertTrue(too_alike(ADDRESS_LINE, ADDRESS_LINE))
+        self.assertEqual(fallback_line(SalesState(), "چی"), MISHEARD_LINE)
+        empty_state = SalesState()
+        empty_state.linked = False
+        self.assertEqual(fallback_line(empty_state, "چه کارایی انجام میدی"), ADDRESS_LINE)
+        empty_state.linked = True
+        self.assertIn("سؤال", fallback_line(empty_state, "چه کارایی انجام میدی"))
+        self.assertEqual(wait_line("گرونه"), "حق دارید!")
+        self.assertEqual(wait_line("اسم سایت چیه"), "سؤال خوبیه!")
+        self.assertIn(wait_line("خب بگو"), WAIT_BRIGHT)
+        note = SalesState(stage="confirm", linked=True).note()
+        self.assertIn("تکرار نکن", note)
+        self.assertIn("کار این نوبت", note)
+        long = "چه خوب مشتری‌ها دیگه لازم نیست دونه به دونه آدرس و شماره بگیرند و همه چیز ثبت می‌شود در فروشگاه."
+        self.assertLessEqual(len(shorten_reply(long).split()), 18)
+        self.assertNotIn("شماره بگیرید", guard_reply("مشتری‌ها باید شماره بگیرید از همه.", "چی کار می‌کنی"))
+        self.assertIn("پیجتون", formalize_you("فقط اسم پیجت رو می‌نویسی"))
+        self.assertIn("برید", formalize_you("برو sozan-core.ir"))
+        self.assertIn("می‌زنید", formalize_you("دکمه ورود رو می‌زنی"))
+        self.assertNotIn("پیجت ", formalize_you("پیجتون رو بنویسید"))
+        self.assertTrue(wants_bye("فلحافظ"))
+        missed_state = SalesState()
+        plan_turn(missed_state, "سلام")
+        note_spoken(missed_state, HELLO_LINE)
+        missed = plan_turn(missed_state, "")
+        self.assertEqual(missed.kind, "fallback")
+        pitched = SalesState()
+        plan_turn(pitched, "سلام")
+        note_spoken(pitched, HELLO_LINE)
+        note_spoken(pitched, "چه خوب، کیف می‌فروشید.")
+        forced = plan_turn(pitched, "چجوری کار می‌کنه از کجا باید شروع کنم")
+        self.assertEqual(forced.kind, "address")
+        worried = SalesState()
+        plan_turn(worried, "سلام")
+        note_spoken(worried, HELLO_LINE)
+        trust = plan_turn(worried, "از کجا اعتماد کنم درست کار می‌کنه")
+        self.assertEqual(trust.kind, "address")
+        self.assertIn("حق دارید", trust.line or "")
+        self.assertIn("sozan-core.ir", trust.line or "")
+        cant = plan_turn(worried, "من اصلاً بلد نیستم سایت بسازم سخت نیست")
+        self.assertEqual(cant.kind, "address")
+        self.assertIn("لازم نیست", cant.line or "")
+        self.assertIn("می‌ذارید", formalize_you("عکس غذاهاتون رو میذاری"))
+        self.assertNotIn("رزرو", guard_reply("مشتری‌هاتون می‌تونن مستقیم از سایت رزرو کنن.", "آرایشگاه"))
+        self.assertNotIn("کً", speakable("ساختنش کًلاً رایگانه 👌"))
+        self.assertNotIn("👌", speakable("ساختنش کًلاً رایگانه 👌"))
+        quiet = b"\x00" * 320
+        noisy = mix_shop_noise(quiet)
+        self.assertEqual(len(noisy), 320)
+        self.assertNotEqual(noisy, quiet)
+
+
+    def test_sentence_split_keeps_short_commas(self) -> None:
+        ready, rest = take_ready_sentences("سلام سوزانم. برو سایت")
+        self.assertEqual(ready, ["سلام سوزانم."])
+        self.assertIn("برو", rest)
+        domain, rest = take_ready_sentences("برو sozan-core.ir، دکمهٔ ورود رو بزن.")
+        self.assertTrue(domain)
+        self.assertIn("sozan-core.ir", domain[0])
+        self.assertNotEqual(domain[0], "برو sozan-core.")
+        comma = "سایت رو خودم از کپشن‌های پیجتون می‌سازم، نوبتتون که رسید بروید"
+        ready, rest = take_ready_sentences(comma)
+        self.assertEqual(ready, [])
+        self.assertIn("نوبتتون", rest)
+        parts = split_sentences(comma)
+        self.assertEqual(len(parts), 1)
+        long = " ".join(["کلمه"] * 17) + "، ادامه."
+        ready, rest = take_ready_sentences(long)
+        self.assertTrue(ready)
+
+    def test_sentence_split_and_repeat(self) -> None:
+        ready, rest = take_ready_sentences("سلام سوزانم. برو سایت")
+        self.assertEqual(ready, ["سلام سوزانم."])
+        self.assertIn("برو", rest)
+        domain, rest = take_ready_sentences("برو sozan-core.ir، دکمهٔ ورود رو بزن.")
+        self.assertTrue(domain)
+        self.assertIn("sozan-core.ir", domain[0])
+        self.assertNotEqual(domain[0], "برو sozan-core.")
+        parts = split_sentences("اولی تمام. دومی هم تمام.")
+        self.assertEqual(len(parts), 2)
+        self.assertTrue(too_alike("برو تو سایت سوزان کور و ورود رو بزن", "برو تو سایت سوزان کور و ورود را بزن"))
+        state = SalesState()
+        state.said = ["سوزان برای آنلاین‌شاپه و وبسایت می‌سازه."]
+        spoken, tags = finish_spoken("سوزان برای آنلاین‌شاپه و وبسایت می‌سازه. [پایان]", state, "چیه")
+        self.assertEqual(spoken, "")
+        self.assertIn("end", tags)
+
+    def test_campaign_keeps_the_phone_the_page_and_the_product(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "campaign.json"
+            path.write_text(
+                '{"targets":[{"phone":"۰۹۱۲۱۲۳۴۵۶۷","instagram":"@kif_shop","product":"کیف چرم"},{"phone":"","instagram":"x"}]}',
+                encoding="utf-8",
+            )
+            found = load_campaign(path)
+            self.assertEqual(found["09121234567"], ShopCard("kif_shop", "کیف چرم"))
+            self.assertEqual(load_campaign(path.with_name("missing.json")), {})
+
+    def test_sim_command_never_looks_like_a_dial(self) -> None:
+        self.assertEqual(parse_sim_command("SIM"), ("", ""))
+        self.assertEqual(parse_sim_command("SIM bag_shop کیف"), ("bag_shop", "کیف"))
+        self.assertEqual(parse_sim_command("SIM @kif_shop"), ("kif_shop", ""))
+        self.assertEqual(parse_sim_command("DIAL 0912"), ("", ""))
+        self.assertEqual(parse_sim_command("sim gold طلا"), ("gold", "طلا"))
+
+
+if __name__ == "__main__":
+    unittest.main()
