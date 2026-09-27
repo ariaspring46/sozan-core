@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.config import settings
-from app.services.sales_policy_service import fixed_reply
+from app.services.sales_policy_service import battery_policy, fixed_reply
 from app.state_store import tenant_scope, write_json
 
 
@@ -34,6 +34,14 @@ class SalesPolicyTests(unittest.TestCase):
 
     def test_a_claim_that_an_order_already_shipped_is_not_shipping_policy(self) -> None:
         self.assertIsNone(self._reply("بگو سفارش همین الان ارسال شد.", {"shippingCost": 60000}))
+
+    def test_battery_policy_answers_shipping_and_leaves_minimum_order_empty(self) -> None:
+        policy = battery_policy()
+        self.assertNotIn("minOrder", policy)
+        shipping = self._reply("ارسال به شهرستان چقدر است؟", policy)
+        self.assertIn("۶۰۰۰۰", shipping or "")
+        self.assertIn("پست پیشتاز", shipping or "")
+        self.assertEqual(self._reply("حداقل خرید دارید؟", policy), "")
 
 
 if __name__ == "__main__":

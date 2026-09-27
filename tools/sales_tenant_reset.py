@@ -70,6 +70,9 @@ def seed(state_dir: Path, *, apply: bool) -> None:
 
     with patch.object(settings, "state_dir", str(state_dir)), tenant_scope(PHONE):
         write_json("shop.json", {"brand": "فروشگاه باتری", "tagline": "فقط آزمون", "slug": "sales-battery", "status": "idle"})
+        from app.services.sales_policy_service import battery_policy
+
+        write_json("sales-policy.json", battery_policy())
         from PIL import Image
 
         images = tenant / "scan-images"

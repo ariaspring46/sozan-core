@@ -21,6 +21,28 @@ _TEXT_KEYS = (
 _INT_KEYS = ("shippingCost", "freeShippingFrom", "returnDays", "minOrder")
 
 
+def battery_policy() -> dict:
+    """Policy for the sales-battery shop.
+
+    minOrder is omitted on purpose: the minimum-purchase question must still
+    hand off, while every other stored field can be answered from this file.
+    """
+    return {
+        "shippingMethod": "پست پیشتاز",
+        "shippingCost": 60000,
+        "shippingDays": "۳ تا ۵ روز کاری",
+        "shippingCities": "همهٔ شهرها",
+        "freeShippingFrom": 2000000,
+        "returnDays": 7,
+        "returnNote": "اگر استفاده نشده باشد پس گرفته می‌شود",
+        "returnPayer": "مشتری",
+        "hours": "۱۰ تا ۱۸",
+        "sizeExchange": "تعویض سایز تا ۷ روز اگر استفاده نشده باشد",
+        "invoice": "بله، فاکتور فروش می‌دهیم",
+        "cod": "نداریم",
+    }
+
+
 def _norm(text: str) -> str:
     return (
         str(text or "")
