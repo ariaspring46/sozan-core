@@ -1292,7 +1292,7 @@ async def _run_action_list(
         if verified.get("ok"):
             any_ok = True
             if kind in mutating:
-                if kind not in RUNTIME_VERIFY_KINDS or not live:
+                if kind in {"create_page", "add_nav_link"} or kind not in RUNTIME_VERIFY_KINDS or not live:
                     needs_rebuild = True
             previews.update(preview)
             if kind == "create_page":
