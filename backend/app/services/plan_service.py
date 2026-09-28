@@ -260,6 +260,18 @@ def snapshot() -> dict:
     used = len(_sites())
     limit = int(plan["sites"])
     catalog = public_catalog()
+    from app.services.billing_service import lab_checkout_amount
+    from app.state_store import current_tenant
+
+    trial = lab_checkout_amount(current_tenant(), "pro")
+    if trial is not None:
+        for card in catalog["plans"]:
+            if card.get("id") != "pro":
+                continue
+            card["price"] = trial
+            card["priceToman"] = trial
+            card["listPrice"] = trial
+            card["discountPercent"] = 0
     return {
         "plan": plan["id"],
         "label": plan["label"],
