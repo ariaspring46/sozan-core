@@ -30,9 +30,17 @@ TRAIN_TASKS = ("router", "shop_edit", "caption", "inbox_reply", "site_design")
 _ZWNJ = {"\u200c", "\u200d"}
 _NOISE = re.compile(r"[\s\u200c\u200d\.,،؛:!؟?\(\)\[\]{}«»\"'ـ-]+")
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+_FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+_URL_SPLIT = re.compile(r"(https?://\S+)")
 # The mask always folds Persian digits, so a changed string is not a leak.
 # A row leaks only when masking inserts one of these placeholders.
 _PII_MARKS = ("[تلفن]", "[کارت]", "[شبا]", "[کد]", "[نشانی]")
+
+
+def fa_digits(text: str) -> str:
+    """Panel style keeps Persian numerals; URLs stay Latin so links keep working."""
+    parts = _URL_SPLIT.split(str(text or ""))
+    return "".join(part if part.startswith(("http://", "https://")) else part.translate(_FA_DIGITS) for part in parts)
 
 
 def load_mask():
@@ -80,7 +88,11 @@ def load_day(raw: Path, day: str) -> tuple[list[dict], list[dict], int]:
     day_dir = raw / day
     if not day_dir.is_dir():
         return examples, labels, bad
-    for path in sorted(day_dir.glob("*.jsonl")):
+    # Labels can arrive days later (panel buttons, review page); gather every
+    # _labels.jsonl under the raw tree and join by exampleId regardless of day.
+    label_files = sorted(raw.glob(f"*/{LABELS_FILE}"))
+    files = [path for path in sorted(day_dir.glob("*.jsonl")) if path.name != LABELS_FILE]
+    for path in list(files) + label_files:
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
@@ -95,7 +107,7 @@ def load_day(raw: Path, day: str) -> tuple[list[dict], list[dict], int]:
                 continue
             if path.name == LABELS_FILE:
                 labels.append(row)
-            else:
+            elif path.parent == day_dir:
                 examples.append(row)
     return examples, labels, bad
 
@@ -145,8 +157,9 @@ def trainable(row: dict, allow_sources: set[str]) -> bool:
 def to_sft(row: dict) -> dict:
     labels = row.get("labels") if isinstance(row.get("labels"), dict) else {}
     messages = [msg for msg in row.get("messages") or [] if isinstance(msg, dict)]
+    answer = str(labels.get("editedText") or (row.get("output") or {}).get("text") or "")
     return {
-        "messages": messages + [{"role": "assistant", "content": str(labels.get("editedText") or (row.get("output") or {}).get("text") or "")}],
+        "messages": messages + [{"role": "assistant", "content": fa_digits(answer)}],
         "task": row.get("task") or "",
         "teacher": row.get("teacher") or "",
         "id": row.get("id") or "",
@@ -161,8 +174,8 @@ def to_dpo(row: dict) -> dict | None:
         return None
     return {
         "prompt": [msg for msg in row.get("messages") or [] if isinstance(msg, dict)],
-        "chosen": edited,
-        "rejected": original,
+        "chosen": fa_digits(edited),
+        "rejected": fa_digits(original),
         "task": row.get("task") or "",
         "id": row.get("id") or "",
     }

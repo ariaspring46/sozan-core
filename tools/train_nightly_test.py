@@ -108,6 +108,15 @@ class TrainNightlyTest(unittest.TestCase):
         self.assertEqual(stats["raw"], 0)
         self.assertEqual(stats["sft"], 0)
 
+    def test_sft_answers_keep_persian_digits_but_links_stay_latin(self) -> None:
+        self._write("inbox_reply.jsonl", [_example("f1", "قیمت 250000 تومان است. لینک: https://shop.example/p/x-2")])
+        self._write("_labels.jsonl", [{"exampleId": "f1", "labels": {"accept": True}}])
+        train_nightly.build(raw=self.raw, out=self.out, day=DAY)
+        sft = [json.loads(line) for line in (self.out / "sft" / DAY / "inbox_reply.jsonl").read_text(encoding="utf-8").splitlines()]
+        answer = sft[0]["messages"][-1]["content"]
+        self.assertEqual(answer, "قیمت ۲۵۰۰۰۰ تومان است. لینک: https://shop.example/p/x-2")
+        self.assertEqual(train_nightly.fa_digits("سفارش 12 در https://s.ir/p/a-3 تمام"), "سفارش ۱۲ در https://s.ir/p/a-3 تمام")
+
     def test_other_tasks_are_split_apart(self) -> None:
         self._write(
             "caption.jsonl",

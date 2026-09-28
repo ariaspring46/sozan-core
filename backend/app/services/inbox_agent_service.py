@@ -277,18 +277,36 @@ def tool_order_status(order_id: str) -> dict:
     }
 
 
-def _dry_mock_payment() -> bool:
-    """Fake link only on the dry edge, and only while the shop gateway is still mock.
-
-    Real shops without a merchant keep the handoff. payment_service stays unchanged.
-    """
-    from app.services.arvan_dns_service import edge_dry
+def _seller_has_own_gateway() -> bool:
+    """Own zarinpal/idpay only. There is no hub gateway and no seller wallet (talk.md 16:52)."""
     from app.services.settings_service import get_settings
 
-    if not edge_dry():
-        return False
-    gateway = str(get_settings().get("paymentGateway") or "mock").strip().lower()
-    return gateway in {"", "mock"}
+    cfg = get_settings()
+    gateway = str(cfg.get("paymentGateway") or "").strip().lower()
+    if gateway == "zarinpal" and str(cfg.get("paymentMerchantId") or "").strip():
+        return True
+    return gateway == "idpay" and bool(str(cfg.get("paymentApiKey") or "").strip())
+
+
+def _dry_gateway() -> bool:
+    """A fake gateway link only on the dry edge, and only when the seller has his own gateway."""
+    from app.services.arvan_dns_service import edge_dry
+
+    return bool(edge_dry()) and _seller_has_own_gateway()
+
+
+def _receipt_payment(item: dict, price: int, count: int) -> dict:
+    """No seller gateway: card-to-card with a receipt on the shop page. Confirmation stays with the seller."""
+    url = _public_shop_url()
+    if not url:
+        return {"ok": False, "error": "صفحهٔ پرداخت این فروشگاه آماده نیست"}
+    return {
+        "ok": True,
+        "receipt": True,
+        "title": str(item.get("title") or ""),
+        "amount": price * count,
+        "payUrl": url,
+    }
 
 
 async def tool_payment_link(product: str, qty: int, *, thread: dict | None) -> dict:
@@ -303,7 +321,7 @@ async def tool_payment_link(product: str, qty: int, *, thread: dict | None) -> d
     if price <= 0:
         return {"ok": False, "error": "قیمت تومان برای این کالا نیست"}
     count = min(5, max(1, int(qty or 1)))
-    if _dry_mock_payment():
+    if _dry_gateway():
         slug = re.sub(r"[^a-z0-9]+", "-", str(item.get("id") or "item").lower()).strip("-") or "item"
         return {
             "ok": True,
@@ -312,6 +330,8 @@ async def tool_payment_link(product: str, qty: int, *, thread: dict | None) -> d
             "amount": price * count,
             "payUrl": f"https://{DRY_PAY_HOST}/p/{slug}-{count}",
         }
+    if not _seller_has_own_gateway():
+        return _receipt_payment(item, price, count)
     platform = str((thread or {}).get("platform") or "")
     channel = PLATFORMS.get(platform, platform) or "دایرکت"
     order = await create_order(
@@ -809,6 +829,22 @@ _HANDOFF_MARKS = (
     "پشت گوش",
     "عصبانی",
 )
+_CONFIRM_MARKS = (
+    "پرداخت کردم",
+    "پرداخت شد",
+    "واریز کردم",
+    "واریز شد",
+    "رسید فرستادم",
+    "رسید زدم",
+    "رسید اپلود",
+    "رسید آپلود",
+    "عکس رسید",
+    "تایید شد",
+    "تایید میشه",
+    "تأیید شد",
+    "تأیید میشه",
+)
+CONFIRM_LINE = "تأیید پرداخت را خود فروشنده انجام می‌دهد؛ بعد از بررسی رسید خبر می‌دهد."
 _ADDRESS_MARKS = ("آدرس", "مترو", "تحویل حضوری", "مغازهتان")
 
 
@@ -897,6 +933,8 @@ async def _known_reply(thread: dict | None, sentence: str) -> str | None:
         if re.search(r"[A-Za-z]{3,}", sentence):
             return None
         return _finish("شماره سفارش را بگویید. اگر در فروشگاه نباشد می‌گویم سفارش پیدا نشد.", "order")
+    if any(mark in folded for mark in _CONFIRM_MARKS):
+        return _finish(CONFIRM_LINE, "payment")
     products = _mentioned_products(sentence)
     if "تخفیف" in folded or "کمتر" in folded or ("ارزان" in folded and "ارزانترین" not in folded):
         if not products:
@@ -928,6 +966,11 @@ async def _known_reply(thread: dict | None, sentence: str) -> str | None:
         if not result.get("ok") or not str(result.get("payUrl") or "").strip():
             return _finish_handoff(thread, "خطای ابزار پرداخت")
         amount = _fa_num(int(result.get("amount") or 0))
+        if result.get("receipt"):
+            return _finish(
+                f"پرداخت {title} کارت‌به‌کارت با رسید است؛ سفارش از صفحهٔ فروشگاه: {result['payUrl']} مبلغ {amount} تومان. تأیید پرداخت را خود فروشنده انجام می‌دهد.",
+                "pay",
+            )
         return _finish(f"لینک پرداخت {title}: {result['payUrl']} مبلغ {amount} تومان.", "pay")
     if products:
         return _finish(_catalog_sentence(sentence, products), "catalog")

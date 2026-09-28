@@ -144,8 +144,8 @@ class InboxAgentTests(unittest.TestCase):
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
         ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, seen)), patch(
-            "app.services.pay_service.create_order", new=fake_order
-        ):
+            "app.services.inbox_agent_service._seller_has_own_gateway", return_value=True
+        ), patch("app.services.pay_service.create_order", new=fake_order):
             storefront_service.add_product(title="کیف دوشی", price=1000, stock=1, sku="b")
             reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت کیف را بفرست"))
         self.assertIn("https://api.sozan-core.ir/p/abc", reply or "")
@@ -285,8 +285,8 @@ class InboxAgentTests(unittest.TestCase):
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
         ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
-            "app.services.pay_service.create_order", new=fake_order
-        ):
+            "app.services.inbox_agent_service._seller_has_own_gateway", return_value=True
+        ), patch("app.services.pay_service.create_order", new=fake_order):
             write_json("shop.json", {"url": "https://battery.example", "slug": "sales-battery"})
             storefront_service.add_product(title="کیف دوشی", price=1000, stock=1, sku="k")
             reply = asyncio.run(inbox_agent_service.answer("لینک سایت و پرداخت"))
@@ -420,7 +420,7 @@ class InboxAgentTests(unittest.TestCase):
         self.assertEqual(reply, inbox_agent_service.CLAIMS_LINE)
         self.claims_complete.assert_not_called()
 
-    def test_dry_edge_mock_gateway_returns_a_fake_pay_link(self) -> None:
+    def test_dry_edge_own_gateway_returns_a_fake_pay_link(self) -> None:
         payloads = [
             _chat(calls=[_call("payment_link", {"product": "کفش چرم", "qty": 1})]),
             _chat(content="لینک پرداخت اینجاست."),
@@ -429,11 +429,14 @@ class InboxAgentTests(unittest.TestCase):
         async def no_hint(_text: str) -> str:
             return ""
 
+        own = {"paymentGateway": "zarinpal", "paymentMerchantId": "12345678-1234-1234-1234-123456789abc"}
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
         ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
             "app.services.inbox_agent_service.intent_hint", no_hint
         ), patch("app.services.arvan_dns_service.edge_dry", return_value=True), patch(
+            "app.services.settings_service.get_settings", lambda: own
+        ), patch(
             "app.services.pay_service.create_order", new=AsyncMock()
         ) as create:
             storefront_service.add_product(title="کفش چرم", price=4000000, stock=2, sku="c")
@@ -441,6 +444,59 @@ class InboxAgentTests(unittest.TestCase):
         self.assertIn("dry-mock.invalid", reply or "")
         self.assertNotIn("zarinpal", reply or "")
         create.assert_not_called()
+
+    def test_no_gateway_answers_with_the_receipt_page(self) -> None:
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        async def broken(*_args, **_kwargs):
+            raise AssertionError("gateway")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden), patch(
+            "app.services.pay_service.create_order", new=broken
+        ):
+            from app.state_store import write_json
+
+            write_json("shop.json", {"url": "https://battery.example", "slug": "sales-battery"})
+            storefront_service.add_product(title="کفش چرم", price=4000000, stock=2, sku="c")
+            reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت کفش را بفرست"))
+        self.assertIn("battery.example", reply or "")
+        self.assertIn("کارت‌به‌کارت", reply or "")
+        self.assertIn("فروشنده", reply or "")
+        self.assertNotIn("dry-mock.invalid", reply or "")
+
+    def test_receipt_without_a_shop_page_hands_off(self) -> None:
+        from app.state_store import write_json
+
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            write_json("shop.json", {"url": "", "slug": ""})
+            storefront_service.add_product(title="کفش چرم", price=4000000, stock=2, sku="c")
+            reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت کفش را بفرست"))
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+
+    def test_agent_never_confirms_a_payment(self) -> None:
+        from app.services import inbox_service
+
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            created = inbox_service.inbound(platform="instagram", sender="مشتری", text="پرداخت کردم")
+            reply = asyncio.run(
+                inbox_agent_service.answer("پرداخت کردم، تأیید شد؟", thread=created["thread"])
+            )
+        self.assertEqual(reply, inbox_agent_service.CONFIRM_LINE)
+        self.assertNotIn("تأیید شد", reply or "")
+        self.assertIn("فروشنده", reply or "")
 
     def test_multi_product_message_does_not_open_payment(self) -> None:
         payloads = [
