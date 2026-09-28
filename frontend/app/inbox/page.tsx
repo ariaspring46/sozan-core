@@ -306,7 +306,7 @@ export default function InboxPage() {
                       {thread.handoffReason ? (
                         <span className="text-[11px] text-warm">منتظر شما</span>
                       ) : thread.paused ? (
-                        <span className="text-[11px] text-warm">پاسخ دستی</span>
+                        <span className="text-[11px] text-warm">پاسخ خودکار متوقف</span>
                       ) : null}
                     </div>
                     <p className="truncate text-sm text-muted">{preview(thread)}</p>
