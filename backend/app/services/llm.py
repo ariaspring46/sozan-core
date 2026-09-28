@@ -235,14 +235,16 @@ def inbox_cloud_route() -> dict | None:
 
 
 def inbox_hops() -> list[dict]:
-    """Cloud first. The home 9b is only the last hop."""
+    """Haiku's cloud, then DeepSeek on that same cloud, then the home 9b."""
     hops: list[dict] = []
     cloud = inbox_cloud_route()
     if cloud and cloud.get("url"):
         hops.append(cloud)
-    fallback = _fallback_cloud_route()
-    if fallback and all(str(fallback.get("url") or "") != str(hop.get("url") or "") for hop in hops):
-        hops.append(fallback)
+        if "openrouter.ai" in str(cloud.get("url") or "") and str(cloud.get("model") or "") != INBOX_FALLBACK_MODEL:
+            second = dict(cloud)
+            second["model"] = INBOX_FALLBACK_MODEL
+            second["source"] = "inbox-fallback"
+            hops.append(second)
     local = _local_default_route("inbox")
     local["model"] = "qwen3.5-9b"
     if all(str(local.get("url") or "") != str(hop.get("url") or "") for hop in hops):
@@ -911,7 +913,7 @@ def _same_hop(left: dict, right: dict) -> bool:
 
 
 def _inbox_hops(surface: str) -> list[dict]:
-    """Cloud chain first. The home 9b is only the last hop, and only if time remains."""
+    """Haiku, then DeepSeek on the same cloud, then the home 9b if time remains."""
     hops: list[dict] = []
     cloud = route_for_surface(surface)
     if cloud.get("kind") == "cloud" and cloud.get("url"):
@@ -921,9 +923,6 @@ def _inbox_hops(surface: str) -> list[dict]:
             second["model"] = INBOX_FALLBACK_MODEL
             second["source"] = "inbox-fallback"
             hops.append(second)
-    fallback = _fallback_cloud_route()
-    if fallback and all(not _same_hop(fallback, hop) for hop in hops):
-        hops.append(fallback)
     local = _local_default_route(surface)
     if all(not _same_hop(local, hop) for hop in hops):
         hops.append(local)
