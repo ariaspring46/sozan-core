@@ -9,6 +9,85 @@ from app.services import channel_service, inbox_service, sendbox_service
 from app.state_store import tenant_scope
 
 
+class SendboxTakeoverTests(unittest.TestCase):
+    """P0-1: حساب آزاد دیگری نه فهرست می‌شود، نه با claim، نه با callback بی‌nonce بسته می‌شود."""
+
+    def _bind(self, raw: str, tenant: str, account: str) -> None:
+        with patch.object(settings, "state_dir", raw), patch.object(
+            sendbox_service, "_kick_scan", lambda **kwargs: None
+        ):
+            sendbox_service.bind_instagram(account_id=account, phone=tenant, handle="victim")
+
+    def test_claim_refuses_foreign_free_account(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            self._bind(raw, "09135409482", "777")
+            with patch.object(settings, "state_dir", raw):
+                with self.assertRaises(ValueError):
+                    asyncio.run(
+                        sendbox_service.claim_account(account_id="777", phone="09111111111", handle="steal")
+                    )
+
+    def test_claim_allows_own_account_rename(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            self._bind(raw, "09135409482", "777")
+            with patch.object(settings, "state_dir", raw), patch.object(
+                sendbox_service, "_kick_scan", lambda **kwargs: None
+            ):
+                out = asyncio.run(
+                    sendbox_service.claim_account(account_id="777", phone="09135409482", handle="newname")
+                )
+            self.assertTrue(out.get("account"))
+
+    def test_list_shows_only_own_accounts(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            self._bind(raw, "09135409482", "777")
+            with patch.object(settings, "state_dir", raw):
+                rows = sendbox_service.unused_remote_accounts(
+                    [{"id": "777", "username": "victim"}, {"id": "888", "username": "other"}],
+                    phone="09135409482",
+                )
+        self.assertEqual([r["id"] for r in rows], ["777"])
+
+    def test_new_account_callback_needs_nonce(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw):
+            nonce = sendbox_service.mark_connect_started("09135409482")
+            after = patch.object(sendbox_service, "_after_bind_url", side_effect=lambda phone, **kw: kw["flag"])
+            with after as after_mock:
+                # بدون state ← رد
+                sendbox_service.finish_redirect(
+                    status="ok", account_id="999", username="fresh", seller_id="09135409482"
+                )
+                self.assertEqual(after_mock.call_args.kwargs["flag"], "error")
+            # nonce درست ← بسته می‌شود
+            nonce2 = sendbox_service.mark_connect_started("09135409482")
+            with patch.object(settings, "state_dir", raw), patch.object(
+                sendbox_service, "bind_instagram", return_value={"ok": True}
+            ) as bind, patch.object(
+                sendbox_service, "_after_bind_url", side_effect=lambda phone, **kw: kw["flag"]
+            ):
+                out = sendbox_service.finish_redirect(
+                    status="ok", account_id="999", username="fresh", seller_id="09135409482", state=nonce2
+                )
+                self.assertEqual(out, "ok")
+                bind.assert_called_once()
+
+    def test_own_account_reconnect_without_nonce(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            self._bind(raw, "09135409482", "555")
+            with patch.object(settings, "state_dir", raw):
+                sendbox_service.mark_connect_started("09135409482")
+            with patch.object(settings, "state_dir", raw), patch.object(
+                sendbox_service, "bind_instagram", return_value={"ok": True}
+            ) as bind, patch.object(
+                sendbox_service, "_after_bind_url", side_effect=lambda phone, **kw: kw["flag"]
+            ):
+                out = sendbox_service.finish_redirect(
+                    status="ok", account_id="555", username="mine", seller_id="09135409482"
+                )
+                self.assertEqual(out, "ok")
+                bind.assert_called_once()
+
+
 class SendboxServiceTests(unittest.TestCase):
     def test_login_url_adds_seller_id(self) -> None:
         with patch.object(settings, "sendbox_api_key", "key"), patch.object(
@@ -50,12 +129,13 @@ class SendboxServiceTests(unittest.TestCase):
             with patch.object(settings, "state_dir", raw), patch.object(
                 settings, "panel_url", "https://app.sozan-core.ir"
             ):
-                sendbox_service.mark_connect_started("09135409482")
+                nonce = sendbox_service.mark_connect_started("09135409482")
                 url = sendbox_service.finish_redirect(
                     status="success",
                     account_id="acc-1",
                     username="joahr",
                     seller_id="09135409482",
+                    state=nonce,
                 )
                 with tenant_scope("09135409482"):
                     row = channel_service.account_for_platform("instagram") or {}
@@ -139,10 +219,10 @@ class SendboxServiceTests(unittest.TestCase):
         ), patch("app.services.sendbox_service.fetch_oauth_url", new=AsyncMock(return_value="")), patch(
             "app.services.sendbox_service.list_remote_accounts",
             new=AsyncMock(return_value=[{"id": "acc-9", "username": "kif", "active": True}]),
-        ):
+        ), patch.object(sendbox_service, "tenant_for_sendbox_account", return_value="09135409482"):
             result = asyncio.run(sendbox_service.start_instagram(phone="09135409482"))
         self.assertEqual(result["existing"][0]["id"], "acc-9")
-        self.assertFalse(result["existing"][0]["bound"])
+        self.assertTrue(result["existing"][0]["bound"])
 
     def test_finish_redirect_without_account_id_keeps_onboard(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

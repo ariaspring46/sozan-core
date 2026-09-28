@@ -97,6 +97,7 @@ async def sendbox_callback(
     username: str = Query(default=""),
     id: str = Query(default=""),
     error: str = Query(default=""),
+    state: str = Query(default=""),
 ):
     url = sendbox_service.finish_redirect(
         status=status,
@@ -104,6 +105,7 @@ async def sendbox_callback(
         username=username,
         seller_id=id,
         error=error,
+        state=state,
     )
     return RedirectResponse(url, status_code=302)
 

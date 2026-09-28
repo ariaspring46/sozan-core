@@ -52,28 +52,36 @@ def _pending_rows() -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def mark_connect_started(phone: str) -> None:
-    tenant = normalize_phone(phone)
+def mark_connect_started(phone: str) -> str:
+    """نقطهٔ شروع اتصال رسمی؛ یک nonce می‌سازد که Sendbox باید در بازگشت echo کند."""
+    import secrets as _secrets
     import time
 
+    tenant = normalize_phone(phone)
+    nonce = _secrets.token_hex(16)
     rows = _pending_rows()
-    rows[tenant] = time.time()
+    rows[tenant] = {"t": time.time(), "n": nonce}
     write_json(PENDING_FILE, rows, shared=True)
+    return nonce
 
 
-def consume_connect(phone: str) -> bool:
+def consume_connect(phone: str) -> tuple[bool, str]:
+    """اتصال در جریان را مصرف کن؛ (درست‌بودن، nonce) را برمی‌گرداند."""
     import time
 
     try:
         tenant = normalize_phone(phone)
     except ValueError:
-        return False
+        return False, ""
     rows = _pending_rows()
-    started = float(rows.get(tenant) or 0)
+    row = rows.get(tenant)
     if tenant in rows:
         rows.pop(tenant, None)
         write_json(PENDING_FILE, rows, shared=True)
-    return bool(started) and time.time() - started <= CONNECT_TTL
+    if not isinstance(row, dict):
+        return False, ""
+    started = float(row.get("t") or 0)
+    return bool(started) and time.time() - started <= CONNECT_TTL, str(row.get("n") or "")
 
 
 def panel_channels_url(query: str) -> str:
@@ -86,7 +94,7 @@ def panel_onboard_url(query: str) -> str:
     return f"{base}/onboard?{query}"
 
 
-def login_url(*, phone: str, oauth: str = "") -> str:
+def login_url(*, phone: str, oauth: str = "", state: str = "") -> str:
     tenant = phone.strip()
     if not tenant:
         raise ValueError("فروشنده برای ورود اینستاگرام شناخته نشد. دوباره وارد پنل شو.")
@@ -96,6 +104,8 @@ def login_url(*, phone: str, oauth: str = "") -> str:
     parts = urlsplit(raw)
     query = dict(parse_qsl(parts.query, keep_blank_values=True))
     query["id"] = tenant
+    if state:
+        query["state"] = state
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
@@ -137,6 +147,7 @@ async def list_remote_accounts() -> list[dict]:
 
 
 def unused_remote_accounts(rows: list[dict], *, phone: str) -> list[dict]:
+    """فقط حساب‌های همین فروشنده؛ حساب‌های آزادِ دیگران هرگز فهرست نمی‌شوند."""
     tenant = str(phone or "").strip()
     out = []
     for row in rows:
@@ -144,9 +155,9 @@ def unused_remote_accounts(rows: list[dict], *, phone: str) -> list[dict]:
         if not ident:
             continue
         owner = tenant_for_sendbox_account(ident)
-        if owner and owner != tenant:
+        if owner != tenant:
             continue
-        out.append({**row, "bound": bool(owner and owner == tenant)})
+        out.append({**row, "bound": True})
     return out
 
 
@@ -164,8 +175,8 @@ async def start_instagram(*, phone: str) -> dict:
         existing = unused_remote_accounts(await list_remote_accounts(), phone=phone)
     except Exception:
         existing = []
-    url = login_url(phone=phone, oauth=live)
-    mark_connect_started(phone)
+    nonce = mark_connect_started(phone)
+    url = login_url(phone=phone, oauth=live, state=nonce)
     return {
         "configured": True,
         "provider": "sendbox",
@@ -362,16 +373,23 @@ def _after_bind_url(phone: str, *, account_id: str = "", username: str = "", fla
     return panel_channels_url(packed)
 
 
-def finish_redirect(*, status: str, account_id: str, username: str, seller_id: str, error: str = "") -> str:
+def finish_redirect(*, status: str, account_id: str, username: str, seller_id: str, error: str = "", state: str = "") -> str:
     try:
         phone = normalize_phone(seller_id)
     except ValueError:
         return panel_channels_url("instagram=error")
     ident = str(account_id or "").strip()
     name = str(username or "").lstrip("@").strip()
+    provided_state = str(state or "").strip()
     if ident:
-        if not consume_connect(phone):
+        fresh, nonce = consume_connect(phone)
+        if not fresh:
             return _after_bind_url(phone, username=name, flag="error")
+        owner = tenant_for_sendbox_account(ident)
+        # حساب تازه فقط با nonce همان نشست رسمی بسته می‌شود؛ حساب خودی بدون آن هم دوباره وصل می‌شود.
+        if not owner:
+            if not nonce or not provided_state or not hmac.compare_digest(nonce, provided_state):
+                return _after_bind_url(phone, username=name, flag="error")
         try:
             bind_instagram(account_id=ident, phone=phone, handle=name)
         except ValueError:
@@ -381,7 +399,10 @@ def finish_redirect(*, status: str, account_id: str, username: str, seller_id: s
 
 
 async def claim_account(*, account_id: str, phone: str, handle: str = "") -> dict:
-    account = bind_instagram(account_id=account_id, phone=phone, handle=handle)
+    ident = str(account_id or "").strip()
+    if tenant_for_sendbox_account(ident) != str(phone or "").strip():
+        raise ValueError("اتصال حساب تازه فقط با ورود رسمی Sendbox از صفحهٔ کانال‌ها.")
+    account = bind_instagram(account_id=ident, phone=phone, handle=handle)
     with tenant_scope(phone.strip()):
         return {**channel_service.list_accounts(), "account": account}
 
