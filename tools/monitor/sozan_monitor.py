@@ -51,6 +51,26 @@ HOT_CLASSES = ("credit-or-key", "provider-auth", "auth", "401", "402", "payment"
 
 OK, WARN, FAIL = "ok", "warn", "fail"
 
+# بند ۲۴ بازبینی: these slugs must never host a storefront.
+RESERVED_SLUGS = {
+    "sozan", "app", "api", "www", "admin", "ai", "ai0", "status",
+    "mail", "shop", "pay", "help", "blog",
+}
+
+
+def count_products(host: str) -> int | None:
+    """Product cards on /products; None when the page can't be read."""
+    try:
+        out = subprocess.run(
+            ["curl", "-sL", "-m", str(CHECK_TIMEOUT), f"https://{host}/products"],
+            capture_output=True, text=True, timeout=CHECK_TIMEOUT + 5,
+        ).stdout
+        if not out.strip():
+            return None
+        return out.count("product-card") or out.count("data-price=")
+    except Exception:  # noqa: BLE001
+        return None
+
 
 def now() -> float:
     return time.time()
@@ -167,12 +187,18 @@ def check_pass() -> tuple[dict, list[str]]:
         record("hub-ssh", OK, f"{len(slugs)} shops")
     for slug in slugs:
         host = f"{slug}.{DOMAIN}"
+        if slug in RESERVED_SLUGS:
+            record(f"reserved:{slug}", WARN, "اسلاگ رزروشده در حال استفاده")
         d_status, d_detail = dns_status(host)
         record(f"dns:{slug}", d_status, d_detail)
         h_status, h_detail, _ = http_status(f"https://{host}/")
         record(f"shop:{slug}", h_status, h_detail)
         c_status, c_detail = cert_days(host)
         record(f"cert:{slug}", c_status, c_detail)
+        n_products = count_products(host)
+        if n_products is not None:
+            record(f"catalog:{slug}", OK if n_products > 0 else WARN,
+                   f"{n_products} کالا" if n_products else "کاتالوگ خالی")
 
     observe = subprocess.run(
         ["systemctl", "--user", "is-active", "sozan-observe.service"],
