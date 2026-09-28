@@ -39,13 +39,14 @@ def _credit_or_key_problem(http_status: int, status_text: str) -> bool:
     )
 
 
-def _emit_failure(error_class: str, http_status: int) -> None:
+def _emit_failure(error_class: str, http_status: int, status_text: str = "") -> None:
     emit_later(
         kind="sms",
         title="otp-provider-failed",
         surface="auth",
         status="error",
-        payload={"errorClass": error_class, "http": http_status},
+        # متن وضعیتِ خود ملی‌پیامک؛ شرح خطاست، نه دادهٔ شخصی.
+        payload={"errorClass": error_class, "http": http_status, "status": status_text[:120]},
     )
 
 
@@ -62,7 +63,7 @@ async def send_otp(phone: str) -> str:
     except Exception as exc:
         # فقط نام نوع خطا؛ آدرس (که کلید داخلش است) هرگز لاگ نمی‌شود.
         log.warning("melipayamak otp request failed: %s", type(exc).__name__)
-        _emit_failure("network", 0)
+        _emit_failure("network", 0, type(exc).__name__)
         raise OtpSendError("network") from None
     body: dict = {}
     try:
@@ -75,7 +76,7 @@ async def send_otp(phone: str) -> str:
     status_text = str(body.get("status") or "").strip()
     if response.status_code >= 400 or not code:
         error_class = "credit-or-key" if _credit_or_key_problem(response.status_code, status_text) else "provider"
-        log.warning("melipayamak otp rejected: http=%s class=%s", response.status_code, error_class)
-        _emit_failure(error_class, response.status_code)
+        log.warning("melipayamak otp rejected: http=%s class=%s status=%s", response.status_code, error_class, status_text[:120])
+        _emit_failure(error_class, response.status_code, status_text)
         raise OtpSendError(error_class)
     return code
