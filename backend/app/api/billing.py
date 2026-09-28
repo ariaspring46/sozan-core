@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.security import require_permission
-from app.services import billing_service
+from app.services import ai_budget_service, billing_service
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -13,6 +13,28 @@ async def public_plans():
     from app.services import plan_service
 
     return plan_service.public_catalog()
+
+
+TIER_NOTES = {
+    "warn": "مصرف هوش ابری امروز به سقف پلن نزدیک می‌شود.",
+    "capped": "ظرفیت امروز پر شد؛ پاسخ‌ها تا فردا از مدل همیشه در دسترس می‌آید. برای بیشتر، ارتقای پلن.",
+}
+
+
+@router.get("/ai-budget")
+async def ai_budget(user=Depends(require_permission("campaigns:write"))):
+    row = ai_budget_service.tenant_status(user.phone)
+    row["note"] = TIER_NOTES.get(str(row.get("tier")), "")
+    return row
+
+
+@router.get("/ai-budget/report")
+async def ai_budget_report(user=Depends(require_permission("campaigns:write"))):
+    from app.hub_admin import is_hub_admin
+
+    if not is_hub_admin(user.phone):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "این گزارش برای مدیر هاب است")
+    return ai_budget_service.report()
 
 
 class SubscribeIn(BaseModel):

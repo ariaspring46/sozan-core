@@ -278,6 +278,12 @@ class RouteSurfaceTests(unittest.TestCase):
 
 
 class CloudFallbackTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # These tests exercise cloud routing, not the cost cap; keep cloud reachable.
+        cap = patch("app.services.llm._budget_capped", return_value=None)
+        cap.start()
+        self.addCleanup(cap.stop)
+
     def _run(self, surface: str, handler, **extra):
         captured = {}
 
@@ -422,6 +428,12 @@ class CloudFallbackTests(unittest.TestCase):
 
 
 class RouterToolsTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # These tests exercise cloud routing, not the cost cap; keep cloud reachable.
+        cap = patch("app.services.llm._budget_capped", return_value=None)
+        cap.start()
+        self.addCleanup(cap.stop)
+
     def test_requires_cloud(self) -> None:
         with patch("app.services.llm.settings") as settings, patch(
             "app.services.llm_routing_service.get", return_value=None
@@ -490,6 +502,12 @@ class RouterToolsTests(unittest.TestCase):
 
 
 class OpenRouterCutoverTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # These tests exercise cloud routing, not the cost cap; keep cloud reachable.
+        cap = patch("app.services.llm._budget_capped", return_value=None)
+        cap.start()
+        self.addCleanup(cap.stop)
+
     def _client(self, seen: list):
         class FakeClient:
             def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
@@ -836,6 +854,12 @@ class Gpu1GuardTests(unittest.TestCase):
 
 
 class InboxHopTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # These tests exercise cloud routing, not the cost cap; keep cloud reachable.
+        cap = patch("app.services.llm._budget_capped", return_value=None)
+        cap.start()
+        self.addCleanup(cap.stop)
+
     def _client(self, seen: list, *, fail_cloud: bool = False):
         class Client:
             def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
