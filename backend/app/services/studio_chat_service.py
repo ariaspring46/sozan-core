@@ -77,9 +77,29 @@ def _is_greeting(text: str) -> bool:
     return all(word in GREETING_TOKENS for word in words)
 
 
+COMPOSE_STALE_SECONDS = 15 * 60
+
+
 def _messages() -> list[dict]:
     rows = read_json("studio-messages.json", [])
-    return rows if isinstance(rows, list) else []
+    rows = rows if isinstance(rows, list) else []
+    # فرایندی که وسط ساخت بمیرد، پیام را «در حال ساخت» جا می‌گذارد؛ هنگام خواندن کهنه‌اش می‌کنیم.
+    now = time.time()
+    stale = False
+    for row in rows:
+        compose = row.get("compose") if isinstance(row, dict) else None
+        if isinstance(compose, dict) and str(compose.get("status") or "") == "running":
+            started = float(compose.get("startedAt") or 0)
+            if started and now - started > COMPOSE_STALE_SECONDS:
+                compose["status"] = "failed"
+                compose["error"] = "ساخت نیمه‌کاره ماند؛ دوباره تلاش کن."
+                stale = True
+    if stale:
+        try:
+            write_json("studio-messages.json", rows[-400:])
+        except Exception:
+            pass
+    return rows
 
 
 def messages_by_id(ids: set[str]) -> dict[str, dict]:
