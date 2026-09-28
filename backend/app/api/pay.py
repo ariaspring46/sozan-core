@@ -73,11 +73,13 @@ async def shop_paid(request: Request, x_sozan_sign: str = Header(default="")):
 
 
 @router.post("/p/otp/send")
-async def shop_otp_send(body: ShopOtpSendIn):
+async def shop_otp_send(request: Request, body: ShopOtpSendIn):
     from app.services import shop_otp_service
 
     try:
-        return await shop_otp_service.send(slug=body.slug, phone=body.phone)
+        return await shop_otp_service.send(
+            slug=body.slug, phone=body.phone, ip=request.client.host if request.client else ""
+        )
     except shop_otp_service.OtpLimitError as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
     except ValueError as exc:

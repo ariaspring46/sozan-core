@@ -8,6 +8,7 @@ import time
 from app.config import settings
 from app.phone import normalize_phone
 from app.redis_client import redis_client
+from app.services.observe_client import emit_later
 from app.services import sms_service, wallet_service
 from app.services.auth_service import OTP_SEND_LIMIT, OTP_SEND_WINDOW, OTP_VERIFY_LIMIT, OTP_VERIFY_WINDOW
 from app.services.pay_service import find_tenant_by_slug
@@ -19,6 +20,8 @@ class OtpLimitError(ValueError):
     pass
 
 
+SHOP_OTP_IP_HOURLY = 10
+
 def _sign(body: str) -> str:
     return hmac.new(settings.jwt_secret.encode(), body.encode(), hashlib.sha256).hexdigest()[:24]
 
@@ -29,11 +32,32 @@ def mint_token(*, slug: str, phone: str) -> str:
     return f"{body}|{_sign(body)}"
 
 
-async def send(*, slug: str, phone: str) -> dict:
+async def send(*, slug: str, phone: str, ip: str = "") -> dict:
     tenant = find_tenant_by_slug(slug)
     if not tenant:
         raise ValueError("فروشگاه پیدا نشد")
     receptor = normalize_phone(phone)
+    # سقف IP و روزانهٔ فروشگاه، پیش از هر هزینه‌ای که از کیف فروشنده برود.
+    ip_key = f"shop-otp:hip:{ip or 'no-ip'}"
+    ip_hits = await redis_client.incr(ip_key)
+    if ip_hits == 1:
+        await redis_client.expire(ip_key, 3600)
+    if ip_hits > SHOP_OTP_IP_HOURLY:
+        raise OtpLimitError("تعداد درخواست بیش از حد است")
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    day_key = f"shop-otp:daily:{slug}:{day}"
+    day_hits = await redis_client.incr(day_key)
+    if day_hits == 1:
+        await redis_client.expire(day_key, 90000)
+    if day_hits > int(settings.shop_otp_daily_cap or 200):
+        emit_later(
+            kind="sms",
+            title="shop-otp-daily-cap",
+            surface="storefront",
+            status="error",
+            payload={"day": day},
+        )
+        raise OtpLimitError("ظرفیت کد این فروشگاه امروز پر است")
     rl_key = f"shop-otp:rl:{slug}:{receptor}"
     hits = await redis_client.incr(rl_key)
     if hits == 1:
@@ -86,8 +110,11 @@ async def verify(*, slug: str, phone: str, code: str) -> dict:
         await redis_client.expire(vl_key, OTP_VERIFY_WINDOW)
     if hits > OTP_VERIFY_LIMIT:
         raise OtpLimitError("تعداد تلاش بیش از حد است")
+    from app.phone import normalize_digits
+
+    given = "".join(ch for ch in normalize_digits(str(code or "")) if ch.isdigit())
     stored = await redis_client.get(f"shop-otp:{slug}:{receptor}")
-    if stored is None or stored != code.strip():
+    if stored is None or not given or stored != given:
         raise ValueError("کد یک‌بارمصرف نادرست است")
     await redis_client.delete(f"shop-otp:{slug}:{receptor}")
     await redis_client.delete(vl_key)
