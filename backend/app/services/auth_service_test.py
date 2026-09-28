@@ -60,6 +60,8 @@ class OtpResendTests(unittest.TestCase):
         self.patches = [
             patch.object(auth_service, "redis_client", self.redis),
             patch.object(auth_service, "get_settings", return_value={"mockSms": True}),
+            # این کلاس درگاه همیشگی را می‌سنجد؛ محیط ممکن است ملی‌پیامک را روشن کرده باشد.
+            patch.object(auth_service.settings, "otp_provider", ""),
         ]
         for item in self.patches:
             item.start()
@@ -159,6 +161,7 @@ class FixedOtpTests(unittest.TestCase):
             patch.object(auth_service, "redis_client", self.redis),
             patch.object(auth_service, "get_settings", return_value={"mockSms": False, "otpTtlSeconds": 300}),
             patch.object(auth_service, "fixed_otp_for", side_effect=lambda phone: "100001" if phone == "09129900001" else None),
+            patch.object(auth_service.settings, "otp_provider", ""),
         ]
         for item in self.patches:
             item.start()
