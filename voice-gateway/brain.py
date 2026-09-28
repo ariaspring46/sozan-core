@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -70,6 +71,36 @@ def chat_completions_url(url: str) -> str:
     if root.endswith("/chat/completions"):
         return root
     return root + "/chat/completions"
+
+
+TTS_STYLE = "خانم، گرم، دوستانه و آرام، فروشندهٔ مؤدب، با مکث طبیعی؛ نه خبرخوان"
+
+
+def cloud_speech_body(model: str, voice: str, text: str) -> dict:
+    body: dict = {
+        "model": model,
+        "input": text,
+        "response_format": "pcm",
+        "provider": {"sort": "latency"},
+    }
+    if voice:
+        body["voice"] = voice
+    if model.startswith("google/"):
+        body["provider"]["options"] = {
+            "google-ai-studio": {"speech_metadata": {"style": TTS_STYLE}}
+        }
+    return body
+
+
+def tts_model() -> str:
+    return os.environ.get("TTS_MODEL", "").strip()
+
+
+def tts_first_s() -> float:
+    try:
+        return float(os.environ.get("TTS_FIRST_S", "6"))
+    except ValueError:
+        return 6.0
 
 
 def llm_is_local(url: str) -> bool:
@@ -687,6 +718,8 @@ class Brain:
             return False
 
     def phone_ready(self) -> bool:
+        if not llm_is_local(self.llm_url):
+            return True
         if not self.health():
             return False
         root = self.llm_url.split("/v1/")[0]
@@ -798,6 +831,8 @@ class Brain:
         return hit
 
     def warm_chat(self) -> None:
+        if not llm_is_local(self.llm_url):
+            return
         payload = dumps(
             {
                 "model": self.llm_model,
@@ -1039,7 +1074,7 @@ class Brain:
             hops.append((self.llm_fallback_url, self.llm_fallback_model))
         local = (
             chat_completions_url(os.environ.get("LLM_LOCAL_URL", "http://127.0.0.1:19292/v1")),
-            os.environ.get("LLM_LOCAL_MODEL", "ornith-phone"),
+            os.environ.get("LLM_LOCAL_MODEL", "qwen3.5-9b"),
         )
         if local not in hops:
             hops.append(local)
@@ -1191,11 +1226,16 @@ class Brain:
             "cost": usage_cost,
         }
 
-    def synthesize(self, text: str) -> tuple[bytes, float]:
+    def synthesize(self, text: str, *, cloud: bool = True) -> tuple[bytes, float]:
         started = time.monotonic()
         spoken = speakable(text, 3) or text.strip()
         if not spoken:
             return b"", 0.0
+        if cloud and tts_model():
+            phone = self.cloud_pcm(spoken, tts_first_s())
+            if phone:
+                return phone, time.monotonic() - started
+            log.info("tts fallback piper")
         raw = b""
         try:
             raw = self.piper.synth_raw(spoken)
@@ -1206,6 +1246,86 @@ class Brain:
             return b"", time.monotonic() - started
         phone = amplify_pcm16(raw, src_rate=22050)
         return phone, time.monotonic() - started
+
+    def prefetch_cloud(self, text: str) -> bytes:
+        spoken = speakable(text, 3) or (text or "").strip()
+        if not spoken or not tts_model():
+            return b""
+        path = self._tts_cache_path(spoken)
+        if path.is_file() and path.stat().st_size > 400:
+            return path.read_bytes()
+        phone = self.cloud_pcm(spoken, 12.0)
+        if not phone:
+            phone = self.cloud_pcm(spoken, 12.0)
+        if not phone:
+            return b""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(phone)
+        os.chmod(path, 0o600)
+        return phone
+
+    def _tts_cache_path(self, text: str) -> Path:
+        root = Path(os.environ.get("TTS_CACHE", os.path.expanduser("~/local-ai/sozan-voice-cache")))
+        stamp = "\n".join((tts_model(), os.environ.get("TTS_VOICE", "Kore").strip(), TTS_STYLE, text))
+        name = hashlib.sha256(stamp.encode("utf-8")).hexdigest()
+        return root / f"{name}.pcm"
+
+    def cloud_pcm(self, text: str, first_s: float) -> bytes:
+        model = tts_model()
+        key = os.environ.get("LLM_API_KEY", "").strip()
+        if not model or not key or not text:
+            return b""
+        voice = os.environ.get("TTS_VOICE", "Kore").strip()
+        body = cloud_speech_body(model, voice, mask_private(text))
+        req = urllib.request.Request(
+            "https://openrouter.ai/api/v1/audio/speech",
+            data=dumps(body).encode(),
+            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+            method="POST",
+        )
+        started = time.monotonic()
+        try:
+            res = _DIRECT.open(req, timeout=first_s + 8)
+        except Exception as exc:
+            log.warning("tts cloud failed %s", type(exc).__name__)
+            return b""
+        try:
+            ctype = res.headers.get("content-type") or ""
+            if not ctype.startswith("audio/"):
+                log.warning("tts cloud not audio")
+                return b""
+            rate = 24000
+            if "rate=" in ctype:
+                try:
+                    rate = int(ctype.split("rate=")[1].split(";")[0])
+                except ValueError:
+                    rate = 24000
+            chunks: list[bytes] = []
+            broken = False
+            while True:
+                try:
+                    part = res.read(4096)
+                except Exception as exc:
+                    log.warning("tts cloud read %s", type(exc).__name__)
+                    broken = True
+                    break
+                if not part:
+                    break
+                if not chunks:
+                    first = time.monotonic() - started
+                    if first > first_s:
+                        log.info("tts cloud late %.2f", first)
+                        return b""
+                chunks.append(part)
+            if broken:
+                return b""
+        finally:
+            res.close()
+        pcm = b"".join(chunks)
+        if len(pcm) < 400:
+            return b""
+        phone = resample_pcm16(pcm, rate, 8000)
+        return match_rms_pcm16(phone)
 
     def _synth_once(self, spoken: str) -> bytes:
         env = os.environ.copy()

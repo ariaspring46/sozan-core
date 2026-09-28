@@ -41,6 +41,7 @@ from brain import (
     is_social,
     is_stuck,
     is_who,
+    tts_model,
     looks_like_echo,
     looks_like_speech,
     should_hold_fragment,
@@ -58,6 +59,9 @@ from sales import (
     FALLBACK_LINE,
     FIXED_SALES_LINES,
     HELLO_LINE,
+    HELLO_SMS_LINE,
+    PAIN_LINE,
+    FEATURE_LINES,
     MISHEARD_LINE,
     REPEAT_FREE,
     SALES_PROBE_LINE,
@@ -78,6 +82,8 @@ from sales import (
     sales_brief,
     sales_ended,
     sales_open,
+    hello_for,
+    cached_sales_lines,
     too_alike,
     wait_line,
 )
@@ -554,6 +560,7 @@ class Gateway:
         self._sales_said: set[str] = set()
         self._sales_greeted = False
         self._sales_cancel: threading.Event | None = None
+        self._sales_turn_seq = 0
         self._outbound_pitch = False
         self._sim_until = 0.0
         self._sim_call = False
@@ -582,6 +589,9 @@ class Gateway:
             BUY_LINE,
             EXPLAIN,
             HELLO_LINE,
+            HELLO_SMS_LINE,
+            PAIN_LINE,
+            *FEATURE_LINES,
             CLOSE_LINE,
             ADDRESS_LINE,
             FALLBACK_LINE,
@@ -597,10 +607,16 @@ class Gateway:
             lines.append(intent.say)
             lines.append(intent.again)
         started = time.monotonic()
+        cloud_lines = set(cached_sales_lines())
         for line in dict.fromkeys(lines):
             if not (line or "").strip():
                 continue
-            pcm, _ = self.brain.synthesize(line)
+            if line in cloud_lines and tts_model():
+                pcm = self.brain.prefetch_cloud(line)
+                if not pcm:
+                    pcm, _ = self.brain.synthesize(line, cloud=False)
+            else:
+                pcm, _ = self.brain.synthesize(line, cloud=False)
             if pcm:
                 self._voice[line] = pcm
         self._greet_pcm = self._voice.get(GREETING, self._greet_pcm)
@@ -666,9 +682,10 @@ class Gateway:
                 self._peer_number = key
                 self._pending_sales = self._campaign.get(key)
                 self._outbound_pitch = True
+                greet = hello_for(self._pending_sales)
                 brief = sales_brief(self._pending_sales) if self._pending_sales else sales_open()
                 try:
-                    self.brain.warm_sales(brief, HELLO_LINE)
+                    self.brain.warm_sales(brief, greet)
                 except Exception:
                     log.warning("sales warm on dial failed", exc_info=True)
                 placed = self.ua.dial(number)
@@ -720,7 +737,7 @@ class Gateway:
         self._sales_card = card
         self._sales_brief = sales_brief(card) if card else (sales_open() if outbound else "")
         self._sales_state = "live" if self._sales_brief else ""
-        self._sales = SalesState() if self._sales_state else None
+        self._sales = SalesState(sms_sent=bool(card and card.sms_sent)) if self._sales_state else None
         self._sales_pitched = False
         self._sales_said = set()
         self._sales_greeted = False
@@ -732,7 +749,7 @@ class Gateway:
             self._sales_brief = ""
             self._sales = None
             log.info("once line armed")
-        greet = HELLO_LINE if self._sales_state else GREETING
+        greet = hello_for(card) if self._sales_state else GREETING
         if self._sales_state:
             self.brain.start_sales(self._sales_brief, greet)
         else:
@@ -822,6 +839,13 @@ class Gateway:
             self.ua.hangup()
             self._end_call(None)
             return
+        if self._sales_state and tts_model():
+            for line in cached_sales_lines():
+                if line in self._voice:
+                    continue
+                pcm = self.brain.prefetch_cloud(line)
+                if pcm:
+                    self._voice[line] = pcm
         deadline = time.monotonic() + 15 * 60
         while self.ua.running and time.monotonic() < deadline and generation == self._call_generation:
             try:
@@ -1197,7 +1221,7 @@ class Gateway:
             log.info("sales holding for hello text=%s", heard[:80])
             self._log_sales_turn(heard, "hold", "", 0.0, 0.0, False, False)
             return False
-        if plan.kind in {"hello", "close", "address", "fallback"}:
+        if plan.kind in {"hello", "close", "address", "fallback", "feature"}:
             line = plan.line or (HELLO_LINE if plan.kind == "hello" else CLOSE_LINE)
             if plan.kind == "address":
                 line = plan.line or ADDRESS_LINE
@@ -1210,6 +1234,9 @@ class Gateway:
             self._speak(session, generation, line, "bye" if plan.hangup else "meaning")
             if plan.hangup and plan.signals.wrong:
                 remember_dnc(self._peer_number)
+                log.info("sales outcome dnc")
+            if plan.hangup and state.agreed:
+                log.info("sales outcome interested")
             if plan.hangup:
                 session.wait_done(8)
                 self.ua.hangup()
@@ -1218,11 +1245,14 @@ class Gateway:
             return False
         started = time.monotonic()
         played_flag = {"on": False}
+        self._sales_turn_seq += 1
+        turn_seq = self._sales_turn_seq
 
         def filler() -> None:
             time.sleep(THINK_WAIT_S)
             if (
                 not played_flag["on"]
+                and turn_seq == self._sales_turn_seq
                 and generation == self._call_generation
                 and not session.playing.is_set()
                 and session._play.empty()
@@ -1431,8 +1461,6 @@ class Gateway:
         generated.append(sentence)
         if not text:
             return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
-        if played_flag is not None:
-            played_flag["on"] = True
         if generation != self._call_generation or session._speech or session.last_was_barge:
             return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
         pcm = self._voice.get(text)

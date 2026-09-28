@@ -1,6 +1,6 @@
 {
   "source": "instagram-shops",
   "contacts": [
-    {"phone": "09120000000", "instagram": "example_shop", "product": "کیف چرم"}
+    {"phone": "09120000000", "instagram": "example_shop", "product": "کیف چرم", "smsSent": false}
   ]
 }

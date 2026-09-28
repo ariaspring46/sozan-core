@@ -23,6 +23,8 @@ from audio_codec import (
     rtp_parse,
 )
 from brain import (
+    Brain,
+    cloud_speech_body,
     clarify,
     chat_completions_url,
     echo_should_block,
@@ -65,6 +67,12 @@ from sales import (
     CLOSE_LINE,
     FIXED_SALES_LINES,
     HELLO_LINE,
+    HELLO_SMS_LINE,
+    PAIN_LINE,
+    DM_LINE,
+    CONTENT_LINE,
+    ORDER_LINE,
+    SITE_LINE,
     MISHEARD_LINE,
     REPEAT_FREE,
     SALES_PROBE_LINE,
@@ -86,7 +94,9 @@ from sales import (
     sales_ended,
     sales_kind,
     sales_open,
+    cached_sales_lines,
     set_plans_fetcher,
+    set_payment_fetcher,
     shorten_reply,
     split_sentences,
     take_ready_sentences,
@@ -410,10 +420,22 @@ class SpeechTest(unittest.TestCase):
         self.assertIn("توضیح", heard)
         self.assertTrue(usable_request(heard))
 
+    def test_cloud_line_is_ready_without_the_local_model(self) -> None:
+        from brain import Brain
+
+        brain = Brain.__new__(Brain)
+        brain.llm_url = "https://openrouter.ai/api/v1/chat/completions"
+        brain.llm_model = "google/gemini-2.5-flash"
+        self.assertTrue(brain.phone_ready())
+        brain.llm_url = "http://127.0.0.1:19292/v1/chat/completions"
+        brain.health = lambda: False
+        self.assertFalse(brain.phone_ready())
+
 
 class SalesTest(unittest.TestCase):
     def setUp(self) -> None:
         set_plans_fetcher(lambda: PLAN_FIXTURE)
+        set_payment_fetcher(lambda: False)
 
     def tearDown(self) -> None:
         os.environ.pop("GIFT_CODE_SPOKEN", None)
@@ -492,7 +514,8 @@ class SalesTest(unittest.TestCase):
         self.assertNotIn("ورود", HELLO_LINE)
         note_spoken(state, HELLO_LINE)
         later = plan_turn(state, "من آرایشگاه دارم")
-        self.assertEqual(later.kind, "model")
+        self.assertEqual(later.kind, "feature")
+        self.assertEqual(later.line, PAIN_LINE)
         self.assertEqual(state.trade, "آرایشگاه")
         self.assertTrue(person_started("صحبت کن"))
         os.environ["GIFT_CODE_SPOKEN"] = "سوزان سی"
@@ -509,7 +532,9 @@ class SalesTest(unittest.TestCase):
         self.assertEqual(gift_line(), "")
         self.assertFalse(gift_allowed(state, read_signals("گرونه")))
         self.assertIn("sozan-core.ir", CLOSE_LINE)
-        self.assertIn("پیجتون", HELLO_LINE)
+        self.assertIn("دایرکت", HELLO_LINE)
+        self.assertIn("سفارش", HELLO_LINE)
+        self.assertLessEqual(len(HELLO_LINE.split()), 18)
         self.assertNotIn("پیجت ", HELLO_LINE)
         self.assertNotIn("کور", ADDRESS_LINE)
         self.assertIn("کُر", ADDRESS_LINE)
@@ -567,7 +592,9 @@ class SalesTest(unittest.TestCase):
         note_spoken(asked_job, HELLO_LINE)
         note_spoken(asked_job, "اسمم سوزانه.")
         job = plan_turn(asked_job, "چه کارایی رو انجام میدی")
-        self.assertEqual(job.kind, "model")
+        self.assertEqual(job.line, PAIN_LINE)
+        again = plan_turn(asked_job, "چه کارایی رو انجام میدی")
+        self.assertEqual(again.kind, "model")
         where = plan_turn(asked_job, "پیجام کجا باید وارد کنم")
         self.assertEqual(where.kind, "address")
         self.assertEqual(where.line, ADDRESS_LINE)
@@ -663,11 +690,12 @@ class SalesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "campaign.json"
             path.write_text(
-                '{"targets":[{"phone":"۰۹۱۲۱۲۳۴۵۶۷","instagram":"@kif_shop","product":"کیف چرم"},{"phone":"","instagram":"x"}]}',
+                '{"targets":[{"phone":"۰۹۱۲۱۲۳۴۵۶۷","instagram":"@kif_shop","product":"کیف چرم","smsSent":true},{"phone":"","instagram":"x"}]}',
                 encoding="utf-8",
             )
             found = load_campaign(path)
-            self.assertEqual(found["09121234567"], ShopCard("kif_shop", "کیف چرم"))
+            self.assertEqual(found["09121234567"], ShopCard("kif_shop", "کیف چرم", True))
+            self.assertTrue(found["09121234567"].sms_sent)
             self.assertEqual(load_campaign(path.with_name("missing.json")), {})
 
     def test_spoken_prices_match_the_catalog(self) -> None:
@@ -753,7 +781,45 @@ class SalesTest(unittest.TestCase):
         self.assertNotIn("تومان", missed.line or "")
         self.assertIn("کُر", missed.line or "")
 
-    def test_sim_command_never_looks_like_a_dial(self) -> None:
+    def test_intro_asks_one_pain_and_sms_does_not_insist(self) -> None:
+        for line in (HELLO_LINE, HELLO_SMS_LINE, PAIN_LINE, DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE):
+            self.assertLessEqual(len(line.split()), 18)
+        opened = sales_open()
+        self.assertIn("دستیار فروش", opened)
+        self.assertIn("پرو مکس", opened)
+        self.assertIn("لینک پرداخت داخل گفتگو را نگو", opened)
+        self.assertIn("لغو است", opened)
+        set_payment_fetcher(lambda: True)
+        self.assertIn("داخل همان گفتگو", sales_open())
+        sms = SalesState(sms_sent=True)
+        first = plan_turn(sms, "الو")
+        self.assertEqual(first.line, HELLO_SMS_LINE)
+        note_spoken(sms, HELLO_SMS_LINE)
+        second = plan_turn(sms, "سلام")
+        self.assertEqual(second.line, HELLO_LINE)
+        self.assertNotIn("پیامک", second.line or "")
+        note_spoken(sms, HELLO_LINE)
+        third = plan_turn(sms, "دایرکت‌هام مونده")
+        self.assertEqual(third.line, DM_LINE)
+        site = plan_turn(SalesState(greeted=True, intro_said=True, pain_asked=True), "یه سایت می‌خوام")
+        self.assertEqual(site.line, SITE_LINE)
+        content = plan_turn(SalesState(greeted=True, intro_said=True, pain_asked=True), "استوری و کپشن")
+        self.assertEqual(content.line, CONTENT_LINE)
+        order = plan_turn(SalesState(greeted=True, intro_said=True, pain_asked=True), "سفارش‌ها رو کی پیگیری می‌کنه")
+        self.assertEqual(order.line, ORDER_LINE)
+
+    def test_gemini_flash_style_is_not_spoken(self) -> None:
+        body = cloud_speech_body("google/gemini-3.8-flash-tts", "Kore", "سلام")
+        self.assertEqual(body["input"], "سلام")
+        self.assertEqual(body["voice"], "Kore")
+        self.assertEqual(body["model"], "google/gemini-3.8-flash-tts")
+        style = body["provider"]["options"]["google-ai-studio"]["speech_metadata"]["style"]
+        self.assertIn("گرم", style)
+        self.assertNotIn("گرم", body["input"])
+        lines = cached_sales_lines()
+        self.assertIn(HELLO_LINE, lines)
+        self.assertIn(ADDRESS_LINE, lines)
+        self.assertTrue(any("تومان" in line for line in lines))
         self.assertEqual(parse_sim_command("SIM"), ("", ""))
         self.assertEqual(parse_sim_command("SIM bag_shop کیف"), ("bag_shop", "کیف"))
         self.assertEqual(parse_sim_command("SIM @kif_shop"), ("kif_shop", ""))

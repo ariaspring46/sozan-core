@@ -29,9 +29,16 @@ FIXED_SALES_LINES = frozenset(
 
 BYE_LINE = "خداحافظ، روزتون خوش!"
 HELLO_LINE = (
-    "سلام، وقتتون بخیر! سوزانم. "
-    "برای پیج اینستا رایگان وبسایت می‌سازیم. پیجتون چی می‌فروشه؟"
+    "سوزان دستیار فروش آنلاین‌شاپ‌هاست؛ "
+    "دایرکت‌ها را جواب می‌دهد، محتوا می‌سازد، سفارش را پیگیری می‌کند."
 )
+HELLO_SMS_LINE = "سلام، از سوزان تماس می‌گیرم؛ احتمالاً پیامکمون به دستتون رسیده."
+PAIN_LINE = "دایرکت بی‌جوابه، محتوا می‌خواید، یا سایت؟"
+DM_LINE = "دایرکت اینستا و تلگرام را با لحن خودتون جواب می‌دهد؛ خودکار فقط پرو مکس."
+CONTENT_LINE = "استودیو پست، استوری، عکس کالا و کپشن تبلیغ را می‌سازد."
+ORDER_LINE = "سفارش را پیگیری می‌کند و فروش و موجودی انبار را ثبت می‌کند."
+SITE_LINE = "فروشگاه را از روی همان پیج می‌سازد و شروعش رایگان است."
+FEATURE_LINES = (DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE)
 BUY_LINE = "رایگان شروع می‌کنید، برید تو سایت سوزان کُر، sozan-core.ir، و دکمهٔ ورود رو بزنید."
 EXPLAIN = (
     "سوزان برای آنلاین‌شاپه و وبسایت فروشگاهتون رو از کپشن پیجتون می‌سازه. "
@@ -70,6 +77,7 @@ _LATIN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234
 _PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 _MONEY_KEYS = ("listPrice", "price", "priceToman", "codePrice", "phonePrice")
 _PLANS_URL = "https://api.sozan-core.ir/billing/plans"
+_HEALTH_URL = "https://api.sozan-core.ir/health"
 _PLANS_TTL_S = 600
 _ONES = ("", "یک", "دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه")
 _TEENS = ("ده", "یازده", "دوازده", "سیزده", "چهارده", "پانزده", "شانزده", "هفده", "هجده", "نوزده")
@@ -78,6 +86,10 @@ _HUNDREDS = ("", "صد", "دویست", "سیصد", "چهارصد", "پانصد",
 _plans_cache: dict | None = None
 _plans_cached_at = 0.0
 _plans_fetcher = None
+_payment_cache: bool | None = None
+_payment_cached_at = 0.0
+_payment_fetcher = None
+_DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _STAGE_FA = {
     "greet": "سلام",
     "discover": "کشف",
@@ -87,9 +99,9 @@ _STAGE_FA = {
     "close": "بستن",
 }
 _STAGE_DO = {
-    "greet": "فقط سلام گرم بگو و بپرس پیجتون چی می‌فروشه.",
-    "discover": "فقط بپرس پیجتون چی می‌فروشه. آدرس سایت نگو.",
-    "pitch": "یک فایدهٔ مخصوص همان کسب‌وکار بگو. دعوت سایت نکن مگر بپرسد.",
+    "greet": "اگر پیامک گفته شد دوباره نپرس. وگرنه معرفی کوتاه بگو.",
+    "discover": "اگر درد را نگفته، یک سؤال: دایرکت بی‌جواب، محتوا، یا سایت. اگر گفته، فقط همان یک قابلیت.",
+    "pitch": "فقط همان یک قابلیتِ مربوط را بگو. بقیه را نریز. دعوت سایت نکن مگر بپرسد.",
     "cta": "آدرس sozan-core.ir، دکمهٔ ورود و رایگان بودن را فقط یک بار بگو.",
     "confirm": "آدرس را تکرار نکن مگر بپرسد. نگرانی‌اش را جواب بده.",
     "close": "تشکر گرم و خداحافظی.",
@@ -213,10 +225,13 @@ def plans_url() -> str:
 
 
 def reset_plan_cache() -> None:
-    global _plans_cache, _plans_cached_at, _plans_fetcher
+    global _plans_cache, _plans_cached_at, _plans_fetcher, _payment_cache, _payment_cached_at, _payment_fetcher
     _plans_cache = None
     _plans_cached_at = 0.0
     _plans_fetcher = None
+    _payment_cache = None
+    _payment_cached_at = 0.0
+    _payment_fetcher = None
 
 
 def set_plans_fetcher(fn) -> None:
@@ -224,6 +239,43 @@ def set_plans_fetcher(fn) -> None:
     _plans_fetcher = fn
     _plans_cache = None
     _plans_cached_at = 0.0
+
+
+def set_payment_fetcher(fn) -> None:
+    global _payment_fetcher, _payment_cache, _payment_cached_at
+    _payment_fetcher = fn
+    _payment_cache = None
+    _payment_cached_at = 0.0
+
+
+def health_url() -> str:
+    return os.environ.get("HEALTH_URL", _HEALTH_URL).strip() or _HEALTH_URL
+
+
+def payment_ready() -> bool:
+    global _payment_cache, _payment_cached_at
+    if _payment_fetcher is not None:
+        return bool(_payment_fetcher())
+    now = time.monotonic()
+    if _payment_cache is not None and now - _payment_cached_at < _PLANS_TTL_S:
+        return _payment_cache
+    ready = False
+    try:
+        request = urllib.request.Request(health_url(), headers={"Accept": "application/json"})
+        with _DIRECT.open(request, timeout=4) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        ready = bool(isinstance(body, dict) and body.get("paymentReady"))
+    except (OSError, urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+        ready = False
+    _payment_cache = ready
+    _payment_cached_at = now
+    return ready
+
+
+def payment_clause() -> str:
+    if payment_ready():
+        return "لینک پرداخت را می‌شود داخل همان گفتگوی مشتری فرستاد. فقط اگر پرسیدند بگو.\n"
+    return "لینک پرداخت داخل گفتگو را نگو. پرداخت هنوز روشن نیست.\n"
 
 
 def _http_plans() -> dict:
@@ -416,12 +468,18 @@ def sales_open() -> str:
     return (
         "تو سوزان هستی، زن، گرم، پرانرژی، کاملاً خودمونی با خطاب «شما». "
         "زنگ زدی خود سوزان را معرفی کنی.\n"
-        "سوزان دقیقاً برای آنلاین‌شاپ اینستاگرام ساخته شده. "
-        "وبسایت فروشگاه را از کپشن پیج می‌سازد. ساختنش رایگان است. "
-        "استودیو از روی عکس پست و فیلم هم می‌سازد، ولی اصل کار آنلاین‌شاپ است.\n"
-        "رایگان یعنی یک وب‌سایت، انبار، و چت دستی. نگو سایت همان لحظه حاضر است. بگو رایگان شروع می‌کنید.\n"
+        "سوزان دستیار فروش آنلاین‌شاپ‌هاست، نه فقط سازندهٔ سایت. فقط همین‌ها را بگو، چون همین‌ها کار می‌کنند:\n"
+        "جواب دایرکت مشتری در اینستاگرام و تلگرام، با لحن خود فروشنده. پیش‌نویس هست. پاسخ خودکار فقط پرو مکس.\n"
+        "فروشگاه اینترنتی از روی همان پیج. شروعش رایگان است. نگو سایت همان لحظه حاضر است.\n"
+        "استودیو: پست، استوری، عکس کالا و کپشن برای تبلیغ.\n"
+        "سفارش و فروش: پیگیری سفارش مشتری، ثبت فروش، و موجودی انبار.\n"
         "رزرو و نوبت‌دهی نداریم. نگو مشتری از سایت رزرو می‌کند.\n"
-        "نگو درگاه پرداخت روشن است. نگو وب‌سایت نامحدود. لینک را در واتساپ و دایرکت و پیامک نفرست.\n"
+        "نگو وب‌سایت نامحدود. لینک را در واتساپ و دایرکت و پیامک نفرست.\n"
+        + payment_clause()
+        + "روش: یک جملهٔ معرفی، بعد یک سؤال دربارهٔ دردش (دایرکت بی‌جواب، محتوا، یا سایت)، "
+        "بعد فقط همان یک قابلیت. قابلیت‌های دیگر را همان نوبت نگو.\n"
+        "اگر سلام پیامک بود و نگفت دیده، دوباره از پیامک نپرس و برو سر معرفی.\n"
+        "از جواب دایرکت حرف بزن. قاعدهٔ قدیمیِ حرف نزدن از دایرکت لغو است.\n"
         "هر نوبت یک جمله، حداکثر هجده کلمه. "
         "اول همان سؤال را جواب بده، بعد فقط یک قدم جلوتر برو، هر بار فقط یک سؤال.\n"
         "خطاب تو ممنوع: نگو پیجت، سایتت، برو، بزن، می‌ری، می‌زنی، خودت. "
@@ -446,13 +504,13 @@ def sales_open() -> str:
         "وقتی کار تمام است فقط بنویس [پایان]. وقتی هدیه مناسب است فقط بنویس [هدیه]. "
         "کد تخفیف را خودت نساز.\n"
         "نمونه‌های زیر فقط لحن‌اند، از بر تکرارشان نکن:\n"
-        "مشتری: من آرایشگاه دارم. → سوزان واسه پیج اینستاگرام شماست. از کپشن پیج، سایت محصولات رو می‌سازه.\n"
+        "مشتری: دایرکت‌ها بی‌جواب می‌مونن. → دایرکت اینستا و تلگرام را با لحن خودتون جواب می‌دهد.\n"
+        "مشتری: محتوا چی؟ → استودیو پست و استوری و کپشن را می‌سازد.\n"
         "مشتری: پیجمو چجوری بدم؟ → تو تماس نمی‌خواد. برید sozan-core.ir، ورود رو بزنید، اونجا اسم پیج رو می‌نویسید.\n"
         "مشتری: گرونه. → ساخت وبسایت کلاً رایگانه؛ پول فقط برای پرو، اونم اگه بخواید.\n"
         "مشتری: بعداً. → باشه. یادتون باشه sozan-core.ir، دکمه ورود. [هدیه]\n"
         "مشتری: رباتی؟ → دستیار صوتی سوزانم. خود سایت رو که باز کنید دست خودتونه.\n"
         "مشتری: لینکو بفرست. → تو تماس لینک نمی‌فرستم. خودتون sozan-core.ir رو باز کنید و ورود رو بزنید.\n"
-        "مشتری: تو واتساپ بفرست. → تو تماس لینک نمی‌فرستم. خودتون sozan-core.ir رو باز کنید و ورود رو بزنید.\n"
         "مشتری: سایت دارم. → سوزان مخصوص پیج اینستاست؛ محصولات رو خودش از پیجتون می‌آره.\n"
         "مشتری: بلد نیستم. → لازم نیست بلد باشید، فقط اسم پیجتون رو تو سایت می‌زنید.\n"
         "اعتراض‌ها: نگرانی را قبول کن، یک زاویهٔ تازه بگو، دعوت کوچک بکن. فوریت ساختگی نگو."
@@ -479,6 +537,9 @@ class SalesState:
     turns: int = 0
     greeted: bool = False
     linked: bool = False
+    sms_sent: bool = False
+    intro_said: bool = False
+    pain_asked: bool = False
     last_cue: str = ""
     said: list[str] = field(default_factory=list)
     interrupted: str = ""
@@ -585,6 +646,74 @@ def read_signals(heard: str) -> Signals:
     )
 
 
+def pain_kind(heard: str) -> str:
+    blob = heard or ""
+    if any(part in blob for part in ("دایرکت", "بی‌جواب", "بی جواب", "پیام مشتری")):
+        return "dm"
+    if any(part in blob for part in ("استوری", "کپشن", "محتوا", "عکس کالا", "پست")):
+        return "content"
+    if any(part in blob for part in ("سفارش", "موجودی", "انبار")):
+        return "order"
+    if any(part in blob for part in ("سایت دارم", "سایتم هست", "وبسایت دارم")):
+        return ""
+    if any(part in blob for part in ("سایت", "فروشگاه", "وبسایت", "وب‌سایت")):
+        return "site"
+    return ""
+
+
+def feature_line(kind: str) -> str:
+    return {
+        "dm": DM_LINE,
+        "content": CONTENT_LINE,
+        "order": ORDER_LINE,
+        "site": SITE_LINE,
+    }.get(kind, "")
+
+
+def cached_sales_lines() -> list[str]:
+    lines = [
+        HELLO_LINE,
+        HELLO_SMS_LINE,
+        PAIN_LINE,
+        *FEATURE_LINES,
+        BYE_LINE,
+        CLOSE_LINE,
+        ADDRESS_LINE,
+        BUY_LINE,
+        EXPLAIN,
+        FALLBACK_LINE,
+        MISHEARD_LINE,
+        SALES_PROBE_LINE,
+        WAIT_LINE,
+        *WAIT_BRIGHT,
+    ]
+    for heard in ("قیمت", "پرو مکس"):
+        priced = price_spoken_line(heard)
+        if priced:
+            lines.append(priced)
+    for signals, heard in (
+        (Signals(trust=True), "اعتماد ندارم"),
+        (Signals(cant=True), "بلد نیستم"),
+        (Signals(has_site=True), "سایت دارم"),
+        (Signals(robot=True), "رباتی"),
+        (Signals(source=True), "شماره من از کجا"),
+        (Signals(), "تو واتساپ بفرست"),
+    ):
+        line = objection_line(signals, heard)
+        if line:
+            lines.append(line)
+    gift = gift_line()
+    if gift:
+        lines.append(gift)
+    return [line for line in dict.fromkeys(lines) if (line or "").strip()]
+
+
+def hello_for(card: ShopCard | None) -> str:
+    if card is not None and card.sms_sent:
+        return HELLO_SMS_LINE
+    return HELLO_LINE
+
+
 def wants_address(heard: str) -> bool:
     blob = heard or ""
     if any(part in blob for part in ("بلد نیست", "اعتماد", "سایت دارم", "ربات", "فرقش", "فرق ")):
@@ -663,6 +792,9 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
                 state.stage = "cta"
                 return TurnPlan(kind="address", line=priced, signals=signals)
             return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
+        if state.sms_sent:
+            return TurnPlan(kind="hello", line=HELLO_SMS_LINE, signals=signals)
+        state.intro_said = True
         return TurnPlan(kind="hello", line=HELLO_LINE, signals=signals)
     if signals.bye:
         line = BYE_LINE if (state.refused_cta or not state.linked) else CLOSE_LINE
@@ -691,6 +823,20 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         else:
             state.stage = "cta"
             return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
+    kind = pain_kind(heard)
+    line = feature_line(kind)
+    if line:
+        state.intro_said = True
+        state.pain_asked = True
+        state.stage = "pitch"
+        return TurnPlan(kind="feature", line=line, signals=signals)
+    if not state.intro_said:
+        state.intro_said = True
+        state.stage = "discover"
+        return TurnPlan(kind="hello", line=HELLO_LINE, signals=signals)
+    if not state.pain_asked:
+        state.pain_asked = True
+        return TurnPlan(kind="feature", line=PAIN_LINE, signals=signals)
     return TurnPlan(
         kind="model",
         cue=state.cue(heard),
@@ -998,6 +1144,7 @@ def utterance_open(heard: str) -> bool:
 class ShopCard:
     instagram: str
     product: str
+    sms_sent: bool = False
 
 
 DNC_PATH = Path.home() / "local-ai" / "config" / "sozan-dnc.txt"
@@ -1028,6 +1175,7 @@ def load_campaign(path: Path) -> dict[str, ShopCard]:
         phone = normalize_dial(str(row.get("phone", "")))
         handle = str(row.get("instagram", "")).strip().lstrip("@")
         product = str(row.get("product", "")).strip()
+        sms_sent = bool(row.get("smsSent"))
         if phone and handle:
-            found[phone] = ShopCard(instagram=handle, product=product)
+            found[phone] = ShopCard(instagram=handle, product=product, sms_sent=sms_sent)
     return found
