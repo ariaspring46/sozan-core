@@ -566,6 +566,32 @@ class StudioChatTests(unittest.TestCase):
         self.assertIn("turquoise ring", started.call_args.kwargs["image_prompt"])
         self.assertNotRegex(started.call_args.kwargs["image_prompt"], r"[\u0600-\u06FF]")
 
+    def test_regenerate_image_without_campaign_creates_fresh_one(self) -> None:
+        campaigns = FakeCampaigns()
+        message_id = str(uuid4())
+        rows = [
+            {
+                "id": message_id,
+                "role": "assistant",
+                "text": "پست انگشتر",
+                "captions": {"instagram": "انگشتر", "telegram": "انگشتر", "whatsapp": "انگشتر"},
+                "imagePrompt": "product photo of a silver ring, studio light, no text",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            patches = self._patches(Path(raw), rows)
+            with patches[0], patches[1], patches[2], patches[3], patches[4], patch(
+                "app.services.studio_compose_service.start", return_value="job"
+            ) as started:
+                out = asyncio.run(
+                    studio_chat_service.regenerate(message_id=message_id, part="image", campaigns=campaigns)
+                )
+        # کمپین تازه ساخته شد و ساخت از نو راه افتاد؛ پیام هم کمپین گرفت
+        self.assertTrue(campaigns.created, "campaign create must be called")
+        self.assertTrue(started.call_args.kwargs["campaign_id"])
+        found = next(row for row in out.get("messages", []) if row.get("id") == message_id)
+        self.assertTrue(found.get("campaignId"))
+
     def test_incomplete_caption_keeps_the_last_full_sentence(self) -> None:
         out = studio_chat_service._clip_captions(
             {

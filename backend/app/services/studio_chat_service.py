@@ -1332,7 +1332,10 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
             payload={"error": str(exc)[:200]},
         )
         attachments = _fallback_attachment(media)
-    if not reply:
+    if want_compose and not campaign_id:
+        # ساخت واقعی نشد؛ جواب مدل هر چه باشد، ادعای موفقیت نمی‌ماند.
+        reply = "ساخت پست الان ممکن نیست؛ چند لحظه بعد «تلاش مجدد» را بزن."
+    elif not reply:
         reply = f"کمپین «{title}» آماده شد." if campaign_id else "کپشن را نوشتم؛ کمپین ذخیره نشد."
     reply = _strip_progress(reply)
     if want_compose and campaign_id and not has_media and subject_name and SAMPLE_PHOTO not in reply:
@@ -1353,6 +1356,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         "captions": captions,
         "subject": subject_name,
         "facts": facts,
+        **({"compose": {"status": "failed", "startedAt": time.time(), "jobId": "", "error": ""}} if want_compose and not campaign_id else {}),
         **({"campaignId": campaign_id} if campaign_id else {}),
         **({"attachments": attachments} if attachments else {}),
         **({"imagePrompt": image_prompt} if image_prompt else {}),
@@ -1507,7 +1511,25 @@ async def regenerate(*, message_id: str, part: str, campaigns: CampaignService, 
         return {"messages": (result or {}).get("messages") or _messages()}
     if kind == "image":
         if not campaign_id:
-            raise ValueError("کمپین این پست نیست")
+            # ساخت اولیه نیمه‌مانده و کمپینی برجا نمانده؛ تلاش مجدد کمپین تازه می‌سازد.
+            from uuid import uuid4 as _uuid4
+
+            title = str(target.get("title") or target.get("text") or "").strip()[:80] or "پست استودیو"
+            try:
+                campaign = await campaigns.create(
+                    slug=f"c{_uuid4().hex[:12]}",
+                    pillar="shop",
+                    title=title,
+                    subtitle="",
+                    cta="",
+                    instagram_caption=str(captions.get("instagram") or ""),
+                    telegram_caption=str(captions.get("telegram") or ""),
+                    whatsapp_caption=str(captions.get("whatsapp") or ""),
+                )
+            except Exception as exc:
+                raise ValueError("کمپین تازه برای ساخت دوباره باز نشد.") from exc
+            campaign_id = str(campaign.id)
+            _update_message(ident, lambda row: row.update({"campaignId": campaign_id}))
         if media and str(media.get("kind") or "") == "image":
             await _attach_still(campaigns, UUID(campaign_id), media)
         prompt = str(target.get("imagePrompt") or "").strip()
