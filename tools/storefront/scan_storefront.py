@@ -22,8 +22,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
-import urllib.request
 from pathlib import Path
 
 # Phrases no seller types verbatim; safe to ban in served HTML outright.
@@ -64,8 +64,13 @@ TRUST_TITLES = ("ارسال", "مرجوعی", "پرداخت در محل", "فا�
 
 
 def fetch(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=15) as res:
-        return res.read().decode("utf-8", errors="replace")
+    # curl carries the shell socks proxy env; python urllib cannot.
+    out = subprocess.run(
+        ["curl", "-sL", "-m", "20", url], capture_output=True, text=True, timeout=25
+    )
+    if not out.stdout:
+        raise RuntimeError(f"empty response from {url}")
+    return out.stdout
 
 
 def policy_texts(policy: dict) -> list[str]:
@@ -76,6 +81,69 @@ def policy_texts(policy: dict) -> list[str]:
         elif isinstance(value, int):
             out.append(str(value))
     return out
+
+
+def fa_num(value: int) -> str:
+    grouped = f"{value:,}"
+    return grouped.replace("0", "۰").replace("1", "۱").replace("2", "۲").replace("3", "۳") \
+        .replace("4", "۴").replace("5", "۵").replace("6", "۶").replace("7", "۷") \
+        .replace("8", "۸").replace("9", "۹").replace(",", "٬")
+
+
+def expected_trust_cards(policy: dict) -> list[tuple[str, str]]:
+    """Python mirror of policyTrustItems() in lib/policy.ts."""
+    s = policy.get("shippingMethod", "")
+    d = policy.get("shippingDays", "")
+    c = policy.get("shippingCities", "")
+    cost = policy.get("shippingCost")
+    free = policy.get("freeShippingFrom")
+    cards: list[tuple[str, str]] = []
+    ship: list[str] = [x for x in (s, d, c) if isinstance(x, str) and x]
+    if isinstance(cost, int) and cost > 0:
+        ship.append(f"هزینهٔ ارسال {fa_num(cost)} تومان")
+    if isinstance(free, int) and free > 0:
+        ship.append(f"ارسال رایگان از خرید {fa_num(free)} تومان")
+    if ship:
+        cards.append(("ارسال", "؛ ".join(ship)))
+    rdays = policy.get("returnDays")
+    ret: list[str] = []
+    if isinstance(rdays, int) and rdays > 0:
+        ret.append(f"تا {fa_num(rdays)} روز")
+    for key in ("returnNote", "returnPayer"):
+        if policy.get(key):
+            ret.append(str(policy[key]))
+    if ret:
+        cards.append(("مرجوعی", "؛ ".join(ret)))
+    if policy.get("cod"):
+        cards.append(("پرداخت در محل", str(policy["cod"])))
+    if policy.get("invoice"):
+        cards.append(("فاکتور", str(policy["invoice"])))
+    return cards
+
+
+CARD_RE = re.compile(r'<div[^>]*class="[^"]*surface-card[^"]*"[^>]*>(.*?)</div>', re.S)
+P_RE = re.compile(r"<p[^>]*>(.*?)</p>", re.S)
+
+
+def strip_tags(fragment: str) -> str:
+    text = re.sub(r"<[^>]+>", "", fragment)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def trust_cards_from_html(html: str) -> list[tuple[str, str]]:
+    start = TRUST_SECTION.search(html)
+    if not start:
+        return []
+    section = html[start.start() : start.start() + 8000]
+    cards: list[tuple[str, str]] = []
+    for card in CARD_RE.findall(section):
+        paras = [strip_tags(p) for p in P_RE.findall(card)]
+        paras = [p for p in paras if p]
+        if len(paras) >= 2:
+            cards.append((paras[0], paras[1]))
+        if len(cards) == 4:
+            break
+    return cards
 
 
 def scan_html(url: str, pages: list[str], policy: dict | None) -> list[str]:
@@ -110,15 +178,22 @@ def scan_html(url: str, pages: list[str], policy: dict | None) -> list[str]:
         trust = TRUST_SECTION.search(html)
         if trust:
             if policy is None:
-                problems.append(f"{where}trust section shown but no --policy passed to scanner")
+                problems.append(f"{where}trust/features section shown but no --policy passed to scanner")
+            elif not expected_trust_cards(policy):
+                problems.append(f"{where}trust/features section shown but policy has no set fields")
             else:
-                blob = re.sub(r"<[^>]+>", " ", html[trust.start() : trust.start() + 4000])
-                for title in TRUST_TITLES:
-                    pass  # titles are fixed section names; bodies checked below
-                # every card body must be built from policy values (fa digits render)
-                allowed = policy_texts(policy)
-                if not allowed:
-                    problems.append(f"{where}trust section shown but policy has no set fields")
+                # بند ۲۳: every card (trust or "features") must be exactly a
+                # policy-built card — no invented claims anywhere on the page.
+                rendered = trust_cards_from_html(html)
+                expected = expected_trust_cards(policy)
+                if not rendered:
+                    problems.append(f"{where}trust section exists but no cards parsed")
+                for title, body in rendered:
+                    if (title, body) not in expected:
+                        problems.append(f"{where}non-policy card: «{title}: {body[:50]}»")
+                for title, _body in expected:
+                    if title not in [t for t, _ in rendered]:
+                        problems.append(f"{where}policy card missing from page: «{title}»")
     if not seen:
         problems.append("no page could be fetched")
     return problems
