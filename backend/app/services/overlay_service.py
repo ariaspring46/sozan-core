@@ -6,6 +6,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 SIZES = {
+    "post": (1080, 1350),
     "feed": (1080, 1080),
     "story": (1080, 1920),
     "wide": (1920, 1080),

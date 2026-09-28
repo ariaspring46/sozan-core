@@ -1349,6 +1349,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         "role": "assistant",
         "text": reply,
         "at": int(time.time()),
+        "aspect": compose_aspect(spoken),
         "captions": captions,
         "subject": subject_name,
         "facts": facts,
@@ -1361,15 +1362,14 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         assistant["mediaName"] = attachments[0]["name"]
     rows = _put_assistant(assistant, into_id)
     if want_compose and campaign_id:
-        story = any(mark in spoken for mark in ("استوری", "ریلز"))
+        aspect = compose_aspect(spoken)
         studio_compose_service.start(
             message_id=assistant["id"],
             campaign_id=campaign_id,
             media=media,
             title=title,
             image_prompt=image_prompt,
-            width=1080,
-            height=1920 if story else 1080,
+            aspect=aspect,
             edit=_edit_kind(parsed, spoken, has_media) == "scene",
             edit_kind=_edit_kind(parsed, spoken, has_media),
             subject=_guard_subject(spoken),
@@ -1388,6 +1388,16 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         payload={"role": "assistant", "text": assistant["text"], "id": assistant["id"], "campaignId": campaign_id},
     )
     return {"messages": rows, "campaignId": campaign_id}
+
+
+def compose_aspect(spoken: str) -> str:
+    """پست ۴:۵ پیش‌فرض؛ مربع و استوری فقط با خواست صریح فروشنده."""
+    text = str(spoken or "")
+    if any(mark in text for mark in ("استوری", "ریلز")):
+        return "story"
+    if "مربع" in text or "۱:۱" in text or "1x1" in text.lower():
+        return "square"
+    return "post"
 
 
 def mark_published(message_id: str, platform: str) -> dict:
@@ -1509,6 +1519,7 @@ async def regenerate(*, message_id: str, part: str, campaigns: CampaignService, 
             media=media,
             title=str(target.get("text") or "")[:80],
             image_prompt=prompt,
+            aspect=compose_aspect(str(target.get("aspect") or "") or str(target.get("text") or "")),
         )
         return {"messages": _messages()}
     raise ValueError("فقط عکس یا کپشن را می‌توان دوباره ساخت")

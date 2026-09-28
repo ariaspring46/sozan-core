@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { SalesPolicyForm } from "@/components/sales-policy-form";
 import { ShopSettingsForm } from "@/components/shop-settings-form";
+import { TrainingChoice } from "@/components/training-choice";
 
 export default function MoreSettingsPage() {
   return (
@@ -19,8 +20,9 @@ export default function MoreSettingsPage() {
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4">
         <SalesPolicyForm />
+        <TrainingChoice />
         <ShopSettingsForm />
       </div>
     </AppShell>

@@ -204,7 +204,7 @@ export default function LoginPage() {
                 ) : (
                   <button
                     type="button"
-                    className="min-h-11 px-1 text-warm disabled:opacity-50"
+                    className="min-h-11 px-1 text-warm disabled:text-muted"
                     disabled={busy}
                     onClick={() => {
                       setCode("");

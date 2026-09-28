@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -20,15 +21,19 @@ FA_CHAR = re.compile(r"[\u0600-\u06FF]")
 LATIN_CHAR = re.compile(r"[A-Za-z]")
 STALE_ASSISTANT = ("ویرایش فروشگاه نیست", "المان را در پیش‌نمایش لمس", "The user is")
 CLOUD_UA = "curl/8.5.0"
-VOICE_SURFACES = frozenset({"voice", "inbox"})
+VOICE_SURFACES = frozenset({"voice"})
 PINNED_SURFACES = frozenset({"studio"})
 CLOUD_SURFACES = frozenset({"factory"})
-SHOP_CLOUD_SURFACES = frozenset({"shop", "shop-edit", "router"})
+SHOP_CLOUD_SURFACES = frozenset({"shop", "shop-edit", "router", "inbox"})
+INBOX_LOCAL_MODEL = "qwen3.5-9b"
+INBOX_FALLBACK_MODEL = "deepseek/deepseek-v4.1-flash"
 CLOUD_PRIMARY_SURFACES = frozenset({"shop", "shop-edit", "studio", "router"})
 ARVAN_HOST_SUFFIX = "arvancloudai.ir"
 CLOUD_PRIMARY_TIMEOUT = 120
 PRIMARY_CLOUD_TIMEOUT = 10
 FALLBACK_CLOUD_TIMEOUT = 45
+INBOX_HOP_TIMEOUT = 15.0
+INBOX_TURN_BUDGET = 30.0
 DEFAULT_SHOP_CLOUD_MODEL = "DeepSeek-V4-Pro"
 DEFAULT_STUDIO_CLOUD_MODEL = "Gemini-3.1-Flash-Lite-Preview"
 GPU1_LOCAL = frozenset(
@@ -230,14 +235,16 @@ def inbox_cloud_route() -> dict | None:
 
 
 def inbox_hops() -> list[dict]:
-    """Cloud first. The home 9b is only the last hop."""
+    """Haiku's cloud, then DeepSeek on that same cloud, then the home 9b."""
     hops: list[dict] = []
     cloud = inbox_cloud_route()
     if cloud and cloud.get("url"):
         hops.append(cloud)
-    fallback = _fallback_cloud_route()
-    if fallback and all(str(fallback.get("url") or "") != str(hop.get("url") or "") for hop in hops):
-        hops.append(fallback)
+        if "openrouter.ai" in str(cloud.get("url") or "") and str(cloud.get("model") or "") != INBOX_FALLBACK_MODEL:
+            second = dict(cloud)
+            second["model"] = INBOX_FALLBACK_MODEL
+            second["source"] = "inbox-fallback"
+            hops.append(second)
     local = _local_default_route("inbox")
     local["model"] = "qwen3.5-9b"
     if all(str(local.get("url") or "") != str(hop.get("url") or "") for hop in hops):
@@ -312,6 +319,8 @@ def route_for_surface(surface: str) -> dict:
 
 
 def _default_local_model(surface: str) -> str:
+    if surface == "inbox":
+        return INBOX_LOCAL_MODEL
     if surface in PINNED_SURFACES:
         return _str_setting(settings.studio_llm_model, "qwen3.5-9b") or "qwen3.5-9b"
     if surface in VOICE_SURFACES:
@@ -320,7 +329,7 @@ def _default_local_model(surface: str) -> str:
 
 
 def _rejects_pinned_gpu1(surface: str, override: dict) -> bool:
-    if surface not in PINNED_SURFACES:
+    if surface not in PINNED_SURFACES and surface != "inbox":
         return False
     if str(override.get("kind") or "") != "local":
         return False
@@ -860,6 +869,7 @@ async def _tools_once(
     temperature: float,
     max_tokens: int,
     timeout: float,
+    surface: str = "router",
 ) -> dict:
     body = {
         "model": route["model"],
@@ -869,7 +879,7 @@ async def _tools_once(
         "tools": tools,
         "tool_choice": "auto",
     }
-    headers = {"Content-Type": "application/json", **llm_headers(surface="router")}
+    headers = {"Content-Type": "application/json", **llm_headers(surface=surface)}
     if route["kind"] != "cloud":
         body["think"] = False
         body["chat_template_kwargs"] = {"enable_thinking": False, "thinking": False}
@@ -888,12 +898,79 @@ async def _tools_once(
         res.raise_for_status()
         payload = res.json()
     counts = _emit_usage(
-        surface="router",
+        surface=surface,
         model=str(body.get("model") or route.get("model") or ""),
         payload=payload if isinstance(payload, dict) else {},
         latency_ms=(time.perf_counter() - started) * 1000,
     )
     return _tool_result(route, payload if isinstance(payload, dict) else {}, counts)
+
+
+def _same_hop(left: dict, right: dict) -> bool:
+    return str(left.get("url") or "") == str(right.get("url") or "") and str(left.get("model") or "") == str(
+        right.get("model") or ""
+    )
+
+
+def _inbox_hops(surface: str) -> list[dict]:
+    """Haiku, then DeepSeek on the same cloud, then the home 9b if time remains."""
+    hops: list[dict] = []
+    cloud = route_for_surface(surface)
+    if cloud.get("kind") == "cloud" and cloud.get("url"):
+        hops.append(cloud)
+        if "openrouter.ai" in str(cloud.get("url") or "") and str(cloud.get("model") or "") != INBOX_FALLBACK_MODEL:
+            second = dict(cloud)
+            second["model"] = INBOX_FALLBACK_MODEL
+            second["source"] = "inbox-fallback"
+            hops.append(second)
+    local = _local_default_route(surface)
+    if all(not _same_hop(local, hop) for hop in hops):
+        hops.append(local)
+    return hops or [local]
+
+
+async def _inbox_tools(
+    *,
+    messages: list[dict],
+    tools: list[dict],
+    temperature: float,
+    max_tokens: int,
+    surface: str,
+    budget: float,
+) -> dict:
+    deadline = time.monotonic() + max(0.0, budget)
+    hops = _inbox_hops(surface)
+    last_exc: Exception | None = None
+    for index, hop in enumerate(hops):
+        left = deadline - time.monotonic()
+        if left < 1:
+            break
+        hop_timeout = min(INBOX_HOP_TIMEOUT, left)
+        try:
+            return await asyncio.wait_for(
+                _tools_once(
+                    hop,
+                    messages=messages,
+                    tools=tools,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=hop_timeout,
+                    surface=surface,
+                ),
+                timeout=hop_timeout,
+            )
+        except Exception as exc:
+            last_exc = exc
+            if index == len(hops) - 1:
+                raise
+            nxt = hops[index + 1]
+            _emit_cloud_fallback(
+                surface=surface,
+                reason=_classify_llm_error(exc),
+                requested=str(hop.get("model") or ""),
+                used=str(nxt.get("model") or ""),
+            )
+    raise last_exc or TimeoutError("inbox")
 
 
 async def complete_tools(
@@ -903,11 +980,36 @@ async def complete_tools(
     temperature: float = 0.2,
     max_tokens: int = ROUTER_MAX_TOKENS,
     timeout: float | None = None,
+    surface: str = "router",
 ) -> dict:
-    """Tool-call round for the product router. OpenRouter, then the configured cloud fallback, then local."""
-    route = route_for_surface("router")
+    """Tool-call round. Router and inbox are cloud-first.
+
+    Inbox uses the same cloud chain (routing override, shop cloud, fallback cloud)
+    and calls the home 9b only after those clouds fail. Each hop is about 15
+    seconds, inside the budget the caller still has for this turn.
+    """
+    route = route_for_surface(surface)
+    if surface == "inbox":
+        return await _inbox_tools(
+            messages=messages,
+            tools=tools,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            surface=surface,
+            budget=INBOX_TURN_BUDGET if timeout is None else timeout,
+        )
     if route.get("kind") != "cloud":
-        raise RuntimeError("router_requires_cloud")
+        if surface == "router":
+            raise RuntimeError("router_requires_cloud")
+        return await _tools_once(
+            route,
+            messages=messages,
+            tools=tools,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout or FALLBACK_CLOUD_TIMEOUT,
+            surface=surface,
+        )
     fallback = _fallback_cloud_route()
     chained = bool(fallback) and str(fallback.get("url") or "") != str(route.get("url") or "")
     later = FALLBACK_CLOUD_TIMEOUT if timeout is None else timeout
@@ -916,7 +1018,7 @@ async def complete_tools(
         allow_local = True
     else:
         hops = [(route, CLOUD_PRIMARY_TIMEOUT if timeout is None else timeout)]
-        allow_local = False
+        allow_local = surface != "router"
     last_exc: Exception | None = None
     for index, (hop, hop_timeout) in enumerate(hops):
         try:
@@ -927,6 +1029,7 @@ async def complete_tools(
                 temperature=temperature,
                 max_tokens=max_tokens,
                 timeout=hop_timeout,
+                surface=surface,
             )
         except Exception as exc:
             last_exc = exc
@@ -935,14 +1038,14 @@ async def complete_tools(
                 note_provider_denied(str(hop.get("url") or ""), denied)
             if index == len(hops) - 1 and not allow_local:
                 raise
-            nxt = _local_default_route("router") if index == len(hops) - 1 else hops[index + 1][0]
+            nxt = _local_default_route(surface) if index == len(hops) - 1 else hops[index + 1][0]
             _emit_cloud_fallback(
-                surface="router",
+                surface=surface,
                 reason=_classify_llm_error(exc),
                 requested=str(hop.get("model") or ""),
                 used=str(nxt.get("model") or ""),
             )
-    local = _local_default_route("router")
+    local = _local_default_route(surface)
     try:
         return await _tools_once(
             local,
@@ -951,6 +1054,7 @@ async def complete_tools(
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=later,
+            surface=surface,
         )
     except Exception:
         raise last_exc or RuntimeError("llm")

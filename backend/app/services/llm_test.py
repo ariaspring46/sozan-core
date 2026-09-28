@@ -144,7 +144,7 @@ class RouteSurfaceTests(unittest.TestCase):
     def test_six_surfaces_without_cloud_stay_local(self) -> None:
         expected = {
             "voice": "qwen3.8-27b",
-            "inbox": "qwen3.8-27b",
+            "inbox": "qwen3.5-9b",
             "shop": "ornith-1.5-35b",
             "shop-edit": "ornith-1.5-35b",
             "studio": "qwen3.5-9b",
@@ -188,8 +188,19 @@ class RouteSurfaceTests(unittest.TestCase):
         self.assertNotIn("studio-secret", str(studio["url"]))
         self.assertEqual(voice["kind"], "local")
         self.assertEqual(voice["model"], "qwen3.8-27b")
-        self.assertEqual(inbox["kind"], "local")
-        self.assertEqual(inbox["model"], "qwen3.8-27b")
+        self.assertEqual(inbox["kind"], "cloud")
+        self.assertEqual(inbox["model"], "DeepSeek-V4-Pro")
+        self.assertEqual(inbox["url"], "https://api.arvancloudai.ir/v1")
+
+    def test_inbox_ignores_a_gpu1_local_override(self) -> None:
+        with patch("app.services.llm.settings") as settings, patch(
+            "app.services.llm_routing_service.get",
+            return_value={"kind": "local", "model": "qwen3.8-27b"},
+        ):
+            _apply_settings(settings, _route_settings())
+            route = route_for_surface("inbox")
+        self.assertEqual(route["kind"], "local")
+        self.assertEqual(route["model"], "qwen3.5-9b")
 
     def test_shop_cloud_does_not_move_studio(self) -> None:
         extra = {
@@ -822,6 +833,108 @@ class Gpu1GuardTests(unittest.TestCase):
         with patch("app.services.llm._running_models", new=AsyncMock(return_value={"qwen3.8-27b", "qwen3.5-9b"})):
             self.assertEqual(asyncio.run(_ensure_gpu1("qwen3.8-27b")), "qwen3.8-27b")
         self.assertEqual(asyncio.run(_ensure_gpu1("qwen3.5-9b")), "qwen3.5-9b")
+
+
+class InboxHopTests(unittest.TestCase):
+    def _client(self, seen: list, *, fail_cloud: bool = False):
+        class Client:
+            def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+                self.timeout = timeout
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return False
+
+            async def post(self, url, json=None, headers=None):
+                seen.append({"url": url, "timeout": self.timeout, "model": (json or {}).get("model")})
+                if fail_cloud and "ai.example" in url:
+                    raise httpx.TimeoutException("late")
+                request = httpx.Request("POST", url)
+                return httpx.Response(
+                    200,
+                    json={"choices": [{"message": {"content": "سلام"}}]},
+                    request=request,
+                )
+
+        return Client
+
+    def _run(self, seen: list, *, fail_cloud: bool = False) -> dict:
+        with patch("app.services.llm.settings") as settings, patch(
+            "app.services.llm_routing_service.get", return_value=None
+        ), patch("app.services.llm.httpx.AsyncClient", self._client(seen, fail_cloud=fail_cloud)), patch(
+            "app.services.llm.emit_later"
+        ):
+            _apply_settings(
+                settings,
+                _route_settings(
+                    cloud_llm_url="https://ai.example/v1",
+                    cloud_llm_model="GPT-OSS-120B",
+                    cloud_llm_token="cloud-token",
+                ),
+            )
+            return asyncio.run(
+                complete_tools(messages=[{"role": "user", "content": "سلام"}], tools=[], surface="inbox")
+            )
+
+    def _chats(self, seen: list) -> list:
+        return [row for row in seen if str(row.get("url") or "").endswith("/chat/completions")]
+
+    def test_inbox_starts_on_the_cloud_within_fifteen_seconds(self) -> None:
+        seen: list = []
+        out = self._run(seen)
+        chats = self._chats(seen)
+        self.assertEqual(out["text"], "سلام")
+        self.assertEqual(len(chats), 1)
+        self.assertIn("ai.example", chats[0]["url"])
+        self.assertEqual(chats[0]["model"], "GPT-OSS-120B")
+        self.assertEqual(chats[0]["timeout"], 15)
+        self.assertNotIn("9292", chats[0]["url"])
+
+    def test_inbox_uses_the_local_model_only_after_the_cloud_fails(self) -> None:
+        seen: list = []
+        out = self._run(seen, fail_cloud=True)
+        chats = self._chats(seen)
+        self.assertEqual(out["text"], "سلام")
+        self.assertEqual(len(chats), 2)
+        self.assertIn("ai.example", chats[0]["url"])
+        self.assertIn("127.0.0.1:9292", chats[1]["url"])
+        self.assertEqual(chats[1]["model"], "qwen3.5-9b")
+        self.assertEqual(chats[1]["timeout"], 15)
+
+    def test_openrouter_inbox_is_haiku_then_deepseek_then_9b(self) -> None:
+        from app.services.llm import _inbox_hops
+
+        cloud = {
+            "kind": "cloud",
+            "url": "https://openrouter.ai/api/v1",
+            "model": "anthropic/claude-haiku-4.5",
+            "token": "x",
+            "source": "override",
+        }
+        extra = {
+            "kind": "cloud",
+            "url": "https://fallback.example/v1",
+            "model": "GPT-OSS-120B",
+            "token": "y",
+            "source": "fallback",
+        }
+        local = {
+            "kind": "local",
+            "url": "http://127.0.0.1:9292/v1",
+            "model": "qwen3.5-9b",
+            "token": "",
+            "source": "default",
+        }
+        with patch("app.services.llm.route_for_surface", return_value=cloud), patch(
+            "app.services.llm._fallback_cloud_route", return_value=extra
+        ), patch("app.services.llm._local_default_route", return_value=local):
+            hops = _inbox_hops("inbox")
+        self.assertEqual(
+            [hop["model"] for hop in hops],
+            ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v4.1-flash", "qwen3.5-9b"],
+        )
 
 
 if __name__ == "__main__":

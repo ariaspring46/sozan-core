@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
+from pathlib import Path
 
 from app.config import settings as env
 from app.services import payment_service, sms_service
@@ -118,6 +120,7 @@ def public_settings() -> dict:
             out["smsTemplateId"] = hub_sms["template_id"]
         if hub_sms.get("token_name"):
             out["smsTokenName"] = hub_sms["token_name"]
+    out["helpImprove"] = allows_training()
     voice = get_voice()
     out["voice"] = {
         "summary": voice.get("summary") or "",
@@ -179,4 +182,36 @@ def save_settings(patch: dict, *, hub_admin: bool = False) -> dict:
         if "storeTagline" in patch and patch["storeTagline"] is not None:
             shop["tagline"] = str(patch["storeTagline"]).strip()
         write_json("shop.json", shop)
+    if "helpImprove" in patch and patch["helpImprove"] is not None:
+        save_training_choice(bool(patch["helpImprove"]))
     return public_settings()
+
+
+TRAINING_FILE = "training.json"
+
+
+def allows_training() -> bool:
+    """True unless this seller turned «کمک به بهتر شدن سوزان» off.
+
+    training_log.log_example must call this before it writes a sample.
+    """
+    raw = read_json(TRAINING_FILE, {})
+    if not isinstance(raw, dict) or "helpImprove" not in raw:
+        return True
+    return bool(raw.get("helpImprove"))
+
+
+def save_training_choice(value: bool) -> bool:
+    choice = bool(value)
+    write_json(TRAINING_FILE, {"helpImprove": choice})
+    return choice
+
+
+def note_training_example(example: dict, dest: Path) -> bool:
+    if not allows_training():
+        return False
+    path = Path(dest)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(example, ensure_ascii=False) + "\n")
+    return True

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 
 from app.services.llm import complete_json
 from app.services.observe_client import emit_later
 from app.services.settings_service import get_settings
 from app.state_store import read_json, write_json
+
+_URL_RE = re.compile(
+    r"https?://[^\s<>)\]]+|www\.[^\s<>)\]]+|(?<![\w@./])(?:[a-z0-9-]+\.)?sozan-core\.ir(?:/[^\s<>)\]]*)?",
+    re.I,
+)
 
 DEFAULT_VOICE = {
     "summary": "فروشندهٔ گرم کیف و کفش؛ کوتاه و بی‌تعارف.",
@@ -19,12 +25,19 @@ DEFAULT_VOICE = {
 }
 
 
+def strip_urls(text: str) -> str:
+    """Tone samples keep the seller's words. A shop or payment address is not tone."""
+    return " ".join(_URL_RE.sub(" ", str(text or "")).split())
+
+
 def get_voice() -> dict:
     stored = read_json("voice.json", {})
     if not isinstance(stored, dict):
         stored = {}
     out = dict(DEFAULT_VOICE)
     out.update({key: stored[key] for key in DEFAULT_VOICE if key in stored})
+    out["sampleReply"] = strip_urls(str(out.get("sampleReply") or ""))
+    out["samples"] = [clean for item in (out.get("samples") or []) if (clean := strip_urls(str(item)))]
     return out
 
 
@@ -42,7 +55,7 @@ def apply_tone(tone_id: str) -> dict:
     voice = get_voice()
     voice["tone"] = preset["tone"]
     voice["summary"] = preset["summary"]
-    voice["sampleReply"] = preset["sampleReply"]
+    voice["sampleReply"] = strip_urls(preset["sampleReply"])
     voice["toneId"] = preset["id"]
     voice["at"] = int(time.time())
     return _save(voice)
@@ -74,7 +87,7 @@ def prompt_block() -> str:
 async def learn(*, platform: str, handle: str, samples: str) -> dict:
     cfg = get_settings()
     previous = get_voice()
-    blob = samples.strip()
+    blob = strip_urls(samples)
     parsed = await complete_json(
         """از نوشته‌های فروشنده فقط JSON برگردان.
 {"summary":"یک خط شخصیت","tone":"چند کلمه لحن","do":["..."],"dont":["..."],"sampleReply":"یک پاسخ نمونه به مشتری"}""",
@@ -96,9 +109,9 @@ async def learn(*, platform: str, handle: str, samples: str) -> dict:
     if isinstance(parsed.get("dont"), list):
         voice["dont"] = [str(item).strip() for item in parsed["dont"] if str(item).strip()][:6]
     if parsed.get("sampleReply"):
-        voice["sampleReply"] = str(parsed["sampleReply"]).strip()[:280]
+        voice["sampleReply"] = strip_urls(str(parsed["sampleReply"]))[:280]
     if blob:
-        kept = [str(item) for item in (voice.get("samples") or []) if str(item).strip()]
+        kept = [clean for item in (voice.get("samples") or []) if (clean := strip_urls(str(item)))]
         kept.append(blob[:1200])
         voice["samples"] = kept[-8:]
     elif not voice.get("summary"):

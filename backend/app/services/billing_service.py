@@ -109,6 +109,26 @@ def preview_coupon(plan_id: str, code: str) -> dict:
     return {"plan": wanted, "amount": amount, "code": coupon or ""}
 
 
+def lab_checkout_amount(phone: str, plan_id: str) -> int | None:
+    """Temporary pro price for the lab shop only. Unset means the public price."""
+    import os
+
+    from app.lab_account import LAB_PHONE
+
+    if str(phone or "") != LAB_PHONE or str(plan_id or "").strip().lower() != "pro":
+        return None
+    raw = os.environ.get("LAB_CHECKOUT_TOMAN", "").strip()
+    if not raw:
+        return None
+    try:
+        amount = int(raw)
+    except ValueError:
+        return None
+    if amount < 1000:
+        return None
+    return amount
+
+
 def callback_url() -> str:
     base = str(env.public_api_url or "https://api.sozan-core.ir").rstrip("/")
     return f"{base}/billing/zarinpal/callback"
@@ -128,7 +148,8 @@ async def start_subscription(plan_id: str, *, phone: str, code: str | None = Non
         raise ValueError("خرید اولترا به‌زودی باز می‌شود")
     if wanted == plan_service.current_plan_id():
         return {"activated": True, "plan": wanted, "subscription": plan_service.snapshot()}
-    amount = plan_service.effective_price(wanted)
+    override = lab_checkout_amount(phone, wanted)
+    amount = override if override is not None else plan_service.effective_price(wanted)
     final, coupon, _listed = apply_phone_coupon(wanted, amount, code)
     amount = final
     if amount <= 0:
@@ -140,7 +161,7 @@ async def start_subscription(plan_id: str, *, phone: str, code: str | None = Non
         available = int(wallet_service.get().get("available") or 0)
     except (TypeError, ValueError):
         available = 0
-    if available >= amount:
+    if override is None and available >= amount:
         wallet_service.debit("plan", amount, note=f"اشتراک {spec['label']}")
         plan_service.set_plan(wanted)
         history = _history()

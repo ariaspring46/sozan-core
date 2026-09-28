@@ -223,6 +223,7 @@ class CampaignService:
         out = self._dir(campaign.slug) / "out"
         items: list[dict] = []
         for name, kind in (
+            ("ig-post.png", "image"),
             ("ig-feed.png", "image"),
             ("ig-story.png", "image"),
             ("ig-reel.mp4", "video"),

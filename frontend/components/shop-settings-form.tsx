@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -70,8 +70,10 @@ export function ShopSettingsForm() {
   const [couponCode, setCouponCode] = useState("");
   const [couponAmount, setCouponAmount] = useState<number | null>(null);
   const [plansOpen, setPlansOpen] = useState(false);
+  const subRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
+    const jumpToPlans = window.location.hash === "#plans";
     const pay = new URLSearchParams(window.location.search).get("pay");
     if (pay) {
       window.history.replaceState({}, "", window.location.pathname);
@@ -80,13 +82,27 @@ export function ShopSettingsForm() {
       else if (pay === "fail" || pay === "missing") setError("پرداخت کامل نشد. دوباره از همین صفحه اقدام کن.");
     }
     void api<StudioSettings>("/settings")
-      .then((data) =>
-        setForm({
-          ...data,
-          smsApiKey: "",
-          paymentApiKey: "",
-        }),
-      )
+      .then((data) => {
+        setForm({ ...data, smsApiKey: "", paymentApiKey: "" });
+        if (jumpToPlans) {
+          setPlansOpen(true);
+          if (subRef.current) subRef.current.open = true;
+          const jump = () => {
+            const el = subRef.current;
+            if (!el) return;
+            // بدنهٔ برنامه overflow-hidden است و scrollIntoView را بی‌اثر می‌کند؛ خودمان می‌پریم.
+            const scroller = el.closest(".overflow-y-auto");
+            if (scroller instanceof HTMLElement) {
+              scroller.scrollTop += el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8;
+            } else {
+              el.scrollIntoView({ block: "start" });
+            }
+          };
+          // کارت‌های بالای صفحه دیر بالا می‌آیند؛ دوباره تلاش کن تا جا افتاید.
+          window.setTimeout(jump, 80);
+          window.setTimeout(jump, 900);
+        }
+      })
       .catch((err) => setError(err.message));
   }, []);
 
@@ -137,8 +153,7 @@ export function ShopSettingsForm() {
   const walletCovers = Boolean(form && pickedPrice > 0 && Number(form.walletAvailable || 0) >= pickedPrice);
 
   return (
-      <div className="flex h-full flex-col">
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="space-y-4">
           {form ? (
             <Card className="space-y-3">
               <h2 className="font-bold">فروشگاه و پرداخت</h2>
@@ -343,7 +358,7 @@ export function ShopSettingsForm() {
             </Card>
           ) : null}
           {form?.subscription ? (
-            <details className="rounded-2xl border border-line bg-surface p-4 shadow-card">
+            <details ref={subRef} id="plans" className="rounded-2xl border border-line bg-surface p-4 shadow-card">
               <summary className="cursor-pointer font-bold">
                 اشتراک {form.subscription.label}
               </summary>
@@ -527,7 +542,6 @@ export function ShopSettingsForm() {
               </div>
             </details>
           ) : null}
-        </div>
         {form ? (
           <div className="shrink-0 bg-paper/80 px-4 py-3 backdrop-blur-md">
             {error ? <p className="mb-2 text-sm text-danger">{error}</p> : null}

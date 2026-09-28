@@ -17,6 +17,7 @@ const TEXT_FIELDS: { key: string; label: string }[] = [
   { key: "sizeExchange", label: "تعویض سایز" },
   { key: "invoice", label: "فاکتور" },
   { key: "cod", label: "پرداخت در محل" },
+  { key: "cardToCard", label: "کارت به کارت" },
 ];
 
 const NUMBER_FIELDS: { key: string; label: string }[] = [

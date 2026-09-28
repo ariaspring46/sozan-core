@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ExternalLink, Monitor, RefreshCw, Smartphone, X } from "lucide-react";
+import { Copy, ExternalLink, Monitor, RefreshCw, Smartphone, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shopHostLabel } from "@/components/domain-menu";
 
@@ -117,7 +117,9 @@ function ShopLiveReady({ href }: { href: string }) {
         <p className="mt-1 truncate text-xs text-muted" dir="ltr">
           {host}
         </p>
-      ) : null}
+      ) : (
+        <p className="mt-1 text-xs text-muted">سایت در حال آماده شدن</p>
+      )}
     </>
   );
 
@@ -332,6 +334,14 @@ function ShopLivePreview({
           </IconBtn>
           <IconBtn label="تازه‌کردن" onClick={() => setReload((value) => value + 1)}>
             <RefreshCw size={14} />
+          </IconBtn>
+          <IconBtn
+            label="کپی نشانی عمومی"
+            onClick={() => {
+              void navigator.clipboard?.writeText(href.replace(/\/$/, "") + (path.split("?")[0] || "/"));
+            }}
+          >
+            <Copy size={14} />
           </IconBtn>
           <a
             href={href.replace(/\/$/, "") + (path.split("?")[0] || "/")}

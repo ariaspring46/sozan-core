@@ -70,6 +70,16 @@ def _svc(session) -> CampaignService:
     return CampaignService(CampaignRepository(session), AssetRepository(session), CopyRepository(session))
 
 
+# Instagram output sizes; the seller picks one, the export is exactly this box.
+ASPECT_SIZES = {
+    "post": (1080, 1350),
+    "square": (1080, 1080),
+    "story": (1080, 1920),
+}
+RAW_NAMES = {"post": "feed.png", "square": "square.png", "story": "story.png"}
+OUT_NAMES = {"post": "ig-post.png", "square": "ig-feed.png", "story": "ig-story.png"}
+
+
 def start(
     *,
     message_id: str,
@@ -79,6 +89,7 @@ def start(
     image_prompt: str = "",
     width: int = 1080,
     height: int = 1080,
+    aspect: str = "",
     edit: bool = False,
     edit_kind: str = "",
     subject: str = "",
@@ -101,8 +112,11 @@ def start(
         payload={"jobId": job_id, "title": title[:80]},
     )
     tenant = current_tenant()
+    if aspect in ASPECT_SIZES:
+        width, height = ASPECT_SIZES[aspect]
     kwargs = {
         "tenant": tenant,
+        "aspect": aspect if aspect in ASPECT_SIZES else "post",
         "message_id": message_id,
         "campaign_id": campaign_id,
         "media": media,
@@ -149,6 +163,7 @@ async def _run(
     started: float,
     width: int = 1080,
     height: int = 1080,
+    aspect: str = "post",
     edit: bool = False,
     edit_kind: str = "",
     subject: str = "",
@@ -223,7 +238,7 @@ async def _run(
 
                     if image_provider_service.last_closeup:
                         studio_chat_service.append_note(message_id, studio_chat_service.CLOSEUP_PHOTO)
-                    await campaigns.save_raw(cid, "feed.png", png)
+                    await campaigns.save_raw(cid, RAW_NAMES.get(aspect, "feed.png"), png)
                     emit_later(
                         kind="studio",
                         surface="studio",
@@ -236,7 +251,10 @@ async def _run(
                     )
                 studio_chat_service.mark_compose_stage(message_id, "layout")
                 await campaigns.compose(cid)
-                attachments = studio_chat_service.copy_outputs(await campaigns.preview_outputs(cid))
+                outputs = await campaigns.preview_outputs(cid)
+                wanted = OUT_NAMES.get(aspect, "ig-post.png")
+                matched = [row for row in outputs if str(row.get("name") or "") == wanted]
+                attachments = studio_chat_service.copy_outputs(matched or outputs)
                 if not attachments:
                     attachments = studio_chat_service.fallback_attachment(media)
                 studio_chat_service.finish_compose(message_id, attachments, status="ready", job_id=job_id)
