@@ -26,13 +26,13 @@ _KEEP_DAYS = 8
 DEFAULTS: dict[str, Any] = {
     # Proposal numbers; the owner approves or edits ai-budget.json in place.
     "company": {"dailyUsd": 3.0},
-    # Formula: monthly cloud spend ~= 20% of the plan price; weekly = /4,
-    # daily = weekly/3 (a busy day is allowed), at ~230,000 toman per USD.
+    # Owner-approved 2026-09-28: monthly cloud spend = 30% of the discounted
+    # plan price; weekly = /4, daily = weekly/3, at ~230,000 toman per USD.
     "plans": {
         "free": {"dailyUsd": 0.002, "weeklyUsd": 0.006},
-        "pro": {"dailyUsd": 0.04, "weeklyUsd": 0.11},
-        "promax": {"dailyUsd": 0.11, "weeklyUsd": 0.33},
-        "ultra": {"dailyUsd": 0.28, "weeklyUsd": 0.84},
+        "pro": {"dailyUsd": 0.15, "weeklyUsd": 0.46},
+        "promax": {"dailyUsd": 0.21, "weeklyUsd": 0.63},
+        "ultra": {"dailyUsd": 0.29, "weeklyUsd": 0.88},
     },
     "notifyRatio": 0.8,
 }
