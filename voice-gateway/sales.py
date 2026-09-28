@@ -921,6 +921,11 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
     if state.stage in {"intro", "permq", "await"} and not (heard or "").strip():
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     if state.stage == "intro":
+        if signals.busy or signals.later:
+            line = notime_line()
+            state.objection = state.objection or "time"
+            state.stage = "discover"
+            return TurnPlan(kind="hello", line=line, signals=signals)
         if signals.ack or signals.yes or signals.hello:
             line = state.intro_line_said or intro_line(state.sms_sent)
             state.intro_line_said = line
