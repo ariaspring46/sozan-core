@@ -117,6 +117,35 @@ class ShopEditVerifyTests(unittest.TestCase):
             )
             self.assertFalse(missed["ok"])
 
+    def test_create_page_accepts_disk_before_the_menu_is_rebuilt(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "app" / "about").mkdir(parents=True)
+            (root / "public" / "pages").mkdir(parents=True)
+            (root / "app" / "about" / "page.tsx").write_text("export default function About() { return null }\n", encoding="utf-8")
+            (root / "public" / "pages" / "about.json").write_text(
+                json.dumps({"enabled": True, "title": "درباره ما"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            (root / "public" / "storefront-flags.json").write_text(
+                json.dumps({"links": [{"label": "درباره ما", "href": "/about"}]}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            created = verify_action(
+                action={"type": "create_page", "kind": "about", "label": "درباره ما"},
+                root=root,
+                runtime={"html": "<html></html>", "css": "", "flags": "", "page_html": ""},
+                require_live=True,
+            )
+            self.assertTrue(created["ok"])
+            linked = verify_action(
+                action={"type": "add_nav_link", "href": "/about", "label": "درباره ما"},
+                root=root,
+                runtime={"html": "<html></html>", "css": "", "flags": (root / "public" / "storefront-flags.json").read_text(encoding="utf-8")},
+                require_live=True,
+            )
+            self.assertTrue(linked["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

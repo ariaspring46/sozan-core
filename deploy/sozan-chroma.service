@@ -1,0 +1,18 @@
+# Hub unit for the per-shop Chroma. Do not install until the stage-4 report is in talk.md.
+# The token is read from EnvironmentFile. It does not belong in this unit or in git.
+
+[Unit]
+Description=Sozan shop memory (Chroma, localhost only)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+EnvironmentFile=-/etc/sozan/chroma.env
+ExecStart=/usr/local/bin/chroma run --host 127.0.0.1 --port 8008 --path /var/lib/sozan-chroma
+Restart=on-failure
+MemoryMax=1500M
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

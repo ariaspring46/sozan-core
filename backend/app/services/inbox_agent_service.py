@@ -1,29 +1,57 @@
-"""Direct-message agent.
+"""Direct-message sales agent.
 
-The chat cloud is the first hop. The home 9b is only the last hop, and Arvan
-is never used. Stock, order status, and payment links come from existing
-services. Local bge-m3 only nudges a tool when the model answered with none.
+Chat goes through llm.py on the inbox surface: cloud first, and the home 9b
+only after those clouds fail. Customer text is masked before that call and is
+not written to observe. Shipping, returns, and shop policy are copied from the
+stored policy, not from the model. Stock, order status, and payment links still
+come from the shop's own data. Local bge-m3 only nudges a tool when the model
+answered with none.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextvars
 import json
 import logging
-import os
+import re
+import time
 
 import httpx
 
 from app.config import settings
-from app.services.llm import ARVAN_HOST_SUFFIX, LLM_BAD_JSON, _emit_usage, _persian_enough, spoken_model_reply
+from app.services.llm import (
+    ARVAN_HOST_SUFFIX,
+    INBOX_TURN_BUDGET,
+    LLM_BAD_JSON,
+    complete_tools,
+    spoken_model_reply,
+)
 from app.services.observe_client import emit_later
 from app.services.persian_text import guard_output
+from app.services.pii_mask import mask_pii
 from app.services.router_embed import cosine
 
 log = logging.getLogger("sozan.inbox.agent")
+outcome: contextvars.ContextVar[dict | None] = contextvars.ContextVar("sozan_inbox_outcome", default=None)
 
 AGENT_MODEL = "qwen3.5-9b"
 EMBED_MODEL = "bge-m3"
-MAX_ROUNDS = 3
+MAX_ROUNDS = 4
+DRY_PAY_HOST = "dry-mock.invalid"
+_BUY_MARKS = (
+    "لینک پرداخت",
+    "پرداخت",
+    "بخرم",
+    "بخرید",
+    "بخر",
+    "خرید",
+    "پول",
+    "کارت به کارت",
+    "لینک بده",
+    "درگاه",
+)
+_TITLE_NOISE = {"چرم", "نخی", "کوچک", "فلزی", "مردانه", "تابستانی"}
 TIMEOUT = 45.0
 INTENT_THRESHOLD = 0.75
 INTENT_SAMPLES = {
@@ -42,8 +70,39 @@ def _cloud_base(url: str) -> bool:
     return ARVAN_HOST_SUFFIX in url.lower()
 
 
-def _tools() -> list[dict]:
-    return [
+def _explicit_buy(text: str) -> bool:
+    folded = _norm(text)
+    return any(_norm(mark) in folded for mark in _BUY_MARKS)
+
+
+def _mentioned_products(text: str) -> list[dict]:
+    folded = _norm(text)
+    scored: list[tuple[int, dict]] = []
+    for item in _products():
+        title = _norm(str(item.get("title") or ""))
+        words = [word for word in title.split() if len(word) >= 3 and word not in _TITLE_NOISE]
+        hits = [word for word in words if _has_word(word, folded)]
+        if hits:
+            scored.append((len(hits), item))
+    if not scored:
+        return _color_matches(folded)
+    best = max(count for count, _item in scored)
+    tier = [item for count, item in scored if count == best]
+    if len(tier) == 1:
+        return tier
+    extra = []
+    for item in tier:
+        title = _norm(str(item.get("title") or ""))
+        noise = [word for word in title.split() if word in _TITLE_NOISE and _has_word(word, folded)]
+        extra.append((len(noise), item))
+    best_noise = max(count for count, _item in extra)
+    if best_noise:
+        return [item for count, item in extra if count == best_noise]
+    return tier
+
+
+def _tools(*, allow_payment: bool = True) -> list[dict]:
+    rows = [
         {
             "type": "function",
             "function": {
@@ -84,10 +143,57 @@ def _tools() -> list[dict]:
             },
         },
     ]
+    if allow_payment:
+        return rows
+    return [row for row in rows if (row.get("function") or {}).get("name") != "payment_link"]
 
 
 def _norm(text: str) -> str:
-    return str(text or "").replace("ي", "ی").replace("ك", "ک").strip().lower()
+    return (
+        str(text or "")
+        .replace("\u200c", "")
+        .replace("\u200d", "")
+        .replace("ي", "ی")
+        .replace("ك", "ک")
+        .strip()
+        .lower()
+    )
+
+
+_WORD_EDGE = re.compile(r"[0-9A-Za-z\u0621-\u064A\u0660-\u0669\u0671-\u06D3\u06F0-\u06F9]")
+_CLITICS = ("تان", "تون", "مان", "شان", "هات", "ها")
+
+
+def _has_word(word: str, folded: str) -> bool:
+    if not word:
+        return False
+    start = 0
+    while True:
+        index = folded.find(word, start)
+        if index < 0:
+            return False
+        before = folded[index - 1] if index else ""
+        after_at = index + len(word)
+        rest = folded[after_at:]
+        after = rest[:1]
+        clitic = False
+        for suffix in _CLITICS:
+            if rest.startswith(suffix):
+                tail = rest[len(suffix) : len(suffix) + 1]
+                clitic = not tail or not _WORD_EDGE.match(tail)
+                break
+        if not (before and _WORD_EDGE.match(before)) and (clitic or not (after and _WORD_EDGE.match(after))):
+            return True
+        start = index + 1
+
+
+def _color_matches(folded: str) -> list[dict]:
+    found = []
+    for item in _products():
+        colors = [_norm(str(color)) for color in (item.get("colors") or []) if str(color).strip()]
+        if any(len(color) >= 3 and _has_word(color, folded) for color in colors):
+            found.append(item)
+    return found
 
 
 def _one_edit(a: str, b: str) -> bool:
@@ -166,6 +272,20 @@ def tool_order_status(order_id: str) -> dict:
     }
 
 
+def _dry_mock_payment() -> bool:
+    """Fake link only on the dry edge, and only while the shop gateway is still mock.
+
+    Real shops without a merchant keep the handoff. payment_service stays unchanged.
+    """
+    from app.services.arvan_dns_service import edge_dry
+    from app.services.settings_service import get_settings
+
+    if not edge_dry():
+        return False
+    gateway = str(get_settings().get("paymentGateway") or "mock").strip().lower()
+    return gateway in {"", "mock"}
+
+
 async def tool_payment_link(product: str, qty: int, *, thread: dict | None) -> dict:
     from app.services.channel_service import PLATFORMS
     from app.services.pay_service import create_order
@@ -178,6 +298,15 @@ async def tool_payment_link(product: str, qty: int, *, thread: dict | None) -> d
     if price <= 0:
         return {"ok": False, "error": "قیمت تومان برای این کالا نیست"}
     count = min(5, max(1, int(qty or 1)))
+    if _dry_mock_payment():
+        slug = re.sub(r"[^a-z0-9]+", "-", str(item.get("id") or "item").lower()).strip("-") or "item"
+        return {
+            "ok": True,
+            "dry": True,
+            "title": str(item.get("title") or ""),
+            "amount": price * count,
+            "payUrl": f"https://{DRY_PAY_HOST}/p/{slug}-{count}",
+        }
     platform = str((thread or {}).get("platform") or "")
     channel = PLATFORMS.get(platform, platform) or "دایرکت"
     order = await create_order(
@@ -261,63 +390,217 @@ async def _post(path: str, body: dict) -> dict:
     return payload
 
 
-def _agent_body(messages: list[dict], model: str) -> dict:
-    body = {
-        "model": model,
-        "temperature": 0.3,
-        "max_tokens": 500,
-        "messages": messages,
-        "tools": _tools(),
-        "tool_choice": "auto",
-    }
-    if model == AGENT_MODEL:
-        body["chat_template_kwargs"] = {"enable_thinking": False, "thinking": False}
-        body["reasoning_format"] = "none"
-    return body
+def _mask_for_model(messages: list[dict]) -> list[dict]:
+    safe = []
+    for msg in messages:
+        if str(msg.get("role") or "") == "user":
+            safe.append({**msg, "content": mask_pii(str(msg.get("content") or ""))})
+        else:
+            safe.append(msg)
+    return safe
 
 
-def _cloud_body(messages: list[dict], model: str) -> dict:
-    body = _agent_body(messages, model)
-    provider = os.environ.get("INBOX_CLOUD_PROVIDER", "").strip()
-    if provider:
-        body["provider"] = {"order": [provider], "allow_fallbacks": True}
-    return body
+def _digit_fold(text: str) -> str:
+    return str(text or "").translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
 
 
-async def _post_route(route: dict, messages: list[dict]) -> dict:
-    if str(route.get("kind") or "") == "local" or not route.get("token"):
-        return await _post("/chat/completions", _agent_body(messages, AGENT_MODEL))
-    url = str(route.get("url") or "")
-    if not url or _cloud_base(url):
-        raise RuntimeError("inbox_cloud_refused")
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {route.get('token')}"}
-    async with httpx.AsyncClient(timeout=15, trust_env=False, proxy=None) as client:
-        res = await client.post(
-            f"{url}/chat/completions",
-            json=_cloud_body(messages, str(route.get("model") or "")),
-            headers=headers,
+def _amounts(text: str) -> set[str]:
+    folded = _digit_fold(text)
+    found = set(re.findall(r"\d{4,}", folded))
+    found.update(re.findall(r"\d+(?:\.\d+)?\s*٪", folded))
+    found.update(re.findall(r"\d+(?:\.\d+)?\s*%", folded))
+    return found
+
+
+def _tool_blob(messages: list[dict]) -> str:
+    parts = []
+    for msg in messages:
+        content = str(msg.get("content") or "")
+        if msg.get("role") == "tool" or content.startswith("موجودی این کالاها"):
+            parts.append(content)
+    return "\n".join(parts)
+
+
+def _numbers_ok(reply: str, tool_blob: str) -> bool:
+    return not (_amounts(reply) - _amounts(tool_blob))
+
+
+def _number_reminder(tool_blob: str) -> str:
+    allowed = sorted(_amounts(tool_blob))
+    if not allowed:
+        return (
+            "پیام قبلی رد شد. در خروجی ابزار این نوبت هیچ قیمت، مبلغ یا درصدی نیست. "
+            "جواب را از نو بنویس و هیچ عدد قیمت یا درصدی نیاور."
         )
-        res.raise_for_status()
-        payload = res.json()
-    if not isinstance(payload, dict):
-        raise RuntimeError("inbox_bad_json")
-    return payload
+    shown = "، ".join(allowed)
+    return (
+        "پیام قبلی رد شد. فقط این عددها در خروجی ابزار این نوبت هستند و باید عیناً بیایند: "
+        f"{shown}. جواب را از نو بنویس و عدد دیگری نیاور."
+    )
 
 
-async def _complete(messages: list[dict]) -> tuple[str, list[dict]]:
-    from app.services.llm import inbox_hops
+_CLAIM_MARKS = (
+    "اصیل",
+    "طبیعی",
+    "مقاوم",
+    "حکاکی",
+    "ضمانت",
+    "ارسال",
+    "قیمت",
+    "موجود",
+    "چرم",
+    "طلا",
+    "نقره",
+    "جیب",
+    "قابل تنظیم",
+    "دوام",
+    "اصالت",
+    "جنس",
+)
+_URL = re.compile(r"https?://[^\s<>\"']+")
+HANDOFF_LINE = "همکارم به‌زودی جواب می‌دهد"
+CLAIMS_LINE = "اجازه بدهید دقیق چک کنم و برگردم."
 
-    last: Exception | None = None
-    for route in inbox_hops():
-        try:
-            payload = await _post_route(route, messages)
-        except Exception as exc:
-            last = exc
+
+def _looks_like_claim(text: str) -> bool:
+    if any(mark in text for mark in _CLAIM_MARKS):
+        return True
+    return bool(re.search(r"اصل(?!ا)", text))
+
+
+def _shop_url() -> str:
+    from app.services.shop_service import _shop, live_url
+
+    return live_url(_shop()).strip().rstrip("/")
+
+
+def _public_shop_url() -> str:
+    """A real storefront address. Localhost and an empty shop are not one."""
+    url = _shop_url()
+    if not url.startswith(("http://", "https://")):
+        return ""
+    host = url.split("://", 1)[-1].split("/", 1)[0].split("@")[-1].split(":")[0].lower()
+    if host in {"localhost", "127.0.0.1", "0.0.0.0"}:
+        return ""
+    return url
+
+
+def _fix_links(reply: str, pay_urls: list[str]) -> str:
+    """Keep this shop's address and this turn's payment links. Anything else goes.
+
+    When the shop has no public address yet, a made-up URL is removed.
+    """
+    shop = _public_shop_url()
+    allowed = {shop} if shop else set()
+    for url in pay_urls:
+        cleaned = url.strip().rstrip("/")
+        if cleaned:
+            allowed.add(cleaned)
+
+    def repl(match: re.Match) -> str:
+        raw = match.group(0).rstrip(".,،);؛")
+        bare = raw.rstrip("/")
+        if bare in allowed or any(bare == item or bare.startswith(item + "/") for item in allowed):
+            return raw
+        return shop
+
+    text = _URL.sub(repl, reply)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
+
+
+def _hand_off(thread: dict | None, reason: str) -> str:
+    _mark("handoff", reason)
+    thread_id = str((thread or {}).get("id") or "").strip()
+    if thread_id:
+        from app.services.inbox_service import mark_handoff
+
+        mark_handoff(thread_id, reason)
+    return HANDOFF_LINE
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    return isinstance(exc, TimeoutError) or "Timeout" in type(exc).__name__
+
+
+_QUALITATIVE = tuple(mark for mark in _CLAIM_MARKS if mark not in {"قیمت", "موجود"})
+
+
+def _availability_conflict(text: str, facts: str) -> bool:
+    stocks = [int(item) for item in re.findall(r'"stock":\s*(-?\d+)', facts)]
+    if not stocks:
+        return False
+    says_out = any(word in text for word in ("ناموجود", "موجود نیست", "تموم", "تمام شده"))
+    says_in = "موجود" in text and not says_out
+    if says_in and max(stocks) <= 0:
+        return True
+    if says_out and min(stocks) > 0:
+        return True
+    return False
+
+
+def _needs_claims_model(text: str, facts: str) -> bool:
+    """A second model call only for a product claim that is not already in the tool text."""
+    if any(mark in text and mark not in facts for mark in _QUALITATIVE):
+        return True
+    if re.search(r"اصل(?!ا)", text) and not re.search(r"اصل(?!ا)", facts):
+        return True
+    if re.search(r'"stock":\s*-?\d+', facts):
+        return False
+    return "موجود" in text or "تموم" in text or "تمام" in text
+
+
+async def _inbox_claims_complete(system: str, user: str, **_kwargs) -> dict:
+    from app.services.llm import complete_json
+
+    return await complete_json(system, user, surface="inbox", max_tokens=400)
+
+
+async def _claims(text: str, facts: str) -> str:
+    if _availability_conflict(text, facts):
+        return CLAIMS_LINE
+    if not _needs_claims_model(text, facts):
+        return text
+    try:
+        from app.services.claims_guard import check
+    except ImportError:
+        return text
+    try:
+        hits = await check(mask_pii(text), facts, complete=_inbox_claims_complete)
+    except Exception:
+        log.warning("claims guard skipped")
+        return text
+    if hits:
+        return CLAIMS_LINE
+    return text
+
+
+async def _complete(messages: list[dict], *, allow_payment: bool, timeout: float) -> tuple[str, list[dict]]:
+    result = await complete_tools(
+        messages=_mask_for_model(messages),
+        tools=_tools(allow_payment=allow_payment),
+        temperature=0.3,
+        max_tokens=500,
+        timeout=timeout,
+        surface="inbox",
+    )
+    calls = []
+    for call in result.get("tool_calls") or []:
+        if not isinstance(call, dict) or not call.get("name"):
             continue
-        model = AGENT_MODEL if str(route.get("kind") or "") == "local" or not route.get("token") else str(route.get("model") or AGENT_MODEL)
-        _emit_usage(surface="inbox", model=model, payload=payload)
-        return _calls_from(payload)
-    raise last or RuntimeError("inbox")
+        args = call.get("arguments")
+        calls.append(
+            {
+                "id": str(call.get("id") or "call"),
+                "name": str(call.get("name")),
+                "arguments": args if isinstance(args, dict) else {},
+            }
+        )
+    raw = str(result.get("text") or "").strip()
+    # A shop address is Latin. Judge the Persian around it, and keep the address for the link guard.
+    judged = spoken_model_reply(_URL.sub("نشانی", raw))
+    text = "" if judged == LLM_BAD_JSON["reply"] else raw
+    return text, calls
 
 
 def _vectors_of(payload: dict, count: int) -> list[list[float]]:
@@ -361,7 +644,7 @@ async def intent_hint(text: str) -> str:
                 saved[name] = vectors[cursor : cursor + len(rows)]
                 cursor += len(rows)
             _SAMPLE_VECTORS = saved
-        query = (await _embed([sentence[:500]]))[0]
+        query = (await _embed([mask_pii(sentence[:500])]))[0]
     except Exception:
         log.warning("inbox intent embed skipped")
         return ""
@@ -386,7 +669,7 @@ def clear_intent_cache() -> None:
 def _history(thread: dict | None) -> list[dict]:
     rows = (thread or {}).get("messages") or []
     messages = []
-    for msg in rows[-8:]:
+    for msg in rows[-12:]:
         text = str(msg.get("text") or "").strip()
         if not text:
             continue
@@ -416,7 +699,11 @@ def _system(thread: dict | None) -> str:
     return (
         "تو فروشندهٔ همین فروشگاه هستی و در دایرکت جواب می‌دهی. فقط فارسی کوتاه بنویس.\n"
         "موجودی، قیمت، وضعیت سفارش و لینک پرداخت را فقط از ابزار بگیر. "
-        "اگر ابزار چیزی پیدا نکرد، همان را بگو و عدد یا لینک نساز.\n"
+        "اگر چند ابزار لازم است، همه را در همان نوبت صدا بزن. "
+        "اگر ابزار چیزی پیدا نکرد، همان را بگو و عدد یا لینک نساز. "
+        "آدرس، نماد اعتماد، قیمت رقیب، نرخ ارز و تخفیف را نساز. "
+        "سؤال بیرون از فروش را در یک جمله رد کن. "
+        "فقط اگر مشتری آدم یا مدیر یا فروشنده خواست، یا عصبانی بود، بگو همکارم به‌زودی جواب می‌دهد.\n"
         f"{prompt_block()}\n"
         f"فروشگاه: {cfg.get('storeName') or ''} / {cfg.get('storeTagline') or ''}\n"
         f"نام کالاها: {'، '.join(titles) if titles else 'کاتالوگی ثبت نشده'}\n"
@@ -424,24 +711,298 @@ def _system(thread: dict | None) -> str:
     ).strip()
 
 
+def _catalog_line(item: dict) -> str:
+    title = str(item.get("title") or "")
+    row = tool_stock(title)
+    colors = [str(color).strip() for color in (item.get("colors") or []) if str(color).strip()]
+    sizes = str(item.get("sizes") or "").strip()
+    products = row.get("products") if isinstance(row.get("products"), list) else []
+    for product in products:
+        if isinstance(product, dict):
+            product["colors"] = colors
+            product["sizes"] = sizes
+    return json.dumps(row, ensure_ascii=False)
+
+
+def _catalog_facts(reply: str) -> str:
+    """Color, material words in the title, and size, so a matching reply skips the claims model."""
+    folded = _norm(reply).replace("\u200c", "")
+    lines = []
+    for item in _products():
+        title = str(item.get("title") or "")
+        colors = [str(color).strip() for color in (item.get("colors") or []) if str(color).strip()]
+        sizes = str(item.get("sizes") or "").strip()
+        words = [word for word in _norm(title).replace("\u200c", "").split() if len(word) >= 3]
+        keys = words + [_norm(color).replace("\u200c", "") for color in colors]
+        if sizes:
+            keys.append(_norm(sizes).replace("\u200c", ""))
+        if any(key and key in folded for key in keys):
+            lines.append(
+                json.dumps({"title": title, "colors": colors, "sizes": sizes}, ensure_ascii=False)
+            )
+    return "\n".join(lines)
+
+
+def _seed_stock(messages: list[dict], products: list[dict]) -> None:
+    lines = [_catalog_line(item) for item in products]
+    messages.append(
+        {
+            "role": "system",
+            "content": "موجودی این کالاها از کاتالوگ آمده است.\n"
+            + "\n".join(lines)
+            + "\nجواب را از همین عددها، رنگ‌ها و اندازه‌ها بنویس و ابزار پرداخت را صدا نزن.",
+        }
+    )
+
+
+def _mark(path: str, reason: str = "") -> None:
+    outcome.set({"path": path, "reason": reason})
+
+
+def _fa_num(value: int) -> str:
+    return str(value).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+
+
+def _finish(reply: str, reason: str) -> str:
+    text = str(reply or "").strip()
+    if text == HANDOFF_LINE:
+        path = "handoff"
+    elif DRY_PAY_HOST in text or "/p/" in text:
+        path = "link"
+    else:
+        path = "template"
+    _mark(path, reason)
+    emit_later(
+        kind="inbox",
+        surface="inbox",
+        title="inbox-agent",
+        status="handoff" if text == HANDOFF_LINE else "ready",
+        payload={"tools": [], "reason": reason},
+    )
+    return text[:1000]
+
+
+def _finish_handoff(thread: dict | None, reason: str) -> str:
+    return _finish(_hand_off(thread, reason), reason)
+
+
+_HANDOFF_MARKS = (
+    "صاحب",
+    "فروشنده",
+    "مدیر",
+    "عمده",
+    "نفر واقعی",
+    "دیر جواب",
+    "بد قول",
+    "شکایت",
+    "طرز حرف",
+    "پشت گوش",
+    "عصبانی",
+)
+_ADDRESS_MARKS = ("آدرس", "مترو", "تحویل حضوری", "مغازهتان")
+
+
+def _item_price(item: dict) -> int:
+    return int(item.get("finalPrice") or item.get("price") or 0)
+
+
+def _item_stock(item: dict) -> int:
+    return int(item.get("stock") or 0)
+
+
+def _item_colors(item: dict) -> list[str]:
+    return [str(color).strip() for color in (item.get("colors") or []) if str(color).strip()]
+
+
+def _item_sizes(item: dict) -> str:
+    return str(item.get("sizes") or "").strip()
+
+
+def _catalog_sentence(sentence: str, products: list[dict]) -> str:
+    folded = _norm(sentence)
+    if "چه رنگی" in folded:
+        named = {
+            _norm(color)
+            for item in products
+            for color in _item_colors(item)
+            if _norm(color) in folded
+        }
+        others: list[str] = []
+        for item in _products():
+            if _item_stock(item) <= 0:
+                continue
+            for color in _item_colors(item):
+                if _norm(color) not in named and color not in others:
+                    others.append(color)
+        if others:
+            return "رنگ‌های موجود: " + "، ".join(others) + "."
+    if any(mark in folded for mark in ("رنگ دیگر", "غیر از")) and len(products) == 1:
+        colors = _item_colors(products[0])
+        title = str(products[0].get("title") or "")
+        if len(colors) == 1:
+            return f"{title} فقط رنگ {colors[0]} را دارد."
+        if colors:
+            return f"{title} این رنگ‌ها را دارد: " + "، ".join(colors) + "."
+    if "ارزانترین" in folded:
+        products = [min(products, key=_item_price)]
+    qty = 2 if ("دو" in folded and "عدد" in folded) else 1
+    want_price = any(mark in folded for mark in ("قیمت", "چند", "چقدر", "جمع", "ارزان"))
+    lines = []
+    for item in products:
+        title = str(item.get("title") or "")
+        stock = _item_stock(item)
+        price = _item_price(item)
+        colors = _item_colors(item)
+        sizes = _item_sizes(item)
+        if stock <= 0:
+            line = f"{title} موجود نیست."
+        else:
+            line = f"{title} موجود است، {_fa_num(stock)} عدد."
+        if want_price and price > 0:
+            line += f" قیمت {_fa_num(price * qty)} تومان است."
+        if colors and ("رنگ" in folded or any(_norm(color) in folded for color in colors)):
+            line += " رنگ " + "، ".join(colors) + "."
+        if sizes and ("سایز" in folded or "اندازه" in folded or _norm(sizes) in folded):
+            line += f" اندازه {sizes}."
+        lines.append(line)
+    return " ".join(lines)
+
+
+async def _known_reply(thread: dict | None, sentence: str) -> str | None:
+    """Facts the shop already stores. The model is only for what is not stored."""
+    folded = _norm(sentence)
+    if "ارسال شد" in folded:
+        return _finish("وضعیت ارسال را از اینجا اعلام نمی‌کنم.", "order")
+    if any(mark in folded for mark in _HANDOFF_MARKS):
+        return _finish_handoff(thread, "نیاز به انسان")
+    if any(mark in folded for mark in _ADDRESS_MARKS):
+        return _finish("نشانی حضوری در سیاست این فروشگاه ثبت نشده.", "address")
+    if "سفارش" in folded:
+        order_ids = re.findall(r"\d{3,}", _digit_fold(sentence))
+        if order_ids:
+            row = tool_order_status(order_ids[0])
+            if not row.get("ok"):
+                return _finish("سفارش پیدا نشد.", "order")
+            return _finish(f"وضعیت سفارش {row.get('id') or order_ids[0]}: {row.get('status') or ''}.", "order")
+        if re.search(r"[A-Za-z]{3,}", sentence):
+            return None
+        return _finish("شماره سفارش را بگویید. اگر در فروشگاه نباشد می‌گویم سفارش پیدا نشد.", "order")
+    products = _mentioned_products(sentence)
+    if "تخفیف" in folded or "کمتر" in folded or ("ارزان" in folded and "ارزانترین" not in folded):
+        if not products:
+            return _finish("تخفیف ثبت نشده است.", "price")
+        bits = [
+            f"قیمت {item.get('title') or ''} {_fa_num(_item_price(item))} تومان است."
+            for item in products
+            if _item_price(item) > 0
+        ]
+        bits.append("تخفیف ثبت نشده است.")
+        return _finish(" ".join(bits), "price")
+    if "لینک سایت" in folded and "پرداخت" not in folded:
+        url = _public_shop_url()
+        if not url:
+            return _finish("نشانی عمومی این فروشگاه ثبت نشده.", "shop")
+        return _finish(f"نشانی فروشگاه: {url}", "shop")
+    if "عکس" in folded and not products:
+        return _finish("عکس به این پیام نرسیده و از روی متن کالا را نام نمی‌برم.", "photo")
+    if _explicit_buy(sentence) and len(products) == 1:
+        item = products[0]
+        title = str(item.get("title") or "")
+        if _item_stock(item) <= 0:
+            return _finish(f"{title} موجود نیست.", "stock")
+        qty = 2 if ("دو" in folded and "عدد" in folded) else 1
+        try:
+            result = await tool_payment_link(title, qty, thread=thread)
+        except Exception:
+            return _finish_handoff(thread, "خطای ابزار پرداخت")
+        if not result.get("ok") or not str(result.get("payUrl") or "").strip():
+            return _finish_handoff(thread, "خطای ابزار پرداخت")
+        amount = _fa_num(int(result.get("amount") or 0))
+        return _finish(f"لینک پرداخت {title}: {result['payUrl']} مبلغ {amount} تومان.", "pay")
+    if products:
+        return _finish(_catalog_sentence(sentence, products), "catalog")
+    return None
+
+
+def _policy_reply(thread: dict | None, sentence: str) -> str | None:
+    from app.services.sales_policy_service import fixed_reply
+
+    fixed = fixed_reply(sentence)
+    if fixed is None:
+        return None
+    reply = guard_output(fixed) if fixed.strip() else ""
+    if not reply.strip():
+        reply = _hand_off(thread, "سیاست ثبت نشده")
+        _mark("handoff", "سیاست ثبت نشده")
+    else:
+        _mark("template", "policy")
+    emit_later(
+        kind="inbox",
+        surface="inbox",
+        title="inbox-agent",
+        status="handoff" if reply == HANDOFF_LINE else "ready",
+        payload={"tools": [], "reason": "policy"},
+    )
+    return reply[:1000]
+
+
 async def answer(customer_text: str, thread: dict | None = None) -> str | None:
     sentence = str(customer_text or "").strip()
     if not sentence:
         return None
-    if _cloud_base(local_base()):
-        emit_later(kind="inbox", surface="inbox", title="inbox-agent", status="refused", payload={"errorClass": "cloud"})
-        return None
+    stored = _policy_reply(thread, sentence)
+    if stored is not None:
+        return stored
+    known = await _known_reply(thread, sentence)
+    if known is not None:
+        return known
+    started = time.monotonic()
     messages: list[dict] = [{"role": "system", "content": _system(thread)}, *_history(thread)]
     if not messages[-1:] or messages[-1].get("content") != sentence:
         messages.append({"role": "user", "content": sentence[:800]})
     nudged = ""
     used: list[str] = []
     pay_urls: list[str] = []
+    number_retried = False
+    force_retry = False
+    rounds = 0
+    allow_payment = _explicit_buy(sentence)
+    mentioned = _mentioned_products(sentence)
+    if mentioned and not allow_payment:
+        _seed_stock(messages, mentioned[:3])
     try:
-        for _round in range(MAX_ROUNDS):
-            text, calls = await _complete(messages)
+        while rounds < MAX_ROUNDS or force_retry:
+            force_retry = False
+            rounds += 1
+            if rounds > MAX_ROUNDS + 1:
+                break
+            left = INBOX_TURN_BUDGET - (time.monotonic() - started)
+            if left < 1:
+                reply = _hand_off(thread, "مهلت مدل")
+                emit_later(
+                    kind="inbox",
+                    surface="inbox",
+                    title="inbox-agent",
+                    status="handoff",
+                    payload={"tools": used, "reason": "مهلت مدل"},
+                )
+                return reply
+            text, calls = await _complete(messages, allow_payment=allow_payment, timeout=left)
             if not calls:
-                if not nudged and not used:
+                blob_now = _tool_blob(messages)
+                grounded = bool(_amounts(text) & _amounts(blob_now)) or (
+                    "موجود" in text and '"stock"' in blob_now
+                )
+                if (
+                    not nudged
+                    and not used
+                    and not grounded
+                    and (
+                        mentioned
+                        or allow_payment
+                        or any(mark in _norm(sentence) for mark in ("موجود", "قیمت", "هنوز", "دارید", "سفارش", "سایز", "رنگ"))
+                    )
+                ):
                     hinted = await intent_hint(sentence)
                     if hinted:
                         nudged = hinted
@@ -452,18 +1013,52 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                             }
                         )
                         continue
+                blob = _tool_blob(messages)
                 reply = guard_output(text)
+                if not _numbers_ok(mask_pii(reply), blob):
+                    if not number_retried:
+                        number_retried = True
+                        force_retry = True
+                        messages.append({"role": "system", "content": _number_reminder(blob)})
+                        continue
+                    reply = _hand_off(thread, "عدد نامجاز")
+                    emit_later(
+                        kind="inbox",
+                        surface="inbox",
+                        title="inbox-agent",
+                        status="handoff",
+                        payload={"tools": used, "reason": "numbers"},
+                    )
+                    return reply
+                reply = _fix_links(reply, pay_urls)
+                facts = "\n".join(part for part in (blob, _catalog_facts(reply)) if part)
+                left = INBOX_TURN_BUDGET - (time.monotonic() - started)
+                if left < 1:
+                    reply = _hand_off(thread, "مهلت مدل")
+                    emit_later(
+                        kind="inbox",
+                        surface="inbox",
+                        title="inbox-agent",
+                        status="handoff",
+                        payload={"tools": used, "reason": "مهلت مدل"},
+                    )
+                    return reply
+                reply = await asyncio.wait_for(_claims(reply, facts), timeout=left)
                 for url in pay_urls:
                     if url and url not in reply:
                         reply = f"{reply}\n{url}".strip()
+                if not str(reply or "").strip():
+                    reply = _hand_off(thread, "جواب خالی")
+                else:
+                    _mark("handoff" if reply == HANDOFF_LINE else "model", "")
                 emit_later(
                     kind="inbox",
                     surface="inbox",
                     title="inbox-agent",
-                    status="ready" if reply else "empty",
+                    status="handoff" if reply == HANDOFF_LINE else "ready",
                     payload={"tools": used, "nudge": nudged},
                 )
-                return reply[:1000] or None
+                return reply[:1000]
             messages.append(
                 {
                     "role": "assistant",
@@ -483,7 +1078,30 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
             )
             for call in calls:
                 used.append(call["name"])
-                result = await run_tool(call["name"], call["arguments"], thread=thread)
+                if call["name"] == "payment_link" and not allow_payment:
+                    result = {"ok": False, "error": "مشتری خرید را نخواسته"}
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": call["id"],
+                            "content": json.dumps(result, ensure_ascii=False),
+                        }
+                    )
+                    continue
+                try:
+                    result = await run_tool(call["name"], call["arguments"], thread=thread)
+                except Exception as exc:
+                    reason = "خطای ابزار پرداخت" if call["name"] == "payment_link" else "خطای ابزار"
+                    log.warning("inbox tool failed: %s %s", call["name"], type(exc).__name__)
+                    reply = _hand_off(thread, reason)
+                    emit_later(
+                        kind="inbox",
+                        surface="inbox",
+                        title="inbox-agent",
+                        status="handoff",
+                        payload={"tools": used, "reason": reason, "errorClass": type(exc).__name__},
+                    )
+                    return reply
                 url = str(result.get("payUrl") or "").strip()
                 if url:
                     pay_urls.append(url)
@@ -495,20 +1113,23 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                     }
                 )
     except Exception as exc:
+        reason = "مهلت مدل" if _is_timeout(exc) else "خطای پاسخ"
         log.warning("inbox agent failed: %s", type(exc).__name__)
+        reply = _hand_off(thread, reason)
         emit_later(
             kind="inbox",
             surface="inbox",
             title="inbox-agent",
-            status="failed",
-            payload={"errorClass": type(exc).__name__},
+            status="handoff",
+            payload={"tools": used, "reason": reason, "errorClass": type(exc).__name__},
         )
-        return None
+        return reply
+    reply = _hand_off(thread, "دورها تمام شد")
     emit_later(
         kind="inbox",
         surface="inbox",
         title="inbox-agent",
-        status="empty",
-        payload={"tools": used, "nudge": nudged},
+        status="handoff",
+        payload={"tools": used, "nudge": nudged, "reason": "دورها تمام شد"},
     )
-    return None
+    return reply
