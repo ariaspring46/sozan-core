@@ -492,6 +492,9 @@ class SalesTest(unittest.TestCase):
         self.assertTrue(person_started("سرم شلوغه سریع بگو"))
         self.assertTrue(person_started("شماره منو از کجا آوردید"))
         self.assertTrue(person_started("من مغازه ندارم اشتباه گرفتید"))
+        for phrase in ("دیگه تماس نگیرید", "شماره‌مو پاک کن", "مزاحم نشید دیگه", "زنگ نزن دیگه"):
+            self.assertTrue(read_signals(phrase).wrong, phrase)
+        self.assertIn("هرگز خودت را انسان معرفی نکن", sales_open())
         wrong = plan_turn(SalesState(), "من مغازه ندارم اشتباه گرفتید")
         self.assertEqual(wrong.kind, "close")
         self.assertEqual(wrong.line, BYE_LINE)

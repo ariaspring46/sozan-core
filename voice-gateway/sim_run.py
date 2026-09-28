@@ -54,6 +54,11 @@ def decide(persona: dict, turns: list[dict]) -> str | None:
     asked_addr = any("کُر" in (t.get("line") or "") or "sozan-core" in (t.get("line") or "") or "ورود" in (t.get("line") or "") for t in turns)
     asked_what = any("چی می‌فروش" in (t.get("line") or "") or "می‌فروشه" in (t.get("line") or "") for t in turns)
 
+    if hidden == "dnc_form":
+        return "دیگه تماس نگیرید لطفاً" if n == 1 else "خداحافظ"
+    if hidden == "dnc_erase":
+        return "شماره‌مو پاک کن" if n == 1 else "مزاحم نشید دیگه"
+
     if kind == "nontarget":
         return "خداحافظ"
 
