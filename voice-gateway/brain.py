@@ -18,7 +18,7 @@ import urllib.parse
 import urllib.request
 import wave
 from base64 import b64encode
-from json import dumps, loads as json_loads
+from json import dumps, loads
 from pathlib import Path
 
 from audio_codec import (
@@ -998,7 +998,7 @@ class Brain:
         )
         try:
             res = _DIRECT.open(req, timeout=timeout)
-            data = json_loads(res.read())
+            data = loads(res.read())
             text = str(data["choices"][0]["message"]["content"] or "").strip()
         except Exception as exc:
             log.warning("cloud ear failed %s", type(exc).__name__)
