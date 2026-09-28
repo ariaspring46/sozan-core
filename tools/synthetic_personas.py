@@ -254,7 +254,11 @@ def _check(intent: str, reply: str, want: dict, shop_url: str) -> tuple[bool, st
 def _router_example(question: str, tool: str, persona: dict):
     from app.services.training_log import log_example
 
-    output = {"tool": tool} if tool else {"tool": "", "reply": "جواب کوتاه خودم می‌دهم."}
+    output = (
+        {"text": json.dumps({"tool": tool}, ensure_ascii=False), "tool": tool}
+        if tool
+        else {"text": "جواب کوتاه خودم می‌دهم.", "tool": ""}
+    )
     return log_example(
         task="router",
         messages=[{"role": "user", "content": question}],
@@ -266,7 +270,7 @@ def _router_example(question: str, tool: str, persona: dict):
     )
 
 
-def run(count_target: int = 200, out: Path | None = None) -> dict:
+def run(count_target: int = 200, out: Path | None = None, *, router_only: bool = False) -> dict:
     os.environ.setdefault("SOZAN_EDGE_DRY", "1")
     env_file = ROOT / ".env"
     if env_file.is_file():
@@ -285,26 +289,44 @@ def run(count_target: int = 200, out: Path | None = None) -> dict:
     from app.config import settings
     from app.services import inbox_agent_service, storefront_service
     from app.state_store import tenant_scope, write_json
+    from app.services import observe_client
     from app.services.training_log import log_label
 
-    inbox = []
-    routed = []
+    # One-shot asyncio.run per turn kills emit_later's background task, so train
+    # events are captured here and really sent by one live loop at the end.
+    inbox: list[dict] = []
+    drained: list[dict] = []
+    routed: list[dict] = []
     results: list[dict] = []
 
     def capture(**kwargs):
-        if kwargs.get("kind") == "train" and kwargs.get("title") == "train-example":
-            inbox.append(dict(kwargs.get("payload") or {}))
-        inbox_agent_service.emit_later(**kwargs)
+        drained.append(dict(kwargs))
+        payload = kwargs.get("payload")
+        if kwargs.get("kind") == "train" and kwargs.get("title") == "train-example" and isinstance(payload, dict):
+            inbox.append(dict(payload))
 
-    persona_turns = [(persona, turn) for persona in PERSONAS for turn in _turns(persona)]
+    async def _drain() -> int:
+        sent = 0
+        for kwargs in drained:
+            try:
+                await observe_client.emit(**kwargs)
+                sent += 1
+            except Exception:
+                continue
+        await observe_client.flush_outbox()
+        return sent
+
+    persona_turns = [] if router_only else [(persona, turn) for persona in PERSONAS for turn in _turns(persona)]
     router_turns = [(persona, turn) for persona in PERSONAS for turn in _ROUTER_TURNS]
-    plan_inbox = max(1, round(count_target * len(persona_turns) / (len(persona_turns) + len(router_turns))))
+    plan_inbox = max(1, round(count_target * len(persona_turns) / (len(persona_turns) + len(router_turns)))) if persona_turns else 0
     plan_router = max(0, count_target - plan_inbox)
     selected_inbox = [persona_turns[i * len(persona_turns) // plan_inbox] for i in range(plan_inbox)]
     selected_router = [router_turns[i * len(router_turns) // plan_router] for i in range(plan_router)] if plan_router else []
 
     started = time.time()
-    with patch.object(settings, "state_dir", str(state)), tenant_scope(_PHONE):
+    with patch.object(settings, "state_dir", str(state)), tenant_scope(_PHONE), patch.object(
+        inbox_agent_service, "emit_later", capture
+    ), patch("app.services.training_log.emit_later", capture):
         for persona in PERSONAS:
             write_json(
                 "shop.json",
@@ -330,7 +352,18 @@ def run(count_target: int = 200, out: Path | None = None) -> dict:
                 ok, note = _check(intent, reply, want, shop_url)
                 eid = str(example.get("id") or "")
                 if eid:
-                    log_label(eid, {"accept": ok, "autoCheck": intent if ok else f"{intent}:{note}"})
+                    kwargs = {
+                        "kind": "train",
+                        "title": "train-label",
+                        "surface": "train",
+                        "payload": {
+                            "exampleId": eid,
+                            "labels": {"accept": ok, "autoCheck": intent if ok else f"{intent}:{note}"},
+                            "ts": time.time(),
+                            "tenant": str(example.get("tenant") or ""),
+                        },
+                    }
+                    drained.append(kwargs)
                 results.append(
                     {
                         "id": eid,
@@ -346,6 +379,8 @@ def run(count_target: int = 200, out: Path | None = None) -> dict:
             for text, tool in [turn for owner, turn in selected_router if owner is persona]:
                 eid = _router_example(text, tool, persona)
                 routed.append({"id": eid, "persona": persona["domain"], "intent": f"router:{tool or 'none'}", "ok": bool(eid)})
+
+    sent = asyncio.run(_drain())
 
     passed = sum(1 for row in results if row["ok"])
     stats = {
@@ -378,8 +413,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=200)
     parser.add_argument("--out", default=str(Path.home() / "local-ai/sozan-train/synthetic"))
+    parser.add_argument("--router-only", action="store_true")
     args = parser.parse_args()
-    stats = run(args.count, Path(args.out))
+    stats = run(args.count, Path(args.out), router_only=args.router_only)
     print(json.dumps(stats, ensure_ascii=False, indent=2))
     return 0
 

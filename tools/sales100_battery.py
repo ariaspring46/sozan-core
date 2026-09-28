@@ -620,7 +620,7 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
             return await real(*args, **kwargs)
 
         with patch.object(inbox_agent_service, "complete_tools", counting):
-            reply = await inbox_agent_service.answer(text, thread={"sender": "آزمون"})
+            reply = await inbox_agent_service.answer(text, thread={"sender": "آزمون"}, source="battery")
         meta = inbox_agent_service.outcome.get() or {}
         return str(reply or ""), meta if isinstance(meta, dict) else {}
 

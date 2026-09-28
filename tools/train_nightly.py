@@ -150,8 +150,15 @@ def dedupe(examples: list[dict]) -> tuple[list[dict], int]:
 
 
 def trainable(row: dict, allow_sources: set[str]) -> bool:
+    """Real (and flagged battery/synthetic overrides) train freely; synthetic
+    enters only with an explicit accept label, never a bare rejection."""
     labels = row.get("labels") if isinstance(row.get("labels"), dict) else {}
-    return str(row.get("source") or "real") in allow_sources and labels.get("accept") is not False
+    if labels.get("accept") is False:
+        return False
+    source = str(row.get("source") or "real")
+    if source in allow_sources:
+        return True
+    return source == "synthetic" and labels.get("accept") is True
 
 
 def to_sft(row: dict) -> dict:

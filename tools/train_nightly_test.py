@@ -117,6 +117,25 @@ class TrainNightlyTest(unittest.TestCase):
         self.assertEqual(answer, "قیمت ۲۵۰۰۰۰ تومان است. لینک: https://shop.example/p/x-2")
         self.assertEqual(train_nightly.fa_digits("سفارش 12 در https://s.ir/p/a-3 تمام"), "سفارش ۱۲ در https://s.ir/p/a-3 تمام")
 
+    def test_synthetic_enters_sft_only_with_accept_label(self) -> None:
+        self._write(
+            "inbox_reply.jsonl",
+            [
+                _example("s1", "جواب تأییدشده", source="synthetic"),
+                _example("s2", "بدون برچسب مصنوعی", source="synthetic"),
+                _example("s3", "ردشده", source="synthetic"),
+            ],
+        )
+        self._write(
+            "_labels.jsonl",
+            [
+                {"exampleId": "s1", "labels": {"accept": True, "autoCheck": "price"}},
+                {"exampleId": "s3", "labels": {"accept": False}},
+            ],
+        )
+        stats = train_nightly.build(raw=self.raw, out=self.out, day=DAY)
+        self.assertEqual(stats["tasks"]["inbox_reply"]["sft"], 1)
+
     def test_other_tasks_are_split_apart(self) -> None:
         self._write(
             "caption.jsonl",
