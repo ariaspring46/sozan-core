@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, setOnboarded, setToken } from "@/lib/api";
+import { ApiError, api, setOnboarded, setToken } from "@/lib/api";
 import { toLatinDigits } from "@/lib/digits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
+  const [captcha, setCaptcha] = useState<{ token: string; question: string } | null>(null);
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
   const autoTried = useRef("");
 
   const cleanPhone = normalizePhone(phone);
@@ -64,19 +66,42 @@ export default function LoginPage() {
     return () => window.clearTimeout(timer);
   }, [wait]);
 
+  async function fetchCaptcha() {
+    try {
+      const data = await api<{ token: string; question: string }>(
+        `/auth/otp/captcha?phone=${encodeURIComponent(cleanPhone)}`,
+      );
+      setCaptcha(data);
+      setCaptchaAnswer("");
+    } catch {
+      setCaptcha(null);
+    }
+  }
+
   async function requestCode() {
     setError("");
     setBusy(true);
     try {
       const data = await api<{ ok: boolean; dev_code?: string }>("/auth/otp/send", {
         method: "POST",
-        body: JSON.stringify({ phone: cleanPhone }),
+        body: JSON.stringify({
+          phone: cleanPhone,
+          captchaToken: captcha?.token || "",
+          captchaAnswer,
+        }),
       });
       setSent(true);
       setHint(data.dev_code || "");
       setWait(RESEND_SECONDS);
+      setCaptcha(null);
+      setCaptchaAnswer("");
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : "ارسال کد انجام نشد. دوباره امتحان کن.");
+      if (err instanceof ApiError && err.status === 428) {
+        setError("برای ادامه، پاسخ پرسش امنیتی را بنویس.");
+        await fetchCaptcha();
+      } else {
+        setError(err instanceof Error && err.message ? err.message : "ارسال کد انجام نشد. دوباره امتحان کن.");
+      }
     } finally {
       setBusy(false);
     }
@@ -153,7 +178,22 @@ export default function LoginPage() {
               <p id="phone-hint" className="min-h-5 text-xs text-muted" aria-live="polite">
                 {hintText}
               </p>
-              <Button type="submit" className="w-full" disabled={!phoneOk || busy}>
+              {captcha ? (
+                <div className="space-y-2 rounded-xl border border-line bg-canvas p-3">
+                  <p className="text-sm" aria-live="polite">
+                    پرسش امنیتی: <bdo dir="ltr">{captcha.question}</bdo>
+                  </p>
+                  <Input
+                    dir="ltr"
+                    inputMode="numeric"
+                    className="text-center"
+                    placeholder="پاسخ"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value)}
+                  />
+                </div>
+              ) : null}
+              <Button type="submit" className="w-full" disabled={!phoneOk || busy || Boolean(captcha && !captchaAnswer.trim())}>
                 {busy ? "در حال ارسال…" : "ارسال کد"}
               </Button>
             </form>

@@ -62,6 +62,7 @@ class OtpResendTests(unittest.TestCase):
             patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": True}),
             # این کلاس درگاه همیشگی را می‌سنجد؛ محیط ممکن است ملی‌پیامک را روشن کرده باشد.
             patch.object(auth_service.settings, "otp_provider", ""),
+            patch.object(auth_service.settings, "payments_enabled", False),
         ]
         for item in self.patches:
             item.start()
@@ -153,6 +154,77 @@ class OtpResendTests(unittest.TestCase):
         self.assertNotIn("otp:09111234567", self.redis.store)
 
 
+
+
+class OtpCaptchaTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.redis = _FakeRedis()
+        self.svc = AuthService(_Users())
+        self.patches = [
+            patch.object(auth_service, "redis_client", self.redis),
+            patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": True}),
+            patch.object(auth_service.settings, "otp_provider", ""),
+            patch.object(auth_service.settings, "payments_enabled", False),
+            patch.object(auth_service.settings, "otp_dev", True),
+            patch.object(auth_service.settings, "payments_enabled", False),
+        ]
+        for item in self.patches:
+            item.start()
+            self.addCleanup(item.stop)
+
+    def test_third_send_requires_captcha(self) -> None:
+        asyncio.run(self.redis.setex("captcha:tok1", 300, "9"))
+        asyncio.run(self.svc.send_otp("09111234567"))  # ۱
+        asyncio.run(self.svc.send_otp("09111234567"))  # ۲
+        with self.assertRaises(HTTPException) as ctx:
+            asyncio.run(self.svc.send_otp("09111234567", captcha_token="tok1", captcha_answer="8"))
+        self.assertEqual(ctx.exception.status_code, 428)
+        asyncio.run(self.svc.send_otp("09111234567", captcha_token="tok1", captcha_answer="9"))
+        self.assertNotIn("captcha:tok1", self.redis.store)
+
+
+class FactoryEnvTests(unittest.TestCase):
+    def test_factory_env_whitelist_hides_secrets(self) -> None:
+        from app.services import shop_service
+
+        with patch.dict(
+            "os.environ",
+            {"JWT_SECRET": "x" * 40, "PATH": "/usr/bin", "SOZAN_KEEP": "1", "OPEN_ROUT_API_TOKEN": "leak"},
+        ):
+            env = shop_service._factory_env()
+        self.assertNotIn("JWT_SECRET", env)
+        self.assertNotIn("OPEN_ROUT_API_TOKEN", env)
+        self.assertEqual(env["SOZAN_KEEP"], "1")
+        self.assertEqual(env["PATH"], "/usr/bin")
+
+
+class SecurityGuardTests(unittest.TestCase):
+    def test_default_secret_rejected(self) -> None:
+        from app import main as app_main
+
+        with patch.object(app_main.settings, "jwt_secret", "change-me-to-a-long-random-secret"):
+            with self.assertRaises(RuntimeError):
+                app_main._security_guard()
+
+    def test_short_secret_rejected(self) -> None:
+        from app import main as app_main
+
+        with patch.object(app_main.settings, "jwt_secret", "short"), patch.object(
+            app_main.settings, "otp_dev", False
+        ):
+            with self.assertRaises(RuntimeError):
+                app_main._security_guard()
+
+    def test_otp_dev_with_payments_rejected(self) -> None:
+        from app import main as app_main
+
+        with patch.object(app_main.settings, "jwt_secret", "k" * 40), patch.object(
+            app_main.settings, "otp_dev", True
+        ), patch.object(app_main.settings, "payments_enabled", True):
+            with self.assertRaises(RuntimeError):
+                app_main._security_guard()
+
+
 class SendCapTests(unittest.TestCase):
     def setUp(self) -> None:
         self.redis = _FakeRedis()
@@ -161,7 +233,9 @@ class SendCapTests(unittest.TestCase):
             patch.object(auth_service, "redis_client", self.redis),
             patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": True}),
             patch.object(auth_service.settings, "otp_provider", ""),
+            patch.object(auth_service.settings, "payments_enabled", False),
             patch.object(auth_service.settings, "otp_dev", True),
+            patch.object(auth_service.settings, "payments_enabled", False),
         ]
         for item in self.patches:
             item.start()
@@ -201,6 +275,7 @@ class FixedOtpTests(unittest.TestCase):
             patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": False, "otpTtlSeconds": 300}),
             patch.object(auth_service, "fixed_otp_for", side_effect=lambda phone: "100001" if phone == "09129900001" else None),
             patch.object(auth_service.settings, "otp_provider", ""),
+            patch.object(auth_service.settings, "payments_enabled", False),
         ]
         for item in self.patches:
             item.start()

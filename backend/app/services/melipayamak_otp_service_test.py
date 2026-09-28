@@ -156,16 +156,20 @@ class MelipayamakFlowTests(unittest.TestCase):
         self.assertNotIn("otp:09111234567", self.redis.store)
 
         asyncio.run(self.redis.delete("otp:cool:09111234567"))
+        asyncio.run(self.redis.setex("captcha:tok9", 300, "7"))
         with self._mock_provider_code("654321"):
-            asyncio.run(self.svc.send_otp("09111234567", ip="10.1.1.5"))
+            asyncio.run(self.svc.send_otp("09111234567", ip="10.1.1.5", captcha_token="tok9", captcha_answer="7"))
         for _ in range(auth_service.OTP_WRONG_ATTEMPTS):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(self.svc.verify_otp("09111234567", "000000"))
             self.assertEqual(ctx.exception.status_code, 400)
         self.assertNotIn("otp:09111234567", self.redis.store)
         asyncio.run(self.redis.delete("otp:cool:09111234567"))
+        asyncio.run(self.redis.setex("captcha:tok10", 300, "3"))
         with self._mock_provider_code("654321"):
-            asyncio.run(self.svc.send_otp("09111234567", ip="10.1.1.5"))
+            asyncio.run(
+                self.svc.send_otp("09111234567", ip="10.1.1.5", captcha_token="tok10", captcha_answer="3")
+            )
         with self.assertRaises(HTTPException):
             asyncio.run(self.svc.verify_otp("09111234567", "654321"))
 

@@ -12,6 +12,7 @@ from app.phone import normalize_phone
 from app.services import payment_service, storefront_service, wallet_service
 from app.services.observe_client import emit_later
 from app.services.settings_service import get_settings
+from app.services.tenant_lock import tenant_file_lock
 from app.state_store import current_tenant, iter_tenants, read_json, shared_lock, tenant_scope, write_json
 
 log = logging.getLogger("sozan.pay")
@@ -44,7 +45,10 @@ def _orders() -> list[dict]:
 
 
 def _save_orders(rows: list[dict]) -> None:
-    write_json("pay-orders.json", rows[-200:])
+    # ردیف‌های pending هرگز حذف نمی‌شوند؛ فقط تاریخچهٔ قدیمی کوتاه می‌شود.
+    keep = [row for row in rows if str(row.get("status") or "") == "pending"]
+    done = [row for row in rows if str(row.get("status") or "") != "pending"]
+    write_json("pay-orders.json", (keep + done)[-400:])
 
 
 def _pending() -> dict:
@@ -340,8 +344,12 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
         except ValueError:
             return panel_pay_url(order_id, "fail")
         try:
-            _mark_paid(row, ref_id=str(verified.get("refId") or ""))
-            _save_orders(orders)
+            # پس از مکث verify دوباره بخوان؛ سفارش هم‌زمان‌ساخته گم نمی‌شود.
+            with tenant_file_lock("pay-orders"):
+                fresh = _orders()
+                row = next((item for item in fresh if str(item.get("id")) == order_id), row)
+                _mark_paid(row, ref_id=str(verified.get("refId") or ""))
+                _save_orders(fresh)
         finally:
             _drop_pending(key)
     return panel_pay_url(order_id, "ok")
@@ -424,7 +432,8 @@ def verify_pay_secret(slug: str, secret: str) -> str:
 
 
 def sign_body(raw: bytes) -> str:
-    return hmac.new(env.jwt_secret.encode(), raw, hashlib.sha256).hexdigest()
+    key = (env.payment_sign_secret or env.jwt_secret).encode()
+    return hmac.new(key, raw, hashlib.sha256).hexdigest()
 
 
 def valid_sign(raw: bytes, header: str) -> bool:
@@ -441,8 +450,22 @@ async def shop_checkout(
     name: str = "",
     phone: str = "",
     lines: list[dict] | None = None,
+    ip: str = "",
 ) -> dict:
     tenant = verify_pay_secret(slug, secret)
+    from app.redis_client import redis_client
+
+    try:
+        rl = f"pay:co:{slug}:{ip or 'no-ip'}"
+        hits = await redis_client.incr(rl)
+        if hits == 1:
+            await redis_client.expire(rl, 3600)
+        if hits > 30:
+            raise ValueError("تعداد سفارش بیش از حد است؛ کمی بعد تلاش کنید")
+    except ValueError:
+        raise
+    except Exception:
+        pass  # بدون Redis سقف نمی‌ماند، اما فروش نمی‌ایستد
     with tenant_scope(tenant):
         total = 0
         titles = []
@@ -491,25 +514,14 @@ def shop_paid(*, slug: str, order_id: str, amount: int, title: str, customer: st
         )
         if existing and str(existing.get("status") or "") == "paid":
             return public_order(existing)
-        row = existing or {
-            "id": order_id or _new_id(),
-            "title": (title or "سفارش فروشگاه").strip()[:120],
-            "amount": int(amount),
-            "productId": "",
-            "qty": 1,
-            "customer": (customer or "مشتری").strip()[:80],
-            "channel": "فروشگاه",
-            "gateway": "zarinpal",
-            "owner": "hub",
-            "commissionBps": payment_service.commission_bps(),
-            "status": "pending",
-            "at": int(time()),
-            "phone": phone,
-        }
+        # پرداخت فقط سفارشِ در انتظارِ همان مبلغ را تأیید می‌کند؛ وب‌هوک سفارش نمی‌سازد.
+        if existing is None:
+            raise ValueError("سفارش متناظر پیدا نشد")
+        if int(existing.get("amount") or 0) != int(amount):
+            raise ValueError("مبلغ پرداخت با سفارش نمی‌خواند")
+        row = existing
         if int(row.get("amount") or 0) <= 0:
             row["amount"] = int(amount)
         _mark_paid(row, ref_id=ref_id)
-        if existing is None:
-            orders.append(row)
         _save_orders(orders)
         return public_order(row)

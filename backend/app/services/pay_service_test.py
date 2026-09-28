@@ -137,20 +137,15 @@ class ShopPayB1Tests(unittest.TestCase):
                 )
                 first = pay_service.get_order("ord-a")
                 second = pay_service.get_order("ord-b")
-                empty = pay_service.shop_paid(
-                    slug=SLUG,
-                    order_id="",
-                    amount=3000,
-                    title="جدید",
-                    customer="سه",
-                    ref_id="",
-                )
         self.assertEqual(paid["id"], "ord-b")
         self.assertEqual(paid["status"], "paid")
         self.assertEqual(first["status"], "pending")
         self.assertEqual(second["status"], "paid")
-        self.assertNotEqual(empty["id"], "ord-a")
-        self.assertNotEqual(empty["id"], "ord-b")
+        # وب‌هوک سفارش تازه نمی‌سازد و مبلغ متفاوت را رد می‌کند
+        with self.assertRaises(ValueError):
+            pay_service.shop_paid(slug=SLUG, order_id="", amount=3000, title="جدید", customer="سه", ref_id="")
+        with self.assertRaises(ValueError):
+            pay_service.shop_paid(slug=SLUG, order_id="ord-a", amount=999, title="اول", customer="یک", ref_id="")
 
     def test_finish_order_drops_pending_if_mark_paid_fails(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

@@ -77,7 +77,17 @@ async def _rearm_inbox() -> None:
 
 
 @asynccontextmanager
+def _security_guard() -> None:
+    """شروع production با کلید نمونه/کوتاه یا otp_dev روشن رد می‌شود."""
+    secret = str(settings.jwt_secret or "")
+    if not secret or secret == "change-me-to-a-long-random-secret" or len(secret) < 32:
+        raise RuntimeError("JWT_SECRET must be a real key of at least 32 characters")
+    if settings.otp_dev and settings.payments_enabled:
+        raise RuntimeError("OTP_DEV must be off in production (PAYMENTS_ENABLED=1)")
+
+
 async def lifespan(_app: FastAPI):
+    _security_guard()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     from app.tenant_migrate import migrate_campaign_ids, migrate_files

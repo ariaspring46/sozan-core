@@ -424,8 +424,15 @@ def set_domain(domain: str) -> dict:
     return snapshot()
 
 
+FACTORY_ENV_ALLOW = (
+    "PATH", "HOME", "USER", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TERM",
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+)
+
+
 def _factory_env() -> dict[str, str]:
-    env = os.environ.copy()
+    # فقط فهرست سفید؛ رازهای هاب هرگز به زیرپروسهٔ کارخانه نمی‌روند.
+    env = {key: value for key, value in os.environ.items() if key.startswith("SOZAN_") or key.startswith("LLAMA_") or key in FACTORY_ENV_ALLOW}
     swap = settings.local_llm_url.rstrip("/")
     if swap.endswith("/v1"):
         swap = swap[:-3].rstrip("/")

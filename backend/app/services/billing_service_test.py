@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from time import time
+
 import asyncio
 import tempfile
 import unittest
@@ -8,6 +10,29 @@ from unittest.mock import AsyncMock, patch
 from app.config import settings
 from app.services import billing_service, payment_service, plan_service
 from app.state_store import tenant_scope
+
+
+class PlanExpiryTests(unittest.TestCase):
+    def test_paid_plan_expires_to_free(self) -> None:
+        import tempfile
+        from app.services import plan_service
+        from app.state_store import read_json
+
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            plan_service.set_plan("pro", paid_until=int(time()) - 10)
+            self.assertEqual(plan_service.current_plan_id(), "free")
+            row = read_json("plan.json", {})
+        self.assertEqual(row.get("expiredFrom"), "pro")
+
+    def test_paid_plan_inside_window_stays(self) -> None:
+        import tempfile
+        from app.services import plan_service
+
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            plan_service.set_plan("pro", paid_until=int(time()) + 20 * 86400)
+            snap = plan_service.snapshot()
+        self.assertEqual(snap["plan"], "pro")
+        self.assertLessEqual(snap["daysLeft"], 20)
 
 
 class BillingServiceTests(unittest.TestCase):

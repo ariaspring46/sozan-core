@@ -15,9 +15,11 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 720
     admin_phone: str = "09120000000"
     otp_ttl_seconds: int = 300
-    otp_dev: bool = True
+    otp_dev: bool = False
     otp_provider: str = ""
     otp_global_daily_cap: int = 500
+    payment_sign_secret: str = ""
+    lab_login_until: str = "2026-10-31"
     shop_otp_daily_cap: int = 200
     melipayamak_otp_apikey: str = ""
     melipayamak_otp_base: str = "https://console.melipayamak.com/api/send/otp"

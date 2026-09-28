@@ -27,6 +27,7 @@ OTP_MELIPAYAMAK_TTL = 120
 OTP_MELIPAYAMAK_COOLDOWN = 60
 OTP_MELIPAYAMAK_HOURLY = 5
 OTP_WRONG_ATTEMPTS = 5
+OTP_CAPTCHA_AFTER = 2
 
 
 def _overlay_without_side_effects(phone: str) -> dict:
@@ -58,7 +59,7 @@ class AuthService:
     def __init__(self, users: UserRepository) -> None:
         self.users = users
 
-    async def send_otp(self, phone_raw: str, *, ip: str = "") -> dict:
+    async def send_otp(self, phone_raw: str, *, ip: str = "", captcha_token: str = "", captcha_answer: str = "") -> dict:
         try:
             phone = normalize_phone(phone_raw)
         except ValueError as exc:
@@ -68,11 +69,15 @@ class AuthService:
         if is_lab_phone(phone):
             return {"ok": True}
         await self._check_send_caps(phone, ip=ip)
+        await self._check_captcha(phone, token=captcha_token, answer=captcha_answer)
         if str(settings.otp_provider or "").strip().lower() == "melipayamak_otp":
             return await self._send_melipayamak_otp(phone, ip=ip)
         overlay = _overlay_without_side_effects(phone)
         mock_sms = overlay.get("mockSms")
-        if mock_sms is None:
+        if settings.payments_enabled:
+            # در production کد آزمایشی وجود ندارد، هر تنظیمی فروشنده گذاشته باشد.
+            mock_sms = False
+        elif mock_sms is None:
             mock_sms = settings.otp_dev is True
         else:
             mock_sms = mock_sms is True
@@ -119,6 +124,22 @@ class AuthService:
             await drop_fresh_code()
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ارسال پیامک به درگاه نرسید.") from exc
         return payload
+
+    async def _check_captcha(self, phone: str, *, token: str, answer: str) -> None:
+        """بعد از دو ارسال در روز، کد ورود پاسخ کپچای ساده می‌خواهد."""
+        sends = await redis_client.incr(f"otp:cs:{phone}")
+        if sends == 1:
+            await redis_client.expire(f"otp:cs:{phone}", 86400)
+        if sends <= OTP_CAPTCHA_AFTER:
+            return
+        key = f"captcha:{str(token or '').strip()}"
+        stored = await redis_client.get(key)
+        from app.phone import normalize_digits
+
+        given = "".join(ch for ch in normalize_digits(str(answer or "")) if ch.isdigit())
+        if not stored or not given or not hmac.compare_digest(str(stored), given):
+            raise HTTPException(status.HTTP_428_PRECONDITION_REQUIRED, "پاسخ پرسش امنیتی لازم است")
+        await redis_client.delete(key)
 
     async def _check_send_caps(self, phone: str, *, ip: str = "") -> None:
         """سقف IP در ساعت و کل ارسال‌های روز، برای هر دو درگاه کد ورود."""

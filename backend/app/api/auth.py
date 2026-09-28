@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
@@ -21,10 +21,29 @@ def _auth(session: AsyncSession = Depends(get_session)) -> AuthService:
     return AuthService(UserRepository(session))
 
 
+@router.get("/otp/captcha")
+async def otp_captcha(phone: str):
+    import secrets as _secrets
+
+    from app.redis_client import redis_client
+
+    a = _secrets.randbelow(8) + 2
+    b = _secrets.randbelow(8) + 2
+    token = _secrets.token_hex(12)
+    await redis_client.setex(f"captcha:{token}", 300, str(a + b))
+    fa = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+    return {"token": token, "question": f"{str(a).translate(fa)} + {str(b).translate(fa)} = ؟"}
+
+
 @router.post("/otp/send")
 async def otp_send(request: Request, body: OtpSendIn, service: AuthService = Depends(_auth)):
     ip = request.client.host if request.client else ""
-    return await service.send_otp(body.phone, ip=ip)
+    return await service.send_otp(
+        body.phone,
+        ip=ip,
+        captcha_token=body.captchaToken,
+        captcha_answer=body.captchaAnswer,
+    )
 
 
 @router.post("/otp/verify")

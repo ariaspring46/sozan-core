@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 
 class OtpSendIn(BaseModel):
     phone: str
+    captchaToken: str = Field(default="", max_length=80)
+    captchaAnswer: str = Field(default="", max_length=8)
 
 
 class OtpVerifyIn(BaseModel):

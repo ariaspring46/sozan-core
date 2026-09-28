@@ -234,20 +234,51 @@ def record_site(slug: str) -> None:
         write_json("sites.json", rows)
 
 
+PLAN_MONTH_SECONDS = 30 * 86400
+
+
+def _paid_until(row: dict) -> int:
+    try:
+        return int(row.get("paidUntil") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def current_plan_id() -> str:
     stored = read_json("plan.json", {})
     if isinstance(stored, dict):
         plan = str(stored.get("plan") or "").strip().lower()
+        if plan in PLANS and plan != "free":
+            until = _paid_until(stored)
+            if until and int(time()) >= until:
+                # پایان اشتراک پرداختی: برگشت به رایگان و یک رویداد پایش.
+                write_json("plan.json", {"plan": "free", "at": int(time()), "expiredFrom": plan})
+                try:
+                    from app.services.observe_client import emit_later
+
+                    emit_later(
+                        kind="billing",
+                        title="plan-expired",
+                        surface="panel",
+                        status="ok",
+                        payload={"plan": plan},
+                    )
+                except Exception:
+                    pass
+                return "free"
         if plan in PLANS:
             return plan
     return "free"
 
 
-def set_plan(plan_id: str) -> dict:
+def set_plan(plan_id: str, *, paid_until: int | None = None) -> dict:
     plan = str(plan_id or "free").strip().lower()
     if plan not in PLANS:
         raise ValueError("این اشتراک وجود ندارد")
-    write_json("plan.json", {"plan": plan, "at": int(time())})
+    row: dict = {"plan": plan, "at": int(time())}
+    if plan != "free":
+        row["paidUntil"] = int(paid_until if paid_until is not None else int(time()) + PLAN_MONTH_SECONDS)
+    write_json("plan.json", row)
     return snapshot()
 
 
@@ -272,9 +303,15 @@ def snapshot() -> dict:
             card["priceToman"] = trial
             card["listPrice"] = trial
             card["discountPercent"] = 0
-    return {
+    stored_plan = read_json("plan.json", {})
+    days_left = ""
+    if isinstance(stored_plan, dict) and plan["id"] != "free":
+        left = max(0, (_paid_until(stored_plan) - int(time())) // 86400)
+        days_left = left
+    out = {
         "plan": plan["id"],
         "label": plan["label"],
+        "daysLeft": days_left,
         "sitesUsed": used,
         "sitesLimit": limit,
         "workspaces": int(plan.get("workspaces") or 1),
@@ -287,6 +324,7 @@ def snapshot() -> dict:
         "discountUntilLabel": catalog["discountUntilLabel"],
         "plans": catalog["plans"],
     }
+    return out
 
 
 def allow_new_site() -> str | None:

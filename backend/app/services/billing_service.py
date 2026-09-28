@@ -251,7 +251,11 @@ async def finish_subscription(*, authority: str, ok: bool) -> str:
         except ValueError:
             return panel_return("fail")
         _drop_pending(key)
-        plan_service.set_plan(str(row.get("plan") or "free"))
+        from time import time as _time
+
+        plan_service.set_plan(
+            str(row.get("plan") or "free"), paid_until=int(_time()) + 30 * 86400
+        )
         for item in history:
             if item.get("authority") == key:
                 item["status"] = "paid"

@@ -35,7 +35,7 @@ class ShopOtpVerifyIn(BaseModel):
 
 
 @router.post("/p/shop/checkout")
-async def shop_checkout(body: ShopCheckoutIn):
+async def shop_checkout(request: Request, body: ShopCheckoutIn):
     try:
         return await pay_service.shop_checkout(
             slug=body.slug,
@@ -43,6 +43,7 @@ async def shop_checkout(body: ShopCheckoutIn):
             name=body.name,
             phone=body.phone,
             lines=[item.model_dump() for item in body.lines],
+            ip=request.client.host if request.client else "",
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
