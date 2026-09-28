@@ -106,6 +106,7 @@ export function ChatThread({
   onConfirm,
   onCancel,
   persona = "",
+  aspects,
 }: {
   messages: ChatMsg[];
   busy: boolean;
@@ -132,6 +133,8 @@ export function ChatThread({
   onCancel?: (confirmId: string) => void;
   persona?: string;
   showTime?: boolean;
+  /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */
+  aspects?: readonly { id: string; label: string; word: string }[];
 }) {
   const [draft, setDraft] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -212,10 +215,14 @@ export function ChatThread({
     }
   }
 
+  const [aspect, setAspect] = useState("");
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!canSend) return;
-    const text = draft.trim();
+    let text = draft.trim();
+    const chosen = (aspects || []).find((row) => row.id === aspect);
+    if (chosen && chosen.word && !text.includes(chosen.word)) text = `${text} (${chosen.word})`.trim();
     const attached = file || undefined;
     try {
       await onSend({ text, file: attached });
@@ -495,6 +502,26 @@ export function ChatThread({
         ) : null}
         {recording ? <p className="text-xs text-warm">در حال ضبط صدا…</p> : null}
         {micError ? <p className="text-xs text-danger">{micError}</p> : null}
+        {aspects?.length ? (
+          <div className="flex items-center gap-2 px-1" role="group" aria-label="نسبت تصویر">
+            {aspects.map((row) => {
+              const on = aspect === row.id || (!aspect && row.id === "post");
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={() => setAspect((value) => (value === row.id ? "" : row.id))}
+                  className={cn(
+                    "min-h-9 rounded-xl px-3 text-xs font-medium",
+                    on ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted",
+                  )}
+                >
+                  {row.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="flex items-end gap-2 rounded-2xl border border-line/80 bg-paper px-2 py-2">
           {allowMedia ? (
             <>

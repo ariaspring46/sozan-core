@@ -36,7 +36,7 @@ export default function MorePage() {
               <p className="text-lg font-bold">{plan.label}</p>
             </div>
             <Link
-              href="/more/settings"
+              href="/more/settings#plans"
               className={plan.canUpgrade ? "min-h-11 rounded-xl bg-accentStrong px-4 py-2.5 text-sm font-bold text-onAccent" : "min-h-11 rounded-xl border border-line px-4 py-2.5 text-sm text-warm"}
             >
               {plan.canUpgrade ? "ارتقای پلن" : "جزئیات اشتراک"}

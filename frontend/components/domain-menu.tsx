@@ -43,12 +43,29 @@ export type BuildState = {
   error?: string;
 };
 
+/** آدرس عمومی فقط دامنه است؛ IP، پورت و نشانی‌های داخلی هرگز به فروشنده نشان داده نمی‌شوند. */
+function publicUrlOrNull(raw: string | undefined | null): string {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  const href = value.startsWith("http") ? value : `https://${value}`;
+  try {
+    const url = new URL(href);
+    const host = url.hostname.toLowerCase();
+    if (!host) return "";
+    if (/(^|\.)localhost$/.test(host)) return "";
+    if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) return "";
+    if (host.includes(":")) return "";
+    if (/\.(local|internal)$/.test(host)) return "";
+    return `https://${host}`;
+  } catch {
+    return "";
+  }
+}
+
 export function shopPublicUrl(shop: ShopState | null, fallback = "") {
   for (const raw of [shop?.publicHost, shop?.domain, shop?.url, fallback]) {
-    const value = String(raw || "").trim();
-    if (!value) continue;
-    if (value.includes("127.0.0.1") || value.includes("localhost")) continue;
-    return value.startsWith("http") ? value : `https://${value}`;
+    const found = publicUrlOrNull(raw);
+    if (found) return found;
   }
   return "";
 }

@@ -43,6 +43,12 @@ const CHAT_HINTS = [
   "تو چه کارهایی می‌توانی بکنی؟",
 ];
 
+const STUDIO_ASPECTS = [
+  { id: "post", label: "پست ۴:۵", word: "" },
+  { id: "square", label: "مربع", word: "مربع" },
+  { id: "story", label: "استوری/ریلز", word: "استوری" },
+] as const;
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [pendingConfirm, setPendingConfirm] = useState<ChatPayload["pendingConfirm"]>(null);
@@ -266,6 +272,7 @@ export default function ChatPage() {
             welcome
             welcomeLines={welcomeLines(brand)}
             hints={CHAT_HINTS}
+            aspects={STUDIO_ASPECTS}
             placeholder="به سوزان بگو…"
             persona="سوزان"
             showTime

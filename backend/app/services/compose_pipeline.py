@@ -123,6 +123,9 @@ def compose_campaign_dir(
     story_list = _pick(raw, STORY_NAMES)
     wide_list = _pick(raw, WIDE_NAMES)
 
+    produced["ig-post"] = str(
+        overlay.render(feed_src, out / "ig-post.png", format_name="post", **render_kw)
+    )
     produced["ig-feed"] = str(
         overlay.render(feed_src, out / "ig-feed.png", format_name="feed", **render_kw)
     )

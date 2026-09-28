@@ -20,7 +20,7 @@ export default function MoreSettingsPage() {
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4">
         <SalesPolicyForm />
         <TrainingChoice />
         <ShopSettingsForm />
