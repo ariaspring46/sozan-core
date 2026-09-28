@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     admin_phone: str = "09120000000"
     otp_ttl_seconds: int = 300
     otp_dev: bool = True
+    otp_provider: str = ""
+    melipayamak_otp_apikey: str = ""
+    melipayamak_otp_base: str = "https://console.melipayamak.com/api/send/otp"
     otp_fixed_accounts: str = ""
     sms_provider: str = "smsir"
     sms_ir_api_key: str = ""

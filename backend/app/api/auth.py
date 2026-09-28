@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
@@ -22,8 +22,9 @@ def _auth(session: AsyncSession = Depends(get_session)) -> AuthService:
 
 
 @router.post("/otp/send")
-async def otp_send(body: OtpSendIn, service: AuthService = Depends(_auth)):
-    return await service.send_otp(body.phone)
+async def otp_send(request: Request, body: OtpSendIn, service: AuthService = Depends(_auth)):
+    ip = request.client.host if request.client else ""
+    return await service.send_otp(body.phone, ip=ip)
 
 
 @router.post("/otp/verify")
