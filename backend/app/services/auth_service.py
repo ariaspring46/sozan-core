@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import re
 import secrets
 
@@ -20,6 +22,16 @@ OTP_SEND_LIMIT = 5
 OTP_SEND_WINDOW = 900
 OTP_VERIFY_LIMIT = 5
 OTP_VERIFY_WINDOW = 300
+# Melipayamak console OTP: the provider's own code lives hashed, 2 minutes only.
+OTP_MELIPAYAMAK_TTL = 120
+OTP_MELIPAYAMAK_COOLDOWN = 60
+OTP_MELIPAYAMAK_HOURLY = 5
+OTP_WRONG_ATTEMPTS = 5
+
+
+def _hash_otp(phone: str, code: str) -> str:
+    key = f"{settings.jwt_secret}:{phone}".encode("utf-8")
+    return "sha256:" + hmac.new(key, code.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def fixed_otp_for(phone: str) -> str | None:
@@ -30,7 +42,7 @@ class AuthService:
     def __init__(self, users: UserRepository) -> None:
         self.users = users
 
-    async def send_otp(self, phone_raw: str) -> dict:
+    async def send_otp(self, phone_raw: str, *, ip: str = "") -> dict:
         try:
             phone = normalize_phone(phone_raw)
         except ValueError as exc:
@@ -39,6 +51,8 @@ class AuthService:
 
         if is_lab_phone(phone):
             return {"ok": True}
+        if str(settings.otp_provider or "").strip().lower() == "melipayamak_otp":
+            return await self._send_melipayamak_otp(phone, ip=ip)
         with tenant_scope(phone):
             overlay = get_settings()
         mock_sms = overlay.get("mockSms")
@@ -104,6 +118,27 @@ class AuthService:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ارسال پیامک به درگاه نرسید.") from exc
         return payload
 
+    async def _send_melipayamak_otp(self, phone: str, *, ip: str = "") -> dict:
+        """کد را خود ملی‌پیک می‌سازد؛ ما فقط هش آن را دو دقیقه نگه می‌داریم."""
+        from app.services import melipayamak_otp_service
+
+        if int(await redis_client.ttl(f"otp:cool:{phone}")) > 0:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "کد قبلی هنوز تازه است؛ کمی بعد دوباره تلاش کن")
+        for key in (f"otp:hphone:{phone}", f"otp:hip:{ip or 'no-ip'}"):
+            hits = await redis_client.incr(key)
+            if hits == 1:
+                await redis_client.expire(key, 3600)
+            if hits > OTP_MELIPAYAMAK_HOURLY:
+                raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست کد بیش از حد است؛ بعداً تلاش کن")
+        try:
+            code = await melipayamak_otp_service.send_otp(phone)
+        except melipayamak_otp_service.OtpSendError:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ارسال کد ناموفق بود، دوباره تلاش کنید") from None
+        await redis_client.setex(f"otp:{phone}", OTP_MELIPAYAMAK_TTL, _hash_otp(phone, code))
+        await redis_client.setex(f"otp:cool:{phone}", OTP_MELIPAYAMAK_COOLDOWN, "1")
+        await redis_client.delete(f"otp:wa:{phone}")
+        return {"ok": True}
+
     async def _current_or_new_code(self, phone: str, ttl: int) -> tuple[str, bool]:
         """Reuse the live code on resend so a late-arriving SMS still verifies.
 
@@ -133,13 +168,29 @@ class AuthService:
         stored = await redis_client.get(f"otp:{phone}")
         given = re.sub(r"\D", "", normalize_digits(code))
         fixed = fixed_otp_for(phone)
+        hashed = str(stored or "").startswith("sha256:")
         matched = bool(given) and (
-            (fixed is not None and given == fixed) or (stored is not None and stored == given)
+            (fixed is not None and hmac.compare_digest(fixed, given))
+            or (
+                stored is not None
+                and (
+                    hmac.compare_digest(str(stored), _hash_otp(phone, given))
+                    if hashed
+                    else hmac.compare_digest(str(stored), given)
+                )
+            )
         )
         if not matched:
+            if hashed:
+                wrong = await redis_client.incr(f"otp:wa:{phone}")
+                if wrong == 1:
+                    await redis_client.expire(f"otp:wa:{phone}", OTP_MELIPAYAMAK_TTL)
+                if wrong >= OTP_WRONG_ATTEMPTS:
+                    await redis_client.delete(f"otp:{phone}")
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "کد یک‌بارمصرف نادرست است")
         await redis_client.delete(f"otp:{phone}")
         await redis_client.delete(vl_key)
+        await redis_client.delete(f"otp:wa:{phone}")
         user = await self.users.get_by_phone(phone)
         existed = user is not None
         if user is None:
