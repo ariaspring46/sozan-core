@@ -502,6 +502,86 @@ async def shop_checkout(
         return {**order, "url": order["startPayUrl"] or order["payUrl"], "orderId": order["id"]}
 
 
+def shop_config(*, slug: str, secret: str) -> dict:
+    tenant = verify_pay_secret(slug, secret)
+    with tenant_scope(tenant):
+        overlay = get_settings()
+        gateway = str(overlay.get("paymentGateway") or "").strip().lower()
+        merchant = str(overlay.get("zarinpalMerchantId") or "").strip()
+        methods = ["zarinpal"] if gateway == "zarinpal" and merchant else ["receipt"]
+        return {"paymentMethods": methods, "slug": slug}
+
+
+async def attach_receipt(*, slug: str, secret: str, order_no: str, upload) -> dict:
+    tenant = verify_pay_secret(slug, secret)
+    with tenant_scope(tenant):
+        orders = _orders()
+        row = next(
+            (
+                item
+                for item in orders
+                if str(item.get("id")) == str(order_no or "").strip()
+                and str(item.get("status") or "") in ("pending", "awaiting_receipt", "receipt_rejected")
+            ),
+            None,
+        )
+        if row is None:
+            raise ValueError("سفارش پیدا نشد")
+        image_name = ""
+        if upload is not None and getattr(upload, "filename", ""):
+            data = await upload.read()
+            if len(data) > 4_000_000:
+                raise ValueError("عکس رسید بزرگ‌تر از حد مجاز است")
+            if data:
+                from app.services import chat_media_service
+
+                saved = chat_media_service.save(upload.filename, data, upload.content_type or "")
+                image_name = str(saved.get("name") or "")
+        row["status"] = "awaiting_receipt"
+        row["receipt"] = image_name
+        row["receiptStatus"] = "waiting"
+        _save_orders(orders)
+        from app.services import support_service
+
+        support_service.create_ticket(
+            subject=f"رسید سفارش {order_no}",
+            text="رسید کارت‌به‌کارت بارگذاری شد؛ بررسی و تأیید کنید.",
+            order_no=str(order_no),
+            image_name=image_name,
+        )
+        return {"ok": True, "status": "awaiting_receipt"}
+
+
+def list_receipts() -> list[dict]:
+    with tenant_scope(current_tenant()):
+        return [
+            public_order(row)
+            for row in _orders()
+            if str(row.get("status") or "") == "awaiting_receipt"
+        ]
+
+
+def review_receipt(*, order_no: str, approve: bool, note: str = "") -> dict:
+    with tenant_scope(current_tenant()):
+        orders = _orders()
+        row = next(
+            (item for item in orders if str(item.get("id")) == str(order_no or "").strip()),
+            None,
+        )
+        if row is None or str(row.get("status") or "") != "awaiting_receipt":
+            raise ValueError("رسیدی با این شماره در انتظار نیست")
+        if approve:
+            row["status"] = "paid"
+            row["gateway"] = "receipt"
+            row["receiptStatus"] = "approved"
+        else:
+            row["status"] = "receipt_rejected"
+            row["receiptStatus"] = "rejected"
+        row["receiptNote"] = str(note or "").strip()[:300]
+        _save_orders(orders)
+        return public_order(row)
+
+
 def shop_paid(*, slug: str, order_id: str, amount: int, title: str, customer: str, ref_id: str = "") -> dict:
     phone = find_tenant_by_slug(slug)
     if not phone:

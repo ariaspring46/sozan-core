@@ -131,12 +131,19 @@ def live_url(shop: dict) -> str:
     return str(shop.get("url") or "")
 
 
+RESERVED_SLUGS = frozenset(
+    {"sozan", "app", "api", "www", "admin", "ai", "ai0", "status", "mail", "shop", "pay", "help", "blog"}
+)
+
+
 def _publish_dns(shop: dict) -> dict:
     from app.services import arvan_dns_service
 
     slug = str(shop.get("slug") or "").strip()
     if not slug:
         return shop
+    if slug.lower() in RESERVED_SLUGS:
+        raise ValueError("این نام برای فروشگاه رزرو است؛ نام دیگری انتخاب کن")
     result = arvan_dns_service.ensure_shop_record(slug)
     shop["publicHost"] = arvan_dns_service.public_host(slug)
     shop["cnameTarget"] = arvan_dns_service.cname_target(slug)

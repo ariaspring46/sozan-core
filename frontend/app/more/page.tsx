@@ -15,6 +15,7 @@ const HUB = [
   { href: "/studio", title: "استودیو", hint: "پست‌ها و کمپین‌های ساخته‌شده" },
   { href: "/more/settings", title: "پرداخت و پیامک", hint: "اشتراک، درگاه پرداخت و کد ورود" },
   { href: "/more/wallet", title: "کیف پول", hint: "مانده، برداشت شبا و پیامک" },
+  { href: "/more/support", title: "پشتیبانی و رسیدها", hint: "تیکت مشتری و تأیید کارت‌به‌کارت" },
 ] as const;
 
 export default function MorePage() {

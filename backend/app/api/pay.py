@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
@@ -32,6 +32,117 @@ class ShopOtpVerifyIn(BaseModel):
     slug: str = Field(min_length=1, max_length=80)
     phone: str = Field(min_length=8, max_length=20)
     code: str = Field(min_length=4, max_length=8)
+
+
+class TicketIn(BaseModel):
+    slug: str = Field(min_length=1, max_length=80)
+    phone: str = Field(min_length=8, max_length=20)
+    otpToken: str = Field(min_length=10, max_length=160)
+    subject: str = Field(min_length=2, max_length=120)
+    orderNo: str = Field(default="", max_length=40)
+    text: str = Field(min_length=2, max_length=2000)
+
+
+@router.get("/p/shop-config")
+async def shop_config(slug: str = Query(default=""), secret: str = Query(default="")):
+    try:
+        return pay_service.shop_config(slug=slug, secret=secret)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.post("/p/orders/{order_no}/receipt")
+async def order_receipt(
+    order_no: str,
+    request: Request,
+    slug: str = Form(default=""),
+    secret: str = Form(default=""),
+    file: UploadFile | None = File(default=None),
+):
+    try:
+        return await pay_service.attach_receipt(slug=slug, secret=secret, order_no=order_no, upload=file)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.post("/p/tickets")
+async def storefront_ticket(
+    request: Request,
+    slug: str = Form(default=""),
+    phone: str = Form(default=""),
+    otpToken: str = Form(default=""),
+    subject: str = Form(default=""),
+    orderNo: str = Form(default=""),
+    text: str = Form(default=""),
+    file: UploadFile | None = File(default=None),
+):
+    from app.services import shop_otp_service, support_service
+    from app.state_store import tenant_scope
+
+    tenant = pay_service.find_tenant_by_slug(slug)
+
+    if not shop_otp_service.valid_buyer_token(otpToken, slug=slug, phone=phone):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "تأیید شماره لازم است")
+    if not tenant:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "فروشگاه پیدا نشد")
+    image_name = ""
+    if file is not None and file.filename:
+        data = await file.read()
+        if len(data) > 4_000_000:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "عکس بزرگ‌تر از حد مجاز است")
+        if data:
+            from app.services import chat_media_service
+
+            with tenant_scope(tenant):
+                saved = chat_media_service.save(file.filename, data, file.content_type or "")
+                image_name = str(saved.get("name") or "")
+    with tenant_scope(tenant):
+        out = support_service.create_ticket(
+            subject=subject, text=text, phone=phone, order_no=orderNo, image_name=image_name
+        )
+    return out
+
+
+@router.get("/pay/receipts")
+async def panel_receipts(_user=Depends(require_permission("campaigns:write"))):
+    return {"receipts": pay_service.list_receipts()}
+
+
+@router.post("/pay/receipts/{order_no}/review")
+async def panel_review_receipt(
+    order_no: str,
+    body: dict,
+    _user=Depends(require_permission("campaigns:write")),
+):
+    try:
+        return pay_service.review_receipt(
+            order_no=order_no, approve=bool(body.get("approve")), note=str(body.get("note") or "")
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.get("/support/tickets")
+async def panel_tickets(_user=Depends(require_permission("campaigns:read"))):
+    from app.services import support_service
+
+    return {"tickets": support_service.list_tickets()}
+
+
+@router.post("/support/tickets/{ticket_id}/reply")
+async def panel_ticket_reply(
+    ticket_id: str,
+    body: dict,
+    _user=Depends(require_permission("campaigns:write")),
+):
+    from app.services import support_service
+
+    try:
+        return support_service.reply_ticket(
+            ticket_id, text=str(body.get("text") or ""), status=str(body.get("status") or "")
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.post("/p/shop/checkout")

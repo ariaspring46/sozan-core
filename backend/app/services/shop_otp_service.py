@@ -32,6 +32,24 @@ def mint_token(*, slug: str, phone: str) -> str:
     return f"{body}|{_sign(body)}"
 
 
+def valid_buyer_token(token: str, *, slug: str, phone: str) -> bool:
+    """توکنی که /p/otp/verify داده؛ فقط برای همان فروشگاه و همان شماره و تا انقضا."""
+    import hmac as _hmac
+
+    parts = str(token or "").split("|")
+    if len(parts) != 4:
+        return False
+    got_slug, got_phone, exp, sig = parts
+    if not _hmac.compare_digest(_sign(f"{got_slug}|{got_phone}|{exp}"), sig):
+        return False
+    if got_slug != slug or got_phone != phone:
+        return False
+    try:
+        return int(exp) > int(time.time())
+    except ValueError:
+        return False
+
+
 async def send(*, slug: str, phone: str, ip: str = "") -> dict:
     tenant = find_tenant_by_slug(slug)
     if not tenant:

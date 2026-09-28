@@ -19,6 +19,9 @@ TEXT_FIELDS = (
     "invoice",
     "cod",
     "cardToCard",
+    "cardNumber",
+    "sheba",
+    "accountHolder",
 )
 INT_FIELDS = ("shippingCost", "freeShippingFrom", "returnDays", "minOrder")
 
@@ -58,6 +61,17 @@ def save_policy(patch: dict) -> dict:
         value = str(patch.get(key) or "").strip()
         if value:
             cleaned[key] = value[:200]
+    card = str(cleaned.get("cardNumber") or "").replace("-", "").strip()
+    if card:
+        if not (card.isdigit() and len(card) == 16):
+            raise ValueError("شماره کارت باید ۱۶ رقم باشد")
+        cleaned["cardNumber"] = card
+    sheba = str(cleaned.get("sheba") or "").strip()
+    if sheba:
+        sheba = sheba.replace(" ", "").upper()
+        if not (sheba.startswith("IR") and len(sheba) == 24):
+            raise ValueError("شبا باید با IR شروع شود و ۲۴ نویسه باشد")
+        cleaned["sheba"] = sheba
     for key in INT_FIELDS:
         if key not in patch or patch.get(key) in ("", None):
             continue

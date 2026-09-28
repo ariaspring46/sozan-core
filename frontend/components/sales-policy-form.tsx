@@ -18,6 +18,9 @@ const TEXT_FIELDS: { key: string; label: string }[] = [
   { key: "invoice", label: "فاکتور" },
   { key: "cod", label: "پرداخت در محل" },
   { key: "cardToCard", label: "کارت به کارت" },
+  { key: "cardNumber", label: "شماره کارت (۱۶ رقم، برای رسید)" },
+  { key: "sheba", label: "شبا (IR…، برای رسید)" },
+  { key: "accountHolder", label: "نام صاحب حساب (برای رسید)" },
 ];
 
 const NUMBER_FIELDS: { key: string; label: string }[] = [

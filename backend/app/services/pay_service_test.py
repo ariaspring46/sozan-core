@@ -83,6 +83,60 @@ class ShopPayB1Tests(unittest.TestCase):
         self.assertTrue(str(order["payUrl"]).startswith("https://dry-mock.invalid/p/"))
         called.assert_not_called()
 
+    def test_shop_config_and_receipt_flow(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                write_json("shop.json", {"slug": SLUG, "paySecret": SECRET})
+                cfg = pay_service.shop_config(slug=SLUG, secret=SECRET)
+                self.assertEqual(cfg["paymentMethods"], ["receipt"])
+                ctx = _gateway()
+                with ctx[0], ctx[1], ctx[2]:
+                    order = asyncio.run(pay_service.create_order(title="سفارش", amount=5000))
+
+                class _Up:
+                    filename = "receipt.png"
+                    content_type = "image/png"
+
+                    async def read(self):
+                        return b"x" * 64
+
+                out = asyncio.run(
+                    pay_service.attach_receipt(slug=SLUG, secret=SECRET, order_no=order["id"], upload=_Up())
+                )
+                self.assertEqual(out["status"], "awaiting_receipt")
+                from app.services import support_service
+
+                tickets = support_service.list_tickets()
+                self.assertTrue(any(row.get("orderNo") == order["id"] for row in tickets))
+                approved = pay_service.review_receipt(order_no=order["id"], approve=True, note="")
+                self.assertEqual(approved["status"], "paid")
+
+    def test_receipt_reject_keeps_order_reachable(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                write_json("shop.json", {"slug": SLUG, "paySecret": SECRET})
+                ctx = _gateway()
+                with ctx[0], ctx[1], ctx[2]:
+                    order = asyncio.run(pay_service.create_order(title="سفارش", amount=5000))
+                asyncio.run(
+                    pay_service.attach_receipt(slug=SLUG, secret=SECRET, order_no=order["id"], upload=None)
+                )
+                rejected = pay_service.review_receipt(order_no=order["id"], approve=False, note="خوانا نیست")
+                self.assertEqual(rejected["status"], "receipt_rejected")
+                # دوباره رسید می‌گذارد
+                again = asyncio.run(
+                    pay_service.attach_receipt(slug=SLUG, secret=SECRET, order_no=order["id"], upload=None)
+                )
+                self.assertEqual(again["status"], "awaiting_receipt")
+
+    def test_buyer_token_binding(self) -> None:
+        from app.services import shop_otp_service
+
+        token = shop_otp_service.mint_token(slug="shopx", phone="09111234567")
+        self.assertTrue(shop_otp_service.valid_buyer_token(token, slug="shopx", phone="09111234567"))
+        self.assertFalse(shop_otp_service.valid_buyer_token(token, slug="shopy", phone="09111234567"))
+        self.assertFalse(shop_otp_service.valid_buyer_token(token + "x", slug="shopx", phone="09111234567"))
+
     def test_mock_outside_edge_dry_still_opens_the_hub_gateway(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):

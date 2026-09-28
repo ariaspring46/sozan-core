@@ -695,6 +695,8 @@ def _looks_like_product_title(title: str) -> bool:
         return False
     if any(bit in text for bit in SLOGAN_BITS):
         return False
+    if any(bit in text for bit in ("کامنت", "دایرکت", "دیرکت", "برات بیاد", "قیمت و سایز", "پیام بده", "لایک")):
+        return False
     if len(text.split()) > 6:
         return False
     return bool(ITEM_WORD.search(text))
@@ -774,10 +776,11 @@ def _page_posts(page: dict) -> list[dict]:
     return rows
 
 
-def _product_from_caption(caption: str, brand: str = "", image_url: str = "") -> dict | None:
+def _product_from_caption(caption: str, brand: str = "", image_url: str = "", fallback_no: int = 0) -> dict | None:
     title = product_title_from_caption(caption, brand=brand)
     if not title:
-        title = SPACE.sub(" ", caption or "").strip(" .،,")[:36]
+        # نامی پیدا نشد؛ جملهٔ فراخوان هرگز نام کالا نمی‌شود.
+        title = f"کالای {max(1, fallback_no)}"
     if len(title) < 3:
         return None
     price, price_note = parse_caption_price(caption)
@@ -811,7 +814,9 @@ def _caption_products(page: dict, brand: str = "") -> list[dict]:
     rows: list[dict] = []
     for post in _page_posts(page):
         caption = str(post.get("caption") or "")
-        row = _product_from_caption(caption, brand=brand, image_url=str(post.get("image") or ""))
+        row = _product_from_caption(
+            caption, brand=brand, image_url=str(post.get("image") or ""), fallback_no=len(seen) + 1
+        )
         if not row:
             continue
         title = str(row.get("title") or "")
