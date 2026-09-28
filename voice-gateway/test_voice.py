@@ -815,6 +815,7 @@ class SalesTest(unittest.TestCase):
         self.assertIn("لغو است", opened)
         self.assertIn("اول به حرف مخاطب ربط", opened)
         self.assertIn("حدس نزن", opened)
+        self.assertIn("از سوزان‌کُر", opened)
         self.assertIn("سه قدم", opened)
         set_payment_fetcher(lambda: True)
         self.assertIn("داخل همان گفتگو", sales_open())
