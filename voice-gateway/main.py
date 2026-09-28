@@ -131,7 +131,7 @@ CHECK_LINE = CURIOUS_LINES[0]
 HOWDY_LINE = "خوبم. تو بگو."
 BYE_LINE = "خداحافظ."
 WAIT_LINE = THINKING_LINES[0]
-THINK_WAIT_S = 1.8
+THINK_WAIT_S = 0.7
 # How long the contact may talk before we take our turn instead of holding the reply.
 SPEAK_OVER_MS = int(os.environ.get("SPEAK_OVER_MS", "2500"))
 NUDGE_AFTER_S = 5.0
@@ -569,6 +569,8 @@ class Gateway:
         self._sales_greeted = False
         self._sales_cancel: threading.Event | None = None
         self._sales_turn_seq = 0
+        self._prefetch_lock = threading.Lock()
+        self._prefetch_inflight: set[str] = set()
         self._outbound_pitch = False
         self._sim_until = 0.0
         self._sim_call = False
@@ -1274,17 +1276,19 @@ class Gateway:
         turn_seq = self._sales_turn_seq
 
         def filler() -> None:
-            time.sleep(THINK_WAIT_S)
-            if (
-                not played_flag["on"]
-                and turn_seq == self._sales_turn_seq
-                and generation == self._call_generation
-                and not session.playing.is_set()
-                and session._play.empty()
-                and not session._speech
-                and self._last_kind != "wait"
-            ):
-                self._speak(session, generation, wait_line(heard), "wait")
+            for delay, guard_kind in ((THINK_WAIT_S, "any"), (2.8, "wait")):
+                time.sleep(delay)
+                if (
+                    not played_flag["on"]
+                    and turn_seq == self._sales_turn_seq
+                    and generation == self._call_generation
+                    and not session.playing.is_set()
+                    and session._play.empty()
+                    and not session._speech
+                ):
+                    if guard_kind == "wait" and self._last_kind != "wait":
+                        break
+                    self._speak(session, generation, wait_line(heard), "wait")
 
         if self._last_kind != "wait":
             threading.Thread(target=filler, name="sales-wait", daemon=True).start()
@@ -1533,15 +1537,29 @@ class Gateway:
         return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
 
     def _ahead_sales(self, gen, cancel: threading.Event, generation: int):
-        """Keep reading tokens while Piper builds the sentence already queued."""
+        """Keep reading tokens while the previous sentence is still playing, and
+        start the next sentence's cloud TTS in parallel so sentences never gap."""
         bits: queue.Queue = queue.Queue()
         done = threading.Event()
 
         def pump() -> None:
+            sentence_index = 0
             try:
                 for bit in gen:
                     if cancel.is_set() or generation != self._call_generation:
                         break
+                    sentence = str(bit.get("sentence") or "").strip()
+                    if sentence:
+                        if sentence_index >= 1:
+                            text, _tags = extract_tags(sentence)
+                            if text and text not in self._voice:
+                                threading.Thread(
+                                    target=self._prefetch_line,
+                                    args=(text,),
+                                    name="sales-tts-prefetch",
+                                    daemon=True,
+                                ).start()
+                        sentence_index += 1
                     bits.put(bit)
             except Exception:
                 log.warning("sales stream turn failed", exc_info=True)
@@ -1559,6 +1577,23 @@ class Gateway:
         finally:
             cancel.set()
             done.wait(timeout=5)
+
+    def _prefetch_line(self, text: str) -> None:
+        """Synthesize a model sentence ahead of playback; the result lands in the
+        voice cache so _sales_play_bit plays it the instant it is popped."""
+        with self._prefetch_lock:
+            if text in self._prefetch_inflight:
+                return
+            self._prefetch_inflight.add(text)
+        try:
+            pcm = self.brain.prefetch_cloud(text)
+            if pcm and self._voice.get(text) is None:
+                self._voice[text] = pcm
+        except Exception:
+            log.warning("tts prefetch failed", exc_info=True)
+        finally:
+            with self._prefetch_lock:
+                self._prefetch_inflight.discard(text)
 
     def _speak_more(self, session: RtpSession, generation: int, line: str) -> None:
         pcm = self._voice.get(line)

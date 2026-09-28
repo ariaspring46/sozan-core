@@ -93,6 +93,67 @@ def clean_ear_text(text: str) -> str:
         return ""
     return text
 
+class _KeepAlivePool:
+    """Small HTTPS connection pool: keeps the TLS session warm so each cloud
+    request skips the handshake. Only for fully-read request/response cycles."""
+
+    def __init__(self, host: str, maxsize: int = 4):
+        import http.client
+
+        self._http = http.client
+        self.host = host
+        self.maxsize = maxsize
+        self._lock = threading.Lock()
+        self._idle: list = []
+
+    def _fresh(self, timeout: float):
+        return self._http.HTTPSConnection(self.host, timeout=timeout)
+
+    def request(self, path: str, body: bytes, headers: dict, timeout: float = 20.0):
+        """POST and return (status, content-type, connection). The caller MUST
+        either read the response to EOF and call put(), or call drop()."""
+        conn = None
+        for attempt in (0, 1):
+            try:
+                with self._lock:
+                    conn = self._idle.pop() if self._idle else None
+                if conn is None:
+                    conn = self._fresh(timeout)
+                conn.request("POST", path, body=body, headers=headers)
+                res = conn.getresponse()
+                return res.status, res.headers.get("content-type") or "", res, conn
+            except Exception:
+                try:
+                    if conn is not None:
+                        conn.close()
+                except Exception:
+                    pass
+                conn = None
+                if attempt:
+                    raise
+        raise RuntimeError("unreachable")
+
+    def put(self, conn) -> None:
+        with self._lock:
+            if len(self._idle) < self.maxsize:
+                self._idle.append(conn)
+                return
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    @staticmethod
+    def drop(conn) -> None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+_OR_POOL = _KeepAlivePool("openrouter.ai")
+
+
 def cloud_speech_body(model: str, voice: str, text: str) -> dict:
     body: dict = {
         "model": model,
@@ -115,9 +176,9 @@ def tts_model() -> str:
 
 def tts_first_s() -> float:
     try:
-        return float(os.environ.get("TTS_FIRST_S", "6"))
+        return float(os.environ.get("TTS_FIRST_S", "12"))
     except ValueError:
-        return 6.0
+        return 12.0
 
 
 def llm_is_local(url: str) -> bool:
@@ -990,15 +1051,19 @@ class Brain:
             "max_tokens": 200,
             "temperature": 0,
         }
-        req = urllib.request.Request(
-            chat_completions_url("https://openrouter.ai/api/v1"),
-            data=dumps(body).encode(),
-            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-            method="POST",
-        )
         try:
-            res = _DIRECT.open(req, timeout=timeout)
-            data = loads(res.read())
+            status, _ctype, res, conn = _OR_POOL.request(
+                "/api/v1/chat/completions",
+                dumps(body).encode(),
+                {"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+                timeout=timeout,
+            )
+            raw = res.read()
+            _OR_POOL.put(conn)
+            if status != 200:
+                log.warning("cloud ear status=%s", status)
+                return ""
+            data = loads(raw)
             text = str(data["choices"][0]["message"]["content"] or "").strip()
         except Exception as exc:
             log.warning("cloud ear failed %s", type(exc).__name__)
@@ -1351,15 +1416,14 @@ class Brain:
             return
         voice = os.environ.get("TTS_VOICE", "Kore").strip()
         body = cloud_speech_body(model, voice, mask_private(text))
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/audio/speech",
-            data=dumps(body).encode(),
-            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
-            method="POST",
-        )
         started = time.monotonic()
         try:
-            res = _DIRECT.open(req, timeout=first_s + 8)
+            status, ctype, res, conn = _OR_POOL.request(
+                "/api/v1/audio/speech",
+                dumps(body).encode(),
+                {"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+                timeout=first_s + 8,
+            )
         except Exception as exc:
             log.warning("tts cloud failed %s", type(exc).__name__)
             return
@@ -1367,9 +1431,10 @@ class Brain:
         block = bytearray()
         yielded = False
         try:
-            ctype = res.headers.get("content-type") or ""
-            if not ctype.startswith("audio/"):
-                log.warning("tts cloud not audio")
+            if status != 200 or not ctype.startswith("audio/"):
+                log.warning("tts cloud not audio status=%s", status)
+                _OR_POOL.drop(conn)
+                conn = None
                 return
             if "rate=" in ctype:
                 try:
@@ -1381,6 +1446,8 @@ class Brain:
                     part = res.read(4096)
                 except Exception as exc:
                     log.warning("tts cloud read %s", type(exc).__name__)
+                    _OR_POOL.drop(conn)
+                    conn = None
                     break
                 if not part:
                     break
@@ -1388,6 +1455,8 @@ class Brain:
                     first = time.monotonic() - started
                     if first > first_s:
                         log.info("tts cloud late %.2f", first)
+                        _OR_POOL.drop(conn)
+                        conn = None
                         return
                 block.extend(part)
                 if len(block) >= 12288:
@@ -1401,8 +1470,12 @@ class Brain:
                 block.clear()
                 if piece:
                     yield piece
+        except GeneratorExit:
+            _OR_POOL.drop(conn)
+            conn = None
         finally:
-            res.close()
+            if conn is not None:
+                _OR_POOL.put(conn)
 
     def _synth_once(self, spoken: str) -> bytes:
         env = os.environ.copy()
