@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from unittest.mock import patch
 
@@ -113,6 +114,15 @@ class ArvanCnameTests(unittest.TestCase):
             out = arvan_dns_service.check_cname("shop.example.com", "sozan")
         self.assertFalse(out["ok"])
         self.assertEqual(out["status"], "waiting")
+
+    def test_dry_edge_does_not_call_arvan(self) -> None:
+        with patch.dict(os.environ, {"SOZAN_EDGE_DRY": "1"}), patch.object(arvan_dns_service, "_client") as client:
+            record = arvan_dns_service.ensure_shop_record("tast-didari")
+            setup = arvan_dns_service.start_cname_setup("shop.example.com", "tast-didari")
+        client.assert_not_called()
+        self.assertTrue(record["dry"])
+        self.assertTrue(setup["dry"])
+        self.assertEqual(record["host"], "tast-didari.sozan-core.ir")
 
 
 if __name__ == "__main__":
