@@ -1,5 +1,6 @@
 .env
 .env.*
+bench-images/
 !.env.example
 !.env*.example
 .venv

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B6B78"/>
+      <stop offset="1" stop-color="#0E3F4A"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E2B35C"/>
+      <stop offset="1" stop-color="#B9802F"/>
+    </linearGradient>
+  </defs>
+  <!-- gem silhouette: crown (top) + pavilion (bottom) -->
+  <path d="M52 62 L78 36 H122 L148 62 L100 168 Z" fill="url(#g1)"/>
+  <!-- girdle line -->
+  <path d="M52 62 H148" stroke="#E2B35C" stroke-width="3" fill="none"/>
+  <!-- facet / network lines -->
+  <g stroke="#E2B35C" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.95">
+    <path d="M78 36 L100 62 L122 36"/>
+    <path d="M52 62 L100 168 L148 62"/>
+    <path d="M78 62 L100 168 L122 62"/>
+    <path d="M100 62 L100 168"/>
+  </g>
+  <!-- network nodes on facet joints -->
+  <g fill="url(#g2)" stroke="#0E3F4A" stroke-width="2">
+    <circle cx="78" cy="36" r="6"/>
+    <circle cx="122" cy="36" r="6"/>
+    <circle cx="52" cy="62" r="6"/>
+    <circle cx="148" cy="62" r="6"/>
+    <circle cx="100" cy="62" r="7.5"/>
+    <circle cx="100" cy="168" r="7"/>
+  </g>
+</svg>

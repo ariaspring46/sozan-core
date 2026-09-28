@@ -1,0 +1,7 @@
+[Unit]
+Description=Check Sozan public DNS and storefronts
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/home/ubuntu/sozan-core/deploy/dns-watch.sh

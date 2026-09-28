@@ -1,0 +1,2505 @@
+[
+  {
+    "page": "login",
+    "size": 390,
+    "theme": "light",
+    "href": "/login",
+    "h1": "ورود",
+    "text": "shop.build({ brand, style })\nawait factory.start(prompt)\ndns.publish(slug)\ninbox.sync(telegram)\nbuild_shop()\n\nسوزان\n\nورود\n\nفروشگاه را در چت می‌سازی. شماره‌ات را وارد کن تا کد پیامک بیاید.\n\nشماره موبایل\n\nارسال کد",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"d:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\","
+    ],
+    "latin": [
+      "shop",
+      "build",
+      "brand",
+      "style",
+      "await",
+      "factory",
+      "start",
+      "prompt",
+      "dns",
+      "publish",
+      "slug",
+      "inbox"
+    ],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": []
+  },
+  {
+    "page": "onboard",
+    "size": 390,
+    "theme": "light",
+    "href": "/chat",
+    "h1": "سوزان",
+    "text": "گفتگو\n\nسوزان\nگفتگوها\nگفتگو\nگفتگوی تازه\nشروع کار\nهمه\n۰ از ۶\nبستن\nقدم بعد\nاتصال اینستاگرام یا تلگرام\nانجام بده\n\nسلام، من سوزانم — برای آزمایش پنل.\n\nفروشگاه، محتوا یا دایرکت را همین‌جا بگو.\n\nتغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.\n\n«یک بخش درباره م\n\nمثلاً این را بنویس — یا روی جمله بزن\n\nبفرست\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "بفرست",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": true,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": true,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "chat",
+    "size": 390,
+    "theme": "light",
+    "href": "/chat",
+    "h1": "سوزان",
+    "text": "گفتگو\n\nسوزان\nگفتگوها\nگفتگو\nگفتگوی تازه\nشروع کار\nهمه\n۰ از ۶\nبستن\nقدم بعد\nاتصال اینستاگرام یا تلگرام\nانجام بده\n\nسلام، من سوزانم — برای آزمایش پنل.\n\nفروشگاه، محتوا یا دایرکت را همین‌جا بگو.\n\nتغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.\n\n«برای انگشتر نقره یک پست اینستاگرام بساز»\n\nمثلاً این را بنویس — یا روی جمله بزن\n\nبفرست\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "بفرست",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": true,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": true,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "shop",
+    "size": 390,
+    "theme": "light",
+    "href": "/shop",
+    "h1": "آزمایش پنل",
+    "text": "فروشگاه\n\nآزمایش پنل\nبعد از ساخت سایت\n\nبدون قیمت تومان ویترین فروش نمی‌شود. ثبت قیمت\n\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "studio",
+    "size": 390,
+    "theme": "light",
+    "href": "/studio",
+    "h1": "رسانه‌های ساخته‌شده",
+    "text": "استودیو\n\nرسانه‌های ساخته‌شده\nمحتوا\nکمپین‌ها\n\nهنوز رسانه‌ای ساخته نشده\n\nاز چت بگو چه پست یا ویدیویی می‌خواهی. ساخته‌شده‌ها همین‌جا می‌مانند.\n\nرفتن به چت\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "رفتن به چت",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "inbox",
+    "size": 390,
+    "theme": "light",
+    "href": "/inbox",
+    "h1": "پیام مشتری‌ها",
+    "text": "صندوق\n\nپیام مشتری‌ها\nپاسخ سوزان به دایرکت\nپلن رایگان\nخاموش\nپیش‌نویس 🔒\nارسال خودکار 🔒\n\nجواب‌ها را خودت می‌نویسی. پیش‌نویس و ارسال خودکار در پلن‌های پولی\n\nهمگام‌سازی دایرکت در این پلن خاموش است. پیام‌های جدید از اینستاگرام و تلگرام نمی‌آیند.\n\nهمه\nخوانده‌نشده\nمنتظر شما\nهمه کانال‌ها\nاینستاگرام\nتلگرام\n\nهنوز پیامی نیامده\n\nحساب کانال را وصل کن تا پیام مشتری اینجا بیاید.\n\nوصل کردن کانال\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "خاموش",
+        "ratio": 1.1
+      },
+      {
+        "text": "همه",
+        "ratio": 1.1
+      },
+      {
+        "text": "همه کانال‌ها",
+        "ratio": 1.1
+      },
+      {
+        "text": "وصل کردن کانال",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": true,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "sales",
+    "size": 390,
+    "theme": "light",
+    "href": "/sales",
+    "h1": "فروش و سفارش‌ها",
+    "text": "فروش\n\nفروش و سفارش‌ها\nکیف پول\nانبار\n\nامروز\n\n۰\n\nتومان\n\n۷ روز اخیر\n\n۰\n\nتومان\n\n۳۰ روز اخیر\n\n۰\n\nتومان\n\nفروش‌ها\nثبت فروش دستی\n\nهنوز فروشی نیامده\n\nفروش‌هایی که از درگاه سایت یا لینک پرداخت دایرکت می‌آیند خودکار اینجا می‌نشینند. فروش بیرونی را با «ثبت فروش دستی» وارد کن.\n\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ثبت فروش دستی",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "campaigns",
+    "size": 390,
+    "theme": "light",
+    "href": "/campaigns",
+    "h1": "کمپین‌ها",
+    "text": "استودیو\n\nکمپین‌ها\nمحتوا\nکمپین‌ها\n\nکمپینی نیست\n\nاز چت بگو چه پستی می‌خواهی، یا اگر پوشه روی دیسک داری شناسه را بالا بگذار.\n\nرفتن به چت\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "رفتن به چت",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "more",
+    "size": 390,
+    "theme": "light",
+    "href": "/more",
+    "h1": "همهٔ ابزارها",
+    "text": "بیشتر\n\nهمهٔ ابزارها\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nانبار\n\nکالا، قیمت و موجودی\n\nاسناد آموزشی\n\nاز ورود تا دامنه و ویرایش\n\nکانال‌ها\n\nاینستاگرام تا روبیکا\n\nهویت و لوگو\n\nنام، لوگو و حرکت برند\n\nاستودیو\n\nپست‌ها و کمپین‌های ساخته‌شده\n\nپرداخت و پیامک\n\nاشتراک، درگاه پرداخت و کد ورود\n\nکیف پول\n\nمانده، برداشت شبا و پیامک\n\nظاهر پنل\n\n«خودکار» همان روشن یا تیرهٔ گوشی/سیستم را دنبال می‌کند.\n\nروشن\nتیره\nخودکار\nخروج\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": true,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "wallet",
+    "size": 390,
+    "theme": "light",
+    "href": "/more/wallet",
+    "h1": "کیف پول",
+    "text": "بیشتر\n\nکیف پول\n\nقابل‌برداشت\n\n۰ تومان\n\nدر انتظار برداشت\n\n۰ تومان\n\nفروش آنلاین\n\n۰ تومان\n\nکمیسیون سوزان\n\n۰ تومان\n\nفروش دستی وارد کیف نمی‌شود. اگر مرچنت شخصی داشته باشی پول در حساب خودت می‌ماند و اینجا فقط ثبت می‌شود. درگاه سوزان ۲٪ کمیسیون دارد.\n\nپیامک این ماه: ۰ از ۵۰ · بعد از سقف هر پیامک ۲۰۰ تومان\n\nبرداشت با شبا\nمبلغ به تومان\nشبا\nنام صاحب حساب\nثبت درخواست برداشت\nگردش کیف\n\nهنوز گردشی نیست\n\nفروش درگاهی اینجا می‌آید.\n\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ثبت درخواست برداشت",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": true,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": []
+  },
+  {
+    "page": "inventory",
+    "size": 390,
+    "theme": "light",
+    "href": "/more/inventory",
+    "h1": "انبار کالا",
+    "text": "بیشتر\n\nانبار کالا\n\nفروشگاه هنوز ساخته نشده؛ کالاها بعد از ساختن سایت روی آن می‌آیند.\n\nافزودن کالا\n\nهنوز کالایی نیست\n\nکانال را وصل کن یا کالا را دستی اضافه کن.\n\nوصل کردن کانال\nافزودن کالا\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "افزودن کالا",
+        "ratio": 1.1
+      },
+      {
+        "text": "وصل کردن کانال",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "channels",
+    "size": 390,
+    "theme": "light",
+    "href": "/more/channels",
+    "h1": "حساب کانال‌ها",
+    "text": "بازگشت\nحساب کانال‌ها\n\nاینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.\n\nپلتفرم\nاینستاگرام\nتلگرام\nواتساپ\nبله\nروبیکا\n\nاینستاگرام را با ورود رسمی BoxAPI وصل کن تا دایرکت مشتری بیاید. رمز را در فرم سوزان نگذار. اسکن ویترین عمومی با نام کاربری جداست.\n\nاسناد اتصال اینستاگرام\nورود با اینستاگرام\nنام کاربری صفحه\nچند پیام به لحن خودت\nافزودن حساب\n\nحسابی وصل نیست\n\nپلتفرم و مشخصات اتصال را بالا بگذار تا کانال به فروشگاه وصل شود.\n\nلحن یادگرفته\n\nگرم، کوتاه، فارسی روزمره\n\nفروشندهٔ صمیمی؛ واضح و بی‌تعارف.\n\nنمونه پاسخ: سلام، موجودی را همین حالا چک می‌کنم و برمی‌گردم.\n\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [
+      "BoxAPI"
+    ],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ورود با اینستاگرام",
+        "ratio": 1.1
+      },
+      {
+        "text": "افزودن حساب",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": []
+  },
+  {
+    "page": "settings",
+    "size": 390,
+    "theme": "light",
+    "href": "/more/settings",
+    "h1": "پرداخت و پیامک",
+    "text": "بیشتر\n\nپرداخت و پیامک\nارسال و مرجوعی\n\nفیلد خالی یعنی هنوز ثبت نشده و دایرکت همان موضوع را به شما می‌سپارد.\n\nهزینهٔ ارسال (تومان)\nارسال رایگان از (تومان)\nمهلت مرجوعی (روز)\nحداقل خرید (تومان)\nروش ارسال\nزمان ارسال\nشهرهای ارسال\nشرط مرجوعی\nهزینهٔ برگشت با\nساعت پاسخ\nتعویض سایز\nفاکتور\nپرداخت در محل\nذخیرهٔ ارسال و مرجوعی\nفروشگاه و پرداخت\nنام فروشگاه\nشعار\nدرگاه پرداخت\nثبت دستی / بدون درگاه\nزرین‌پال\nآیدی‌پی\n\nفروش را خودت در بخش فروش ثبت می‌کنی. برای دریافت آنلاین، زرین‌پال یا آیدی‌پی را انتخاب کن.\n\nمرچنت شخصی زرین‌پال یا آیدی‌پی کمیسیون ندارد. اگر نباشد، لینک پرداخت و فروشگاه روی درگاه سوزان می‌رود و ۲٪ کم می‌شود. پول قابل‌برداشت در کیف پول است.\n\nفروش آنلاین خاموش است؛ فروش دستی ثبت می‌شود.\n\nدرگاه پیامک\n\nورود پنل با پیامک SMS.ir هاب سوزان ارسال می‌شود.\n\nپیامک آزمایشی (کد روی صفحه ورود)\nدرگاه\nکاوه نگار\nSMS.ir\n\nاز پنل SMS.ir کلید API و شناسه عددی قالب ارسال سریع (verify) را بردار. اسناد\n\nکلید API\nشناسه قالب (Template ID)\nنام پارامتر قالب\nاشتراک رایگان\nذخیره تنظیمات\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])",
+      "وب‌سایت 0 از 1"
+    ],
+    "latin": [
+      "SMS",
+      "API",
+      "verify",
+      "Template"
+    ],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ذخیرهٔ ارسال و مرجوعی",
+        "ratio": 1.1
+      },
+      {
+        "text": "ذخیره تنظیمات",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": true,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "onboard",
+    "size": 1440,
+    "theme": "light",
+    "href": "/chat",
+    "h1": "سوزان",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nگفتگو\n\nسوزان\nگفتگوها\nگفتگو\nگفتگوی تازه\nشروع کار\nهمه\n۰ از ۶\nبستن\nقدم بعد\nاتصال اینستاگرام یا تلگرام\nانجام بده\n\nسلام، من سوزانم — برای آزمایش پنل.\n\nفروشگاه، محتوا یا دایرکت را همین‌جا بگو.\n\nتغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.\n\n«یک بخش درباره ما \n\nمثلاً این را بنویس — یا روی جمله بزن\n\nبفرست",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "بفرست",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": true,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": true,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "chat",
+    "size": 1440,
+    "theme": "light",
+    "href": "/chat",
+    "h1": "سوزان",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nگفتگو\n\nسوزان\nگفتگوها\nگفتگو\nگفتگوی تازه\nشروع کار\nهمه\n۰ از ۶\nبستن\nقدم بعد\nاتصال اینستاگرام یا تلگرام\nانجام بده\n\nسلام، من سوزانم — برای آزمایش پنل.\n\nفروشگاه، محتوا یا دایرکت را همین‌جا بگو.\n\nتغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.\n\n«برای انگشتر نقره یک پست اینستاگرام بساز»\n\nمثلاً این را بنویس — یا روی جمله بزن\n\nبفرست",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "بفرست",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": true,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": true,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "shop",
+    "size": 1440,
+    "theme": "light",
+    "href": "/shop",
+    "h1": "آزمایش پنل",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nفروشگاه\n\nآزمایش پنل\nبعد از ساخت سایت\n\nبدون قیمت تومان ویترین فروش نمی‌شود. ثبت قیمت",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "studio",
+    "size": 1440,
+    "theme": "light",
+    "href": "/studio",
+    "h1": "رسانه‌های ساخته‌شده",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nاستودیو\n\nرسانه‌های ساخته‌شده\nمحتوا\nکمپین‌ها\n\nهنوز رسانه‌ای ساخته نشده\n\nاز چت بگو چه پست یا ویدیویی می‌خواهی. ساخته‌شده‌ها همین‌جا می‌مانند.\n\nرفتن به چت",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "رفتن به چت",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "inbox",
+    "size": 1440,
+    "theme": "light",
+    "href": "/inbox",
+    "h1": "پیام مشتری‌ها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nصندوق\n\nپیام مشتری‌ها\nپاسخ سوزان به دایرکت\nپلن رایگان\nخاموش\nپیش‌نویس 🔒\nارسال خودکار 🔒\n\nجواب‌ها را خودت می‌نویسی. پیش‌نویس و ارسال خودکار در پلن‌های پولی\n\nهمگام‌سازی دایرکت در این پلن خاموش است. پیام‌های جدید از اینستاگرام و تلگرام نمی‌آیند.\n\nهمه\nخوانده‌نشده\nمنتظر شما\nهمه کانال‌ها\nاینستاگرام\nتلگرام\n\nهنوز پیامی نیامده\n\nحساب کانال را وصل کن تا پیام مشتری اینجا بیاید.\n\nوصل کردن کانال",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "خاموش",
+        "ratio": 1.1
+      },
+      {
+        "text": "همه",
+        "ratio": 1.1
+      },
+      {
+        "text": "همه کانال‌ها",
+        "ratio": 1.1
+      },
+      {
+        "text": "وصل کردن کانال",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": true,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "sales",
+    "size": 1440,
+    "theme": "light",
+    "href": "/sales",
+    "h1": "فروش و سفارش‌ها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nفروش\n\nفروش و سفارش‌ها\nکیف پول\nانبار\n\nامروز\n\n۰\n\nتومان\n\n۷ روز اخیر\n\n۰\n\nتومان\n\n۳۰ روز اخیر\n\n۰\n\nتومان\n\nفروش‌ها\nثبت فروش دستی\n\nهنوز فروشی نیامده\n\nفروش‌هایی که از درگاه سایت یا لینک پرداخت دایرکت می‌آیند خودکار اینجا می‌نشینند. فروش بیرونی را با «ثبت فروش دستی» وارد کن.",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ثبت فروش دستی",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "campaigns",
+    "size": 1440,
+    "theme": "light",
+    "href": "/campaigns",
+    "h1": "کمپین‌ها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nاستودیو\n\nکمپین‌ها\nمحتوا\nکمپین‌ها\n\nکمپینی نیست\n\nاز چت بگو چه پستی می‌خواهی، یا اگر پوشه روی دیسک داری شناسه را بالا بگذار.\n\nرفتن به چت",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "رفتن به چت",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "more",
+    "size": 1440,
+    "theme": "light",
+    "href": "/more",
+    "h1": "همهٔ ابزارها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nبیشتر\n\nهمهٔ ابزارها\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nانبار\n\nکالا، قیمت و موجودی\n\nاسناد آموزشی\n\nاز ورود تا دامنه و ویرایش\n\nکانال‌ها\n\nاینستاگرام تا روبیکا\n\nهویت و لوگو\n\nنام، لوگو و حرکت برند\n\nاستودیو\n\nپست‌ها و کمپین‌های ساخته‌شده\n\nپرداخت و پیامک\n\nاشتراک، درگاه پرداخت و کد ورود\n\nکیف پول\n\nمانده، برداشت شبا و پیامک\n\nظاهر پنل\n\n«خودکار» همان روشن یا تیرهٔ گوشی/سیستم را دنبال می‌کند.\n\nروشن\nتیره\nخودکار\nخروج",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": true,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "wallet",
+    "size": 1440,
+    "theme": "light",
+    "href": "/more/wallet",
+    "h1": "کیف پول",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nبیشتر\n\nکیف پول\n\nقابل‌برداشت\n\n۰ تومان\n\nدر انتظار برداشت\n\n۰ تومان\n\nفروش آنلاین\n\n۰ تومان\n\nکمیسیون سوزان\n\n۰ تومان\n\nفروش دستی وارد کیف نمی‌شود. اگر مرچنت شخصی داشته باشی پول در حساب خودت می‌ماند و اینجا فقط ثبت می‌شود. درگاه سوزان ۲٪ کمیسیون دارد.\n\nپیامک این ماه: ۰ از ۵۰ · بعد از سقف هر پیامک ۲۰۰ تومان\n\nبرداشت با شبا\nمبلغ به تومان\nشبا\nنام صاحب حساب\nثبت درخواست برداشت\nگردش کیف\n\nهنوز گردشی نیست\n\nفروش درگاهی اینجا می‌آید.",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ثبت درخواست برداشت",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": true,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": []
+  },
+  {
+    "page": "inventory",
+    "size": 1440,
+    "theme": "light",
+    "href": "/more/inventory",
+    "h1": "انبار کالا",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nبیشتر\n\nانبار کالا\n\nفروشگاه هنوز ساخته نشده؛ کالاها بعد از ساختن سایت روی آن می‌آیند.\n\nافزودن کالا\n\nهنوز کالایی نیست\n\nکانال را وصل کن یا کالا را دستی اضافه کن.\n\nوصل کردن کانال\nافزودن کالا",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "افزودن کالا",
+        "ratio": 1.1
+      },
+      {
+        "text": "وصل کردن کانال",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "channels",
+    "size": 1440,
+    "theme": "light",
+    "href": "/more/channels",
+    "h1": "حساب کانال‌ها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\nبازگشت\nحساب کانال‌ها\n\nاینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.\n\nپلتفرم\nاینستاگرام\nتلگرام\nواتساپ\nبله\nروبیکا\n\nاینستاگرام را با ورود رسمی BoxAPI وصل کن تا دایرکت مشتری بیاید. رمز را در فرم سوزان نگذار. اسکن ویترین عمومی با نام کاربری جداست.\n\nاسناد اتصال اینستاگرام\nورود با اینستاگرام\nنام کاربری صفحه\nچند پیام به لحن خودت\nافزودن حساب\n\nحسابی وصل نیست\n\nپلتفرم و مشخصات اتصال را بالا بگذار تا کانال به فروشگاه وصل شود.\n\nلحن یادگرفته\n\nگرم، کوتاه، فارسی روزمره\n\nفروشندهٔ صمیمی؛ واضح و بی‌تعارف.\n\nنمونه پاسخ: سلام، موجودی را همین حالا چک می‌کنم و برمی‌گردم.",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [
+      "BoxAPI"
+    ],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ورود با اینستاگرام",
+        "ratio": 1.1
+      },
+      {
+        "text": "افزودن حساب",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "settings",
+    "size": 1440,
+    "theme": "light",
+    "href": "/more/settings",
+    "h1": "پرداخت و پیامک",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nبیشتر\n\nپرداخت و پیامک\nارسال و مرجوعی\n\nفیلد خالی یعنی هنوز ثبت نشده و دایرکت همان موضوع را به شما می‌سپارد.\n\nهزینهٔ ارسال (تومان)\nارسال رایگان از (تومان)\nمهلت مرجوعی (روز)\nحداقل خرید (تومان)\nروش ارسال\nزمان ارسال\nشهرهای ارسال\nشرط مرجوعی\nهزینهٔ برگشت با\nساعت پاسخ\nتعویض سایز\nفاکتور\nپرداخت در محل\nذخیرهٔ ارسال و مرجوعی\nفروشگاه و پرداخت\nنام فروشگاه\nشعار\nدرگاه پرداخت\nثبت دستی / بدون درگاه\nزرین‌پال\nآیدی‌پی\n\nفروش را خودت در بخش فروش ثبت می‌کنی. برای دریافت آنلاین، زرین‌پال یا آیدی‌پی را انتخاب کن.\n\nمرچنت شخصی زرین‌پال یا آیدی‌پی کمیسیون ندارد. اگر نباشد، لینک پرداخت و فروشگاه روی درگاه سوزان می‌رود و ۲٪ کم می‌شود. پول قابل‌برداشت در کیف پول است.\n\nفروش آنلاین خاموش است؛ فروش دستی ثبت می‌شود.\n\nدرگاه پیامک\n\nورود پنل با پیامک SMS.ir هاب سوزان ارسال می‌شود.\n\nپیامک آزمایشی (کد روی صفحه ورود)\nدرگاه\nکاوه نگار\nSMS.ir\n\nاز پنل SMS.ir کلید API و شناسه عددی قالب ارسال سریع (verify) را بردار. اسناد\n\nکلید API\nشناسه قالب (Template ID)\nنام پارامتر قالب\nاشتراک رایگان\nذخیره تنظیمات",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])",
+      "وب‌سایت 0 از 1"
+    ],
+    "latin": [
+      "SMS",
+      "API",
+      "verify",
+      "Template"
+    ],
+    "overflow": [],
+    "contrast": [
+      {
+        "text": "ارتقای پلن",
+        "ratio": 1.1
+      },
+      {
+        "text": "ذخیرهٔ ارسال و مرجوعی",
+        "ratio": 1.1
+      },
+      {
+        "text": "ذخیره تنظیمات",
+        "ratio": 1.1
+      }
+    ],
+    "hasStart": false,
+    "hasShipping": true,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "onboard",
+    "size": 390,
+    "theme": "dark",
+    "href": "/chat",
+    "h1": "سوزان",
+    "text": "گفتگو\n\nسوزان\nگفتگوها\nگفتگو\nگفتگوی تازه\nشروع کار\nهمه\n۰ از ۶\nبستن\nقدم بعد\nاتصال اینستاگرام یا تلگرام\nانجام بده\n\nسلام، من سوزانم — برای آزمایش پنل.\n\nفروشگاه، محتوا یا دایرکت را همین‌جا بگو.\n\nتغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.\n\n«یک بخش درباره ما\n\nمثلاً این را بنویس — یا روی جمله بزن\n\nبفرست\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": true,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": true,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "chat",
+    "size": 390,
+    "theme": "dark",
+    "href": "/chat",
+    "h1": "سوزان",
+    "text": "گفتگو\n\nسوزان\nگفتگوها\nگفتگو\nگفتگوی تازه\nشروع کار\nهمه\n۰ از ۶\nبستن\nقدم بعد\nاتصال اینستاگرام یا تلگرام\nانجام بده\n\nسلام، من سوزانم — برای آزمایش پنل.\n\nفروشگاه، محتوا یا دایرکت را همین‌جا بگو.\n\nتغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.\n\n«برای انگشتر نقره یک پست اینستاگرام بساز»\n\nمثلاً این را بنویس — یا روی جمله بزن\n\nبفرست\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": true,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": true,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "shop",
+    "size": 390,
+    "theme": "dark",
+    "href": "/shop",
+    "h1": "آزمایش پنل",
+    "text": "فروشگاه\n\nآزمایش پنل\nبعد از ساخت سایت\n\nبدون قیمت تومان ویترین فروش نمی‌شود. ثبت قیمت\n\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "studio",
+    "size": 390,
+    "theme": "dark",
+    "href": "/studio",
+    "h1": "رسانه‌های ساخته‌شده",
+    "text": "استودیو\n\nرسانه‌های ساخته‌شده\nمحتوا\nکمپین‌ها\n\nهنوز رسانه‌ای ساخته نشده\n\nاز چت بگو چه پست یا ویدیویی می‌خواهی. ساخته‌شده‌ها همین‌جا می‌مانند.\n\nرفتن به چت\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "inbox",
+    "size": 390,
+    "theme": "dark",
+    "href": "/inbox",
+    "h1": "پیام مشتری‌ها",
+    "text": "صندوق\n\nپیام مشتری‌ها\nپاسخ سوزان به دایرکت\nپلن رایگان\nخاموش\nپیش‌نویس 🔒\nارسال خودکار 🔒\n\nجواب‌ها را خودت می‌نویسی. پیش‌نویس و ارسال خودکار در پلن‌های پولی\n\nهمگام‌سازی دایرکت در این پلن خاموش است. پیام‌های جدید از اینستاگرام و تلگرام نمی‌آیند.\n\nهمه\nخوانده‌نشده\nمنتظر شما\nهمه کانال‌ها\nاینستاگرام\nتلگرام\n\nهنوز پیامی نیامده\n\nحساب کانال را وصل کن تا پیام مشتری اینجا بیاید.\n\nوصل کردن کانال\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": true,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "sales",
+    "size": 390,
+    "theme": "dark",
+    "href": "/sales",
+    "h1": "فروش و سفارش‌ها",
+    "text": "فروش\n\nفروش و سفارش‌ها\nکیف پول\nانبار\n\nامروز\n\n۰\n\nتومان\n\n۷ روز اخیر\n\n۰\n\nتومان\n\n۳۰ روز اخیر\n\n۰\n\nتومان\n\nفروش‌ها\nثبت فروش دستی\n\nهنوز فروشی نیامده\n\nفروش‌هایی که از درگاه سایت یا لینک پرداخت دایرکت می‌آیند خودکار اینجا می‌نشینند. فروش بیرونی را با «ثبت فروش دستی» وارد کن.\n\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "campaigns",
+    "size": 390,
+    "theme": "dark",
+    "href": "/campaigns",
+    "h1": "کمپین‌ها",
+    "text": "استودیو\n\nکمپین‌ها\nمحتوا\nکمپین‌ها\n\nکمپینی نیست\n\nاز چت بگو چه پستی می‌خواهی، یا اگر پوشه روی دیسک داری شناسه را بالا بگذار.\n\nرفتن به چت\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "more",
+    "size": 390,
+    "theme": "dark",
+    "href": "/more",
+    "h1": "همهٔ ابزارها",
+    "text": "بیشتر\n\nهمهٔ ابزارها\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nانبار\n\nکالا، قیمت و موجودی\n\nاسناد آموزشی\n\nاز ورود تا دامنه و ویرایش\n\nکانال‌ها\n\nاینستاگرام تا روبیکا\n\nهویت و لوگو\n\nنام، لوگو و حرکت برند\n\nاستودیو\n\nپست‌ها و کمپین‌های ساخته‌شده\n\nپرداخت و پیامک\n\nاشتراک، درگاه پرداخت و کد ورود\n\nکیف پول\n\nمانده، برداشت شبا و پیامک\n\nظاهر پنل\n\n«خودکار» همان روشن یا تیرهٔ گوشی/سیستم را دنبال می‌کند.\n\nروشن\nتیره\nخودکار\nخروج\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": true,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "wallet",
+    "size": 390,
+    "theme": "dark",
+    "href": "/more/wallet",
+    "h1": "کیف پول",
+    "text": "بیشتر\n\nکیف پول\n\nقابل‌برداشت\n\n۰ تومان\n\nدر انتظار برداشت\n\n۰ تومان\n\nفروش آنلاین\n\n۰ تومان\n\nکمیسیون سوزان\n\n۰ تومان\n\nفروش دستی وارد کیف نمی‌شود. اگر مرچنت شخصی داشته باشی پول در حساب خودت می‌ماند و اینجا فقط ثبت می‌شود. درگاه سوزان ۲٪ کمیسیون دارد.\n\nپیامک این ماه: ۰ از ۵۰ · بعد از سقف هر پیامک ۲۰۰ تومان\n\nبرداشت با شبا\nمبلغ به تومان\nشبا\nنام صاحب حساب\nثبت درخواست برداشت\nگردش کیف\n\nهنوز گردشی نیست\n\nفروش درگاهی اینجا می‌آید.\n\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": true,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "inventory",
+    "size": 390,
+    "theme": "dark",
+    "href": "/more/inventory",
+    "h1": "انبار کالا",
+    "text": "بیشتر\n\nانبار کالا\n\nفروشگاه هنوز ساخته نشده؛ کالاها بعد از ساختن سایت روی آن می‌آیند.\n\nافزودن کالا\n\nهنوز کالایی نیست\n\nکانال را وصل کن یا کالا را دستی اضافه کن.\n\nوصل کردن کانال\nافزودن کالا\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "channels",
+    "size": 390,
+    "theme": "dark",
+    "href": "/more/channels",
+    "h1": "حساب کانال‌ها",
+    "text": "بازگشت\nحساب کانال‌ها\n\nاینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.\n\nپلتفرم\nاینستاگرام\nتلگرام\nواتساپ\nبله\nروبیکا\n\nاینستاگرام را با ورود رسمی BoxAPI وصل کن تا دایرکت مشتری بیاید. رمز را در فرم سوزان نگذار. اسکن ویترین عمومی با نام کاربری جداست.\n\nاسناد اتصال اینستاگرام\nورود با اینستاگرام\nنام کاربری صفحه\nچند پیام به لحن خودت\nافزودن حساب\n\nحسابی وصل نیست\n\nپلتفرم و مشخصات اتصال را بالا بگذار تا کانال به فروشگاه وصل شود.\n\nلحن یادگرفته\n\nگرم، کوتاه، فارسی روزمره\n\nفروشندهٔ صمیمی؛ واضح و بی‌تعارف.\n\nنمونه پاسخ: سلام، موجودی را همین حالا چک می‌کنم و برمی‌گردم.\n\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [
+      "BoxAPI"
+    ],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "settings",
+    "size": 390,
+    "theme": "dark",
+    "href": "/more/settings",
+    "h1": "پرداخت و پیامک",
+    "text": "بیشتر\n\nپرداخت و پیامک\nارسال و مرجوعی\n\nفیلد خالی یعنی هنوز ثبت نشده و دایرکت همان موضوع را به شما می‌سپارد.\n\nهزینهٔ ارسال (تومان)\nارسال رایگان از (تومان)\nمهلت مرجوعی (روز)\nحداقل خرید (تومان)\nروش ارسال\nزمان ارسال\nشهرهای ارسال\nشرط مرجوعی\nهزینهٔ برگشت با\nساعت پاسخ\nتعویض سایز\nفاکتور\nپرداخت در محل\nذخیرهٔ ارسال و مرجوعی\nفروشگاه و پرداخت\nنام فروشگاه\nشعار\nدرگاه پرداخت\nثبت دستی / بدون درگاه\nزرین‌پال\nآیدی‌پی\n\nفروش را خودت در بخش فروش ثبت می‌کنی. برای دریافت آنلاین، زرین‌پال یا آیدی‌پی را انتخاب کن.\n\nمرچنت شخصی زرین‌پال یا آیدی‌پی کمیسیون ندارد. اگر نباشد، لینک پرداخت و فروشگاه روی درگاه سوزان می‌رود و ۲٪ کم می‌شود. پول قابل‌برداشت در کیف پول است.\n\nفروش آنلاین خاموش است؛ فروش دستی ثبت می‌شود.\n\nدرگاه پیامک\n\nورود پنل با پیامک SMS.ir هاب سوزان ارسال می‌شود.\n\nپیامک آزمایشی (کد روی صفحه ورود)\nدرگاه\nکاوه نگار\nSMS.ir\n\nاز پنل SMS.ir کلید API و شناسه عددی قالب ارسال سریع (verify) را بردار. اسناد\n\nکلید API\nشناسه قالب (Template ID)\nنام پارامتر قالب\nاشتراک رایگان\nذخیره تنظیمات\nچت\nفروشگاه\nصندوق\nفروش\nبیشتر",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])",
+      "وب‌سایت 0 از 1"
+    ],
+    "latin": [
+      "SMS",
+      "API",
+      "verify",
+      "Template"
+    ],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": true,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "onboard",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/chat",
+    "h1": "سوزان",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nگفتگو\n\nسوزان\nگفتگوها\nگفتگو\nگفتگوی تازه\nشروع کار\nهمه\n۰ از ۶\nبستن\nقدم بعد\nاتصال اینستاگرام یا تلگرام\nانجام بده\n\nسلام، من سوزانم — برای آزمایش پنل.\n\nفروشگاه، محتوا یا دایرکت را همین‌جا بگو.\n\nتغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.\n\n«یک بخش درباره ما به \n\nمثلاً این را بنویس — یا روی جمله بزن\n\nبفرست",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": true,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": true,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "chat",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/chat",
+    "h1": "سوزان",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nگفتگو\n\nسوزان\nگفتگوها\nگفتگو\nگفتگوی تازه\nشروع کار\nهمه\n۰ از ۶\nبستن\nقدم بعد\nاتصال اینستاگرام یا تلگرام\nانجام بده\n\nسلام، من سوزانم — برای آزمایش پنل.\n\nفروشگاه، محتوا یا دایرکت را همین‌جا بگو.\n\nتغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.\n\n«برای انگشتر نقره یک پست اینستاگرام بساز»\n\nمثلاً این را بنویس — یا روی جمله بزن\n\nبفرست",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": true,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": true,
+    "consoleErrors": [],
+    "network": []
+  },
+  {
+    "page": "shop",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/shop",
+    "h1": "آزمایش پنل",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nفروشگاه\n\nآزمایش پنل\nبعد از ساخت سایت\n\nبدون قیمت تومان ویترین فروش نمی‌شود. ثبت قیمت",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "studio",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/studio",
+    "h1": "رسانه‌های ساخته‌شده",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nاستودیو\n\nرسانه‌های ساخته‌شده\nمحتوا\nکمپین‌ها\n\nهنوز رسانه‌ای ساخته نشده\n\nاز چت بگو چه پست یا ویدیویی می‌خواهی. ساخته‌شده‌ها همین‌جا می‌مانند.\n\nرفتن به چت",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "inbox",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/inbox",
+    "h1": "پیام مشتری‌ها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nصندوق\n\nپیام مشتری‌ها\nپاسخ سوزان به دایرکت\nپلن رایگان\nخاموش\nپیش‌نویس 🔒\nارسال خودکار 🔒\n\nجواب‌ها را خودت می‌نویسی. پیش‌نویس و ارسال خودکار در پلن‌های پولی\n\nهمگام‌سازی دایرکت در این پلن خاموش است. پیام‌های جدید از اینستاگرام و تلگرام نمی‌آیند.\n\nهمه\nخوانده‌نشده\nمنتظر شما\nهمه کانال‌ها\nاینستاگرام\nتلگرام\n\nهنوز پیامی نیامده\n\nحساب کانال را وصل کن تا پیام مشتری اینجا بیاید.\n\nوصل کردن کانال",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": true,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "sales",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/sales",
+    "h1": "فروش و سفارش‌ها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nفروش\n\nفروش و سفارش‌ها\nکیف پول\nانبار\n\nامروز\n\n۰\n\nتومان\n\n۷ روز اخیر\n\n۰\n\nتومان\n\n۳۰ روز اخیر\n\n۰\n\nتومان\n\nفروش‌ها\nثبت فروش دستی\n\nهنوز فروشی نیامده\n\nفروش‌هایی که از درگاه سایت یا لینک پرداخت دایرکت می‌آیند خودکار اینجا می‌نشینند. فروش بیرونی را با «ثبت فروش دستی» وارد کن.",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "campaigns",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/campaigns",
+    "h1": "کمپین‌ها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nاستودیو\n\nکمپین‌ها\nمحتوا\nکمپین‌ها\n\nکمپینی نیست\n\nاز چت بگو چه پستی می‌خواهی، یا اگر پوشه روی دیسک داری شناسه را بالا بگذار.\n\nرفتن به چت",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "more",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/more",
+    "h1": "همهٔ ابزارها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nبیشتر\n\nهمهٔ ابزارها\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nانبار\n\nکالا، قیمت و موجودی\n\nاسناد آموزشی\n\nاز ورود تا دامنه و ویرایش\n\nکانال‌ها\n\nاینستاگرام تا روبیکا\n\nهویت و لوگو\n\nنام، لوگو و حرکت برند\n\nاستودیو\n\nپست‌ها و کمپین‌های ساخته‌شده\n\nپرداخت و پیامک\n\nاشتراک، درگاه پرداخت و کد ورود\n\nکیف پول\n\nمانده، برداشت شبا و پیامک\n\nظاهر پنل\n\n«خودکار» همان روشن یا تیرهٔ گوشی/سیستم را دنبال می‌کند.\n\nروشن\nتیره\nخودکار\nخروج",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:1:props:children",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": true,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "wallet",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/more/wallet",
+    "h1": "کیف پول",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nبیشتر\n\nکیف پول\n\nقابل‌برداشت\n\n۰ تومان\n\nدر انتظار برداشت\n\n۰ تومان\n\nفروش آنلاین\n\n۰ تومان\n\nکمیسیون سوزان\n\n۰ تومان\n\nفروش دستی وارد کیف نمی‌شود. اگر مرچنت شخصی داشته باشی پول در حساب خودت می‌ماند و اینجا فقط ثبت می‌شود. درگاه سوزان ۲٪ کمیسیون دارد.\n\nپیامک این ماه: ۰ از ۵۰ · بعد از سقف هر پیامک ۲۰۰ تومان\n\nبرداشت با شبا\nمبلغ به تومان\nشبا\nنام صاحب حساب\nثبت درخواست برداشت\nگردش کیف\n\nهنوز گردشی نیست\n\nفروش درگاهی اینجا می‌آید.",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": true,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "inventory",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/more/inventory",
+    "h1": "انبار کالا",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nبیشتر\n\nانبار کالا\n\nفروشگاه هنوز ساخته نشده؛ کالاها بعد از ساختن سایت روی آن می‌آیند.\n\nافزودن کالا\n\nهنوز کالایی نیست\n\nکانال را وصل کن یا کالا را دستی اضافه کن.\n\nوصل کردن کانال\nافزودن کالا",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "channels",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/more/channels",
+    "h1": "حساب کانال‌ها",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\nبازگشت\nحساب کانال‌ها\n\nاینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.\n\nپلتفرم\nاینستاگرام\nتلگرام\nواتساپ\nبله\nروبیکا\n\nاینستاگرام را با ورود رسمی BoxAPI وصل کن تا دایرکت مشتری بیاید. رمز را در فرم سوزان نگذار. اسکن ویترین عمومی با نام کاربری جداست.\n\nاسناد اتصال اینستاگرام\nورود با اینستاگرام\nنام کاربری صفحه\nچند پیام به لحن خودت\nافزودن حساب\n\nحسابی وصل نیست\n\nپلتفرم و مشخصات اتصال را بالا بگذار تا کانال به فروشگاه وصل شود.\n\nلحن یادگرفته\n\nگرم، کوتاه، فارسی روزمره\n\nفروشندهٔ صمیمی؛ واضح و بی‌تعارف.\n\nنمونه پاسخ: سلام، موجودی را همین حالا چک می‌کنم و برمی‌گردم.",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])"
+    ],
+    "latin": [
+      "BoxAPI"
+    ],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": false,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  },
+  {
+    "page": "settings",
+    "size": 1440,
+    "theme": "dark",
+    "href": "/more/settings",
+    "h1": "پرداخت و پیامک",
+    "text": "سوزان\nچت\nفروشگاه\nاستودیو\nصندوق\nفروش\nبیشتر\n\nپلن فعلی\n\nرایگان\n\nارتقای پلن\n\nبیشتر\n\nپرداخت و پیامک\nارسال و مرجوعی\n\nفیلد خالی یعنی هنوز ثبت نشده و دایرکت همان موضوع را به شما می‌سپارد.\n\nهزینهٔ ارسال (تومان)\nارسال رایگان از (تومان)\nمهلت مرجوعی (روز)\nحداقل خرید (تومان)\nروش ارسال\nزمان ارسال\nشهرهای ارسال\nشرط مرجوعی\nهزینهٔ برگشت با\nساعت پاسخ\nتعویض سایز\nفاکتور\nپرداخت در محل\nذخیرهٔ ارسال و مرجوعی\nفروشگاه و پرداخت\nنام فروشگاه\nشعار\nدرگاه پرداخت\nثبت دستی / بدون درگاه\nزرین‌پال\nآیدی‌پی\n\nفروش را خودت در بخش فروش ثبت می‌کنی. برای دریافت آنلاین، زرین‌پال یا آیدی‌پی را انتخاب کن.\n\nمرچنت شخصی زرین‌پال یا آیدی‌پی کمیسیون ندارد. اگر نباشد، لینک پرداخت و فروشگاه روی درگاه سوزان می‌رود و ۲٪ کم می‌شود. پول قابل‌برداشت در کیف پول است.\n\nفروش آنلاین خاموش است؛ فروش دستی ثبت می‌شود.\n\nدرگاه پیامک\n\nورود پنل با پیامک SMS.ir هاب سوزان ارسال می‌شود.\n\nپیامک آزمایشی (کد روی صفحه ورود)\nدرگاه\nکاوه نگار\nSMS.ir\n\nاز پنل SMS.ir کلید API و شناسه عددی قالب ارسال سریع (verify) را بردار. اسناد\n\nکلید API\nشناسه قالب (Template ID)\nنام پارامتر قالب\nاشتراک رایگان\nذخیره تنظیمات",
+    "digitHits": [
+      "(self.__next_f=self.__next_f||[]).push([0])",
+      "self.__next_f.push([1,\"1:\\\"$Sreact.fragment\\\"\\n2:I[5467,[\\\"177\\\",\\\"static/chunks",
+      "self.__next_f.push([1,\"0:{\\\"P\\\":null,\\\"b\\\":\\\"qiGzb_cat30PbjoC-GOcP\\\",\\\"p\\\":\\\"\\\",",
+      "self.__next_f.push([1,\"8:{}\\n9:\\\"$0:f:0:1:2:children:2:children:2:children:1:pro",
+      "self.__next_f.push([1,\"f:[[\\\"$\\\",\\\"meta\\\",\\\"0\\\",{\\\"charSet\\\":\\\"utf-8\\\"}],[\\\"$\\\",",
+      "self.__next_f.push([1,\"14:I[622,[],\\\"IconMark\\\"]\\nd:{\\\"metadata\\\":[[\\\"$\\\",\\\"titl",
+      "self.__next_f.push([1,\"12:\\\"$d:metadata\\\"\\n\"])",
+      "وب‌سایت 0 از 1"
+    ],
+    "latin": [
+      "SMS",
+      "API",
+      "verify",
+      "Template"
+    ],
+    "overflow": [],
+    "contrast": [],
+    "hasStart": false,
+    "hasShipping": true,
+    "hasCoupon": false,
+    "hasPaySoon": false,
+    "hasSheba": false,
+    "hasReply": false,
+    "hasHints": false,
+    "consoleErrors": [],
+    "network": [
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      },
+      {
+        "status": 0,
+        "url": "net::ERR_ABORTED"
+      }
+    ]
+  }
+]
