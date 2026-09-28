@@ -41,6 +41,7 @@ from brain import (
     is_social,
     is_stuck,
     is_who,
+    tts_first_s,
     tts_model,
     looks_like_echo,
     looks_like_speech,
