@@ -59,7 +59,7 @@ class OtpResendTests(unittest.TestCase):
         self.svc = AuthService(_Users())
         self.patches = [
             patch.object(auth_service, "redis_client", self.redis),
-            patch.object(auth_service, "get_settings", return_value={"mockSms": True}),
+            patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": True}),
             # این کلاس درگاه همیشگی را می‌سنجد؛ محیط ممکن است ملی‌پیامک را روشن کرده باشد.
             patch.object(auth_service.settings, "otp_provider", ""),
         ]
@@ -104,7 +104,7 @@ class OtpResendTests(unittest.TestCase):
     def test_failed_resend_keeps_reused_code(self) -> None:
         first = asyncio.run(self.svc.send_otp("09111234567"))["dev_code"]
         self.redis.ttls["otp:09111234567"] = 200
-        with patch.object(auth_service, "get_settings", return_value={"mockSms": False}), patch(
+        with patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": False}), patch(
             "app.services.wallet_service.consume_sms"
         ), patch.object(auth_service.sms_service, "resolve_sms", return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "code"}), patch.object(
             auth_service.sms_service, "send_otp", new=AsyncMock(side_effect=RuntimeError("gateway"))
@@ -134,23 +134,62 @@ class OtpResendTests(unittest.TestCase):
             asyncio.run(self.svc.verify_otp("09111234567", "123456"))
         self.assertNotIn("otp:vl:09111234567", self.redis.counters)
 
-    def test_failed_send_refunds_sms_charge(self) -> None:
-        with patch.object(auth_service, "get_settings", return_value={"mockSms": False}), patch(
-            "app.services.wallet_service.consume_sms", return_value={"charged": 200, "count": 3, "quota": 2}
-        ) as consume, patch(
+    def test_failed_send_touches_neither_wallet_nor_seller_gateway(self) -> None:
+        with patch.object(
+            auth_service, "_overlay_without_side_effects", return_value={"mockSms": False}
+        ), patch("app.services.wallet_service.consume_sms") as consume, patch(
             "app.services.wallet_service.refund_sms"
         ) as refund, patch.object(
-            auth_service.sms_service,
-            "resolve_sms",
-            return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "code"},
-        ), patch.object(
+            auth_service.sms_service, "resolve_sms", return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "code"}
+        ) as resolve, patch.object(
             auth_service.sms_service, "send_otp", new=AsyncMock(side_effect=RuntimeError("gateway"))
         ):
             with self.assertRaises(HTTPException):
                 asyncio.run(self.svc.send_otp("09111234567"))
-        consume.assert_called_once()
-        refund.assert_called_once_with(200)
+        consume.assert_not_called()
+        refund.assert_not_called()
+        # درگاه پیامک ورود، تنظیمات فروشنده نیست؛ همیشه درگاه خود سوزان.
+        self.assertEqual(resolve.call_args.args[0], {})
         self.assertNotIn("otp:09111234567", self.redis.store)
+
+
+class SendCapTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.redis = _FakeRedis()
+        self.svc = AuthService(_Users())
+        self.patches = [
+            patch.object(auth_service, "redis_client", self.redis),
+            patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": True}),
+            patch.object(auth_service.settings, "otp_provider", ""),
+            patch.object(auth_service.settings, "otp_dev", True),
+        ]
+        for item in self.patches:
+            item.start()
+            self.addCleanup(item.stop)
+
+    def test_ip_hourly_cap(self) -> None:
+        for i in range(auth_service.OTP_MELIPAYAMAK_HOURLY):
+            asyncio.run(self.svc.send_otp(f"0911123456{i}", ip="10.9.9.9"))
+        with self.assertRaises(HTTPException) as ctx:
+            asyncio.run(self.svc.send_otp("09119999999", ip="10.9.9.9"))
+        self.assertEqual(ctx.exception.status_code, 429)
+        asyncio.run(self.svc.send_otp("09118888888", ip="10.8.8.8"))
+
+    def test_global_daily_cap(self) -> None:
+        with patch.object(auth_service.settings, "otp_global_daily_cap", 2):
+            asyncio.run(self.svc.send_otp("09111111111", ip="1.1.1.1"))
+            asyncio.run(self.svc.send_otp("09112222222", ip="2.2.2.2"))
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(self.svc.send_otp("09113333333", ip="3.3.3.3"))
+        self.assertEqual(ctx.exception.status_code, 429)
+
+    def test_send_does_not_create_tenant_folder(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as raw, patch.object(auth_service.settings, "state_dir", raw):
+            asyncio.run(self.svc.send_otp("09111234599"))
+            self.assertFalse((Path(raw) / "tenants" / "09111234599").exists())
 
 
 class FixedOtpTests(unittest.TestCase):
@@ -159,7 +198,7 @@ class FixedOtpTests(unittest.TestCase):
         self.svc = AuthService(_Users())
         self.patches = [
             patch.object(auth_service, "redis_client", self.redis),
-            patch.object(auth_service, "get_settings", return_value={"mockSms": False, "otpTtlSeconds": 300}),
+            patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": False, "otpTtlSeconds": 300}),
             patch.object(auth_service, "fixed_otp_for", side_effect=lambda phone: "100001" if phone == "09129900001" else None),
             patch.object(auth_service.settings, "otp_provider", ""),
         ]

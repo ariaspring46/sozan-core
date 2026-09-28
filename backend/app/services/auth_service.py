@@ -29,6 +29,22 @@ OTP_MELIPAYAMAK_HOURLY = 5
 OTP_WRONG_ATTEMPTS = 5
 
 
+def _overlay_without_side_effects(phone: str) -> dict:
+    """تنظیمات فروشنده را بدون ساختن پوشهٔ tenant بخوان؛ ارسال کد حسابی نمی‌سازد."""
+    import json
+
+    from app.config import settings as env
+
+    path = env.state_path / "tenants" / phone / "settings.json"
+    if not path.is_file():
+        return {}
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
 def _hash_otp(phone: str, code: str) -> str:
     key = f"{settings.jwt_secret}:{phone}".encode("utf-8")
     return "sha256:" + hmac.new(key, code.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -51,10 +67,10 @@ class AuthService:
 
         if is_lab_phone(phone):
             return {"ok": True}
+        await self._check_send_caps(phone, ip=ip)
         if str(settings.otp_provider or "").strip().lower() == "melipayamak_otp":
             return await self._send_melipayamak_otp(phone, ip=ip)
-        with tenant_scope(phone):
-            overlay = get_settings()
+        overlay = _overlay_without_side_effects(phone)
         mock_sms = overlay.get("mockSms")
         if mock_sms is None:
             mock_sms = settings.otp_dev is True
@@ -81,22 +97,12 @@ class AuthService:
         if mock_sms:
             payload["dev_code"] = code
             return payload
-        from app.services import wallet_service
-
+        # پیامک ورود هزینه و کلید خود سوزان است؛ نه کیف پول فروشنده، نه درگاه شخصی او.
         async def drop_fresh_code() -> None:
-            # A reused code may already be in an SMS on its way; only a brand-new one is dropped.
             if not reused:
                 await redis_client.delete(f"otp:{phone}")
 
-        charged = 0
-        try:
-            with tenant_scope(phone):
-                consumed = wallet_service.consume_sms()
-                charged = int(consumed.get("charged") or 0)
-        except ValueError as exc:
-            await drop_fresh_code()
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-        sms = sms_service.resolve_sms(overlay)
+        sms = sms_service.resolve_sms({})
         try:
             await sms_service.send_otp(
                 provider=sms["provider"],
@@ -107,16 +113,38 @@ class AuthService:
                 code=code,
             )
         except ValueError as exc:
-            with tenant_scope(phone):
-                wallet_service.refund_sms(charged)
             await drop_fresh_code()
             raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
         except Exception as exc:
-            with tenant_scope(phone):
-                wallet_service.refund_sms(charged)
             await drop_fresh_code()
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ارسال پیامک به درگاه نرسید.") from exc
         return payload
+
+    async def _check_send_caps(self, phone: str, *, ip: str = "") -> None:
+        """سقف IP در ساعت و کل ارسال‌های روز، برای هر دو درگاه کد ورود."""
+        hits = await redis_client.incr(f"otp:hip:{ip or 'no-ip'}")
+        if hits == 1:
+            await redis_client.expire(f"otp:hip:{ip or 'no-ip'}", 3600)
+        if hits > OTP_MELIPAYAMAK_HOURLY:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست بیش از حد است")
+        import time as _time
+
+        day = _time.strftime("%Y-%m-%d", _time.gmtime())
+        day_key = f"otp:daily:{day}"
+        total = await redis_client.incr(day_key)
+        if total == 1:
+            await redis_client.expire(day_key, 90000)
+        if total > int(settings.otp_global_daily_cap or 500):
+            from app.services.observe_client import emit_later
+
+            emit_later(
+                kind="sms",
+                title="otp-daily-cap",
+                surface="auth",
+                status="error",
+                payload={"day": day},
+            )
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "ظرفیت کد امروز پر است")
 
     async def _send_melipayamak_otp(self, phone: str, *, ip: str = "") -> dict:
         """کد را خود ملی‌پیک می‌سازد؛ ما فقط هش آن را دو دقیقه نگه می‌داریم."""
@@ -124,12 +152,11 @@ class AuthService:
 
         if int(await redis_client.ttl(f"otp:cool:{phone}")) > 0:
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "کد قبلی هنوز تازه است؛ کمی بعد دوباره تلاش کن")
-        for key in (f"otp:hphone:{phone}", f"otp:hip:{ip or 'no-ip'}"):
-            hits = await redis_client.incr(key)
-            if hits == 1:
-                await redis_client.expire(key, 3600)
-            if hits > OTP_MELIPAYAMAK_HOURLY:
-                raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست کد بیش از حد است؛ بعداً تلاش کن")
+        hits = await redis_client.incr(f"otp:hphone:{phone}")
+        if hits == 1:
+            await redis_client.expire(f"otp:hphone:{phone}", 3600)
+        if hits > OTP_MELIPAYAMAK_HOURLY:
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست کد بیش از حد است؛ بعداً تلاش کن")
         try:
             code = await melipayamak_otp_service.send_otp(phone)
         except melipayamak_otp_service.OtpSendError:

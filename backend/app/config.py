@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     otp_ttl_seconds: int = 300
     otp_dev: bool = True
     otp_provider: str = ""
+    otp_global_daily_cap: int = 500
     melipayamak_otp_apikey: str = ""
     melipayamak_otp_base: str = "https://console.melipayamak.com/api/send/otp"
     otp_fixed_accounts: str = ""
