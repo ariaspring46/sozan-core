@@ -24,6 +24,7 @@ from audio_codec import (
 )
 from brain import (
     Brain,
+    clean_ear_text,
     cloud_speech_body,
     clarify,
     chat_completions_url,
@@ -67,7 +68,11 @@ from sales import (
     CLOSE_LINE,
     FIXED_SALES_LINES,
     HELLO_LINE,
-    HELLO_SMS_LINE,
+    GREET_VARIANTS,
+    INTRO_VARIANTS,
+    INTRO_SMS_VARIANTS,
+    NOTIME_VARIANTS,
+    PERM_VARIANTS,
     PAIN_LINE,
     DM_LINE,
     CONTENT_LINE,
@@ -420,6 +425,14 @@ class SpeechTest(unittest.TestCase):
         self.assertIn("توضیح", heard)
         self.assertTrue(usable_request(heard))
 
+
+    def test_cloud_ear_keeps_only_verbatim_text(self) -> None:
+        self.assertEqual(clean_ear_text("الو سلام"), "الو سلام")
+        self.assertEqual(clean_ear_text("  «سلام، خوبید؟» "), "سلام، خوبید؟")
+        self.assertEqual(clean_ear_text("لطفاً فایل صوتی را ارسال کنید تا رونویسی کنم."), "")
+        self.assertEqual(clean_ear_text(""), "")
+        self.assertEqual(clean_ear_text("x" * 400), "")
+
     def test_cloud_line_is_ready_without_the_local_model(self) -> None:
         from brain import Brain
 
@@ -485,7 +498,8 @@ class SalesTest(unittest.TestCase):
         refused = SalesState()
         hello = plan_turn(refused, "سلام")
         self.assertEqual(hello.kind, "hello")
-        note_spoken(refused, HELLO_LINE)
+        self.assertIn(hello.line, GREET_VARIANTS)
+        note_spoken(refused, hello.line)
         self.assertTrue(refused.greeted)
         no = plan_turn(refused, "لازم نیست ممنون نمیخوام")
         self.assertTrue(no.signals.refuse)
@@ -510,12 +524,12 @@ class SalesTest(unittest.TestCase):
         self.assertEqual(hold.kind, "hold")
         hello = plan_turn(state, "سلام")
         self.assertEqual(hello.kind, "hello")
-        self.assertEqual(hello.line, HELLO_LINE)
-        self.assertNotIn("ورود", HELLO_LINE)
-        note_spoken(state, HELLO_LINE)
+        self.assertIn(hello.line, GREET_VARIANTS)
+        self.assertNotIn("ورود", hello.line or "")
+        note_spoken(state, hello.line)
+        self.assertEqual(state.stage, "intro")
         later = plan_turn(state, "من آرایشگاه دارم")
-        self.assertEqual(later.kind, "feature")
-        self.assertEqual(later.line, PAIN_LINE)
+        self.assertEqual(later.kind, "model")
         self.assertEqual(state.trade, "آرایشگاه")
         self.assertTrue(person_started("صحبت کن"))
         os.environ["GIFT_CODE_SPOKEN"] = "سوزان سی"
@@ -542,8 +556,8 @@ class SalesTest(unittest.TestCase):
 
     def test_address_intent_and_fallback(self) -> None:
         state = SalesState()
-        plan_turn(state, "سلام")
-        note_spoken(state, HELLO_LINE)
+        opening = plan_turn(state, "سلام")
+        note_spoken(state, opening.line)
         asked = plan_turn(state, "اسم سایتتون چیه")
         self.assertEqual(asked.kind, "address")
         self.assertEqual(asked.line, ADDRESS_LINE)
@@ -563,7 +577,7 @@ class SalesTest(unittest.TestCase):
         self.assertIn(wait_line("خب بگو"), WAIT_BRIGHT)
         note = SalesState(stage="confirm", linked=True).note()
         self.assertIn("تکرار نکن", note)
-        self.assertIn("کار این نوبت", note)
+        self.assertIn("مسیر پیشنهادی این نوبت", note)
         long = "چه خوب مشتری‌ها دیگه لازم نیست دونه به دونه آدرس و شماره بگیرند و همه چیز ثبت می‌شود در فروشگاه."
         self.assertTrue(shorten_reply(long).endswith("فروشگاه."))
         self.assertGreater(len(shorten_reply(long).split()), 18)
@@ -577,32 +591,39 @@ class SalesTest(unittest.TestCase):
         self.assertNotIn("پیجت ", formalize_you("پیجتون رو بنویسید"))
         self.assertTrue(wants_bye("فلحافظ"))
         missed_state = SalesState()
-        plan_turn(missed_state, "سلام")
-        note_spoken(missed_state, HELLO_LINE)
+        opening_missed = plan_turn(missed_state, "سلام")
+        note_spoken(missed_state, opening_missed.line)
         missed = plan_turn(missed_state, "")
         self.assertEqual(missed.kind, "fallback")
         pitched = SalesState()
-        plan_turn(pitched, "سلام")
-        note_spoken(pitched, HELLO_LINE)
+        opening_pitched = plan_turn(pitched, "سلام")
+        note_spoken(pitched, opening_pitched.line)
         note_spoken(pitched, "چه خوب، کیف می‌فروشید.")
         forced = plan_turn(pitched, "چجوری کار می‌کنه از کجا باید شروع کنم")
         self.assertEqual(forced.kind, "address")
         asked_job = SalesState()
-        plan_turn(asked_job, "سلام")
-        note_spoken(asked_job, HELLO_LINE)
-        note_spoken(asked_job, "اسمم سوزانه.")
+        opening_job = plan_turn(asked_job, "سلام")
+        note_spoken(asked_job, opening_job.line)
+        thanks = plan_turn(asked_job, "ممنون خوبم شما چطورید")
+        self.assertEqual(thanks.kind, "hello")
+        self.assertIn(thanks.line, INTRO_VARIANTS)
+        note_spoken(asked_job, thanks.line)
+        perm = plan_turn(asked_job, "چی شده پس")
+        self.assertIn(perm.line, PERM_VARIANTS)
+        note_spoken(asked_job, perm.line)
+        allowed = plan_turn(asked_job, "بله بگو")
+        self.assertEqual(allowed.line, PAIN_LINE)
+        note_spoken(asked_job, allowed.line)
         job = plan_turn(asked_job, "چه کارایی رو انجام میدی")
-        self.assertEqual(job.line, PAIN_LINE)
-        again = plan_turn(asked_job, "چه کارایی رو انجام میدی")
-        self.assertEqual(again.kind, "model")
+        self.assertEqual(job.kind, "model")
         where = plan_turn(asked_job, "پیجام کجا باید وارد کنم")
         self.assertEqual(where.kind, "address")
         self.assertEqual(where.line, ADDRESS_LINE)
         hard = plan_turn(asked_job, "از اون سخت سیباز باشه")
         self.assertEqual(hard.kind, "model")
         worried = SalesState()
-        plan_turn(worried, "سلام")
-        note_spoken(worried, HELLO_LINE)
+        opening_worried = plan_turn(worried, "سلام")
+        note_spoken(worried, opening_worried.line)
         trust = plan_turn(worried, "از کجا اعتماد کنم درست کار می‌کنه")
         self.assertEqual(trust.kind, "address")
         self.assertIn("حق دارید", trust.line or "")
@@ -782,30 +803,56 @@ class SalesTest(unittest.TestCase):
         self.assertIn("کُر", missed.line or "")
 
     def test_intro_asks_one_pain_and_sms_does_not_insist(self) -> None:
-        for line in (HELLO_LINE, HELLO_SMS_LINE, PAIN_LINE, DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE):
+        for group in (GREET_VARIANTS, INTRO_VARIANTS, INTRO_SMS_VARIANTS, PERM_VARIANTS, NOTIME_VARIANTS):
+            for line in group:
+                self.assertLessEqual(len(line.split()), 18)
+        for line in (HELLO_LINE, PAIN_LINE, DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE):
             self.assertLessEqual(len(line.split()), 18)
         opened = sales_open()
         self.assertIn("دستیار فروش", opened)
         self.assertIn("پرو مکس", opened)
         self.assertIn("لینک پرداخت داخل گفتگو را نگو", opened)
         self.assertIn("لغو است", opened)
+        self.assertIn("اول به حرف مخاطب ربط", opened)
+        self.assertIn("حدس نزن", opened)
+        self.assertIn("سه قدم", opened)
         set_payment_fetcher(lambda: True)
         self.assertIn("داخل همان گفتگو", sales_open())
         sms = SalesState(sms_sent=True)
         first = plan_turn(sms, "الو")
-        self.assertEqual(first.line, HELLO_SMS_LINE)
-        note_spoken(sms, HELLO_SMS_LINE)
-        second = plan_turn(sms, "سلام")
-        self.assertEqual(second.line, HELLO_LINE)
-        self.assertNotIn("پیامک", second.line or "")
-        note_spoken(sms, HELLO_LINE)
-        third = plan_turn(sms, "دایرکت‌هام مونده")
-        self.assertEqual(third.line, DM_LINE)
-        site = plan_turn(SalesState(greeted=True, intro_said=True, pain_asked=True), "یه سایت می‌خوام")
+        self.assertEqual(first.kind, "hello")
+        self.assertIn(first.line, GREET_VARIANTS)
+        note_spoken(sms, first.line)
+        second = plan_turn(sms, "ممنون خوبم شما چطورید")
+        self.assertIn(second.line, INTRO_SMS_VARIANTS)
+        self.assertIn("پیامک", second.line or "")
+        note_spoken(sms, second.line)
+        third = plan_turn(sms, "چی شده پس")
+        self.assertIn(third.line, PERM_VARIANTS)
+        self.assertNotIn("پیامک", third.line or "")
+        note_spoken(sms, third.line)
+        fourth = plan_turn(sms, "باشه بگو")
+        self.assertEqual(fourth.line, PAIN_LINE)
+        who = SalesState()
+        who_greet = plan_turn(who, "الو")
+        note_spoken(who, who_greet.line)
+        identity = plan_turn(who, "تو کی هستی اصلاً")
+        self.assertEqual(identity.kind, "model")
+        busy_state = SalesState()
+        busy_greet = plan_turn(busy_state, "سلام")
+        note_spoken(busy_state, busy_greet.line)
+        busy_intro = plan_turn(busy_state, "سلام خوبید")
+        note_spoken(busy_state, busy_intro.line)
+        busy_perm = plan_turn(busy_state, "خوبه")
+        note_spoken(busy_state, busy_perm.line)
+        self.assertIn(busy_perm.line, PERM_VARIANTS)
+        busy_no = plan_turn(busy_state, "الان سرم شلوغه")
+        self.assertIn(busy_no.line, NOTIME_VARIANTS)
+        site = plan_turn(SalesState(greeted=True, stage="pitch", pain_asked=True), "یه سایت می‌خوام")
         self.assertEqual(site.line, SITE_LINE)
-        content = plan_turn(SalesState(greeted=True, intro_said=True, pain_asked=True), "استوری و کپشن")
+        content = plan_turn(SalesState(greeted=True, stage="pitch", pain_asked=True), "استوری و کپشن")
         self.assertEqual(content.line, CONTENT_LINE)
-        order = plan_turn(SalesState(greeted=True, intro_said=True, pain_asked=True), "سفارش‌ها رو کی پیگیری می‌کنه")
+        order = plan_turn(SalesState(greeted=True, stage="pitch", pain_asked=True), "سفارش‌ها رو کی پیگیری می‌کنه")
         self.assertEqual(order.line, ORDER_LINE)
 
     def test_gemini_flash_style_is_not_spoken(self) -> None:

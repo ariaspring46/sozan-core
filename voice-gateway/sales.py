@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import re
 import time
 import urllib.error
@@ -32,7 +33,33 @@ HELLO_LINE = (
     "سوزان دستیار فروش آنلاین‌شاپ‌هاست؛ "
     "دایرکت‌ها را جواب می‌دهد، محتوا می‌سازد، سفارش را پیگیری می‌کند."
 )
-HELLO_SMS_LINE = "سلام، از سوزان تماس می‌گیرم؛ احتمالاً پیامکمون به دستتون رسیده."
+# Opening protocol: greet → wait, ack+intro, ask permission. Several variants per stage,
+# picked per call so the same shop never hears the same opening twice in a row.
+GREET_VARIANTS = (
+    "سلام، وقتتون بخیر! خوب هستید؟",
+    "سلام، روزتون بخیر! حالتون خوبه؟",
+    "سلام علیکم، خوبید؟",
+)
+INTRO_VARIANTS = (
+    "ممنونم، لطف دارید. من سوزانم، از سوزان‌کُر؛ دربارهٔ فروش پیجتون تماس گرفتم.",
+    "خوبم ممنون، شما لطف دارید. سوزان صدا می‌زنم، از سوزان‌کُر؛ یک پیشنهاد فروش برای پیجتون داشتم.",
+    "ممنون، لطف دارید. اسمم سوزانه و از سوزان‌کُر تماس می‌گیرم؛ کار فروش پیجتون.",
+)
+INTRO_SMS_VARIANTS = (
+    "ممنونم، لطف دارید. من سوزانم، از سوزان‌کُر؛ احتمالاً پیامکمون به دستتون رسیده.",
+    "خوبم ممنون، شما لطف دارید. سوزانم، از سوزان‌کُر؛ پیامکی که فرستادیم به دستتون رسیده؟",
+    "ممنون، لطف دارید. از سوزان‌کُر تماس می‌گیرم؛ دربارهٔ همون پیامکی که براتون فرستادیم.",
+)
+PERM_VARIANTS = (
+    "یک دقیقه وقت دارید؟",
+    "الان یک دقیقه حوصله دارید؟",
+    "می‌تونم فقط یک دقیقه کوتاه مزاحمتون بشم؟",
+)
+NOTIME_VARIANTS = (
+    "چشم، پس کِی راحت‌ترید که دوباره تماس بگیرم؟",
+    "باشه، چه ساعتی بهتون جور درمی‌آید؟",
+)
+HELLO_SMS_LINE = INTRO_SMS_VARIANTS[0]
 PAIN_LINE = "دایرکت بی‌جوابه، محتوا می‌خواید، یا سایت؟"
 DM_LINE = "دایرکت اینستا و تلگرام را با لحن خودتون جواب می‌دهد؛ خودکار فقط پرو مکس."
 CONTENT_LINE = "استودیو پست، استوری، عکس کالا و کپشن تبلیغ را می‌سازد."
@@ -92,14 +119,20 @@ _payment_fetcher = None
 _DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 _STAGE_FA = {
     "greet": "سلام",
+    "intro": "معرفی",
+    "permq": "اجازه",
+    "await": "انتظار اجازه",
     "discover": "کشف",
-    "pitch": "ارزش",
+    "pitch": "معرفی قابلیت",
     "cta": "دعوت",
-    "confirm": "تأیید",
+    "confirm": "اطمینان",
     "close": "بستن",
 }
 _STAGE_DO = {
-    "greet": "اگر پیامک گفته شد دوباره نپرس. وگرنه معرفی کوتاه بگو.",
+    "greet": "فقط سلام و احوال‌پرسی کوتاه و گرم. معرفی نکن، صبر کن جواب بدهد.",
+    "intro": "فقط تشکر کوتاه، اسم، از سوزان‌کُر، و اشاره به پیامک قبلی. قابلیت هنوز نگو.",
+    "permq": "فقط اجازهٔ یک دقیقه بگیر. قابلیت نگو.",
+    "await": "اگر اجازه داد سؤال درد را بپرس؛ اگر گفت سرش شلوغ است، زمان بهتر بپرس.",
     "discover": "اگر درد را نگفته، یک سؤال: دایرکت بی‌جواب، محتوا، یا سایت. اگر گفته، فقط همان یک قابلیت.",
     "pitch": "فقط همان یک قابلیتِ مربوط را بگو. بقیه را نریز. دعوت سایت نکن مگر بپرسد.",
     "cta": "آدرس sozan-core.ir، دکمهٔ ورود و رایگان بودن را فقط یک بار بگو.",
@@ -476,9 +509,15 @@ def sales_open() -> str:
         "رزرو و نوبت‌دهی نداریم. نگو مشتری از سایت رزرو می‌کند.\n"
         "نگو وب‌سایت نامحدود. لینک را در واتساپ و دایرکت و پیامک نفرست.\n"
         + payment_clause()
-        + "روش: یک جملهٔ معرفی، بعد یک سؤال دربارهٔ دردش (دایرکت بی‌جواب، محتوا، یا سایت)، "
-        "بعد فقط همان یک قابلیت. قابلیت‌های دیگر را همان نوبت نگو.\n"
-        "اگر سلام پیامک بود و نگفت دیده، دوباره از پیامک نپرس و برو سر معرفی.\n"
+        + "شروع تماس سه قدم است: اول فقط سلام و احوال‌پرسی کوتاه و گرم و صبر کن. "
+        "وقتی جواب داد، تشکر کوتاه و خودت را معرفی کن: سوزان از سوزان‌کُر، با اشاره به پیامکی که قبلاً فرستاده شده. "
+        "بعد اجازهٔ یک دقیقه بگیر؛ اگر گفت سرش شلوغ است، زمان بهتر بپرس.\n"
+        "فهم: هر جواب اول به حرف مخاطب ربط داشته باشد؛ منظور او را کوتاه بازگو کن، بعد ادامه بده. "
+        "هر نوبت حداکثر دو جمله و فقط یک سؤال. "
+        "اگر مطمئن نیستی چه شنیدی، مؤدبانه بگو درست نشنیدی و دوباره بپرس؛ حدس نزن.\n"
+        "اگر پرسید کی هستی یا شماره‌اش از کجا دستت رسیده، مؤدبانه و کوتاه جواب بده: از پیج اینستاگرامش و پیامک قبلی.\n"
+        "بعد از اجازه، یک سؤال دربارهٔ دردش (دایرکت بی‌جواب، محتوا، یا سایت) و بعد فقط همان یک قابلیتِ مربوط. قابلیت‌های دیگر را همان نوبت نگو.\n"
+        "اگر سلام پیامک بود و نگفت دیده، دوباره از پیامک نپرس و برو سر کار بعدی.\n"
         "از جواب دایرکت حرف بزن. قاعدهٔ قدیمیِ حرف نزدن از دایرکت لغو است.\n"
         "هر نوبت یک جمله، حداکثر هجده کلمه. "
         "اول همان سؤال را جواب بده، بعد فقط یک قدم جلوتر برو، هر بار فقط یک سؤال.\n"
@@ -540,6 +579,9 @@ class SalesState:
     sms_sent: bool = False
     intro_said: bool = False
     pain_asked: bool = False
+    greet_line: str = ""
+    intro_line_said: str = ""
+    perm_line_asked: str = ""
     last_cue: str = ""
     said: list[str] = field(default_factory=list)
     interrupted: str = ""
@@ -553,7 +595,9 @@ class SalesState:
         if self.linked and self.stage in {"cta", "confirm", "pitch"}:
             job = "آدرس را تکرار نکن مگر بپرسد. " + job
         return (
-            f"(مرحله: {self.stage_fa()} | کار این نوبت: {job} | رشته: {self.trade or '-'} | "
+            f"(مرحله: {self.stage_fa()} | مسیر پیشنهادی این نوبت: {job} | "
+            f"مسیر پیشنهادی است؛ اگر حرف مخاطب سؤال یا نگرانی است اول همان را جواب بده | "
+            f"رشته: {self.trade or '-'} | "
             f"لینک گفته شده: {'بله' if self.linked else 'نه'} | "
             f"هدیه: {'بله' if self.gifted else 'نه'} | نوبت: {self.turns})"
         )
@@ -584,6 +628,10 @@ class Signals:
     refuse: bool = False
     source: bool = False
     wrong: bool = False
+    ack: bool = False
+    yes: bool = False
+    busy: bool = False
+    goahead: bool = False
 
 
 @dataclass(frozen=True)
@@ -627,6 +675,22 @@ def read_signals(heard: str) -> Signals:
         part in blob
         for part in ("مغازه ندار", "اشتباه گرفت", "فروشنده نیست", "فروشگاهی ندار", "اینستاگرام ندار", "زنگ نزن")
     )
+    ack = any(
+        part in blob
+        for part in ("ممنون", "مرسی", "خوبم", "خوب هستم", "خوبید", "خوبیم", "عالی", "الهی", "قربون", "شما چطور", "شما خوب")
+    )
+    yes = any(
+        part in blob
+        for part in ("بله", "باشه", "بله بفرما", "حوصله", "وقت دارم", "چشم", "اوکی", "بگو")
+    )
+    busy = any(
+        part in blob
+        for part in ("وقت ندارم", "حوصله ندارم", "سرم شلوغ", "شلوغه", "الان نمی‌تونم", "الان نمیتونم", "بعدا")
+    )
+    goahead = any(
+        part in blob
+        for part in ("بفرمایید", "بفرما", "در خدمتم", "بگید", "بگید", "بله بگو")
+    )
     return Signals(
         bye=wants_bye(blob),
         hello=is_hello(blob),
@@ -643,6 +707,10 @@ def read_signals(heard: str) -> Signals:
         refuse=refuse,
         source=source,
         wrong=wrong,
+        ack=ack or howdy,
+        yes=yes,
+        busy=busy or time,
+        goahead=goahead,
     )
 
 
@@ -670,11 +738,31 @@ def feature_line(kind: str) -> str:
     }.get(kind, "")
 
 
+def greet_line() -> str:
+    return random.choice(GREET_VARIANTS)
+
+
+def intro_line(sms: bool) -> str:
+    return random.choice(INTRO_SMS_VARIANTS if sms else INTRO_VARIANTS)
+
+
+def perm_line() -> str:
+    return random.choice(PERM_VARIANTS)
+
+
+def notime_line() -> str:
+    return random.choice(NOTIME_VARIANTS)
+
+
 def cached_sales_lines() -> list[str]:
     lines = [
         HELLO_LINE,
-        HELLO_SMS_LINE,
         PAIN_LINE,
+        *GREET_VARIANTS,
+        *INTRO_VARIANTS,
+        *INTRO_SMS_VARIANTS,
+        *PERM_VARIANTS,
+        *NOTIME_VARIANTS,
         *FEATURE_LINES,
         BYE_LINE,
         CLOSE_LINE,
@@ -785,22 +873,20 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         if not (signals.hello or signals.howdy or person_started(heard)):
             return TurnPlan(kind="hold", signals=signals)
         state.greeted = True
-        state.stage = "discover"
         if signals.price:
             priced = price_spoken_line(heard)
             if priced:
                 state.stage = "cta"
                 return TurnPlan(kind="address", line=priced, signals=signals)
+            state.stage = "intro"
             return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
-        if state.sms_sent:
-            return TurnPlan(kind="hello", line=HELLO_SMS_LINE, signals=signals)
-        state.intro_said = True
-        return TurnPlan(kind="hello", line=HELLO_LINE, signals=signals)
+        state.stage = "intro"
+        line = state.greet_line or greet_line()
+        state.greet_line = line
+        return TurnPlan(kind="hello", line=line, signals=signals)
     if signals.bye:
         line = BYE_LINE if (state.refused_cta or not state.linked) else CLOSE_LINE
         return TurnPlan(kind="close", line=line, hangup=True, signals=signals)
-    if len((heard or "").strip()) < 4:
-        return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     if signals.wrong:
         return TurnPlan(kind="close", line=BYE_LINE, hangup=True, signals=signals)
     if signals.price:
@@ -830,13 +916,47 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         state.pain_asked = True
         state.stage = "pitch"
         return TurnPlan(kind="feature", line=line, signals=signals)
-    if not state.intro_said:
-        state.intro_said = True
-        state.stage = "discover"
-        return TurnPlan(kind="hello", line=HELLO_LINE, signals=signals)
-    if not state.pain_asked:
-        state.pain_asked = True
-        return TurnPlan(kind="feature", line=PAIN_LINE, signals=signals)
+    if state.stage in {"intro", "permq", "await"} and not (heard or "").strip():
+        return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
+    if state.stage == "intro":
+        if signals.ack or signals.yes or signals.hello:
+            line = state.intro_line_said or intro_line(state.sms_sent)
+            state.intro_line_said = line
+            state.intro_said = True
+            state.stage = "permq"
+            return TurnPlan(kind="hello", line=line, signals=signals)
+        return TurnPlan(
+            kind="model",
+            cue=state.cue(heard),
+            allow_gift=gift_allowed(state, signals),
+            signals=signals,
+        )
+    if state.stage == "permq":
+        if signals.busy:
+            line = notime_line()
+            state.objection = state.objection or "time"
+            state.stage = "discover"
+            return TurnPlan(kind="hello", line=line, signals=signals)
+        if signals.goahead or signals.yes:
+            state.pain_asked = True
+            state.stage = "pitch"
+            return TurnPlan(kind="feature", line=PAIN_LINE, signals=signals)
+        line = state.perm_line_asked or perm_line()
+        state.perm_line_asked = line
+        state.stage = "await"
+        return TurnPlan(kind="hello", line=line, signals=signals)
+    if state.stage == "await":
+        if signals.busy:
+            line = notime_line()
+            state.objection = state.objection or "time"
+            state.stage = "discover"
+            return TurnPlan(kind="hello", line=line, signals=signals)
+        if signals.yes or signals.goahead or signals.ack:
+            state.pain_asked = True
+            state.stage = "pitch"
+            return TurnPlan(kind="feature", line=PAIN_LINE, signals=signals)
+    if len((heard or "").strip()) < 4 and state.stage not in {"intro", "permq", "await"}:
+        return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     return TurnPlan(
         kind="model",
         cue=state.cue(heard),

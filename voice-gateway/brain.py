@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import logging
 import os
@@ -16,7 +17,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import wave
-from json import dumps, loads
+from base64 import b64encode
+from json import dumps, loads as json_loads
 from pathlib import Path
 
 from audio_codec import (
@@ -75,6 +77,21 @@ def chat_completions_url(url: str) -> str:
 
 TTS_STYLE = "خانم، گرم، دوستانه و آرام، فروشندهٔ مؤدب، با مکث طبیعی؛ نه خبرخوان"
 
+CLOUD_EAR_PROMPT = (
+    "این فایل صوتی فارسی تلفنی را دقیقاً و کلمه‌به‌کلمه رونویسی کن. "
+    "فقط متن رونویسی را بنویس، بدون هیچ توضیح دیگری."
+)
+
+
+
+def clean_ear_text(text: str) -> str:
+    """Keep only a plausible verbatim transcription; refusals and prompt echoes die here."""
+    text = (text or "").strip().strip(" «»\"«»")
+    if not text or len(text) > 300:
+        return ""
+    if "رونویسی" in text or "فایل صوتی" in text or "ارسال کنید" in text:
+        return ""
+    return text
 
 def cloud_speech_body(model: str, voice: str, text: str) -> dict:
     body: dict = {
@@ -940,6 +957,54 @@ class Brain:
         self._fast_stt.decode_stream(stream)
         return str(stream.result.text or "").strip()
 
+    def cloud_ear(self, pcm16_8k: bytes) -> str:
+        """Telephony Persian STT through the OpenRouter chat model with audio input.
+        Empty on any failure or refusal, so the caller falls back to the local ear."""
+        key = os.environ.get("LLM_API_KEY", "").strip()
+        if not key or os.environ.get("CLOUD_EAR", "1").strip().lower() in {"0", "false", "no"}:
+            return ""
+        if len(pcm16_8k) < 6400:
+            return ""
+        model = os.environ.get("CLOUD_EAR_MODEL", "google/gemini-2.5-flash").strip() or "google/gemini-2.5-flash"
+        try:
+            timeout = float(os.environ.get("CLOUD_EAR_TIMEOUT_S", "3"))
+        except ValueError:
+            timeout = 3.0
+        body = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": CLOUD_EAR_PROMPT},
+                        {
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": b64encode(pcm16_to_wav(pcm16_8k, 8000)).decode(),
+                                "format": "wav",
+                            },
+                        },
+                    ],
+                }
+            ],
+            "max_tokens": 200,
+            "temperature": 0,
+        }
+        req = urllib.request.Request(
+            chat_completions_url("https://openrouter.ai/api/v1"),
+            data=dumps(body).encode(),
+            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            res = _DIRECT.open(req, timeout=timeout)
+            data = json_loads(res.read())
+            text = str(data["choices"][0]["message"]["content"] or "").strip()
+        except Exception as exc:
+            log.warning("cloud ear failed %s", type(exc).__name__)
+            return ""
+        return clean_ear_text(text)
+
     def transcribe(self, pcm16_8k: bytes) -> tuple[str, float]:
         with self._stt_lock:
             return self._transcribe(pcm16_8k)
@@ -1271,10 +1336,19 @@ class Brain:
         return root / f"{name}.pcm"
 
     def cloud_pcm(self, text: str, first_s: float) -> bytes:
+        pieces: list[bytes] = []
+        for piece in self.cloud_stream(text, first_s):
+            pieces.append(piece)
+        return b"".join(pieces)
+
+    def cloud_stream(self, text: str, first_s: float):
+        """Yield 8 kHz PCM pieces as the cloud TTS produces them. Yields nothing on
+        failure or when the first piece is slower than first_s, so the caller can
+        fall back to Piper without repeating a half-played sentence."""
         model = tts_model()
         key = os.environ.get("LLM_API_KEY", "").strip()
         if not model or not key or not text:
-            return b""
+            return
         voice = os.environ.get("TTS_VOICE", "Kore").strip()
         body = cloud_speech_body(model, voice, mask_private(text))
         req = urllib.request.Request(
@@ -1288,44 +1362,47 @@ class Brain:
             res = _DIRECT.open(req, timeout=first_s + 8)
         except Exception as exc:
             log.warning("tts cloud failed %s", type(exc).__name__)
-            return b""
+            return
+        rate = 24000
+        block = bytearray()
+        yielded = False
         try:
             ctype = res.headers.get("content-type") or ""
             if not ctype.startswith("audio/"):
                 log.warning("tts cloud not audio")
-                return b""
-            rate = 24000
+                return
             if "rate=" in ctype:
                 try:
                     rate = int(ctype.split("rate=")[1].split(";")[0])
                 except ValueError:
                     rate = 24000
-            chunks: list[bytes] = []
-            broken = False
             while True:
                 try:
                     part = res.read(4096)
                 except Exception as exc:
                     log.warning("tts cloud read %s", type(exc).__name__)
-                    broken = True
                     break
                 if not part:
                     break
-                if not chunks:
+                if not yielded and not block:
                     first = time.monotonic() - started
                     if first > first_s:
                         log.info("tts cloud late %.2f", first)
-                        return b""
-                chunks.append(part)
-            if broken:
-                return b""
+                        return
+                block.extend(part)
+                if len(block) >= 12288:
+                    piece = resample_pcm16(bytes(block), rate, 8000)
+                    block.clear()
+                    if piece:
+                        yielded = True
+                        yield piece
+            if block:
+                piece = resample_pcm16(bytes(block), rate, 8000)
+                block.clear()
+                if piece:
+                    yield piece
         finally:
             res.close()
-        pcm = b"".join(chunks)
-        if len(pcm) < 400:
-            return b""
-        phone = resample_pcm16(pcm, rate, 8000)
-        return match_rms_pcm16(phone)
 
     def _synth_once(self, spoken: str) -> bytes:
         env = os.environ.copy()

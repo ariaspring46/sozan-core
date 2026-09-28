@@ -58,8 +58,12 @@ from sales import (
     EXPLAIN,
     FALLBACK_LINE,
     FIXED_SALES_LINES,
+    GREET_VARIANTS,
+    INTRO_VARIANTS,
+    INTRO_SMS_VARIANTS,
+    NOTIME_VARIANTS,
+    PERM_VARIANTS,
     HELLO_LINE,
-    HELLO_SMS_LINE,
     PAIN_LINE,
     FEATURE_LINES,
     MISHEARD_LINE,
@@ -82,7 +86,7 @@ from sales import (
     sales_brief,
     sales_ended,
     sales_open,
-    hello_for,
+    greet_line,
     cached_sales_lines,
     too_alike,
     wait_line,
@@ -551,6 +555,7 @@ class Gateway:
         campaign_file = CAMPAIGN_PATH if CAMPAIGN_PATH.is_file() else Path(__file__).with_name("campaign.json")
         self._campaign = load_campaign(campaign_file)
         self._pending_sales: ShopCard | None = None
+        self._pending_greet = ""
         self._peer_number = ""
         self._sales_card: ShopCard | None = None
         self._sales_brief = ""
@@ -589,7 +594,11 @@ class Gateway:
             BUY_LINE,
             EXPLAIN,
             HELLO_LINE,
-            HELLO_SMS_LINE,
+            *GREET_VARIANTS,
+            *INTRO_VARIANTS,
+            *INTRO_SMS_VARIANTS,
+            *PERM_VARIANTS,
+            *NOTIME_VARIANTS,
             PAIN_LINE,
             *FEATURE_LINES,
             CLOSE_LINE,
@@ -682,7 +691,8 @@ class Gateway:
                 self._peer_number = key
                 self._pending_sales = self._campaign.get(key)
                 self._outbound_pitch = True
-                greet = hello_for(self._pending_sales)
+                greet = greet_line()
+                self._pending_greet = greet
                 brief = sales_brief(self._pending_sales) if self._pending_sales else sales_open()
                 try:
                     self.brain.warm_sales(brief, greet)
@@ -699,9 +709,11 @@ class Gateway:
         self._pending_sales = ShopCard(instagram=instagram, product=product) if instagram else None
         self._outbound_pitch = True
         self._sim_until = time.monotonic() + SIM_ARM_S
+        greet = greet_line()
+        self._pending_greet = greet
         brief = sales_brief(self._pending_sales) if self._pending_sales else sales_open()
         try:
-            self.brain.warm_sales(brief, HELLO_LINE)
+            self.brain.warm_sales(brief, greet)
         except Exception:
             log.warning("sales warm on sim failed", exc_info=True)
         log.info("sim armed seconds=%s instagram=%s", SIM_ARM_S, instagram or "-")
@@ -738,6 +750,9 @@ class Gateway:
         self._sales_brief = sales_brief(card) if card else (sales_open() if outbound else "")
         self._sales_state = "live" if self._sales_brief else ""
         self._sales = SalesState(sms_sent=bool(card and card.sms_sent)) if self._sales_state else None
+        if self._sales is not None:
+            self._sales.greet_line = self._pending_greet or greet_line()
+        self._pending_greet = ""
         self._sales_pitched = False
         self._sales_said = set()
         self._sales_greeted = False
@@ -749,7 +764,7 @@ class Gateway:
             self._sales_brief = ""
             self._sales = None
             log.info("once line armed")
-        greet = hello_for(card) if self._sales_state else GREETING
+        greet = self._sales.greet_line if self._sales and self._sales_state else (GREETING if not self._sales_state else greet_line())
         if self._sales_state:
             self.brain.start_sales(self._sales_brief, greet)
         else:
@@ -951,6 +966,11 @@ class Gateway:
 
     def _transcribe_utterance(self, utterance: bytes) -> tuple[str, float]:
         started = time.monotonic()
+        cloud = self.brain.cloud_ear(utterance)
+        if cloud:
+            took = time.monotonic() - started
+            log.info("cloud ear seconds=%.2f text=%s", took, cloud)
+            return cloud, took
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline:
             with self._partial_lock:
@@ -1465,8 +1485,26 @@ class Gateway:
             return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
         pcm = self._voice.get(text)
         tts_s = 0.0
-        if not pcm:
-            pcm, tts_s = self.brain.synthesize(text)
+        if pcm:
+            session.play(pcm, end=False)
+        elif tts_model():
+            synth_started = time.monotonic()
+            for piece in self.brain.cloud_stream(text, tts_first_s()):
+                if generation != self._call_generation or session._speech or session.last_was_barge:
+                    break
+                session.play(piece, end=False)
+                if played_flag is not None:
+                    played_flag["on"] = True
+                if not played:
+                    first_audio = time.monotonic() - started
+                    played = True
+                if not tts_s:
+                    tts_s = time.monotonic() - synth_started
+                    log.info("say kind=meaning tts=%.2f streamed line=%s", tts_s, text)
+            if not tts_s:
+                pcm, tts_s = self.brain.synthesize(text, cloud=False)
+        else:
+            pcm, tts_s = self.brain.synthesize(text, cloud=False)
         if pcm and generation == self._call_generation:
             session.play(pcm, end=False)
             if played_flag is not None:
