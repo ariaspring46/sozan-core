@@ -521,6 +521,94 @@ class InboxAgentTests(unittest.TestCase):
         self.assertNotIn("/p/", reply or "")
         self.assertEqual(shown["thread"]["handoffReason"], "سیاست ثبت نشده")
 
+    def test_every_reply_leaves_one_masked_training_example(self) -> None:
+        events: list[dict] = []
+
+        def capture(**kwargs):
+            events.append(kwargs)
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later", capture
+        ):
+            storefront_service.add_product(title="کفش چرم مشکی", price=4000000, stock=2, sku="c")
+            reply = asyncio.run(
+                inbox_agent_service.answer(
+                    "کفش چرم موجود است؟ شماره‌ام ۰۹۱۲۱۲۳۴۵۶۷", thread={"sender": "علی"}, source="battery"
+                )
+            )
+        self.assertIn("موجود", reply or "")
+        train = [row for row in events if row.get("kind") == "train"]
+        self.assertEqual(len(train), 1)
+        payload = train[0]["payload"]
+        self.assertEqual(train[0]["title"], "train-example")
+        self.assertEqual(payload["task"], "inbox_reply")
+        self.assertEqual(payload["source"], "battery")
+        self.assertEqual(payload["output"]["path"], "template")
+        self.assertEqual(payload["output"]["reason"], "catalog")
+        self.assertEqual(payload["teacher"], "sozan/deterministic")
+        self.assertNotEqual(payload["tenant"], "09120001111")
+        blob = json.dumps(payload, ensure_ascii=False)
+        self.assertNotIn("09121234567", blob)
+        self.assertIn("[تلفن]", blob)
+        self.assertTrue(any(msg.get("role") == "user" for msg in payload["messages"]))
+        self.assertGreaterEqual(payload["latencyMs"], 0)
+
+    def test_voice_source_never_reaches_training(self) -> None:
+        events: list[dict] = []
+
+        def capture(**kwargs):
+            events.append(kwargs)
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later", capture
+        ):
+            storefront_service.add_product(title="کفش چرم", price=10, stock=2, sku="c")
+            reply = asyncio.run(
+                inbox_agent_service.answer("کفش چرم موجود است؟", thread={"sender": "علی"}, source="voice")
+            )
+        self.assertIn("موجود", reply or "")
+        self.assertEqual([row for row in events if row.get("kind") == "train"], [])
+        self.assertTrue(any(row.get("kind") == "inbox" for row in events))
+
+    def test_consent_key_off_records_no_training(self) -> None:
+        events: list[dict] = []
+
+        def capture(**kwargs):
+            events.append(kwargs)
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later", capture
+        ), patch("app.services.settings_service.get_settings", lambda: {"sozanImprove": False}):
+            storefront_service.add_product(title="کفش چرم", price=10, stock=2, sku="c")
+            reply = asyncio.run(inbox_agent_service.answer("کفش چرم موجود است؟"))
+        self.assertIn("موجود", reply or "")
+        self.assertEqual([row for row in events if row.get("kind") == "train"], [])
+
+    def test_tool_error_handoff_is_logged_as_a_set_aside_example(self) -> None:
+        payloads = [_chat(calls=[_call("payment_link", {"product": "کفش", "qty": 1})])]
+
+        async def broken(*_args, **_kwargs):
+            raise ValueError("درگاه سوزان هنوز تنظیم نشده.")
+
+        events: list[dict] = []
+
+        def capture(**kwargs):
+            events.append(kwargs)
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later", capture
+        ), patch(
+            "app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])
+        ), patch("app.services.inbox_agent_service.tool_payment_link", broken):
+            reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت بده", source="real"))
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+        train = [row for row in events if row.get("kind") == "train"]
+        self.assertEqual(len(train), 1)
+        payload = train[0]["payload"]
+        self.assertEqual(payload["output"]["path"], "handoff")
+        self.assertIn("خطای ابزار پرداخت", payload["output"]["reason"])
+        self.assertEqual(payload["tools"], ["payment_link"])
+
 
 if __name__ == "__main__":
     unittest.main()

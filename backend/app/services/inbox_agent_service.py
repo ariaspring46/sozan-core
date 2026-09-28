@@ -6,6 +6,9 @@ not written to observe. Shipping, returns, and shop policy are copied from the
 stored policy, not from the model. Stock, order status, and payment links still
 come from the shop's own data. Local bge-m3 only nudges a tool when the model
 answered with none.
+
+Every final reply becomes one training example (kind `train`) unless it is a
+voice turn or the shop turned `sozanImprove` off; training_log masks it again.
 """
 
 from __future__ import annotations
@@ -31,9 +34,11 @@ from app.services.observe_client import emit_later
 from app.services.persian_text import guard_output
 from app.services.pii_mask import mask_pii
 from app.services.router_embed import cosine
+from app.services.training_log import build_example
 
 log = logging.getLogger("sozan.inbox.agent")
 outcome: contextvars.ContextVar[dict | None] = contextvars.ContextVar("sozan_inbox_outcome", default=None)
+train_trace: contextvars.ContextVar[dict | None] = contextvars.ContextVar("sozan_inbox_train_trace", default=None)
 
 AGENT_MODEL = "qwen3.5-9b"
 EMBED_MODEL = "bge-m3"
@@ -575,7 +580,7 @@ async def _claims(text: str, facts: str) -> str:
     return text
 
 
-async def _complete(messages: list[dict], *, allow_payment: bool, timeout: float) -> tuple[str, list[dict]]:
+async def _complete(messages: list[dict], *, allow_payment: bool, timeout: float) -> tuple[str, list[dict], dict]:
     result = await complete_tools(
         messages=_mask_for_model(messages),
         tools=_tools(allow_payment=allow_payment),
@@ -600,7 +605,12 @@ async def _complete(messages: list[dict], *, allow_payment: bool, timeout: float
     # A shop address is Latin. Judge the Persian around it, and keep the address for the link guard.
     judged = spoken_model_reply(_URL.sub("نشانی", raw))
     text = "" if judged == LLM_BAD_JSON["reply"] else raw
-    return text, calls
+    provider = str(result.get("provider") or "")
+    model = str(result.get("model") or "")
+    return text, calls, {
+        "teacher": f"{provider}/{model}" if provider else model,
+        "latencyMs": int(result.get("latencyMs") or 0),
+    }
 
 
 def _vectors_of(payload: dict, count: int) -> list[list[float]]:
@@ -946,22 +956,62 @@ def _policy_reply(thread: dict | None, sentence: str) -> str | None:
     return reply[:1000]
 
 
-async def answer(customer_text: str, thread: dict | None = None) -> str | None:
+def _log_train(customer_text: str, thread: dict | None, source: str, reply: str | None) -> None:
+    """One training example per turn. Voice never enters the dataset, at all."""
+    text = str(reply or "").strip()
+    if not text or source == "voice":
+        return
+    trace = train_trace.get() or {}
+    mark = outcome.get() or {}
+    started = float(trace.get("started") or time.monotonic())
+    example = build_example(
+        task="inbox_reply",
+        messages=list(trace.get("messages") or []),
+        output={"text": text, "path": str(mark.get("path") or ""), "reason": str(mark.get("reason") or "")},
+        tools=list(trace.get("tools") or []),
+        teacher=str(trace.get("teacher") or "sozan/deterministic"),
+        source=source,
+        latency_ms=int((time.monotonic() - started) * 1000),
+        surface="inbox",
+    )
+    if example is None:
+        return
+    emit_later(kind="train", title="train-example", surface="inbox", payload=example)
+
+
+async def answer(customer_text: str, thread: dict | None = None, *, source: str = "") -> str | None:
+    """Reply to one customer turn; `source` is real, battery, or voice."""
+    train_trace.set(
+        {"started": time.monotonic(), "teacher": "", "tools": [], "messages": []}
+    )
+    reply = await _answer(customer_text, thread)
+    _log_train(customer_text, thread, source, reply)
+    return reply
+
+
+async def _answer(customer_text: str, thread: dict | None = None) -> str | None:
     sentence = str(customer_text or "").strip()
     if not sentence:
         return None
+    trace = train_trace.get() or {"started": time.monotonic(), "teacher": "", "tools": [], "messages": []}
+    started = float(trace.get("started") or time.monotonic())
+    history = _history(thread)
+    user_turn = {"role": "user", "content": sentence[:800]}
+    # The conversation this reply is judged on; training_log masks it again before any write.
+    if history and history[-1].get("content") == user_turn["content"]:
+        trace["messages"] = history
+    else:
+        trace["messages"] = [*history, user_turn]
     stored = _policy_reply(thread, sentence)
     if stored is not None:
         return stored
     known = await _known_reply(thread, sentence)
     if known is not None:
         return known
-    started = time.monotonic()
-    messages: list[dict] = [{"role": "system", "content": _system(thread)}, *_history(thread)]
-    if not messages[-1:] or messages[-1].get("content") != sentence:
-        messages.append({"role": "user", "content": sentence[:800]})
+    messages: list[dict] = [{"role": "system", "content": _system(thread)}, *trace["messages"]]
+    trace["messages"] = messages
+    used = trace["tools"]
     nudged = ""
-    used: list[str] = []
     pay_urls: list[str] = []
     number_retried = False
     force_retry = False
@@ -987,8 +1037,9 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                     payload={"tools": used, "reason": "مهلت مدل"},
                 )
                 return reply
-            text, calls = await _complete(messages, allow_payment=allow_payment, timeout=left)
+            text, calls, meta = await _complete(messages, allow_payment=allow_payment, timeout=left)
             if not calls:
+                trace["teacher"] = str(meta.get("teacher") or "") or str(trace.get("teacher") or "")
                 blob_now = _tool_blob(messages)
                 grounded = bool(_amounts(text) & _amounts(blob_now)) or (
                     "موجود" in text and '"stock"' in blob_now

@@ -73,7 +73,7 @@ async def inbox_dry_reply(body: DryReplyIn, _user=Depends(require_permission("ca
 
     if not edge_dry():
         raise HTTPException(status.HTTP_403_FORBIDDEN, "این مسیر فقط روی نمونهٔ خشک باز است")
-    reply = await answer(body.text, thread={"sender": "آزمون"})
+    reply = await answer(body.text, thread={"sender": "آزمون"}, source="battery")
     return {"text": reply or ""}
 
 
