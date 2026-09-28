@@ -27,6 +27,7 @@ class SettingsIn(BaseModel):
     smsTemplateId: str | None = Field(default=None, max_length=80)
     smsTokenName: str | None = Field(default=None, max_length=40)
     plan: str | None = None
+    helpImprove: bool | None = None
 
 
 def _is_hub_admin(user) -> bool:
