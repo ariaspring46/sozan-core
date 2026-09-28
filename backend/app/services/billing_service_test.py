@@ -135,3 +135,30 @@ class BillingServiceTests(unittest.TestCase):
             )
         self.assertTrue(out["ok"])
         self.assertEqual(out["refId"], "t9")
+
+    def test_lab_checkout_amount_is_only_for_the_lab_shop(self) -> None:
+        with patch.dict("os.environ", {"LAB_CHECKOUT_TOMAN": "1000"}):
+            self.assertEqual(billing_service.lab_checkout_amount("09120000991", "pro"), 1000)
+            self.assertIsNone(billing_service.lab_checkout_amount("09135409482", "pro"))
+            self.assertIsNone(billing_service.lab_checkout_amount("09120000991", "promax"))
+        self.assertIsNone(billing_service.lab_checkout_amount("09120000991", "pro"))
+
+    def test_lab_trial_price_is_what_the_gateway_is_asked(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09120000991"):
+            seen: dict = {}
+
+            async def grab(**kwargs):
+                seen.update(kwargs)
+                return {"authority": "B" * 36, "startPayUrl": "https://payment.zarinpal.com/pg/StartPay/" + "B" * 36}
+
+            with patch.dict("os.environ", {"LAB_CHECKOUT_TOMAN": "1000"}), patch.object(
+                payment_service.env, "payments_enabled", True
+            ), patch.object(
+                payment_service, "merchant_id", return_value="11111111-1111-1111-1111-111111111111"
+            ), patch.object(payment_service, "zarinpal_request", new=grab):
+                out = asyncio.run(billing_service.start_subscription("pro", phone="09120000991"))
+                shown = plan_service.snapshot()["plans"]
+        self.assertEqual(out["amount"], 1000)
+        self.assertEqual(seen["amount_toman"], 1000)
+        pro = next(item for item in shown if item["id"] == "pro")
+        self.assertEqual(pro["priceToman"], 1000)
