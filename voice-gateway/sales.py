@@ -582,6 +582,8 @@ class SalesState:
     greet_line: str = ""
     intro_line_said: str = ""
     perm_line_asked: str = ""
+    prev_heard: str = ""
+    insist: bool = False
     last_cue: str = ""
     said: list[str] = field(default_factory=list)
     interrupted: str = ""

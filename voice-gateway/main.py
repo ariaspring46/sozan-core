@@ -131,6 +131,8 @@ HOWDY_LINE = "خوبم. تو بگو."
 BYE_LINE = "خداحافظ."
 WAIT_LINE = THINKING_LINES[0]
 THINK_WAIT_S = 1.8
+# How long the contact may talk before we take our turn instead of holding the reply.
+SPEAK_OVER_MS = int(os.environ.get("SPEAK_OVER_MS", "2500"))
 NUDGE_AFTER_S = 5.0
 SALES_HANG_AFTER_S = 6.0
 ANSWER_SILENCE_S = 25.0
@@ -1236,6 +1238,8 @@ class Gateway:
         extra = self._pending_heard(session)
         if extra:
             heard = f"{heard} {extra}".strip()
+        state.insist = bool(state.prev_heard) and too_alike(state.prev_heard, heard)
+        state.prev_heard = heard
         plan = plan_turn(state, heard)
         if plan.kind == "hold":
             log.info("sales holding for hello text=%s", heard[:80])
@@ -1373,6 +1377,9 @@ class Gateway:
         if not spoken:
             spoken, more_tags = finish_spoken(raw_all or generated_text, state, heard)
             tags |= more_tags
+            if spoken:
+                # Nothing was played during the stream (contact kept talking); say it now.
+                self._speak(session, generation, spoken, "meaning")
         offer_gift = plan.allow_gift and not state.gifted and (plan.signals.price or plan.signals.later or "gift" in tags)
         if not spoken and not offer_gift:
             spoken = fallback_line(state, heard)
@@ -1475,22 +1482,30 @@ class Gateway:
         raw = str(bit.get("raw") or "")
         sentence = str(bit.get("sentence") or "").strip()
         text, tags = extract_tags(sentence)
-        text = guard_reply(text, heard)
-        if text and text not in REPEAT_FREE and any(too_alike(text, prev) for prev in state.said + spoken_parts):
+        guarded = guard_reply(text, heard)
+        if text and guarded != text:
+            log.info("sales drop guard line=%s", text)
+        text = guarded
+        if text and text not in REPEAT_FREE and not state.insist and any(too_alike(text, prev) for prev in state.said + spoken_parts):
+            log.info("sales drop alike line=%s", text)
             text = ""
         generated.append(sentence)
         if not text:
             return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
-        if generation != self._call_generation or session._speech or session.last_was_barge:
+        if generation != self._call_generation:
+            return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
+        if session.last_was_barge:
+            log.info("sales hold barge line=%s", text)
+            return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
+        if session._speech and session._speech_ms < SPEAK_OVER_MS:
+            log.info("sales hold speech_ms=%d line=%s", session._speech_ms, text)
             return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
         pcm = self._voice.get(text)
         tts_s = 0.0
-        if pcm:
-            session.play(pcm, end=False)
-        elif tts_model():
+        if not pcm and tts_model():
             synth_started = time.monotonic()
             for piece in self.brain.cloud_stream(text, tts_first_s()):
-                if generation != self._call_generation or session._speech or session.last_was_barge:
+                if generation != self._call_generation:
                     break
                 session.play(piece, end=False)
                 if played_flag is not None:
@@ -1503,7 +1518,7 @@ class Gateway:
                     log.info("say kind=meaning tts=%.2f streamed line=%s", tts_s, text)
             if not tts_s:
                 pcm, tts_s = self.brain.synthesize(text, cloud=False)
-        else:
+        elif not pcm:
             pcm, tts_s = self.brain.synthesize(text, cloud=False)
         if pcm and generation == self._call_generation:
             session.play(pcm, end=False)
