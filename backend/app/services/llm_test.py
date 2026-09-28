@@ -903,6 +903,39 @@ class InboxHopTests(unittest.TestCase):
         self.assertEqual(chats[1]["model"], "qwen3.5-9b")
         self.assertEqual(chats[1]["timeout"], 15)
 
+    def test_openrouter_inbox_is_haiku_then_deepseek_then_9b(self) -> None:
+        from app.services.llm import _inbox_hops
+
+        cloud = {
+            "kind": "cloud",
+            "url": "https://openrouter.ai/api/v1",
+            "model": "anthropic/claude-haiku-4.5",
+            "token": "x",
+            "source": "override",
+        }
+        extra = {
+            "kind": "cloud",
+            "url": "https://fallback.example/v1",
+            "model": "GPT-OSS-120B",
+            "token": "y",
+            "source": "fallback",
+        }
+        local = {
+            "kind": "local",
+            "url": "http://127.0.0.1:9292/v1",
+            "model": "qwen3.5-9b",
+            "token": "",
+            "source": "default",
+        }
+        with patch("app.services.llm.route_for_surface", return_value=cloud), patch(
+            "app.services.llm._fallback_cloud_route", return_value=extra
+        ), patch("app.services.llm._local_default_route", return_value=local):
+            hops = _inbox_hops("inbox")
+        self.assertEqual(
+            [hop["model"] for hop in hops],
+            ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v4.1-flash", "qwen3.5-9b"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
