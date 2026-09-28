@@ -26,6 +26,7 @@ PINNED_SURFACES = frozenset({"studio"})
 CLOUD_SURFACES = frozenset({"factory"})
 SHOP_CLOUD_SURFACES = frozenset({"shop", "shop-edit", "router", "inbox"})
 INBOX_LOCAL_MODEL = "qwen3.5-9b"
+INBOX_FALLBACK_MODEL = "deepseek/deepseek-v4.1-flash"
 CLOUD_PRIMARY_SURFACES = frozenset({"shop", "shop-edit", "studio", "router"})
 ARVAN_HOST_SUFFIX = "arvancloudai.ir"
 CLOUD_PRIMARY_TIMEOUT = 120
@@ -833,17 +834,28 @@ async def _tools_once(
     return _tool_result(route, payload if isinstance(payload, dict) else {}, counts)
 
 
+def _same_hop(left: dict, right: dict) -> bool:
+    return str(left.get("url") or "") == str(right.get("url") or "") and str(left.get("model") or "") == str(
+        right.get("model") or ""
+    )
+
+
 def _inbox_hops(surface: str) -> list[dict]:
     """Cloud chain first. The home 9b is only the last hop, and only if time remains."""
     hops: list[dict] = []
     cloud = route_for_surface(surface)
     if cloud.get("kind") == "cloud" and cloud.get("url"):
         hops.append(cloud)
+        if "openrouter.ai" in str(cloud.get("url") or "") and str(cloud.get("model") or "") != INBOX_FALLBACK_MODEL:
+            second = dict(cloud)
+            second["model"] = INBOX_FALLBACK_MODEL
+            second["source"] = "inbox-fallback"
+            hops.append(second)
     fallback = _fallback_cloud_route()
-    if fallback and all(str(fallback.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+    if fallback and all(not _same_hop(fallback, hop) for hop in hops):
         hops.append(fallback)
     local = _local_default_route(surface)
-    if all(str(local.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+    if all(not _same_hop(local, hop) for hop in hops):
         hops.append(local)
     return hops or [local]
 

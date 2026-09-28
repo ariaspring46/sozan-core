@@ -17,6 +17,7 @@ _TEXT_KEYS = (
     "sizeExchange",
     "invoice",
     "cod",
+    "cardToCard",
 )
 _INT_KEYS = ("shippingCost", "freeShippingFrom", "returnDays", "minOrder")
 
@@ -137,6 +138,15 @@ def _min_order(policy: dict) -> str:
     return f"حداقل خرید {_fa(policy['minOrder'])} تومان است."
 
 
+def _card(policy: dict) -> str:
+    text = policy.get("cardToCard") or ""
+    if not text:
+        return ""
+    if "کارت" in text:
+        return _sentence(text)
+    return f"کارت به کارت: {text}."
+
+
 def _cod(policy: dict) -> str:
     text = policy["cod"]
     if not text:
@@ -156,6 +166,8 @@ def fixed_reply(text: str) -> str | None:
         return None
     policy = get_policy()
     if "کارت به کارت" in folded:
+        if policy.get("cardToCard"):
+            return _card(policy)
         if "کارت به کارت" in _norm(policy.get("cod") or ""):
             return _cod(policy)
         return ""

@@ -38,6 +38,10 @@ class SalesPolicyTests(unittest.TestCase):
     def test_card_transfer_is_empty_when_the_shop_does_not_store_it(self) -> None:
         self.assertEqual(self._reply("کارت به کارت هم می‌شود؟", {"cod": "نداریم"}), "")
 
+    def test_card_transfer_uses_the_stored_field(self) -> None:
+        reply = self._reply("کارت به کارت هم می‌شود؟", {"cardToCard": "بله، بعد از تأیید سفارش"})
+        self.assertIn("بله", reply or "")
+
     def test_battery_policy_answers_shipping_and_leaves_minimum_order_empty(self) -> None:
         policy = battery_policy()
         self.assertNotIn("minOrder", policy)

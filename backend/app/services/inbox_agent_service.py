@@ -11,6 +11,7 @@ answered with none.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import re
@@ -32,6 +33,7 @@ from app.services.pii_mask import mask_pii
 from app.services.router_embed import cosine
 
 log = logging.getLogger("sozan.inbox.agent")
+outcome: contextvars.ContextVar[dict | None] = contextvars.ContextVar("sozan_inbox_outcome", default=None)
 
 AGENT_MODEL = "qwen3.5-9b"
 EMBED_MODEL = "bge-m3"
@@ -79,7 +81,7 @@ def _mentioned_products(text: str) -> list[dict]:
     for item in _products():
         title = _norm(str(item.get("title") or ""))
         words = [word for word in title.split() if len(word) >= 3 and word not in _TITLE_NOISE]
-        hits = [word for word in words if word in folded]
+        hits = [word for word in words if _has_word(word, folded)]
         if hits:
             scored.append((len(hits), item))
     if not scored:
@@ -91,7 +93,7 @@ def _mentioned_products(text: str) -> list[dict]:
     extra = []
     for item in tier:
         title = _norm(str(item.get("title") or ""))
-        noise = [word for word in title.split() if word in _TITLE_NOISE and word in folded]
+        noise = [word for word in title.split() if word in _TITLE_NOISE and _has_word(word, folded)]
         extra.append((len(noise), item))
     best_noise = max(count for count, _item in extra)
     if best_noise:
@@ -158,11 +160,38 @@ def _norm(text: str) -> str:
     )
 
 
+_WORD_EDGE = re.compile(r"[0-9A-Za-z\u0621-\u064A\u0660-\u0669\u0671-\u06D3\u06F0-\u06F9]")
+_CLITICS = ("تان", "تون", "مان", "شان", "هات", "ها")
+
+
+def _has_word(word: str, folded: str) -> bool:
+    if not word:
+        return False
+    start = 0
+    while True:
+        index = folded.find(word, start)
+        if index < 0:
+            return False
+        before = folded[index - 1] if index else ""
+        after_at = index + len(word)
+        rest = folded[after_at:]
+        after = rest[:1]
+        clitic = False
+        for suffix in _CLITICS:
+            if rest.startswith(suffix):
+                tail = rest[len(suffix) : len(suffix) + 1]
+                clitic = not tail or not _WORD_EDGE.match(tail)
+                break
+        if not (before and _WORD_EDGE.match(before)) and (clitic or not (after and _WORD_EDGE.match(after))):
+            return True
+        start = index + 1
+
+
 def _color_matches(folded: str) -> list[dict]:
     found = []
     for item in _products():
         colors = [_norm(str(color)) for color in (item.get("colors") or []) if str(color).strip()]
-        if any(len(color) >= 3 and color in folded for color in colors):
+        if any(len(color) >= 3 and _has_word(color, folded) for color in colors):
             found.append(item)
     return found
 
@@ -481,6 +510,7 @@ def _fix_links(reply: str, pay_urls: list[str]) -> str:
 
 
 def _hand_off(thread: dict | None, reason: str) -> str:
+    _mark("handoff", reason)
     thread_id = str((thread or {}).get("id") or "").strip()
     if thread_id:
         from app.services.inbox_service import mark_handoff
@@ -670,7 +700,10 @@ def _system(thread: dict | None) -> str:
         "تو فروشندهٔ همین فروشگاه هستی و در دایرکت جواب می‌دهی. فقط فارسی کوتاه بنویس.\n"
         "موجودی، قیمت، وضعیت سفارش و لینک پرداخت را فقط از ابزار بگیر. "
         "اگر چند ابزار لازم است، همه را در همان نوبت صدا بزن. "
-        "اگر ابزار چیزی پیدا نکرد، همان را بگو و عدد یا لینک نساز.\n"
+        "اگر ابزار چیزی پیدا نکرد، همان را بگو و عدد یا لینک نساز. "
+        "آدرس، نماد اعتماد، قیمت رقیب، نرخ ارز و تخفیف را نساز. "
+        "سؤال بیرون از فروش را در یک جمله رد کن. "
+        "فقط اگر مشتری آدم یا مدیر یا فروشنده خواست، یا عصبانی بود، بگو همکارم به‌زودی جواب می‌دهد.\n"
         f"{prompt_block()}\n"
         f"فروشگاه: {cfg.get('storeName') or ''} / {cfg.get('storeTagline') or ''}\n"
         f"نام کالاها: {'، '.join(titles) if titles else 'کاتالوگی ثبت نشده'}\n"
@@ -722,12 +755,23 @@ def _seed_stock(messages: list[dict], products: list[dict]) -> None:
     )
 
 
+def _mark(path: str, reason: str = "") -> None:
+    outcome.set({"path": path, "reason": reason})
+
+
 def _fa_num(value: int) -> str:
     return str(value).translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
 
 
 def _finish(reply: str, reason: str) -> str:
     text = str(reply or "").strip()
+    if text == HANDOFF_LINE:
+        path = "handoff"
+    elif DRY_PAY_HOST in text or "/p/" in text:
+        path = "link"
+    else:
+        path = "template"
+    _mark(path, reason)
     emit_later(
         kind="inbox",
         surface="inbox",
@@ -744,33 +788,18 @@ def _finish_handoff(thread: dict | None, reason: str) -> str:
 
 _HANDOFF_MARKS = (
     "صاحب",
-    "واقعی",
     "فروشنده",
     "مدیر",
     "عمده",
-    "هوا",
-    "شعر",
-    "استقلال",
-    "دلار",
-    "لطیفه",
+    "نفر واقعی",
     "دیر جواب",
     "بد قول",
     "شکایت",
     "طرز حرف",
     "پشت گوش",
-    "اعتماد",
-    "کلاهبردار",
-    "اینستاگرام",
-    "رقیب",
-    "دیجی",
-    "جای دیگر",
-    "فروشگاه دیگر",
-    "مغازه",
-    "آدرس",
-    "مترو",
-    "تحویل حضوری",
+    "عصبانی",
 )
-_PII_MARKS = ("[تلفن]", "[کارت]", "[شبا]", "[کد]", "[نشانی]")
+_ADDRESS_MARKS = ("آدرس", "مترو", "تحویل حضوری", "مغازهتان")
 
 
 def _item_price(item: dict) -> int:
@@ -843,9 +872,11 @@ async def _known_reply(thread: dict | None, sentence: str) -> str | None:
     """Facts the shop already stores. The model is only for what is not stored."""
     folded = _norm(sentence)
     if "ارسال شد" in folded:
-        return _finish_handoff(thread, "وضعیت سفارش نامشخص")
+        return _finish("وضعیت ارسال را از اینجا اعلام نمی‌کنم.", "order")
     if any(mark in folded for mark in _HANDOFF_MARKS):
         return _finish_handoff(thread, "نیاز به انسان")
+    if any(mark in folded for mark in _ADDRESS_MARKS):
+        return _finish("نشانی حضوری در سیاست این فروشگاه ثبت نشده.", "address")
     if "سفارش" in folded:
         order_ids = re.findall(r"\d{3,}", _digit_fold(sentence))
         if order_ids:
@@ -859,7 +890,7 @@ async def _known_reply(thread: dict | None, sentence: str) -> str | None:
     products = _mentioned_products(sentence)
     if "تخفیف" in folded or "کمتر" in folded or ("ارزان" in folded and "ارزانترین" not in folded):
         if not products:
-            return _finish_handoff(thread, "تخفیف ثبت نشده")
+            return _finish("تخفیف ثبت نشده است.", "price")
         bits = [
             f"قیمت {item.get('title') or ''} {_fa_num(_item_price(item))} تومان است."
             for item in products
@@ -873,7 +904,7 @@ async def _known_reply(thread: dict | None, sentence: str) -> str | None:
             return _finish("نشانی عمومی این فروشگاه ثبت نشده.", "shop")
         return _finish(f"نشانی فروشگاه: {url}", "shop")
     if "عکس" in folded and not products:
-        return _finish_handoff(thread, "کالا از عکس مشخص نیست")
+        return _finish("عکس به این پیام نرسیده و از روی متن کالا را نام نمی‌برم.", "photo")
     if _explicit_buy(sentence) and len(products) == 1:
         item = products[0]
         title = str(item.get("title") or "")
@@ -890,11 +921,6 @@ async def _known_reply(thread: dict | None, sentence: str) -> str | None:
         return _finish(f"لینک پرداخت {title}: {result['payUrl']} مبلغ {amount} تومان.", "pay")
     if products:
         return _finish(_catalog_sentence(sentence, products), "catalog")
-    masked = mask_pii(sentence)
-    if any(mark in masked for mark in _PII_MARKS):
-        return _finish_handoff(thread, "اطلاعات خصوصی")
-    if _amounts(sentence):
-        return _finish_handoff(thread, "عدد نامجاز")
     return None
 
 
@@ -907,6 +933,9 @@ def _policy_reply(thread: dict | None, sentence: str) -> str | None:
     reply = guard_output(fixed) if fixed.strip() else ""
     if not reply.strip():
         reply = _hand_off(thread, "سیاست ثبت نشده")
+        _mark("handoff", "سیاست ثبت نشده")
+    else:
+        _mark("template", "policy")
     emit_later(
         kind="inbox",
         surface="inbox",
@@ -964,7 +993,16 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                 grounded = bool(_amounts(text) & _amounts(blob_now)) or (
                     "موجود" in text and '"stock"' in blob_now
                 )
-                if not nudged and not used and not grounded:
+                if (
+                    not nudged
+                    and not used
+                    and not grounded
+                    and (
+                        mentioned
+                        or allow_payment
+                        or any(mark in _norm(sentence) for mark in ("موجود", "قیمت", "هنوز", "دارید", "سفارش", "سایز", "رنگ"))
+                    )
+                ):
                     hinted = await intent_hint(sentence)
                     if hinted:
                         nudged = hinted
@@ -1011,6 +1049,8 @@ async def answer(customer_text: str, thread: dict | None = None) -> str | None:
                         reply = f"{reply}\n{url}".strip()
                 if not str(reply or "").strip():
                     reply = _hand_off(thread, "جواب خالی")
+                else:
+                    _mark("handoff" if reply == HANDOFF_LINE else "model", "")
                 emit_later(
                     kind="inbox",
                     surface="inbox",

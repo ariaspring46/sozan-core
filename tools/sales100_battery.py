@@ -206,10 +206,10 @@ def _s091(text: str, folded: str) -> tuple[bool, str]:
     return True, "ok"
 
 
-def _s092(text: str, folded: str) -> tuple[bool, str]:
+def _s092(_text: str, folded: str) -> tuple[bool, str]:
     if "1111" in folded:
         return False, "invented"
-    return _hand(text, folded)
+    return True, "ok"
 
 
 def _s093(_text: str, folded: str) -> tuple[bool, str]:
@@ -223,13 +223,45 @@ def _s093(_text: str, folded: str) -> tuple[bool, str]:
 def _s094(text: str, folded: str) -> tuple[bool, str]:
     if "50" in folded or "%" in text or "٪" in text:
         return False, "invented"
-    return _hand(text, folded)
+    return True, "ok"
 
 
-def _s095(text: str, folded: str) -> tuple[bool, str]:
+def _s095(text: str, _folded: str) -> tuple[bool, str]:
     if "ارسال شد" in text:
         return False, "invented"
-    return _hand(text, folded)
+    return True, "ok"
+
+
+def _open(text: str, _folded: str) -> tuple[bool, str]:
+    if _PAY in text or "/p/" in text:
+        return False, "link"
+    return True, "ok"
+
+
+def _s069(text: str, folded: str) -> tuple[bool, str]:
+    ok, note = _open(text, folded)
+    if not ok:
+        return ok, note
+    parts = "".join(ch if ch.isdigit() else " " for ch in folded).split()
+    if any(len(part) >= 3 for part in parts):
+        return False, "invented"
+    return True, "ok"
+
+
+def _address(text: str, _folded: str) -> tuple[bool, str]:
+    if "http" in text.lower() or _PAY in text:
+        return False, "url"
+    if "نشانی" not in text or text.strip() == _HAND:
+        return False, "missing"
+    return True, "ok"
+
+
+def _no_discount(text: str, _folded: str) -> tuple[bool, str]:
+    if "تخفیف ثبت نشده" not in text:
+        return False, "missing"
+    if "%" in text or "٪" in text:
+        return False, "invented"
+    return True, "ok"
 
 
 def _s101(text: str, _folded: str) -> tuple[bool, str]:
@@ -255,7 +287,7 @@ _EXPECT = {
     "s012": _out_of_stock,
     "s013": _s013,
     "s014": _in_stock,
-    "s015": _hand,
+    "s015": _has("نام نمی‌برم"),
     "s016": _has("مشکی"),
     "s017": _has("سبز"),
     "s018": _has("مشکی"),
@@ -266,11 +298,11 @@ _EXPECT = {
     "s023": _s023,
     "s024": _out_of_stock,
     "s025": _nums(40),
-    "s026": _hand,
+    "s026": _no_discount,
     "s027": _nums(1200000),
-    "s028": _hand,
+    "s028": _no_discount,
     "s029": _s029,
-    "s030": _hand,
+    "s030": _no_discount,
     "s031": _pay(4000000),
     "s032": _pay(2500000),
     "s033": _s033,
@@ -291,26 +323,26 @@ _EXPECT = {
     "s048": _has("استفاده"),
     "s049": _has("مشتری"),
     "s050": _has("استفاده"),
-    "s051": _hand,
-    "s052": _hand,
-    "s053": _hand,
-    "s054": _hand,
-    "s055": _hand,
-    "s056": _hand,
-    "s057": _hand,
-    "s058": _hand,
+    "s051": _open,
+    "s052": _open,
+    "s053": _open,
+    "s054": _open,
+    "s055": _open,
+    "s056": _no_discount,
+    "s057": _no_discount,
+    "s058": _open,
     "s059": _nums(2000000),
-    "s060": _hand,
+    "s060": _no_discount,
     "s061": _hand,
     "s062": _hand,
     "s063": _hand,
     "s064": _hand,
     "s065": _hand,
-    "s066": _hand,
-    "s067": _hand,
-    "s068": _hand,
-    "s069": _hand,
-    "s070": _hand,
+    "s066": _open,
+    "s067": _open,
+    "s068": _open,
+    "s069": _s069,
+    "s070": _open,
     "s071": _hand,
     "s072": _hand,
     "s073": _hand,
@@ -326,21 +358,21 @@ _EXPECT = {
     "s083": _has("فاکتور"),
     "s084": _hand,
     "s085": _has("نداریم"),
-    "s086": _hand,
-    "s087": _hand,
-    "s088": _hand,
-    "s089": _hand,
-    "s090": _hand,
+    "s086": _address,
+    "s087": _address,
+    "s088": _address,
+    "s089": _address,
+    "s090": _address,
     "s091": _s091,
     "s092": _s092,
     "s093": _s093,
     "s094": _s094,
     "s095": _s095,
-    "s096": _hand,
-    "s097": _hand,
-    "s098": _hand,
-    "s099": _hand,
-    "s100": _hand,
+    "s096": _open,
+    "s097": _open,
+    "s098": _open,
+    "s099": _open,
+    "s100": _open,
     "s101": _s101,
 }
 
@@ -458,6 +490,18 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
         print(f"expects {_EXPECT and len(_EXPECT)}")
         return 2
     os.environ["SOZAN_EDGE_DRY"] = "1"
+    env_file = ROOT / ".env"
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            key = key.strip()
+            if key == "open_router_api_token" and not os.environ.get(key):
+                os.environ[key] = val.strip().strip('"').strip("'")
+    if not os.environ.get("open_router_api_token"):
+        print("openrouter key missing")
+        return 2
     spec = importlib.util.spec_from_file_location("sales_tenant_reset", ROOT / "tools" / "sales_tenant_reset.py")
     if spec is None or spec.loader is None:
         print("battery reset module missing")
@@ -468,6 +512,38 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
     if not policy.is_file():
         print("battery policy missing")
         return 2
+    route_path = state_dir / "llm-routing.json"
+    current = {}
+    if route_path.is_file():
+        try:
+            loaded = json.loads(route_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                current = loaded
+        except json.JSONDecodeError:
+            current = {}
+    routes = current.get("routes") if isinstance(current.get("routes"), dict) else {}
+    providers = current.get("providers") if isinstance(current.get("providers"), list) else []
+    routes["inbox"] = {
+        "kind": "cloud",
+        "model": "anthropic/claude-haiku-4.5",
+        "provider": "openrouter",
+        "base_url": "https://openrouter.ai/api/v1",
+    }
+    if not any(isinstance(row, dict) and row.get("id") == "openrouter" for row in providers):
+        providers.append(
+            {
+                "id": "openrouter",
+                "kind": "openai-chat",
+                "base_url": "https://openrouter.ai/api/v1",
+                "key_env": "open_router_api_token",
+                "label": "OpenRouter",
+                "model": "anthropic/claude-haiku-4.5",
+            }
+        )
+    route_path.write_text(
+        json.dumps({"routes": routes, "providers": providers, "at": time.time()}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     from unittest.mock import patch
 
     from app.config import settings
@@ -481,10 +557,13 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
     notes: dict[str, str] = {}
     elapsed_ms: list[float] = []
     model_calls = 0
+    path_counts: dict[str, int] = {}
+    handoff_reasons: dict[str, int] = {}
 
-    async def _answer(text: str) -> str:
+    async def _answer(text: str) -> tuple[str, dict]:
         nonlocal model_calls
         real = inbox_agent_service.complete_tools
+        inbox_agent_service.outcome.set(None)
 
         async def counting(*args, **kwargs):
             nonlocal model_calls
@@ -493,16 +572,23 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
 
         with patch.object(inbox_agent_service, "complete_tools", counting):
             reply = await inbox_agent_service.answer(text, thread={"sender": "آزمون"})
-        return str(reply or "")
+        meta = inbox_agent_service.outcome.get() or {}
+        return str(reply or ""), meta if isinstance(meta, dict) else {}
 
     for run_index in range(1, runs + 1):
         for case in cases:
             started = time.perf_counter()
             with patch.object(settings, "state_dir", str(state_dir)), tenant_scope(reset.PHONE):
-                reply = asyncio.run(_answer(str(case.get("user") or "")))
+                reply, meta = asyncio.run(_answer(str(case.get("user") or "")))
             elapsed_ms.append((time.perf_counter() - started) * 1000)
             ok, note = judge_scenario(case, reply)
-            kind = "handoff" if reply.strip() == _HAND else "dry" if _PAY in reply else "text"
+            path = str(meta.get("path") or "")
+            reason = str(meta.get("reason") or "")
+            if run_index == 1:
+                path_counts[path or "unknown"] = path_counts.get(path or "unknown", 0) + 1
+                if path == "handoff":
+                    handoff_reasons[reason or "نامشخص"] = handoff_reasons.get(reason or "نامشخص", 0) + 1
+            kind = path or ("handoff" if reply.strip() == _HAND else "dry" if _PAY in reply else "text")
             by_id.setdefault(str(case["id"]), []).append(ok)
             if not ok:
                 notes[str(case["id"])] = note
@@ -516,6 +602,7 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
                             "pass": ok,
                             "note": note,
                             "kind": kind,
+                            "reason": reason,
                             "ms": round(elapsed_ms[-1]),
                         },
                         ensure_ascii=False,
@@ -533,6 +620,9 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
         "p95ms": round(_percentile(elapsed_ms, 0.95)),
         "maxms": round(max(elapsed_ms) if elapsed_ms else 0),
         "modelCalls": model_calls,
+        "paths": path_counts,
+        "handoffReasons": handoff_reasons,
+        "handoffPct": round(100 * path_counts.get("handoff", 0) / max(1, len(cases)), 1),
         "failed": failed,
         "notes": {case_id: notes.get(case_id, "") for case_id in failed},
     }
