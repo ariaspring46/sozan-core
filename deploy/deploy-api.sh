@@ -31,7 +31,7 @@ ssh -o ConnectTimeout=15 "$HOST" "chmod +x ${REMOTE}/deploy/sozan-backup.sh && s
 
 if ! ssh -o ConnectTimeout=15 "$HOST" "sudo systemctl restart sozan-api && sleep 3 && curl -fsS -m 8 http://127.0.0.1:8012/health"; then
   echo "restart hung; killing the listener" >&2
-  ssh -o ConnectTimeout=15 "$HOST" 'pid=$(ss -ltnp | awk "/:8012/ {print}" | sed -n "s/.*pid=\\([0-9]*\\).*/\\1/p" | head -1); if [ -n "$pid" ]; then sudo kill -9 $pid; fi; sleep 1; sudo systemctl start sozan-api; sleep 3; curl -fsS -m 8 http://127.0.0.1:8012/health'
+  ssh -o ConnectTimeout=15 "$HOST" 'pid=$(ss -ltnp | awk "/:8012/ {print}" | sed -n "s/.*pid=\\([0-9]*\\).*/\\1/p" | head -1); if [ -n "$pid" ]; then sudo kill -9 $pid; fi; sleep 1; sudo systemctl start sozan-api sozan-worker; sleep 3; curl -fsS -m 8 http://127.0.0.1:8012/health'
 fi
 ssh -o ConnectTimeout=15 "$HOST" "systemctl is-active sozan-api sozan-worker && curl -fsS -m 8 http://127.0.0.1:8012/health"
 echo "deployed ${LOCAL}"
