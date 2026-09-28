@@ -150,6 +150,9 @@ def _summary(thread: dict) -> dict:
         "delivered": bool(thread.get("delivered", True)),
         "pending": pending,
         "paused": bool(thread.get("paused")),
+        "handoffReason": str((thread.get("handoff") or {}).get("reason") or "")
+        if isinstance(thread.get("handoff"), dict)
+        else "",
         "unread": _unread_count(thread),
         "lastRole": _last_role(thread),
         "autoReply": str(thread.get("autoReply") or ""),
@@ -193,9 +196,10 @@ def list_threads(*, q: str = "", platform: str = "", status_filter: str = "") ->
         summary = _summary(row)
         if wanted and summary["platform"] != wanted:
             continue
-        if filt == "unread" and not summary["unread"]:
+        waiting = bool(summary.get("handoffReason"))
+        if filt == "unread" and not summary["unread"] and not waiting:
             continue
-        if filt == "pending" and not summary["pending"]:
+        if filt == "pending" and not summary["pending"] and not waiting:
             continue
         if needle:
             blob = f"{summary['sender']} {summary['lastText']} {summary['platformLabel']}"
@@ -341,6 +345,21 @@ def get_thread(thread_id: str, *, mark_read: bool = False) -> dict:
     }
 
 
+def mark_handoff(thread_id: str, reason: str) -> None:
+    """Stop the agent on this thread until the seller turns auto-reply back on."""
+    reason = str(reason or "").strip()[:80]
+    with tenant_file_lock("inbox"):
+        data = _state()
+        thread = _find_thread(data, thread_id)
+        if thread is None:
+            return
+        thread["paused"] = True
+        thread["handoff"] = {"reason": reason, "at": int(time.time())}
+        thread["lastReadAt"] = 0
+        thread["updatedAt"] = int(time.time())
+        _save(data)
+
+
 def patch_thread(thread_id: str, *, paused: bool | None = None) -> dict:
     with tenant_file_lock("inbox"):
         data = _state()
@@ -349,6 +368,8 @@ def patch_thread(thread_id: str, *, paused: bool | None = None) -> dict:
             raise KeyError("گفتگو پیدا نشد")
         if paused is not None:
             thread["paused"] = bool(paused)
+            if not paused:
+                thread.pop("handoff", None)
             thread["updatedAt"] = int(time.time())
             _save(data)
     return get_thread(thread_id, mark_read=True)
