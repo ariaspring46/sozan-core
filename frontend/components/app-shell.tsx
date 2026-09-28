@@ -9,6 +9,7 @@ import { SozanMark } from "@/components/sozan-mark";
 import { api } from "@/lib/api";
 import { useAppViewport } from "@/lib/use-app-viewport";
 import { usePlan } from "@/lib/use-plan";
+import { useAiBudget } from "@/lib/use-ai-budget";
 import { applyTheme, readTheme } from "@/lib/theme";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -67,6 +68,7 @@ export function AppShell({
   const [unread, setUnread] = useState(0);
   const [typing, setTyping] = useState(false);
   const plan = usePlan();
+  const aiBudget = useAiBudget();
 
   // رنگ نوار مرورگر را با تم انتخابی هم‌راستا کن (اسکریپت head ممکن است قبل از متاها اجرا شده باشد).
   useEffect(() => {
@@ -164,6 +166,16 @@ export function AppShell({
           <SozanMark className="h-9 w-9 shrink-0 md:hidden" />
           <div className="min-w-0 flex-1">{header}</div>
         </header>
+        {aiBudget && aiBudget.tier !== "ok" && aiBudget.note ? (
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-paper px-4 py-2 text-xs text-warm">
+            <span className="min-w-0">{aiBudget.note}</span>
+            {aiBudget.tier === "capped" ? (
+              <Link href="/more/settings" className="shrink-0 rounded-lg bg-accentStrong px-3 py-1 font-bold text-onAccent">
+                ارتقای پلن
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
         <nav
           aria-label="ناوبری"

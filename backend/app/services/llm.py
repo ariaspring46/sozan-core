@@ -11,6 +11,7 @@ from pathlib import Path
 import httpx
 
 from app.config import settings
+from app.services import ai_budget_service
 from app.services.observe_client import emit_later, llm_headers
 
 log = logging.getLogger("sozan.llm")
@@ -182,6 +183,24 @@ def _decorate_cloud_body(body: dict, route: dict) -> None:
         if key == "think":
             continue
         body[key] = value
+
+
+def _budget_capped(surface: str) -> str | None:
+    """Cloud is skipped when the tenant or company hit its cap. Voice never blocks."""
+    try:
+        reason = ai_budget_service.cloud_blocked(surface=surface)
+    except Exception:
+        log.warning("ai-budget check failed; cloud stays allowed", exc_info=True)
+        return None
+    if reason:
+        emit_later(
+            kind="ai-budget",
+            title="cloud-capped",
+            surface=surface,
+            status="ok",
+            payload={"reason": reason},
+        )
+    return reason
 
 
 def _fallback_cloud_route() -> dict | None:
@@ -608,6 +627,11 @@ def _emit_usage(*, surface: str, model: str, payload: dict, latency_ms: float = 
     if cost is not None:
         observed["cost"] = cost
     emit_later(kind="llm", title="llm-usage", surface=surface, status="ok", payload=observed)
+    if cost is not None:
+        try:
+            ai_budget_service.record_cost(surface=surface, usd=cost)
+        except Exception:
+            log.warning("ai-budget record failed", exc_info=True)
     counts["provider"] = provider
     counts["latencyMs"] = int(latency_ms)
     if cost is not None:
@@ -696,6 +720,15 @@ async def _complete_with_route(
 
 async def _chat_completion(*, messages: list[dict], temperature: float, max_tokens: int, surface: str) -> str:
     route = route_for_surface(surface)
+    if route.get("kind") == "cloud" and _budget_capped(surface):
+        log.warning("llm %s at ai-budget cap; local model", surface)
+        return await _complete_with_route(
+            _local_default_route(surface),
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            surface=surface,
+        )
     if route.get("kind") != "cloud":
         return await _complete_with_route(
             route,
@@ -914,6 +947,9 @@ def _same_hop(left: dict, right: dict) -> bool:
 
 def _inbox_hops(surface: str) -> list[dict]:
     """Haiku, then DeepSeek on the same cloud, then the home 9b if time remains."""
+    local = _local_default_route(surface)
+    if _budget_capped(surface):
+        return [local]
     hops: list[dict] = []
     cloud = route_for_surface(surface)
     if cloud.get("kind") == "cloud" and cloud.get("url"):
@@ -923,7 +959,6 @@ def _inbox_hops(surface: str) -> list[dict]:
             second["model"] = INBOX_FALLBACK_MODEL
             second["source"] = "inbox-fallback"
             hops.append(second)
-    local = _local_default_route(surface)
     if all(not _same_hop(local, hop) for hop in hops):
         hops.append(local)
     return hops or [local]
@@ -998,11 +1033,12 @@ async def complete_tools(
             surface=surface,
             budget=INBOX_TURN_BUDGET if timeout is None else timeout,
         )
-    if route.get("kind") != "cloud":
-        if surface == "router":
+    capped = route.get("kind") == "cloud" and _budget_capped(surface)
+    if route.get("kind") != "cloud" or capped:
+        if surface == "router" and not capped:
             raise RuntimeError("router_requires_cloud")
         return await _tools_once(
-            route,
+            _local_default_route(surface) if capped else route,
             messages=messages,
             tools=tools,
             temperature=temperature,

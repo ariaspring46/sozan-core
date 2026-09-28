@@ -1060,6 +1060,13 @@ def _emit_usage(*, model: str, provider: str, cost: float | None, nbytes: int) -
         emit_later(kind="routing", surface="image", title="image-usage", status="ready", payload=payload)
     except Exception:
         log.warning("image usage emit failed")
+    if cost is not None:
+        try:
+            from app.services import ai_budget_service
+
+            ai_budget_service.record_cost(surface="image", usd=cost)
+        except Exception:
+            log.warning("ai-budget record failed", exc_info=True)
 
 
 def _emit_retry(reason: str, model: str) -> None:
