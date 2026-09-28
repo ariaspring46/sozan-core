@@ -4,9 +4,11 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from pathlib import Path
+
 from app.config import settings
 from app.services import settings_service
-from app.state_store import read_json, write_json
+from app.state_store import read_json, tenant_scope, write_json
 
 
 class SettingsGuardTests(unittest.TestCase):
@@ -34,3 +36,15 @@ class SettingsGuardTests(unittest.TestCase):
                     settings_service.save_settings({"otpTtlSeconds": 10}, hub_admin=True)
                 with self.assertRaises(ValueError):
                     settings_service.save_settings({"otpTtlSeconds": 901}, hub_admin=True)
+
+    def test_training_off_stores_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09120000991"):
+            self.assertTrue(settings_service.allows_training())
+            settings_service.save_training_choice(False)
+            dest = Path(raw) / "samples.jsonl"
+            self.assertFalse(settings_service.note_training_example({"task": "router"}, dest))
+            self.assertFalse(dest.exists())
+            settings_service.save_training_choice(True)
+            self.assertTrue(settings_service.note_training_example({"task": "router"}, dest))
+            self.assertTrue(dest.is_file())
+            self.assertIn("router", dest.read_text())
