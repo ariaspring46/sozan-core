@@ -69,6 +69,7 @@ from sales import (
     FIXED_SALES_LINES,
     HELLO_LINE,
     FULL_INTRO_LINE,
+    NONEED_LINE,
     GREET_VARIANTS,
     INTRO_VARIANTS,
     INTRO_SMS_VARIANTS,
@@ -618,8 +619,8 @@ class SalesTest(unittest.TestCase):
         allowed = plan_turn(asked_job, "بله بگو")
         self.assertEqual(allowed.line, FULL_INTRO_LINE)
         note_spoken(asked_job, allowed.line)
-        pitch = plan_turn(asked_job, "خب بگو چی دارید")
-        self.assertEqual(pitch.line, PAIN_LINE)
+        job = plan_turn(asked_job, "چه کارایی دیگه دارید")
+        self.assertEqual(job.kind, "model")
         job = plan_turn(asked_job, "چه کارایی رو انجام میدی")
         self.assertEqual(job.kind, "model")
         where = plan_turn(asked_job, "پیجام کجا باید وارد کنم")
@@ -814,10 +815,10 @@ class SalesTest(unittest.TestCase):
                 self.assertLessEqual(len(line.split()), 18)
         for line in (HELLO_LINE, PAIN_LINE, DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE):
             self.assertLessEqual(len(line.split()), 18)
-        self.assertIn("فروشگاه اینترنتی رایگان", FULL_INTRO_LINE)
-        self.assertIn("دایرکت", FULL_INTRO_LINE)
-        self.assertIn("استودیو", FULL_INTRO_LINE)
-        self.assertIn("سفارش", FULL_INTRO_LINE)
+        self.assertIn("فروشگاه رایگان", FULL_INTRO_LINE)
+        self.assertIn("هزینه", FULL_INTRO_LINE)
+        self.assertIn("وحشتناک", FULL_INTRO_LINE)
+        self.assertIn("کمکتون کنم", FULL_INTRO_LINE)
         opened = sales_open()
         self.assertIn("دستیار فروش", opened)
         self.assertIn("پرو مکس", opened)
@@ -845,9 +846,14 @@ class SalesTest(unittest.TestCase):
         note_spoken(sms, third.line)
         fourth = plan_turn(sms, "باشه بگو")
         self.assertEqual(fourth.line, FULL_INTRO_LINE)
+        self.assertIn("کمکتون کنم", fourth.line)
         note_spoken(sms, fourth.line)
-        fifth = plan_turn(sms, "خب")
-        self.assertEqual(fifth.line, PAIN_LINE)
+        fifth = plan_turn(sms, "خب باشه بگو")
+        self.assertEqual(fifth.kind, "model")
+        no_need = plan_turn(sms, "نه ممنون نیاز ندارم")
+        self.assertEqual(no_need.line, NONEED_LINE)
+        self.assertIn("رایگان", no_need.line or "")
+        self.assertIn("همین شماره", no_need.line or "")
         who = SalesState()
         who_greet = plan_turn(who, "الو")
         note_spoken(who, who_greet.line)
