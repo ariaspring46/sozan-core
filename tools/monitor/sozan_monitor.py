@@ -209,6 +209,33 @@ def check_pass() -> tuple[dict, list[str]]:
         capture_output=True, text=True,
     ).stdout.strip()
     record("observe-home", OK if observe == "active" else FAIL, observe or "unknown")
+
+    tunnel = subprocess.run(
+        ["systemctl", "--user", "is-active", "sozan-llm-tunnel.service"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    record("tunnel-home", OK if tunnel == "active" else FAIL, tunnel or "unknown")
+
+    swap = subprocess.run(
+        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-m", "5", "http://127.0.0.1:9292/"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    record("llama-swap", OK if swap == "302" else FAIL, f"HTTP {swap}")
+
+    queue = subprocess.run(
+        ["/usr/bin/python3",
+         "/home/demon/local-ai/smoke-workspace/site-builder/tools/sozan_queue.py",
+         "status"],
+        capture_output=True, text=True, timeout=20,
+    )
+    out = queue.stdout
+    running = "هیچ پروسسی فعال نیست" not in out
+    stuck = ("در حال اجرا" in out and running) or False
+    if running:
+        record("factory-queue", WARN, "کاری در حال اجراست")
+    else:
+        record("factory-queue", OK, "صف آزاد")
+    del stuck
     return results, notes
 
 
@@ -403,6 +430,22 @@ def push_status_to_hub() -> None:
 
 
 def cmd_run() -> int:
+    import fcntl
+
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    lock = (STATE_DIR / "run.lock").open("w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("another pass is running; skipped")
+        return 0
+    try:
+        return _cmd_run_locked()
+    finally:
+        lock.close()
+
+
+def _cmd_run_locked() -> int:
     state = load_state()
     results, notes = check_pass()
     for message in apply_transitions(state, results):
