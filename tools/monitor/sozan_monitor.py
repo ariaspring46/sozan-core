@@ -106,9 +106,23 @@ def http_status(url: str) -> tuple[str, str, str]:
             capture_output=True, text=True, timeout=CHECK_TIMEOUT + 5,
         ).stdout.strip()
         if not code or not code.isdigit():
+            code = subprocess.run(
+                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-m", str(CHECK_TIMEOUT), url],
+                capture_output=True, text=True, timeout=CHECK_TIMEOUT + 5,
+            ).stdout.strip()
+        if not code or not code.isdigit():
             return FAIL, "curl-error", ""
         body = ""
-        if url.endswith("/health"):
+        if code != "200":
+            # one retry before declaring an outage (proxy/DNS blips happen)
+            import time as _time
+
+            _time.sleep(2)
+            code = subprocess.run(
+                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-m", str(CHECK_TIMEOUT), url],
+                capture_output=True, text=True, timeout=CHECK_TIMEOUT + 5,
+            ).stdout.strip()
+        if code == "200" and url.endswith("/health"):
             body = subprocess.run(
                 ["curl", "-s", "-m", str(CHECK_TIMEOUT), url],
                 capture_output=True, text=True, timeout=CHECK_TIMEOUT + 5,
