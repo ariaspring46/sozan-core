@@ -314,6 +314,11 @@ class CloudFallbackTests(unittest.TestCase):
 
         with patch("app.services.llm.settings") as settings, patch(
             "app.services.llm_routing_service.get", return_value=None
+        ), patch.dict(
+            # env هاب fallback واقعی دارد؛ این کلاس مسیر arvan ساختگی خودش را می‌سنجد.
+            os.environ,
+            {"CLOUD_LLM_FALLBACK_URL": "", "CLOUD_LLM_FALLBACK_MODEL": "", "CLOUD_LLM_FALLBACK_TOKEN": ""},
+            clear=False,
         ), patch("app.services.llm.httpx.AsyncClient", FakeClient), patch(
             "app.services.llm._ensure_gpu1", new=AsyncMock(side_effect=lambda model: model)
         ), patch("app.services.llm.emit_later", new=fake_emit), patch(
