@@ -107,7 +107,8 @@ class ImageProviderTests(unittest.TestCase):
     def test_cloud_fail_does_not_use_local(self) -> None:
         from app.services import image_provider_service
 
-        with patch(
+        # env هاب fallback تصویر (seedream) دارد؛ این تست نبودِ محلیِ موازی را می‌سنجد.
+        with patch.dict(os.environ, {"IMAGE_FALLBACK": "none", "open_router_api_token": ""}, clear=False), patch(
             "app.services.llm_routing_service.get",
             return_value={"kind": "cloud", "model": "x", "provider": "p"},
         ), patch("app.services.llm_routing_service.provider", return_value={}), patch(
