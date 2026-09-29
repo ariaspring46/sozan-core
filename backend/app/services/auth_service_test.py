@@ -63,6 +63,8 @@ class OtpResendTests(unittest.TestCase):
             # این کلاس درگاه همیشگی را می‌سنجد؛ محیط ممکن است ملی‌پیامک را روشن کرده باشد.
             patch.object(auth_service.settings, "otp_provider", ""),
             patch.object(auth_service.settings, "payments_enabled", False),
+            # env هاب پنجرهٔ تست و کلید پیامک واقعی دارد؛ این کلاس مسیر شکست را می‌سنجد.
+            patch.object(auth_service.settings, "otp_test_until", ""),
         ]
         for item in self.patches:
             item.start()
@@ -165,6 +167,8 @@ class OtpTestWindowTests(unittest.TestCase):
             patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": False}),
             patch.object(auth_service.settings, "otp_provider", ""),
             patch.object(auth_service.settings, "payments_enabled", False),
+            # env هاب پنجرهٔ تست و کلید پیامک واقعی دارد؛ این کلاس مسیر شکست را می‌سنجد.
+            patch.object(auth_service.settings, "otp_test_until", ""),
             patch.object(auth_service.sms_service, "send_otp", new=AsyncMock()),
             patch.object(auth_service.sms_service, "resolve_sms", return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "code"}),
         ]
@@ -192,6 +196,8 @@ class OtpCaptchaTests(unittest.TestCase):
             patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": True}),
             patch.object(auth_service.settings, "otp_provider", ""),
             patch.object(auth_service.settings, "payments_enabled", False),
+            # env هاب پنجرهٔ تست و کلید پیامک واقعی دارد؛ این کلاس مسیر شکست را می‌سنجد.
+            patch.object(auth_service.settings, "otp_test_until", ""),
             patch.object(auth_service.settings, "otp_dev", True),
             patch.object(auth_service.settings, "payments_enabled", False),
         ]
@@ -261,6 +267,8 @@ class SendCapTests(unittest.TestCase):
             patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": True}),
             patch.object(auth_service.settings, "otp_provider", ""),
             patch.object(auth_service.settings, "payments_enabled", False),
+            # env هاب پنجرهٔ تست و کلید پیامک واقعی دارد؛ این کلاس مسیر شکست را می‌سنجد.
+            patch.object(auth_service.settings, "otp_test_until", ""),
             patch.object(auth_service.settings, "otp_dev", True),
             patch.object(auth_service.settings, "payments_enabled", False),
         ]
@@ -303,6 +311,8 @@ class FixedOtpTests(unittest.TestCase):
             patch.object(auth_service, "fixed_otp_for", side_effect=lambda phone: "100001" if phone == "09129900001" else None),
             patch.object(auth_service.settings, "otp_provider", ""),
             patch.object(auth_service.settings, "payments_enabled", False),
+            # env هاب پنجرهٔ تست و کلید پیامک واقعی دارد؛ این کلاس مسیر شکست را می‌سنجد.
+            patch.object(auth_service.settings, "otp_test_until", ""),
         ]
         for item in self.patches:
             item.start()

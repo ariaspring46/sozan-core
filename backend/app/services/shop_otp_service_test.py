@@ -44,6 +44,7 @@ class ShopOtpCapTests(unittest.TestCase):
             patch.object(shop_otp_service, "redis_client", self.redis),
             patch.object(shop_otp_service, "find_tenant_by_slug", return_value="09135409482"),
             patch.object(shop_otp_service, "get_settings", return_value={"mockSms": True, "otpTtlSeconds": 300}),
+            patch.object(shop_otp_service.settings, "otp_test_until", ""),
             patch.object(shop_otp_service, "emit_later"),
         ]
         for item in self.patches:
@@ -82,6 +83,7 @@ class ShopOtpHardeningTests(unittest.TestCase):
             patch.object(shop_otp_service, "redis_client", self.redis),
             patch.object(shop_otp_service, "find_tenant_by_slug", return_value="09135409482"),
             patch.object(shop_otp_service, "get_settings", return_value={"mockSms": True, "otpTtlSeconds": 300}),
+            patch.object(shop_otp_service.settings, "otp_test_until", ""),
         ]
         for item in self.patches:
             item.start()

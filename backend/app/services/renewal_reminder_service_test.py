@@ -56,7 +56,9 @@ class RenewalReminderTests(unittest.TestCase):
         from app.services import renewal_reminder_service as rr
 
         with tempfile.TemporaryDirectory() as raw:
-            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"), patch.object(
+                rr.settings, "sozan_sms_api_key", ""
+            ), patch.object(rr.settings, "sms_ir_api_key", ""):
                 write_json("plan.json", {"plan": "pro", "paidUntil": int(time()) + 86400})
                 with patch.object(rr.settings, "sozan_sms_api_key", ""):
                     out = asyncio.run(rr.run_once())
