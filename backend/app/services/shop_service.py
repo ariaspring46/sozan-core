@@ -440,6 +440,9 @@ FACTORY_ENV_ALLOW = (
 )
 
 
+FACTORY_PYTHON = str(Path(sys.executable).resolve())
+
+
 def _factory_env() -> dict[str, str]:
     # فقط فهرست سفید؛ رازهای هاب هرگز به زیرپروسهٔ کارخانه نمی‌روند.
     env = {key: value for key, value in os.environ.items() if key.startswith("SOZAN_") or key.startswith("LLAMA_") or key in FACTORY_ENV_ALLOW}
@@ -480,7 +483,7 @@ def _factory_env() -> dict[str, str]:
         env["SOZAN_CLOUD_LLM_URL"] = cloud_url
         env["SOZAN_CLOUD_LLM_TOKEN"] = cloud_token
         env["SOZAN_CATALOG_MODEL"] = cloud_model or "deepseek/deepseek-v4.1-flash"
-        env.setdefault("SOZAN_FACTORY_PYTHON", factory_python)
+        env.setdefault("SOZAN_FACTORY_PYTHON", FACTORY_PYTHON)
         proxy = (settings.cloud_llm_proxy or settings.channel_proxy or "").strip()
         if proxy:
             env["SOZAN_CLOUD_LLM_PROXY"] = proxy
@@ -494,9 +497,8 @@ def _run_factory(args: list[str]) -> dict:
         return {"ok": False, "error": "اسکریپت کارخانه پیدا نشد"}
     try:
         # کارخانه httpx می‌خواهد؛ پایتون venv هاب آن را دارد، system python نه.
-        factory_python = str(Path(sys.executable).resolve())
         proc = subprocess.run(
-            [factory_python, str(script), *args],
+            [FACTORY_PYTHON, str(script), *args],
             cwd=str(script.parent.parent),
             capture_output=True,
             text=True,
