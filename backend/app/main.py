@@ -122,7 +122,14 @@ async def lifespan(_app: FastAPI):
     await engine.dispose()
 
 
-app = FastAPI(title="Sozan Ads", lifespan=lifespan)
+app = FastAPI(
+    title="Sozan Ads",
+    lifespan=lifespan,
+    # مستندات و طرح API در production باز نیست؛ openapi.json هم داده نمی‌شود.
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
