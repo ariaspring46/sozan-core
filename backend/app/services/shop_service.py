@@ -471,12 +471,16 @@ def _factory_env() -> dict[str, str]:
 
     env["SOZAN_CORE_API_URL"] = str(settings.public_api_url or "https://api.sozan-core.ir").rstrip("/")
     env["SOZAN_PAY_SECRET"] = pay_service.ensure_pay_secret()
+    # توکن همان مسیر LLM هاب: روتر توکن OpenRouter را از open_router_api_token می‌خواند؛
+    # کارخانه هم باید همان را بگیرد وگرنه 401 می‌خورد و مسیر به 27B محلی می‌افتد.
     cloud_url = (settings.cloud_llm_url or "").rstrip("/")
-    cloud_token = (settings.cloud_llm_token or "").strip()
+    cloud_token = os.environ.get("open_router_api_token", "").strip() or (settings.cloud_llm_token or "").strip()
+    cloud_model = str(os.environ.get("SOZAN_ROUTING_MODEL") or settings.cloud_llm_model or "").strip()
     if cloud_url and cloud_token:
         env["SOZAN_CLOUD_LLM_URL"] = cloud_url
         env["SOZAN_CLOUD_LLM_TOKEN"] = cloud_token
-        env["SOZAN_CATALOG_MODEL"] = settings.cloud_llm_model
+        env["SOZAN_CATALOG_MODEL"] = cloud_model or "deepseek/deepseek-v4.1-flash"
+        env.setdefault("SOZAN_FACTORY_PYTHON", factory_python)
         proxy = (settings.cloud_llm_proxy or settings.channel_proxy or "").strip()
         if proxy:
             env["SOZAN_CLOUD_LLM_PROXY"] = proxy
@@ -489,8 +493,10 @@ def _run_factory(args: list[str]) -> dict:
     if not script.is_file():
         return {"ok": False, "error": "اسکریپت کارخانه پیدا نشد"}
     try:
+        # کارخانه httpx می‌خواهد؛ پایتون venv هاب آن را دارد، system python نه.
+        factory_python = str(Path(sys.executable).resolve())
         proc = subprocess.run(
-            [sys.executable, str(script), *args],
+            [factory_python, str(script), *args],
             cwd=str(script.parent.parent),
             capture_output=True,
             text=True,
@@ -612,7 +618,14 @@ def _bind_live_job(shop: dict) -> dict:
         return _fail_stale_job(shop, latest)
     shop["jobId"] = str(latest.get("id") or "")
     status = str(latest.get("status") or "")
+    was_ready = str(shop.get("status") or "") == "ready"
     shop["status"] = "ready" if status == "done" else status or shop.get("status") or "idle"
+    if status == "done" and not was_ready:
+        # کارخانه تازه تمام شد؛ DNS/upstream تازه نوشته و nginx هم‌گام شود.
+        try:
+            _publish_dns(shop)
+        except Exception:
+            pass
     if latest.get("url"):
         shop["url"] = latest["url"]
     if latest.get("port"):

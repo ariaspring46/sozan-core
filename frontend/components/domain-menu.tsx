@@ -207,7 +207,17 @@ export function DomainMenu({
           <p className="text-sm text-warm">ساخت دوباره سایت زنده را از نو می‌سازد و چند دقیقه طول می‌کشد.</p>
         ) : null}
         {shop?.priceBlocked ? (
-          <p className="text-sm text-danger">بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام.</p>
+          <div className="space-y-2">
+            <p className="text-sm text-warm">
+              هنوز کالایی بدون قیمت تومان مانده؛ کالای بی‌قیمت در ویترین فقط «استعلام» می‌شود و خرید نمی‌رود. قیمت‌ها را در انبار بگذار و دوباره بساز.
+            </p>
+            <a
+              href="/more/inventory?focus=price"
+              className="inline-flex min-h-9 items-center rounded-xl bg-accentStrong px-3 text-xs font-bold text-onAccent"
+            >
+              انبار و قیمت‌گذاری
+            </a>
+          </div>
         ) : running ? (
           <p className="text-sm text-warm">در حال ساخت…</p>
         ) : shop?.status === "failed" ? (

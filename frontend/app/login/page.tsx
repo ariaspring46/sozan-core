@@ -66,6 +66,25 @@ export default function LoginPage() {
     return () => window.clearTimeout(timer);
   }, [wait]);
 
+  function renderCaptcha() {
+    if (!captcha) return null;
+    return (
+      <div className="space-y-2 rounded-xl border border-line bg-canvas p-3">
+        <p className="text-sm" aria-live="polite">
+          پرسش امنیتی: <bdo dir="ltr">{captcha.question}</bdo>
+        </p>
+        <Input
+          dir="ltr"
+          inputMode="numeric"
+          className="text-center"
+          placeholder="پاسخ"
+          value={captchaAnswer}
+          onChange={(e) => setCaptchaAnswer(e.target.value)}
+        />
+      </div>
+    );
+  }
+
   async function fetchCaptcha() {
     try {
       const data = await api<{ token: string; question: string }>(
@@ -82,7 +101,7 @@ export default function LoginPage() {
     setError("");
     setBusy(true);
     try {
-      const data = await api<{ ok: boolean; dev_code?: string }>("/auth/otp/send", {
+      const data = await api<{ ok: boolean; dev_code?: string; code?: string }>("/auth/otp/send", {
         method: "POST",
         body: JSON.stringify({
           phone: cleanPhone,
@@ -91,7 +110,7 @@ export default function LoginPage() {
         }),
       });
       setSent(true);
-      setHint(data.dev_code || "");
+      setHint(data.code || data.dev_code || "");
       setWait(RESEND_SECONDS);
       setCaptcha(null);
       setCaptchaAnswer("");
@@ -150,6 +169,7 @@ export default function LoginPage() {
   return (
     <main className="sozan-lamp relative flex min-h-screen items-end justify-center overflow-hidden sm:items-center">
       <LoginCoderScene />
+      <div className="pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative z-10 mx-auto w-full max-w-md px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-40 sm:mt-24 sm:px-6 sm:pb-6 sm:pt-8">
         <Card className="w-full space-y-5 bg-surface/95 backdrop-blur-md">
           <div className="flex items-center gap-3">
@@ -178,21 +198,7 @@ export default function LoginPage() {
               <p id="phone-hint" className="min-h-5 text-xs text-muted" aria-live="polite">
                 {hintText}
               </p>
-              {captcha ? (
-                <div className="space-y-2 rounded-xl border border-line bg-canvas p-3">
-                  <p className="text-sm" aria-live="polite">
-                    پرسش امنیتی: <bdo dir="ltr">{captcha.question}</bdo>
-                  </p>
-                  <Input
-                    dir="ltr"
-                    inputMode="numeric"
-                    className="text-center"
-                    placeholder="پاسخ"
-                    value={captchaAnswer}
-                    onChange={(e) => setCaptchaAnswer(e.target.value)}
-                  />
-                </div>
-              ) : null}
+              {renderCaptcha()}
               <Button type="submit" className="w-full" disabled={!phoneOk || busy || Boolean(captcha && !captchaAnswer.trim())}>
                 {busy ? "در حال ارسال…" : "ارسال کد"}
               </Button>
@@ -207,6 +213,7 @@ export default function LoginPage() {
               <p className="text-sm text-muted">
                 کد پیامک به <bdi dir="ltr">{cleanPhone}</bdi> فرستاده شد.
               </p>
+              {renderCaptcha()}
               <Field label="کد پیامک">
                 <Input
                   dir="ltr"
@@ -219,7 +226,7 @@ export default function LoginPage() {
                   onChange={(e) => setCode(e.target.value)}
                 />
               </Field>
-              <Button type="submit" className="w-full" disabled={!cleanCode || busy}>
+              <Button type="submit" className="w-full" disabled={!cleanCode || busy || Boolean(captcha && !captchaAnswer.trim())}>
                 {busy ? "در حال بررسی…" : "ورود"}
               </Button>
               <div className="flex items-center justify-between gap-2 text-sm">
