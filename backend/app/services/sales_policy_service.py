@@ -7,7 +7,8 @@ seller has not set them, so that topic is handed to the seller.
 from __future__ import annotations
 
 from app.state_store import read_json, write_json
-
+import re
+from app.state_store import read_json
 TEXT_FIELDS = (
     "shippingMethod",
     "shippingDays",
@@ -256,3 +257,207 @@ def fixed_reply(text: str) -> str | None:
     if any(mark in folded for mark in ("ارسال", "پیشتاز", "شهرستان", "پست")):
         return _shipping(policy)
     return None
+
+
+# --- seller-sentence parsing (plan §7.2) -------------------------------------
+#
+# parse(sentence) turns a seller's spoken policy into a structured patch plus a
+# confirmation card. It is deterministic: numbers and promises come only from
+# the sentence itself, never guessed. The caller (panel form today, X's
+# set_sales_policy router tool with the qa50 gate later) shows the card and
+# saves the patch only after the seller confirms.
+
+_FA_FOLD = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+_SHEBA_RE = re.compile(r"IR\s?(?:\d[\s-]?){24}", re.IGNORECASE)
+_HOLDER_RE = re.compile(r"به\s*نام\s+([^\n،.]+)")
+_METHODS = ("پست پیشتاز", "پست معمولی", "تیپاکس", "پیک", "باربری", "پست")
+_WORD_VALUES = {
+    "مجانی": 0,
+    "رایگان": 0,
+}
+_CARD_FIELD_ORDER = (
+    "shippingMethod",
+    "shippingCost",
+    "shippingDays",
+    "shippingCities",
+    "freeShippingFrom",
+    "returnDays",
+    "returnPayer",
+    "hours",
+    "minOrder",
+    "invoice",
+    "cod",
+    "cardNumber",
+    "sheba",
+    "accountHolder",
+)
+CARD_FIELDS = ("shippingCost", "freeShippingFrom", "returnDays", "minOrder", "cardNumber", "sheba", "accountHolder")
+
+
+def _fold_digits(text: str) -> str:
+    return str(text or "").translate(_FA_FOLD)
+
+
+def _numbers(text: str) -> list[tuple[int, str]]:
+    """(value, raw) for amounts; unit-less small numbers (counts, days) stay out."""
+    folded = _fold_digits(text)
+    out = []
+    for match in re.finditer(r"(\d[\d,،_]*)(?:\s*(هزار|میلیون))?", folded):
+        digits = match.group(1).replace(",", "").replace("،", "").replace("_", "")
+        unit = match.group(2) or ""
+        value = int(digits) * (1000 if unit == "هزار" else 1_000_000 if unit == "میلیون" else 1)
+        if unit or value >= 1000:
+            out.append((value, match.group(0).strip()))
+    return out
+
+
+def _fa_span(match_text: str) -> str:
+    return match_text.translate(str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹"))
+
+
+def _word_number(text: str) -> int | None:
+    """«ششصد هزار», «دو میلیون»: word + unit combos worth knowing."""
+    words = {
+        "صد": 100,
+        "دویست": 200,
+        "سیصد": 300,
+        "پانصد": 500,
+        "ششصد": 600,
+        "هفتصد": 700,
+        "هشتصد": 800,
+        "نهصد": 900,
+        "دو": 2,
+        "سه": 3,
+        "پنج": 5,
+        "یک": 1,
+        "نیم": 0.5,
+    }
+    folded = str(text or "").replace("\u200c", " ")
+    for word, base in words.items():
+        for unit, mult in (("میلیون", 1_000_000), ("هزار", 1000)):
+            if f"{word} {unit}" in folded and base * mult >= 1000:
+                return int(base * mult)
+    return None
+
+
+def parse(sentence: str) -> dict:
+    """Seller sentence → {"patch": {...}, "card": {...}}.
+
+    patch holds only confidently parsed fields (int for *_INT_KEYS, string for
+    the rest). card lists every known policy field with its parsed value or a
+    missing state, for the confirmation UI.
+    """
+    raw = str(sentence or "").strip()
+    folded = _fold_digits(raw).replace("\u200c", "").replace("\u200d", "")
+    patched: dict = {}
+
+    for word, value in _WORD_VALUES.items():
+        if re.search(rf"(هزینه|کرایه|پست|ارسال)[^\n]{{0,25}}{word}", folded) and "بالای" not in folded:
+            patched.setdefault("shippingCost", value)
+
+    method = next((name for name in _METHODS if name in folded), "")
+    if method:
+        patched["shippingMethod"] = method
+
+    cities = ""
+    if re.search(r"همهٔ?\s*شهرها|همه\s+شهرها|سراسر\s+کشور", folded):
+        cities = "همهٔ شهرها"
+    else:
+        city = re.search(r"(?:به|در)\s+(تهران|کرج|اصفهان|مشهد|شیراز|تبریز)(?:\s+و\s+\S+)?", folded)
+        if city:
+            cities = city.group(0).replace("به ", "").replace("در ", "").strip()
+    if cities:
+        patched["shippingCities"] = cities
+
+    days = re.search(r"(\d{1,2}(?:\s*تا\s*\d{1,2})?)\s*روز", folded)
+    if days and any(mark in folded for mark in ("ارسال", "پست", "تحویل", "می‌رسد", "میرسه", "کارخانه")):
+        patched["shippingDays"] = f"{_fa_span(days.group(1))} روز"
+
+    if any(mark in folded for mark in ("ارسال", "پست", "کرایه", "هزینهٔ ارسال", "هزینه ارسال", "تیپاکس", "پیک", "باربری")) and "رایگان" not in folded:
+        for value, span in _numbers(folded):
+            if "روز" in span:
+                continue
+            context = folded[max(0, folded.find(span) - 40) : folded.find(span) + len(span) + 6]
+            if "مرجوع" in context or "برگشت" in context or "حداقل" in context:
+                continue
+            patched.setdefault("shippingCost", value)
+            break
+    if "shippingCost" not in patched:
+        for value, span in _numbers(folded):
+            if "روز" in span:
+                continue
+            context = folded[max(0, folded.find(span) - 40) : folded.find(span) + len(span) + 6]
+            if re.search(r"(هزینه|کرایه|پست|ارسال|تیپاکس|پیک|باربری)[^\d]{0,20}$", context):
+                patched.setdefault("shippingCost", value)
+                break
+
+    free = re.search(r"(?:ارسال\s+رایگان[^\d]{0,30}|بالای\s+)(\d[\d,،_]*)", folded)
+    if free:
+        value = int(free.group(1).replace(",", "").replace("،", ""))
+        if value >= 1000:
+            patched["freeShippingFrom"] = value
+    if "freeShippingFrom" not in patched:
+        for value, span in _numbers(folded):
+            context = folded[max(0, folded.find(span) - 50) : folded.find(span) + len(span) + 10]
+            if "رایگان" in context and ("بالای" in context or "از" in context):
+                patched["freeShippingFrom"] = value
+                break
+
+    returns = re.search(r"(\d{1,2})\s*روز[^\n.]{0,20}(مرجوع|برگشت|پس گرفت)|مرجوعی\s*(\d{1,2})\s*روز", folded)
+    if returns:
+        patched["returnDays"] = int(returns.group(1) or returns.group(3))
+    elif re.search(r"(\d{1,2})\s*روزه?[^\n.]{0,10}(مرجوع|برگشت)", folded):
+        match = re.search(r"(\d{1,2})\s*روز", folded)
+        if match:
+            patched["returnDays"] = int(match.group(1))
+    payer = re.search(r"(هزینهٔ?\s*برگشت|پست\s*برگشت|هزینهٔ?\s*مرجوعی)[^\n.]{0,15}(مشتری|فروشنده|خریدار)", folded)
+    if payer:
+        patched["returnPayer"] = payer.group(2) if payer.group(2) != "خریدار" else "مشتری"
+
+    hours = re.search(r"از\s*(\d{1,2})(?:\s*صبح)?\s*تا\s*(\d{1,2})(?:\s*(عصر|شب|شام))?", folded)
+    if not hours and "ساعت" in folded and "روز" not in folded:
+        hours = re.search(r"(\d{1,2})\s*تا\s*(\d{1,2})", folded)
+    if hours:
+        start = int(hours.group(1)) + 12 if hours.group(1) and int(hours.group(1)) <= 8 and not hours.group(2) else int(hours.group(1))
+        end = int(hours.group(2)) + 12 if hours.group(2) and int(hours.group(2)) <= 8 else int(hours.group(2) or 0)
+        if end:
+            patched["hours"] = f"{_fa(str(start))} تا {_fa(str(end))}"
+
+    minimum = re.search(r"حداقل\s*(خرید|سفارش)[^\d]{0,15}(\d[\d,،_]*)", folded)
+    if minimum:
+        value = int(minimum.group(2).replace(",", "").replace("،", ""))
+        if value >= 1000:
+            patched["minOrder"] = value
+    if "minOrder" not in patched:
+        for value, span in _numbers(folded):
+            context = folded[max(0, folded.find(span) - 30) : folded.find(span) + len(span) + 4]
+            if "حداقل" in context:
+                patched["minOrder"] = value
+                break
+
+    if re.search(r"فاکتور[^\n.]{0,10}(می\s*دهیم|داریم|صادر|می کنیم)", folded):
+        patched["invoice"] = "بله، فاکتور فروش می‌دهیم"
+
+    if re.search(r"پرداخت\s*(در\s*محل|درب\s*منزل)\s*(داریم|هست|می‌دهیم|می کنیم|میکنیم)", folded):
+        patched["cod"] = "داریم"
+    elif re.search(r"پرداخت\s*(در\s*محل|درب\s*منزل)\s*(نداریم|نیست)", folded):
+        patched["cod"] = "نداریم"
+
+    flat = folded.replace(" ", "").replace("-", "")
+    card_match = re.search(r"\d{16}", flat)
+    if card_match:
+        patched["cardNumber"] = card_match.group(0)
+    sheba = _SHEBA_RE.search(folded.replace(" ", "").replace("-", ""))
+    if sheba:
+        patched["sheba"] = sheba.group(0).upper().replace(" ", "")
+    holder = _HOLDER_RE.search(raw)
+    if holder:
+        patched["accountHolder"] = holder.group(1).strip()
+
+    card_rows = {}
+    for key in _CARD_FIELD_ORDER:
+        if key in patched:
+            card_rows[key] = {"value": patched[key], "state": "parsed"}
+        else:
+            card_rows[key] = {"value": "", "state": "missing"}
+    return {"patch": patched, "card": card_rows}
