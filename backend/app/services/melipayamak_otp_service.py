@@ -95,6 +95,16 @@ async def send_otp(phone: str, code: str) -> str:
         log.warning("melipayamak pattern rejected: http=%s", response.status_code)
         _emit_failure("provider", f"http-{response.status_code}")
         raise OtpSendError("provider", f"http-{response.status_code}")
+    # پنل دو شکل موفق می‌دهد: رشتهٔ عددی (recId) یا {"d":"<recId>"} از مسیر JSON.
+    if text.startswith("{") and "\"d\"" in text:
+        import json as _json
+
+        try:
+            inner = str(_json.loads(text).get("d") or "").strip()
+        except Exception:
+            inner = ""
+        if inner.lstrip("-").isdigit():
+            text = inner
     digits = text.strip('"').strip()
     if not digits.lstrip("-").isdigit():
         log.warning("melipayamak pattern unexpected body: %s", text[:60])
