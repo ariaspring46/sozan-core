@@ -379,6 +379,24 @@ small{{color:#6b6257}}</style></head><body>
 </body></html>"""
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     STATUS_PAGE.write_text(html, encoding="utf-8")
+    push_status_to_hub()
+
+
+def push_status_to_hub() -> None:
+    """Best-effort mirror so X's nginx (tools/monitor/status-nginx.conf) can serve it."""
+    try:
+        subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "hub",
+             "mkdir -p ~/sozan-status"],
+            capture_output=True, timeout=15,
+        )
+        subprocess.run(
+            ["scp", "-q", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+             str(STATUS_PAGE), "hub:~/sozan-status/status.html"],
+            capture_output=True, timeout=20,
+        )
+    except Exception:  # noqa: BLE001 — mirroring must never break a pass
+        pass
 
 
 # ---------------------------------------------------------------- commands
