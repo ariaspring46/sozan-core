@@ -122,7 +122,17 @@ def p95(values: list[float]) -> float:
     return ordered[index]
 
 
+def require_edge_dry(base: str) -> None:
+    request = urllib.request.Request(f"{base.rstrip('/')}/health")
+    with urllib.request.urlopen(request, timeout=8) as response:
+        body = json.loads(response.read().decode("utf-8"))
+    if not isinstance(body, dict) or body.get("edgeDry") is not True:
+        raise SystemExit("نمونهٔ موازی باید SOZAN_EDGE_DRY=1 داشته باشد")
+
+
 def run(args: argparse.Namespace) -> int:
+    if not args.allow_live:
+        require_edge_dry(args.base)
     cases = load_cases(Path(args.cases))
     token = Path(args.token_file).read_text(encoding="utf-8").strip()
     out_dir = Path(args.out)
@@ -231,6 +241,7 @@ def main() -> None:
     parser.add_argument("--phone", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--runs", type=int, default=2)
+    parser.add_argument("--allow-live", action="store_true")
     raise SystemExit(run(parser.parse_args()))
 
 

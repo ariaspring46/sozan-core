@@ -1,0 +1,433 @@
+diff --git a/backend/app/services/llm.py b/backend/app/services/llm.py
+index d3a17c1..140af28 100644
+--- a/backend/app/services/llm.py
++++ b/backend/app/services/llm.py
+@@ -11,7 +11,6 @@ from pathlib import Path
+ import httpx
+ 
+ from app.config import settings
+-from app.services import ai_budget_service
+ from app.services.observe_client import emit_later, llm_headers
+ 
+ log = logging.getLogger("sozan.llm")
+@@ -146,10 +145,7 @@ def _proxy_for_url(url: str) -> str | None:
+ 
+ 
+ def _openrouter_token() -> str:
+-    named = os.environ.get("open_router_api_token", "").strip()
+-    if named:
+-        return named
+-    return _str_setting(getattr(settings, "open_router_api_token", ""))
++    return os.environ.get("open_router_api_token", "").strip()
+ 
+ 
+ def _route_token(url: str, explicit: str) -> str:
+@@ -185,42 +181,13 @@ def _decorate_cloud_body(body: dict, route: dict) -> None:
+         body[key] = value
+ 
+ 
+-def _budget_capped(surface: str) -> str | None:
+-    """Cloud is skipped when the tenant or company hit its cap. Voice never blocks."""
+-    try:
+-        reason = ai_budget_service.cloud_blocked(surface=surface)
+-    except Exception:
+-        log.warning("ai-budget check failed; cloud stays allowed", exc_info=True)
+-        return None
+-    if reason:
+-        emit_later(
+-            kind="ai-budget",
+-            title="cloud-capped",
+-            surface=surface,
+-            status="ok",
+-            payload={"reason": reason},
+-        )
+-    return reason
+-
+-
+ def _fallback_cloud_route() -> dict | None:
+-    url = os.environ.get("CLOUD_LLM_FALLBACK_URL", "").strip() or _str_setting(
+-        getattr(settings, "cloud_llm_fallback_url", "")
+-    )
+-    model = os.environ.get("CLOUD_LLM_FALLBACK_MODEL", "").strip() or _str_setting(
+-        getattr(settings, "cloud_llm_fallback_model", "")
+-    )
+-    token = os.environ.get("CLOUD_LLM_FALLBACK_TOKEN", "").strip() or _str_setting(
+-        getattr(settings, "cloud_llm_fallback_token", "")
+-    )
++    url = os.environ.get("CLOUD_LLM_FALLBACK_URL", "").strip().rstrip("/")
++    model = os.environ.get("CLOUD_LLM_FALLBACK_MODEL", "").strip()
++    token = os.environ.get("CLOUD_LLM_FALLBACK_TOKEN", "").strip()
+     if not url or not model or not token:
+         return None
+-    url = url.rstrip("/")
+-    auth = (
+-        os.environ.get("CLOUD_LLM_FALLBACK_AUTH", "").strip()
+-        or _str_setting(getattr(settings, "cloud_llm_fallback_auth", ""))
+-        or "Bearer"
+-    )
++    auth = os.environ.get("CLOUD_LLM_FALLBACK_AUTH", "").strip() or "Bearer"
+     return {
+         "kind": "cloud",
+         "url": url,
+@@ -248,29 +215,6 @@ def _auth_scheme(value: object) -> str:
+     return _str_setting(value, "Bearer") or "Bearer"
+ 
+ 
+-def inbox_cloud_route() -> dict | None:
+-    """Chat cloud, used as the first inbox hop."""
+-    return _shop_cloud_route(source="inbox")
+-
+-
+-def inbox_hops() -> list[dict]:
+-    """Haiku's cloud, then DeepSeek on that same cloud, then the home 9b."""
+-    hops: list[dict] = []
+-    cloud = inbox_cloud_route()
+-    if cloud and cloud.get("url"):
+-        hops.append(cloud)
+-        if "openrouter.ai" in str(cloud.get("url") or "") and str(cloud.get("model") or "") != INBOX_FALLBACK_MODEL:
+-            second = dict(cloud)
+-            second["model"] = INBOX_FALLBACK_MODEL
+-            second["source"] = "inbox-fallback"
+-            hops.append(second)
+-    local = _local_default_route("inbox")
+-    local["model"] = "qwen3.5-9b"
+-    if all(str(local.get("url") or "") != str(hop.get("url") or "") for hop in hops):
+-        hops.append(local)
+-    return hops or [local]
+-
+-
+ def _shop_cloud_route(*, source: str = "default") -> dict | None:
+     url = _str_setting(settings.cloud_llm_url).rstrip("/")
+     token = _cloud_token()
+@@ -514,38 +458,6 @@ async def _ensure_gpu1(model: str) -> str:
+     return pick
+ 
+ 
+-def note_provider_denied(url: str, code: int) -> None:
+-    """One observe event per provider and status each hour. No secrets."""
+-    if code not in {401, 402}:
+-        return
+-    host = _host_of(url) or "cloud"
+-    from datetime import datetime, timezone
+-
+-    hour = datetime.now(timezone.utc).strftime("%Y%m%d%H")
+-    key = f"{host}:{code}"
+-    try:
+-        from app.state_store import read_json, write_json
+-
+-        stored = read_json("llm-provider-alert.json", {}, shared=True)
+-        if not isinstance(stored, dict):
+-            stored = {}
+-        if str(stored.get(key) or "") == hour:
+-            return
+-        stored[key] = hour
+-        write_json("llm-provider-alert.json", stored, shared=True)
+-    except Exception:
+-        log.warning("provider auth alert skipped")
+-        return
+-    emit_later(
+-        kind="llm",
+-        title="provider-auth",
+-        surface="llm",
+-        status="failed",
+-        stage=f"http-{code}",
+-        payload={"host": host, "code": code},
+-    )
+-
+-
+ def _classify_llm_error(exc: Exception) -> str:
+     if isinstance(exc, httpx.TimeoutException):
+         return "timeout"
+@@ -627,11 +539,6 @@ def _emit_usage(*, surface: str, model: str, payload: dict, latency_ms: float =
+     if cost is not None:
+         observed["cost"] = cost
+     emit_later(kind="llm", title="llm-usage", surface=surface, status="ok", payload=observed)
+-    if cost is not None:
+-        try:
+-            ai_budget_service.record_cost(surface=surface, usd=cost)
+-        except Exception:
+-            log.warning("ai-budget record failed", exc_info=True)
+     counts["provider"] = provider
+     counts["latencyMs"] = int(latency_ms)
+     if cost is not None:
+@@ -720,15 +627,6 @@ async def _complete_with_route(
+ 
+ async def _chat_completion(*, messages: list[dict], temperature: float, max_tokens: int, surface: str) -> str:
+     route = route_for_surface(surface)
+-    if route.get("kind") == "cloud" and _budget_capped(surface):
+-        log.warning("llm %s at ai-budget cap; local model", surface)
+-        return await _complete_with_route(
+-            _local_default_route(surface),
+-            messages=messages,
+-            temperature=temperature,
+-            max_tokens=max_tokens,
+-            surface=surface,
+-        )
+     if route.get("kind") != "cloud":
+         return await _complete_with_route(
+             route,
+@@ -765,9 +663,6 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
+             )
+         except Exception as exc:
+             last_exc = exc
+-            denied = int(getattr(getattr(exc, "response", None), "status_code", 0) or 0)
+-            if denied in {401, 402}:
+-                note_provider_denied(str(hop.get("url") or ""), denied)
+             if final_hop:
+                 raise
+             nxt = _local_default_route(surface) if index == len(hops) - 1 else hops[index + 1][0]
+@@ -946,10 +841,7 @@ def _same_hop(left: dict, right: dict) -> bool:
+ 
+ 
+ def _inbox_hops(surface: str) -> list[dict]:
+-    """Haiku, then DeepSeek on the same cloud, then the home 9b if time remains."""
+-    local = _local_default_route(surface)
+-    if _budget_capped(surface):
+-        return [local]
++    """Cloud chain first. The home 9b is only the last hop, and only if time remains."""
+     hops: list[dict] = []
+     cloud = route_for_surface(surface)
+     if cloud.get("kind") == "cloud" and cloud.get("url"):
+@@ -959,6 +851,10 @@ def _inbox_hops(surface: str) -> list[dict]:
+             second["model"] = INBOX_FALLBACK_MODEL
+             second["source"] = "inbox-fallback"
+             hops.append(second)
++    fallback = _fallback_cloud_route()
++    if fallback and all(not _same_hop(fallback, hop) for hop in hops):
++        hops.append(fallback)
++    local = _local_default_route(surface)
+     if all(not _same_hop(local, hop) for hop in hops):
+         hops.append(local)
+     return hops or [local]
+@@ -1033,12 +929,11 @@ async def complete_tools(
+             surface=surface,
+             budget=INBOX_TURN_BUDGET if timeout is None else timeout,
+         )
+-    capped = route.get("kind") == "cloud" and _budget_capped(surface)
+-    if route.get("kind") != "cloud" or capped:
+-        if surface == "router" and not capped:
++    if route.get("kind") != "cloud":
++        if surface == "router":
+             raise RuntimeError("router_requires_cloud")
+         return await _tools_once(
+-            _local_default_route(surface) if capped else route,
++            route,
+             messages=messages,
+             tools=tools,
+             temperature=temperature,
+@@ -1069,9 +964,6 @@ async def complete_tools(
+             )
+         except Exception as exc:
+             last_exc = exc
+-            denied = int(getattr(getattr(exc, "response", None), "status_code", 0) or 0)
+-            if denied in {401, 402}:
+-                note_provider_denied(str(hop.get("url") or ""), denied)
+             if index == len(hops) - 1 and not allow_local:
+                 raise
+             nxt = _local_default_route(surface) if index == len(hops) - 1 else hops[index + 1][0]
+diff --git a/backend/app/services/llm_test.py b/backend/app/services/llm_test.py
+index 43dd393..6e2af10 100644
+--- a/backend/app/services/llm_test.py
++++ b/backend/app/services/llm_test.py
+@@ -278,12 +278,6 @@ class RouteSurfaceTests(unittest.TestCase):
+ 
+ 
+ class CloudFallbackTests(unittest.TestCase):
+-    def setUp(self) -> None:
+-        # These tests exercise cloud routing, not the cost cap; keep cloud reachable.
+-        cap = patch("app.services.llm._budget_capped", return_value=None)
+-        cap.start()
+-        self.addCleanup(cap.stop)
+-
+     def _run(self, surface: str, handler, **extra):
+         captured = {}
+ 
+@@ -428,12 +422,6 @@ class CloudFallbackTests(unittest.TestCase):
+ 
+ 
+ class RouterToolsTests(unittest.TestCase):
+-    def setUp(self) -> None:
+-        # These tests exercise cloud routing, not the cost cap; keep cloud reachable.
+-        cap = patch("app.services.llm._budget_capped", return_value=None)
+-        cap.start()
+-        self.addCleanup(cap.stop)
+-
+     def test_requires_cloud(self) -> None:
+         with patch("app.services.llm.settings") as settings, patch(
+             "app.services.llm_routing_service.get", return_value=None
+@@ -502,12 +490,6 @@ class RouterToolsTests(unittest.TestCase):
+ 
+ 
+ class OpenRouterCutoverTests(unittest.TestCase):
+-    def setUp(self) -> None:
+-        # These tests exercise cloud routing, not the cost cap; keep cloud reachable.
+-        cap = patch("app.services.llm._budget_capped", return_value=None)
+-        cap.start()
+-        self.addCleanup(cap.stop)
+-
+     def _client(self, seen: list):
+         class FakeClient:
+             def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+@@ -654,96 +636,6 @@ class OpenRouterCutoverTests(unittest.TestCase):
+         self.assertEqual(titles, ["timeout"])
+         self.assertEqual(len(seen), 2)
+ 
+-    def test_unauthorized_then_next_provider(self) -> None:
+-        seen: list[dict] = []
+-
+-        class DeniedThenOk:
+-            def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+-                self.timeout = timeout
+-
+-            async def __aenter__(self):
+-                return self
+-
+-            async def __aexit__(self, *args):
+-                return False
+-
+-            async def post(self, url, json=None, headers=None):
+-                seen.append({"url": url, "auth": (headers or {}).get("Authorization")})
+-                request = httpx.Request("POST", url)
+-                if "openrouter.ai" in url:
+-                    response = httpx.Response(401, request=request)
+-                    raise httpx.HTTPStatusError("denied", request=request, response=response)
+-                return httpx.Response(
+-                    200,
+-                    json={
+-                        "choices": [
+-                            {
+-                                "message": {
+-                                    "content": "",
+-                                    "tool_calls": [
+-                                        {"id": "c1", "function": {"name": "ask_user", "arguments": "{}"}}
+-                                    ],
+-                                }
+-                            }
+-                        ]
+-                    },
+-                    request=request,
+-                )
+-
+-        with tempfile.TemporaryDirectory() as raw, patch.dict(
+-            os.environ,
+-            {
+-                "open_router_api_token": "",
+-                "CLOUD_LLM_FALLBACK_URL": "",
+-                "CLOUD_LLM_FALLBACK_MODEL": "",
+-                "CLOUD_LLM_FALLBACK_TOKEN": "",
+-                "CLOUD_LLM_FALLBACK_AUTH": "",
+-            },
+-        ), patch("app.services.llm.settings") as settings, patch(
+-            "app.state_store.settings"
+-        ) as state_settings, patch(
+-            "app.services.llm_routing_service.get", return_value=None
+-        ), patch("app.services.llm.httpx.AsyncClient", DeniedThenOk), patch(
+-            "app.services.llm.emit_later"
+-        ), patch("app.services.llm._ensure_gpu1", new=AsyncMock(side_effect=lambda model: model)):
+-            state_settings.state_path = Path(raw)
+-            _apply_settings(
+-                settings,
+-                _route_settings(
+-                    cloud_llm_url="https://openrouter.ai/api/v1",
+-                    cloud_llm_model="deepseek/deepseek-v4.1-flash",
+-                    cloud_llm_token="should-not-use",
+-                    open_router_api_token="or-from-settings",
+-                    cloud_llm_fallback_url="https://api.arvancloudai.ir/v1",
+-                    cloud_llm_fallback_model="GPT-OSS-120B",
+-                    cloud_llm_fallback_token="arvan-from-settings",
+-                ),
+-            )
+-            out = asyncio.run(complete_tools(messages=[{"role": "user", "content": "hi"}], tools=[{"type": "function"}]))
+-        self.assertEqual(out["tool_calls"][0]["name"], "ask_user")
+-        self.assertIn("openrouter.ai", seen[0]["url"])
+-        self.assertIn("arvancloudai.ir", seen[1]["url"])
+-        self.assertEqual(seen[0]["auth"], "Bearer or-from-settings")
+-        self.assertEqual(seen[1]["auth"], "Bearer arvan-from-settings")
+-        self.assertEqual(len(seen), 2)
+-
+-    def test_provider_auth_alert_once_per_hour(self) -> None:
+-        from app.services.llm import note_provider_denied
+-
+-        emitted: list[str] = []
+-
+-        def emit(**kwargs):
+-            if kwargs.get("title") == "provider-auth":
+-                emitted.append(str((kwargs.get("payload") or {}).get("code") or ""))
+-
+-        with tempfile.TemporaryDirectory() as raw, patch("app.state_store.settings") as state_settings, patch(
+-            "app.services.llm.emit_later", new=emit
+-        ):
+-            state_settings.state_path = Path(raw)
+-            note_provider_denied("https://openrouter.ai/api/v1", 401)
+-            note_provider_denied("https://openrouter.ai/api/v1", 401)
+-        self.assertEqual(emitted, ["401"])
+-
+ 
+ class ChatFailReportTests(unittest.TestCase):
+     def test_timeout_classifies_and_emits_chat_failed(self) -> None:
+@@ -854,12 +746,6 @@ class Gpu1GuardTests(unittest.TestCase):
+ 
+ 
+ class InboxHopTests(unittest.TestCase):
+-    def setUp(self) -> None:
+-        # These tests exercise cloud routing, not the cost cap; keep cloud reachable.
+-        cap = patch("app.services.llm._budget_capped", return_value=None)
+-        cap.start()
+-        self.addCleanup(cap.stop)
+-
+     def _client(self, seen: list, *, fail_cloud: bool = False):
+         class Client:
+             def __init__(self, timeout=None, trust_env=False, proxy=None, **kwargs):
+@@ -927,39 +813,6 @@ class InboxHopTests(unittest.TestCase):
+         self.assertEqual(chats[1]["model"], "qwen3.5-9b")
+         self.assertEqual(chats[1]["timeout"], 15)
+ 
+-    def test_openrouter_inbox_is_haiku_then_deepseek_then_9b(self) -> None:
+-        from app.services.llm import _inbox_hops
+-
+-        cloud = {
+-            "kind": "cloud",
+-            "url": "https://openrouter.ai/api/v1",
+-            "model": "anthropic/claude-haiku-4.5",
+-            "token": "x",
+-            "source": "override",
+-        }
+-        extra = {
+-            "kind": "cloud",
+-            "url": "https://fallback.example/v1",
+-            "model": "GPT-OSS-120B",
+-            "token": "y",
+-            "source": "fallback",
+-        }
+-        local = {
+-            "kind": "local",
+-            "url": "http://127.0.0.1:9292/v1",
+-            "model": "qwen3.5-9b",
+-            "token": "",
+-            "source": "default",
+-        }
+-        with patch("app.services.llm.route_for_surface", return_value=cloud), patch(
+-            "app.services.llm._fallback_cloud_route", return_value=extra
+-        ), patch("app.services.llm._local_default_route", return_value=local):
+-            hops = _inbox_hops("inbox")
+-        self.assertEqual(
+-            [hop["model"] for hop in hops],
+-            ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v4.1-flash", "qwen3.5-9b"],
+-        )
+-
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/backend/app/services/shop_service_test.py b/backend/app/services/shop_service_test.py
+index fb84776..acbe3e4 100644
+--- a/backend/app/services/shop_service_test.py
++++ b/backend/app/services/shop_service_test.py
+@@ -139,7 +139,7 @@ class LiveShopChatRouteTests(unittest.TestCase):
+                 "preview": {"colors": {"primary": "#B42318"}},
+             }
+             result = asyncio.run(shop_service.chat("میخواهم رنگ آن قرمز باشد"))
+-        self.assertIn("انتشار تغییرات", result["assistant"]["text"])
++        self.assertIn("بیلد", result["assistant"]["text"])
+         self.assertEqual(result["preview"]["colors"]["primary"], "#B42318")
+         self.assertTrue(result["patched"])
+         answer.assert_not_called()

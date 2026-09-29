@@ -1,0 +1,32 @@
+[
+  {
+    "slug": "ring-post",
+    "prompt": "برای انگشتر نقره یک پست اینستاگرام بساز",
+    "seconds": 65.5,
+    "model": "black-forest-labs/flux.2-klein-4b",
+    "width": 1080,
+    "height": 1080,
+    "bytes": 1021106,
+    "file": "ring-post.png"
+  },
+  {
+    "slug": "bag-story",
+    "prompt": "برای کیف چرمی استوری بساز",
+    "seconds": 74.5,
+    "model": "black-forest-labs/flux.2-klein-4b",
+    "width": 1080,
+    "height": 1920,
+    "bytes": 2579242,
+    "file": "bag-story.png"
+  },
+  {
+    "slug": "necklace-post",
+    "prompt": "برای گردنبند فیروزه یک پست اینستاگرام بساز",
+    "seconds": 73.5,
+    "model": "black-forest-labs/flux.2-klein-4b",
+    "width": 1080,
+    "height": 1080,
+    "bytes": 986210,
+    "file": "necklace-post.png"
+  }
+]

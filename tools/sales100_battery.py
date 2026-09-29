@@ -69,6 +69,8 @@ def judge_reply(case: dict, reply: str) -> tuple[bool, str]:
     foreign = str(case.get("foreignUrl") or "")
     if foreign and foreign in text:
         return False, "foreign-url"
+    if "تأیید پرداخت" in text and "فروشنده" not in text:
+        return False, "self-confirm"
     return True, "ok"
 
 
@@ -112,6 +114,26 @@ def _pay(amount: int):
     def check(text: str, folded: str) -> tuple[bool, str]:
         if _PAY not in text:
             return False, "link"
+        if str(amount) not in folded:
+            return False, "amount"
+        return True, "ok"
+
+    return check
+
+
+_RECEIPT_HOST = "sales-battery.example"
+
+
+def _receipt(amount: int):
+    """No seller gateway: card-to-card with a receipt via the shop page. Never self-confirmed."""
+
+    def check(text: str, folded: str) -> tuple[bool, str]:
+        if _RECEIPT_HOST not in text:
+            return False, "link"
+        if "کارت‌به‌کارت" not in text and "کارت به کارت" not in text:
+            return False, "receipt"
+        if _PAY in text:
+            return False, "invented"
         if str(amount) not in folded:
             return False, "amount"
         return True, "ok"
@@ -265,10 +287,10 @@ def _no_discount(text: str, _folded: str) -> tuple[bool, str]:
 
 
 def _s101(text: str, _folded: str) -> tuple[bool, str]:
-    if "http" in text.lower():
-        return False, "url"
-    if "نشانی" not in text:
+    if "sales-battery.example" not in text:
         return False, "missing"
+    if "joahr-froshi" in text:
+        return False, "foreign-url"
     return True, "ok"
 
 
@@ -376,12 +398,23 @@ _EXPECT = {
     "s101": _s101,
 }
 
+_PAY_IDS = {"s031": 4000000, "s032": 2500000, "s034": 3100000, "s035": 380000}
 
-def judge_scenario(case: dict, reply: str) -> tuple[bool, str]:
+
+def _expect_map(gateway: str = "none") -> dict:
+    """Mode (الف) seller's own zarinpal → fake gateway link; mode (ب) no gateway → receipt page."""
+    out = dict(_EXPECT)
+    maker = _pay if gateway == "own" else _receipt
+    for sid, amount in _PAY_IDS.items():
+        out[sid] = maker(amount)
+    return out
+
+
+def judge_scenario(case: dict, reply: str, expected: dict | None = None) -> tuple[bool, str]:
     ok, note = judge_reply(case, reply)
     if not ok:
         return False, note
-    spec = _EXPECT.get(str(case.get("id") or ""))
+    spec = (expected or _EXPECT).get(str(case.get("id") or ""))
     if spec is None:
         return False, "no-expect"
     return spec(str(reply or ""), _fold_digits(reply))
@@ -480,14 +513,15 @@ def _percentile(values: list[float], fraction: float) -> float:
     return ordered[index]
 
 
-def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int = 2) -> int:
+def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int = 2, gateway: str = "none") -> int:
     """Two in-process dry rounds. Replies are judged per scenario and not saved."""
     import asyncio
     import importlib.util
     import os
 
-    if len(_EXPECT) != 101:
-        print(f"expects {_EXPECT and len(_EXPECT)}")
+    expected = _expect_map(gateway)
+    if len(expected) != 101:
+        print(f"expects {len(expected)}")
         return 2
     os.environ["SOZAN_EDGE_DRY"] = "1"
     env_file = ROOT / ".env"
@@ -512,6 +546,21 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
     if not policy.is_file():
         print("battery policy missing")
         return 2
+    if gateway == "own":
+        from unittest.mock import patch as _patch
+
+        from app.config import settings as _settings
+        from app.state_store import tenant_scope as _scope, write_json as _write
+
+        with _patch.object(_settings, "state_dir", str(state_dir)), _scope(reset.PHONE):
+            _write(
+                "integrations.json",
+                {
+                    "paymentGateway": "zarinpal",
+                    "paymentMerchantId": "01234567-89ab-cdef-0123-456789abcdef",
+                    "paymentSandbox": True,
+                },
+            )
     route_path = state_dir / "llm-routing.json"
     current = {}
     if route_path.is_file():
@@ -571,7 +620,7 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
             return await real(*args, **kwargs)
 
         with patch.object(inbox_agent_service, "complete_tools", counting):
-            reply = await inbox_agent_service.answer(text, thread={"sender": "آزمون"})
+            reply = await inbox_agent_service.answer(text, thread={"sender": "آزمون"}, source="battery")
         meta = inbox_agent_service.outcome.get() or {}
         return str(reply or ""), meta if isinstance(meta, dict) else {}
 
@@ -581,7 +630,7 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
             with patch.object(settings, "state_dir", str(state_dir)), tenant_scope(reset.PHONE):
                 reply, meta = asyncio.run(_answer(str(case.get("user") or "")))
             elapsed_ms.append((time.perf_counter() - started) * 1000)
-            ok, note = judge_scenario(case, reply)
+            ok, note = judge_scenario(case, reply, expected)
             path = str(meta.get("path") or "")
             reason = str(meta.get("reason") or "")
             if run_index == 1:
@@ -642,6 +691,7 @@ def main() -> int:
     parser.add_argument("--base", default="")
     parser.add_argument("--token-file", default="")
     parser.add_argument("--out", default="")
+    parser.add_argument("--gateway", default="none", choices=("none", "own"))
     args = parser.parse_args()
     cases = load_cases(CASES)
     errors = check(cases)
@@ -654,7 +704,7 @@ def main() -> int:
             print("expect scoring needs --state-dir")
             return 2
         out = Path(args.out) if args.out else Path("/tmp/sozan-sales100")
-        return score_expect(cases, state_dir=Path(args.state_dir), out_dir=out)
+        return score_expect(cases, state_dir=Path(args.state_dir), out_dir=out, gateway=args.gateway)
     if not args.live:
         return 0
     if not args.base or not args.token_file:

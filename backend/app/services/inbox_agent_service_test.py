@@ -144,8 +144,8 @@ class InboxAgentTests(unittest.TestCase):
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
         ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, seen)), patch(
-            "app.services.pay_service.create_order", new=fake_order
-        ):
+            "app.services.inbox_agent_service._seller_has_own_gateway", return_value=True
+        ), patch("app.services.pay_service.create_order", new=fake_order):
             storefront_service.add_product(title="کیف دوشی", price=1000, stock=1, sku="b")
             reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت کیف را بفرست"))
         self.assertIn("https://api.sozan-core.ir/p/abc", reply or "")
@@ -285,8 +285,8 @@ class InboxAgentTests(unittest.TestCase):
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
         ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
-            "app.services.pay_service.create_order", new=fake_order
-        ):
+            "app.services.inbox_agent_service._seller_has_own_gateway", return_value=True
+        ), patch("app.services.pay_service.create_order", new=fake_order):
             write_json("shop.json", {"url": "https://battery.example", "slug": "sales-battery"})
             storefront_service.add_product(title="کیف دوشی", price=1000, stock=1, sku="k")
             reply = asyncio.run(inbox_agent_service.answer("لینک سایت و پرداخت"))
@@ -420,7 +420,7 @@ class InboxAgentTests(unittest.TestCase):
         self.assertEqual(reply, inbox_agent_service.CLAIMS_LINE)
         self.claims_complete.assert_not_called()
 
-    def test_dry_edge_mock_gateway_returns_a_fake_pay_link(self) -> None:
+    def test_dry_edge_own_gateway_returns_a_fake_pay_link(self) -> None:
         payloads = [
             _chat(calls=[_call("payment_link", {"product": "کفش چرم", "qty": 1})]),
             _chat(content="لینک پرداخت اینجاست."),
@@ -429,11 +429,14 @@ class InboxAgentTests(unittest.TestCase):
         async def no_hint(_text: str) -> str:
             return ""
 
+        own = {"paymentGateway": "zarinpal", "paymentMerchantId": "12345678-1234-1234-1234-123456789abc"}
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
             "app.services.inbox_agent_service.emit_later"
         ), patch("app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])), patch(
             "app.services.inbox_agent_service.intent_hint", no_hint
         ), patch("app.services.arvan_dns_service.edge_dry", return_value=True), patch(
+            "app.services.settings_service.get_settings", lambda: own
+        ), patch(
             "app.services.pay_service.create_order", new=AsyncMock()
         ) as create:
             storefront_service.add_product(title="کفش چرم", price=4000000, stock=2, sku="c")
@@ -441,6 +444,59 @@ class InboxAgentTests(unittest.TestCase):
         self.assertIn("dry-mock.invalid", reply or "")
         self.assertNotIn("zarinpal", reply or "")
         create.assert_not_called()
+
+    def test_no_gateway_answers_with_the_receipt_page(self) -> None:
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        async def broken(*_args, **_kwargs):
+            raise AssertionError("gateway")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden), patch(
+            "app.services.pay_service.create_order", new=broken
+        ):
+            from app.state_store import write_json
+
+            write_json("shop.json", {"url": "https://battery.example", "slug": "sales-battery"})
+            storefront_service.add_product(title="کفش چرم", price=4000000, stock=2, sku="c")
+            reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت کفش را بفرست"))
+        self.assertIn("battery.example", reply or "")
+        self.assertIn("کارت‌به‌کارت", reply or "")
+        self.assertIn("فروشنده", reply or "")
+        self.assertNotIn("dry-mock.invalid", reply or "")
+
+    def test_receipt_without_a_shop_page_hands_off(self) -> None:
+        from app.state_store import write_json
+
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            write_json("shop.json", {"url": "", "slug": ""})
+            storefront_service.add_product(title="کفش چرم", price=4000000, stock=2, sku="c")
+            reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت کفش را بفرست"))
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+
+    def test_agent_never_confirms_a_payment(self) -> None:
+        from app.services import inbox_service
+
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            created = inbox_service.inbound(platform="instagram", sender="مشتری", text="پرداخت کردم")
+            reply = asyncio.run(
+                inbox_agent_service.answer("پرداخت کردم، تأیید شد؟", thread=created["thread"])
+            )
+        self.assertEqual(reply, inbox_agent_service.CONFIRM_LINE)
+        self.assertNotIn("تأیید شد", reply or "")
+        self.assertIn("فروشنده", reply or "")
 
     def test_multi_product_message_does_not_open_payment(self) -> None:
         payloads = [
@@ -520,6 +576,94 @@ class InboxAgentTests(unittest.TestCase):
         self.assertNotIn("http", reply or "")
         self.assertNotIn("/p/", reply or "")
         self.assertEqual(shown["thread"]["handoffReason"], "سیاست ثبت نشده")
+
+    def test_every_reply_leaves_one_masked_training_example(self) -> None:
+        events: list[dict] = []
+
+        def capture(**kwargs):
+            events.append(kwargs)
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later", capture
+        ):
+            storefront_service.add_product(title="کفش چرم مشکی", price=4000000, stock=2, sku="c")
+            reply = asyncio.run(
+                inbox_agent_service.answer(
+                    "کفش چرم موجود است؟ شماره‌ام ۰۹۱۲۱۲۳۴۵۶۷", thread={"sender": "علی"}, source="battery"
+                )
+            )
+        self.assertIn("موجود", reply or "")
+        train = [row for row in events if row.get("kind") == "train"]
+        self.assertEqual(len(train), 1)
+        payload = train[0]["payload"]
+        self.assertEqual(train[0]["title"], "train-example")
+        self.assertEqual(payload["task"], "inbox_reply")
+        self.assertEqual(payload["source"], "battery")
+        self.assertEqual(payload["output"]["path"], "template")
+        self.assertEqual(payload["output"]["reason"], "catalog")
+        self.assertEqual(payload["teacher"], "sozan/deterministic")
+        self.assertNotEqual(payload["tenant"], "09120001111")
+        blob = json.dumps(payload, ensure_ascii=False)
+        self.assertNotIn("09121234567", blob)
+        self.assertIn("[تلفن]", blob)
+        self.assertTrue(any(msg.get("role") == "user" for msg in payload["messages"]))
+        self.assertGreaterEqual(payload["latencyMs"], 0)
+
+    def test_voice_source_never_reaches_training(self) -> None:
+        events: list[dict] = []
+
+        def capture(**kwargs):
+            events.append(kwargs)
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later", capture
+        ):
+            storefront_service.add_product(title="کفش چرم", price=10, stock=2, sku="c")
+            reply = asyncio.run(
+                inbox_agent_service.answer("کفش چرم موجود است؟", thread={"sender": "علی"}, source="voice")
+            )
+        self.assertIn("موجود", reply or "")
+        self.assertEqual([row for row in events if row.get("kind") == "train"], [])
+        self.assertTrue(any(row.get("kind") == "inbox" for row in events))
+
+    def test_consent_key_off_records_no_training(self) -> None:
+        events: list[dict] = []
+
+        def capture(**kwargs):
+            events.append(kwargs)
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later", capture
+        ), patch("app.services.settings_service.get_settings", lambda: {"sozanImprove": False}):
+            storefront_service.add_product(title="کفش چرم", price=10, stock=2, sku="c")
+            reply = asyncio.run(inbox_agent_service.answer("کفش چرم موجود است؟"))
+        self.assertIn("موجود", reply or "")
+        self.assertEqual([row for row in events if row.get("kind") == "train"], [])
+
+    def test_tool_error_handoff_is_logged_as_a_set_aside_example(self) -> None:
+        payloads = [_chat(calls=[_call("payment_link", {"product": "کفش", "qty": 1})])]
+
+        async def broken(*_args, **_kwargs):
+            raise ValueError("درگاه سوزان هنوز تنظیم نشده.")
+
+        events: list[dict] = []
+
+        def capture(**kwargs):
+            events.append(kwargs)
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later", capture
+        ), patch(
+            "app.services.inbox_agent_service.complete_tools", script_tools(payloads, [])
+        ), patch("app.services.inbox_agent_service.tool_payment_link", broken):
+            reply = asyncio.run(inbox_agent_service.answer("لینک پرداخت بده", source="real"))
+        self.assertEqual(reply, inbox_agent_service.HANDOFF_LINE)
+        train = [row for row in events if row.get("kind") == "train"]
+        self.assertEqual(len(train), 1)
+        payload = train[0]["payload"]
+        self.assertEqual(payload["output"]["path"], "handoff")
+        self.assertIn("خطای ابزار پرداخت", payload["output"]["reason"])
+        self.assertEqual(payload["tools"], ["payment_link"])
 
 
 if __name__ == "__main__":

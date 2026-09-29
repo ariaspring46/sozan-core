@@ -49,9 +49,10 @@ class InboxDryReplyTests(unittest.TestCase):
         self.assertNotIn("text", res.json())
 
     def test_dry_reply_returns_the_agent_and_does_not_deliver(self) -> None:
-        async def fake_answer(text, thread=None):
+        async def fake_answer(text, thread=None, source=""):
             self.assertEqual(text, "قیمت؟")
             self.assertEqual((thread or {}).get("sender"), "آزمون")
+            self.assertEqual(source, "battery")
             return "دو عدد موجود است."
 
         with tempfile.TemporaryDirectory() as raw, patch.dict(os.environ, {"SOZAN_EDGE_DRY": "1"}), patch.object(

@@ -69,7 +69,16 @@ def seed(state_dir: Path, *, apply: bool) -> None:
     from app.state_store import tenant_scope, write_json
 
     with patch.object(settings, "state_dir", str(state_dir)), tenant_scope(PHONE):
-        write_json("shop.json", {"brand": "فروشگاه باتری", "tagline": "فقط آزمون", "slug": "sales-battery", "status": "idle"})
+        write_json(
+            "shop.json",
+            {
+                "brand": "فروشگاه باتری",
+                "tagline": "فقط آزمون",
+                "slug": "sales-battery",
+                "status": "idle",
+                "url": "https://sales-battery.example",
+            },
+        )
         from app.services.sales_policy_service import battery_policy
 
         write_json("sales-policy.json", battery_policy())
