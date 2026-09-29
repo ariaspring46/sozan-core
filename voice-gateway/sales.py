@@ -940,7 +940,13 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         state.cta_count += 1
         state.stage = "confirm"
         return TurnPlan(kind="confirm", line=CLOSE_LINE, signals=signals)
-    if signals.agree and (state.linked or state.cta_count > 0):
+    # "خیلی خب، باشه. آفرین" is a compliment, not a goodbye: close only when the
+    # contact shows an actual next step.
+    close_intent = any(
+        part in heard
+        for part in ("میرم", "می‌رم", "باز کردم", "زدم ورود", "میام", "می آم", "چشم", "باز می‌کنم", "باز میکنم")
+    )
+    if signals.agree and close_intent and (state.linked or state.cta_count > 0):
         state.agreed = True
         state.stage = "close"
         return TurnPlan(kind="close", line=CLOSE_LINE, hangup=True, signals=signals)
