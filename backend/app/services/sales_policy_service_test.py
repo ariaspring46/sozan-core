@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app.config import settings
-from app.services.sales_policy_service import battery_policy, fixed_reply
+from app.services.sales_policy_service import battery_policy, fixed_reply, parse
 from app.state_store import tenant_scope, write_json
 
 
@@ -53,3 +53,82 @@ class SalesPolicyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PolicyParseTests(unittest.TestCase):
+    def test_the_plan_example_sentence_parses_shipping(self) -> None:
+        out = parse("ارسال با پست به همه شهرها، ۳ تا ۵ روز، ۶۰ هزار تومان")
+        self.assertEqual(
+            out["patch"],
+            {
+                "shippingMethod": "پست",
+                "shippingCities": "همهٔ شهرها",
+                "shippingDays": "۳ تا ۵ روز",
+                "shippingCost": 60000,
+            },
+        )
+        self.assertEqual(out["card"]["shippingCost"]["value"], 60000)
+        self.assertEqual(out["card"]["shippingCost"]["state"], "parsed")
+        self.assertEqual(out["card"]["returnDays"]["state"], "missing")
+
+    def test_every_core_field_is_parsed(self) -> None:
+        patch = parse("پست پیشتاز ۶۵ هزار تومان، ۲ تا ۴ روز کاری، همهٔ شهرها")["patch"]
+        self.assertEqual(patch["shippingMethod"], "پست پیشتاز")
+        self.assertEqual(patch["shippingCost"], 65000)
+        self.assertEqual(patch["shippingDays"], "۲ تا ۴ روز")
+
+        self.assertEqual(parse("ارسال رایگان بالای ۲ میلیون")["patch"]["freeShippingFrom"], 2000000)
+        self.assertEqual(parse("مرجوعی ۷ روزه، هزینهٔ برگشت با مشتری")["patch"]["returnDays"], 7)
+        self.assertEqual(parse("هزینهٔ برگشت با فروشنده است")["patch"]["returnPayer"], "فروشنده")
+        self.assertEqual(parse("از ۱۰ صبح تا ۶ عصر باز هستیم")["patch"]["hours"], "۱۰ تا ۱۸")
+        self.assertEqual(parse("ساعت کار ۱۰ تا ۱۸")["patch"]["hours"], "۱۰ تا ۱۸")
+        self.assertEqual(parse("حداقل خرید ۵۰۰ هزار تومان")["patch"]["minOrder"], 500000)
+        self.assertEqual(parse("پرداخت در محل داریم")["patch"]["cod"], "داریم")
+        self.assertEqual(parse("پرداخت در محل نداریم")["patch"]["cod"], "نداریم")
+        self.assertEqual(parse("فاکتور فروش می‌دهیم")["patch"]["invoice"], "بله، فاکتور فروش می‌دهیم")
+        self.assertEqual(parse("ارسال مجانی است")["patch"]["shippingCost"], 0)
+
+    def test_card_transfer_details_are_structured(self) -> None:
+        patch = parse(
+            "کارت به کارت ۶۰37-9911-2233-4455 به نام علی رضایی، شبا IR120340000000001234567890"
+        )["patch"]
+        self.assertEqual(patch["cardNumber"], "6037991122334455")
+        self.assertEqual(patch["sheba"], "IR120340000000001234567890")
+        self.assertEqual(patch["accountHolder"], "علی رضایی")
+
+    def test_nothing_is_guessed_for_an_unrelated_sentence(self) -> None:
+        out = parse("سلام، امروز هوا خوب است")
+        self.assertEqual(out["patch"], {})
+        self.assertEqual(out["card"]["shippingCost"]["state"], "missing")
+        self.assertEqual(parse("")["patch"], {})
+
+    def test_small_unitless_numbers_never_become_amounts(self) -> None:
+        out = parse("ارسال ۳ تا ۵ روز")
+        self.assertNotIn("shippingCost", out["patch"])
+        self.assertEqual(out["patch"]["shippingDays"], "۳ تا ۵ روز")
+
+    def test_card_rows_cover_the_known_field_order(self) -> None:
+        out = parse("ارسال با پیک است")
+        self.assertIn("shippingMethod", out["card"])
+        self.assertIn("accountHolder", out["card"])
+        self.assertEqual(
+            list(out["card"].keys()),
+            list(
+                (
+                "shippingMethod",
+                "shippingCost",
+                "shippingDays",
+                "shippingCities",
+                "freeShippingFrom",
+                "returnDays",
+                "returnPayer",
+                "hours",
+                "minOrder",
+                "invoice",
+                "cod",
+                "cardNumber",
+                "sheba",
+                "accountHolder",
+                )
+            ),
+        )
