@@ -834,6 +834,7 @@ class SalesTest(unittest.TestCase):
         self.assertIn("اول به حرف مخاطب ربط", opened)
         self.assertIn("حدس نزن", opened)
         self.assertIn("گهر شبکه کارمانیا", opened)
+        self.assertIn("هرگز شرکت را سوزان‌کُر معرفی نکن", opened)
         self.assertTrue(all("گهر شبکه کارمانیا" in line or "پیامک" in line for line in INTRO_VARIANTS + INTRO_SMS_VARIANTS))
         self.assertIn("سه قدم", opened)
         set_payment_fetcher(lambda: True)
