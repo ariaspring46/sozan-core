@@ -1248,7 +1248,7 @@ class Gateway:
             log.info("sales holding for hello text=%s", heard[:80])
             self._log_sales_turn(heard, "hold", "", 0.0, 0.0, False, False)
             return False
-        if plan.kind in {"hello", "close", "address", "fallback", "feature"}:
+        if plan.kind in {"hello", "close", "address", "fallback", "feature", "confirm"}:
             line = plan.line or (HELLO_LINE if plan.kind == "hello" else CLOSE_LINE)
             if plan.kind == "address":
                 line = plan.line or ADDRESS_LINE

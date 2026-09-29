@@ -913,6 +913,17 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
     if fixed:
         state.stage = "confirm"
         return TurnPlan(kind="address", line=fixed, signals=signals)
+    # The contact heard the site offer and is leaving for it: that agreement beats
+    # re-reading a feature line, even though the sentence mentions "سایت".
+    if signals.agree and ("سایت" in heard or "sozan-core" in heard or "ورود" in heard):
+        state.agreed = True
+        if state.linked or state.cta_count > 0:
+            state.stage = "close"
+            return TurnPlan(kind="close", line=CLOSE_LINE, hangup=True, signals=signals)
+        state.linked = True
+        state.cta_count += 1
+        state.stage = "confirm"
+        return TurnPlan(kind="confirm", line=CLOSE_LINE, signals=signals)
     if signals.agree and (state.linked or state.cta_count > 0):
         state.agreed = True
         state.stage = "close"
@@ -923,13 +934,13 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         else:
             state.stage = "cta"
             return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
-    kind = pain_kind(heard)
-    line = feature_line(kind)
-    if line:
-        state.intro_said = True
-        state.pain_asked = True
-        state.stage = "pitch"
-        return TurnPlan(kind="feature", line=line, signals=signals)
+    if state.stage not in {"intro", "permq", "await"}:
+        kind = pain_kind(heard)
+        line = feature_line(kind)
+        if line:
+            state.pain_asked = True
+            state.stage = "pitch"
+            return TurnPlan(kind="feature", line=line, signals=signals)
     if state.stage in {"intro", "permq", "await"} and not (heard or "").strip():
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     if state.stage == "intro":

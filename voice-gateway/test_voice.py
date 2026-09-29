@@ -863,6 +863,12 @@ class SalesTest(unittest.TestCase):
         self.assertEqual(site.line, SITE_LINE)
         content = plan_turn(SalesState(greeted=True, stage="pitch", pain_asked=True), "استوری و کپشن")
         self.assertEqual(content.line, CONTENT_LINE)
+        # During the staged opening the intro must not repeat: content words ride to the model.
+        mid_intro = SalesState()
+        g = plan_turn(mid_intro, "الو")
+        note_spoken(mid_intro, g.line)
+        i = plan_turn(mid_intro, "عکس و فیلم هم می‌سازی یا فقط سایت")
+        self.assertEqual(i.kind, "model")
         order = plan_turn(SalesState(greeted=True, stage="pitch", pain_asked=True), "سفارش‌ها رو کی پیگیری می‌کنه")
         self.assertEqual(order.line, ORDER_LINE)
 

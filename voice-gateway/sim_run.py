@@ -247,6 +247,7 @@ def run_persona(pid: str) -> dict:
         "hidden": persona.get("hidden"),
         "result": result,
         "flags": flags,
+        "ear_acc": round(ear_accuracy(turns), 3) if ear_accuracy(turns) is not None else None,
         "start": start,
         "turns": turns,
     }
@@ -254,6 +255,26 @@ def run_persona(pid: str) -> dict:
     with RUNS.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(out, ensure_ascii=False) + "\n")
     return out
+
+
+def ear_accuracy(turns: list[dict]) -> float | None:
+    """Word accuracy of the gateway ear over this call: similarity of what the
+    persona actually said (clean text) to what the gateway heard."""
+    import difflib
+
+    pairs = [(t.get("said") or "", t.get("heard") or "") for t in turns]
+    pairs = [(s, h) for s, h in pairs if s.strip() and h.strip()]
+    if not pairs:
+        return None
+    scores = []
+    for said, heard in pairs:
+        said = re.sub(r"[^\u0600-\u06FF\s]", " ", said).split()
+        heard = re.sub(r"[^\u0600-\u06FF\s]", " ", heard).split()
+        if not said:
+            continue
+        sm = difflib.SequenceMatcher(a=said, b=heard)
+        scores.append(sm.ratio())
+    return sum(scores) / len(scores) if scores else None
 
 
 def dump(row: dict) -> None:
