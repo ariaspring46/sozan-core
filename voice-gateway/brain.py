@@ -105,22 +105,43 @@ class _KeepAlivePool:
         self.maxsize = maxsize
         self._lock = threading.Lock()
         self._idle: list = []
+        self._idle_via = True
+
+    def _set_proxy(self, via_proxy: bool) -> None:
+        # Idle connections only mix with requests on the same leg.
+        with self._lock:
+            if self._idle and via_proxy != self._idle_via:
+                for stale in self._idle:
+                    try:
+                        stale.close()
+                    except Exception:
+                        pass
+                self._idle.clear()
 
     def _fresh(self, timeout: float):
+        proxy = sozan_proxy()
+        if proxy:
+            phost, pport = _proxy_parts()
+            conn = self._http.HTTPSConnection(phost, pport, timeout=timeout)
+            conn.set_tunnel(self.host, 443)
+            return conn
         return self._http.HTTPSConnection(self.host, timeout=timeout)
 
     def request(self, path: str, body: bytes, headers: dict, timeout: float = 20.0):
         """POST and return (status, content-type, connection). The caller MUST
         either read the response to EOF and call put(), or call drop()."""
+        legs: list[bool] = [True, False] if sozan_proxy() else [False]
         conn = None
-        for attempt in (0, 1):
+        for attempt, via_proxy in enumerate(legs):
             try:
                 with self._lock:
-                    conn = self._idle.pop() if self._idle else None
+                    conn = self._idle.pop() if self._idle and via_proxy == self._idle_via else None
                 if conn is None:
+                    self._set_proxy(via_proxy)
                     conn = self._fresh(timeout)
                 conn.request("POST", path, body=body, headers=headers)
                 res = conn.getresponse()
+                self._idle_via = via_proxy
                 return res.status, res.headers.get("content-type") or "", res, conn
             except Exception:
                 try:
@@ -129,7 +150,7 @@ class _KeepAlivePool:
                 except Exception:
                     pass
                 conn = None
-                if attempt:
+                if attempt == len(legs) - 1:
                     raise
         raise RuntimeError("unreachable")
 
@@ -152,6 +173,38 @@ class _KeepAlivePool:
 
 
 _OR_POOL = _KeepAlivePool("openrouter.ai")
+
+
+def sozan_proxy() -> str:
+    return os.environ.get("SOZAN_PROXY", "").strip()
+
+
+def _proxy_parts() -> tuple[str, int]:
+    parsed = urllib.parse.urlparse(sozan_proxy())
+    return parsed.hostname or "", parsed.port or 80
+
+
+def _openrouter_opener() -> urllib.request.OpenerDirector:
+    proxy = sozan_proxy()
+    if proxy:
+        return urllib.request.build_opener(urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+    return _DIRECT
+
+
+def _openrouter_open(req: urllib.request.Request, timeout: float):
+    """POST to OpenRouter: proxy first (owner rule: cloud stays behind proxy);
+    direct only if the proxy itself is down."""
+    proxy = sozan_proxy()
+    if not proxy:
+        return _DIRECT.open(req, timeout=timeout)
+    try:
+        return _openrouter_opener().open(req, timeout=timeout)
+    except (OSError, urllib.error.URLError) as exc:
+        log.warning("proxy failed (%s), trying direct", type(exc).__name__)
+        return _DIRECT.open(req, timeout=timeout)
+
+
+
 
 
 def cloud_speech_body(model: str, voice: str, text: str) -> dict:
@@ -269,7 +322,7 @@ def sales_request_body(
 def open_llm(url: str, req: urllib.request.Request, timeout: float):
     if llm_is_local(url):
         return urllib.request.urlopen(req, timeout=timeout)
-    return _DIRECT.open(req, timeout=timeout)
+    return _openrouter_open(req, timeout)
 
 
 def speakable(text: str, sentences: int = 1) -> str:
