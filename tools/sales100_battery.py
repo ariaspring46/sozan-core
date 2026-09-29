@@ -561,6 +561,15 @@ def score_expect(cases: list[dict], *, state_dir: Path, out_dir: Path, runs: int
                     "paymentSandbox": True,
                 },
             )
+    else:
+        # A previous `own` run in the same state dir must not leak its merchant.
+        from unittest.mock import patch as _patch
+
+        from app.config import settings as _settings
+        from app.state_store import tenant_scope as _scope, write_json as _write
+
+        with _patch.object(_settings, "state_dir", str(state_dir)), _scope(reset.PHONE):
+            _write("integrations.json", {"paymentGateway": "mock", "paymentMerchantId": "", "paymentApiKey": ""})
     route_path = state_dir / "llm-routing.json"
     current = {}
     if route_path.is_file():
