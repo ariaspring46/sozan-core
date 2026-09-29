@@ -68,6 +68,7 @@ from sales import (
     CLOSE_LINE,
     FIXED_SALES_LINES,
     HELLO_LINE,
+    FULL_INTRO_LINE,
     GREET_VARIANTS,
     INTRO_VARIANTS,
     INTRO_SMS_VARIANTS,
@@ -615,8 +616,10 @@ class SalesTest(unittest.TestCase):
         self.assertIn(perm.line, PERM_VARIANTS)
         note_spoken(asked_job, perm.line)
         allowed = plan_turn(asked_job, "بله بگو")
-        self.assertEqual(allowed.line, PAIN_LINE)
+        self.assertEqual(allowed.line, FULL_INTRO_LINE)
         note_spoken(asked_job, allowed.line)
+        pitch = plan_turn(asked_job, "خب بگو چی دارید")
+        self.assertEqual(pitch.line, PAIN_LINE)
         job = plan_turn(asked_job, "چه کارایی رو انجام میدی")
         self.assertEqual(job.kind, "model")
         where = plan_turn(asked_job, "پیجام کجا باید وارد کنم")
@@ -811,6 +814,10 @@ class SalesTest(unittest.TestCase):
                 self.assertLessEqual(len(line.split()), 18)
         for line in (HELLO_LINE, PAIN_LINE, DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE):
             self.assertLessEqual(len(line.split()), 18)
+        self.assertIn("فروشگاه اینترنتی رایگان", FULL_INTRO_LINE)
+        self.assertIn("دایرکت", FULL_INTRO_LINE)
+        self.assertIn("استودیو", FULL_INTRO_LINE)
+        self.assertIn("سفارش", FULL_INTRO_LINE)
         opened = sales_open()
         self.assertIn("دستیار فروش", opened)
         self.assertIn("پرو مکس", opened)
@@ -837,7 +844,10 @@ class SalesTest(unittest.TestCase):
         self.assertNotIn("پیامک", third.line or "")
         note_spoken(sms, third.line)
         fourth = plan_turn(sms, "باشه بگو")
-        self.assertEqual(fourth.line, PAIN_LINE)
+        self.assertEqual(fourth.line, FULL_INTRO_LINE)
+        note_spoken(sms, fourth.line)
+        fifth = plan_turn(sms, "خب")
+        self.assertEqual(fifth.line, PAIN_LINE)
         who = SalesState()
         who_greet = plan_turn(who, "الو")
         note_spoken(who, who_greet.line)
@@ -884,6 +894,7 @@ class SalesTest(unittest.TestCase):
         self.assertIn(HELLO_LINE, lines)
         self.assertIn(ADDRESS_LINE, lines)
         self.assertTrue(any("تومان" in line for line in lines))
+        self.assertIn(PAIN_LINE, lines)
         self.assertEqual(parse_sim_command("SIM"), ("", ""))
         self.assertEqual(parse_sim_command("SIM bag_shop کیف"), ("bag_shop", "کیف"))
         self.assertEqual(parse_sim_command("SIM @kif_shop"), ("kif_shop", ""))

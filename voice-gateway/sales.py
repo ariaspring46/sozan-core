@@ -60,7 +60,15 @@ NOTIME_VARIANTS = (
     "باشه، چه ساعتی بهتون جور درمی‌آید؟",
 )
 HELLO_SMS_LINE = INTRO_SMS_VARIANTS[0]
-PAIN_LINE = "دایرکت بی‌جوابه، محتوا می‌خواید، یا سایت؟"
+# The complete capability pitch, said right after the contact grants the minute.
+FULL_INTRO_LINE = (
+    "سوزان دستیار فروش آنلاین‌شاپ‌هاست. "
+    "دایرکت اینستا و تلگرام را با لحن خود شما جواب می‌دهد؛ خودکار فقط پرو مکس. "
+    "استودیو پست و استوری و عکس کالا می‌سازد. "
+    "سفارش و فروش و انبار را پیگیری می‌کند. "
+    "و از روی همین پیج، فروشگاه اینترنتی رایگان می‌سازد."
+)
+PAIN_LINE = "از این‌هایی که گفتم، کدوم بیشتر به کار شما می‌آد؟"
 DM_LINE = "دایرکت اینستا و تلگرام را با لحن خودتون جواب می‌دهد؛ خودکار فقط پرو مکس."
 CONTENT_LINE = "استودیو پست، استوری، عکس کالا و کپشن تبلیغ را می‌سازد."
 ORDER_LINE = "سفارش را پیگیری می‌کند و فروش و موجودی انبار را ثبت می‌کند."
@@ -771,6 +779,7 @@ def notime_line() -> str:
 def cached_sales_lines() -> list[str]:
     lines = [
         HELLO_LINE,
+        FULL_INTRO_LINE,
         PAIN_LINE,
         *GREET_VARIANTS,
         *INTRO_VARIANTS,
@@ -941,6 +950,9 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             state.pain_asked = True
             state.stage = "pitch"
             return TurnPlan(kind="feature", line=line, signals=signals)
+        if state.stage == "pitch" and not state.pain_asked:
+            state.pain_asked = True
+            return TurnPlan(kind="feature", line=PAIN_LINE, signals=signals)
     if state.stage in {"intro", "permq", "await"} and not (heard or "").strip():
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     if state.stage == "intro":
@@ -968,9 +980,8 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             state.stage = "discover"
             return TurnPlan(kind="hello", line=line, signals=signals)
         if signals.goahead or signals.yes:
-            state.pain_asked = True
             state.stage = "pitch"
-            return TurnPlan(kind="feature", line=PAIN_LINE, signals=signals)
+            return TurnPlan(kind="feature", line=FULL_INTRO_LINE, signals=signals)
         line = state.perm_line_asked or perm_line()
         state.perm_line_asked = line
         state.stage = "await"
@@ -982,9 +993,8 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             state.stage = "discover"
             return TurnPlan(kind="hello", line=line, signals=signals)
         if signals.yes or signals.goahead or signals.ack:
-            state.pain_asked = True
             state.stage = "pitch"
-            return TurnPlan(kind="feature", line=PAIN_LINE, signals=signals)
+            return TurnPlan(kind="feature", line=FULL_INTRO_LINE, signals=signals)
     if len((heard or "").strip()) < 4 and state.stage not in {"intro", "permq", "await"}:
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     return TurnPlan(
