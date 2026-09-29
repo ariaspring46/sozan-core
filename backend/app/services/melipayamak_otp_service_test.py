@@ -14,22 +14,37 @@ from app.services.auth_service_test import _FakeRedis, _Users
 
 
 class MelipayamakAdapterTests(unittest.TestCase):
+    """قرارداد تازه: SendByBaseNumber2؛ کد خود ما در {0} قالب تأییدشده."""
+
     def setUp(self) -> None:
         emit_patcher = patch.object(melipayamak_otp_service, "emit_later")
         self.emit = emit_patcher.start()
         self.addCleanup(emit_patcher.stop)
-        key_patcher = patch.object(settings, "melipayamak_otp_apikey", "SECRET-KEY-123")
-        key_patcher.start()
-        self.addCleanup(key_patcher.stop)
+        for key, value in (
+            ("melipayamak_username", "panel-user"),
+            ("melipayamak_otp_apikey", "SECRET-KEY-123"),
+            ("melipayamak_body_id", "547036"),
+            ("melipayamak_pattern_base", "https://api.payamak-panel.com/post/send.asmx"),
+        ):
+            patcher = patch.object(settings, key, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
-    def _client(self, payload: dict, http_status: int = 200):
+    def _client(self, text: str, http_status: int = 200):
         class Resp:
             status_code = http_status
 
-            def json(self):
-                return payload
+            def __str__(self):
+                return text
+
+            @property
+            def text(self):
+                return text
 
         class Client:
+            seen_url = ""
+            seen_body = {}
+
             def __init__(self, **kwargs) -> None:
                 pass
 
@@ -44,30 +59,45 @@ class MelipayamakAdapterTests(unittest.TestCase):
                 Client.seen_body = json
                 return Resp()
 
-        Client.seen_url = ""
-        Client.seen_body = None
         return Client
 
-    def test_success_returns_code_and_posts_phone(self) -> None:
-        client = self._client({"code": "456789", "status": ""})
+    def test_success_sends_own_code_and_credentials(self) -> None:
+        client = self._client('"179070000000000001"')
         with patch.object(melipayamak_otp_service.httpx, "AsyncClient", client):
-            out = asyncio.run(melipayamak_otp_service.send_otp("09111111111"))
-        self.assertEqual(out, "456789")
-        self.assertIn("SECRET-KEY-123", client.seen_url)
-        self.assertEqual(client.seen_body, {"to": "09111111111"})
+            out = asyncio.run(melipayamak_otp_service.send_otp("09111111111", "456789"))
+        self.assertEqual(out, "179070000000000001")
+        self.assertTrue(client.seen_url.endswith("/SendByBaseNumber2"))
+        self.assertEqual(client.seen_body.get("username"), "panel-user")
+        self.assertEqual(client.seen_body.get("password"), "SECRET-KEY-123")
+        self.assertEqual(client.seen_body.get("bodyId"), "547036")
+        self.assertEqual(client.seen_body.get("text"), "456789")
+        self.assertEqual(client.seen_body.get("to"), "09111111111")
 
-    def test_missing_code_raises_and_emits_without_phone(self) -> None:
-        emit = self.emit
-        client = self._client({"code": "", "status": "insufficient credit"}, http_status=402)
+    def test_error_code_maps_and_emits_without_phone(self) -> None:
+        client = self._client("18")
         with patch.object(melipayamak_otp_service.httpx, "AsyncClient", client):
+            with self.assertRaises(melipayamak_otp_service.OtpSendError) as ctx:
+                asyncio.run(melipayamak_otp_service.send_otp("09111111111", "456789"))
+        self.assertEqual(ctx.exception.error_class, "bad-number")
+        self.assertEqual(ctx.exception.return_code, "18")
+        self.emit.assert_called_once()
+        payload = self.emit.call_args.kwargs.get("payload") or {}
+        self.assertEqual(payload.get("returnCode"), "18")
+        self.assertNotIn("09111111111", str(self.emit.call_args))
+
+    def test_credit_code_maps(self) -> None:
+        client = self._client("2")
+        with patch.object(melipayamak_otp_service.httpx, "AsyncClient", client):
+            with self.assertRaises(melipayamak_otp_service.OtpSendError) as ctx:
+                asyncio.run(melipayamak_otp_service.send_otp("09111111111", "456789"))
+        self.assertEqual(ctx.exception.error_class, "credit")
+
+    def test_missing_credentials_raise_config(self) -> None:
+        with patch.object(settings, "melipayamak_username", ""):
             with self.assertRaises(melipayamak_otp_service.OtpSendError):
-                asyncio.run(melipayamak_otp_service.send_otp("09111111111"))
-        emit.assert_called_once()
-        payload = emit.call_args.kwargs.get("payload") or {}
-        self.assertEqual(payload.get("errorClass"), "credit-or-key")
-        self.assertNotIn("09111111111", str(emit.call_args))
+                asyncio.run(melipayamak_otp_service.send_otp("09111111111", "456789"))
 
-    def test_url_with_key_never_appears_in_logs(self) -> None:
+    def test_url_never_appears_in_logs(self) -> None:
         records: list[str] = []
         handler = logging.Handler()
         handler.emit = lambda record: records.append(record.getMessage())
@@ -86,14 +116,14 @@ class MelipayamakAdapterTests(unittest.TestCase):
                 return False
 
             async def post(self, url, json=None):
-                raise RuntimeError("boom at https://console.melipayamak.com/api/send/otp/SECRET-KEY-123")
+                raise RuntimeError("boom")
 
         with patch.object(melipayamak_otp_service.httpx, "AsyncClient", Boom):
             with self.assertRaises(melipayamak_otp_service.OtpSendError):
-                asyncio.run(melipayamak_otp_service.send_otp("09111111111"))
+                asyncio.run(melipayamak_otp_service.send_otp("09111111111", "456789"))
         for line in records:
             self.assertNotIn("SECRET-KEY-123", line)
-            self.assertNotIn("console.melipayamak.com", line)
+            self.assertNotIn("panel-user", line)
 
 
 class MelipayamakFlowTests(unittest.TestCase):
@@ -111,10 +141,16 @@ class MelipayamakFlowTests(unittest.TestCase):
             self.addCleanup(item.stop)
 
     def _mock_provider_code(self, code: str):
-        async def fake(phone: str) -> str:
+        async def fake(phone: str, otp_code: str) -> str:
             return code
 
         return patch.object(melipayamak_otp_service, "send_otp", new=fake)
+
+    def _mock_provider_echo(self):
+        async def echo(phone: str, otp_code: str) -> str:
+            return otp_code
+
+        return patch.object(melipayamak_otp_service, "send_otp", new=echo)
 
     def test_send_stores_hash_not_plaintext(self) -> None:
         with self._mock_provider_code("443322"):
@@ -149,9 +185,17 @@ class MelipayamakFlowTests(unittest.TestCase):
             asyncio.run(self.svc.send_otp("09118888888", ip="10.2.2.8"))
 
     def test_verify_accepts_right_code_and_rejects_five_wrong(self) -> None:
-        with self._mock_provider_code("778899"):
+        # echo یعنی کدِ دریافتی provider همان کدِ ساختهٔ ما است (رفتار واقعی).
+        code_holder: dict = {}
+
+        async def capture(phone: str, otp_code: str) -> str:
+            code_holder["code"] = otp_code
+            return "179070000000000001"
+
+        with patch.object(melipayamak_otp_service, "send_otp", new=capture):
             asyncio.run(self.svc.send_otp("09111234567", ip="10.1.1.5"))
-        out = asyncio.run(self.svc.verify_otp("09111234567", "77 88 99"))
+        out = asyncio.run(self.svc.verify_otp("09111234567", code_holder["code"]))
+        self.assertIn("otp:rec:09111234567", self.redis.store)  # recId ذخیره شد
         self.assertIn("access_token", out)
         self.assertNotIn("otp:09111234567", self.redis.store)
 
@@ -174,7 +218,7 @@ class MelipayamakFlowTests(unittest.TestCase):
             asyncio.run(self.svc.verify_otp("09111234567", "654321"))
 
     def test_provider_failure_maps_to_friendly_error(self) -> None:
-        async def boom(phone: str) -> str:
+        async def boom(phone: str, otp_code: str) -> str:
             raise melipayamak_otp_service.OtpSendError("credit-or-key")
 
         with patch.object(melipayamak_otp_service, "send_otp", new=boom):

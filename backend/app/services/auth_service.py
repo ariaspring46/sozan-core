@@ -195,7 +195,7 @@ class AuthService:
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "ظرفیت کد امروز پر است")
 
     async def _send_melipayamak_otp(self, phone: str, *, ip: str = "") -> dict:
-        """کد را خود ملی‌پیک می‌سازد؛ ما فقط هش آن را دو دقیقه نگه می‌داریم."""
+        """کد ۶رقمی خود ما در قالب تأییدشده ملی‌پیامک می‌رود؛ هشِ آن دو دقیقه می‌ماند."""
         from app.services import melipayamak_otp_service
 
         if int(await redis_client.ttl(f"otp:cool:{phone}")) > 0:
@@ -205,12 +205,14 @@ class AuthService:
             await redis_client.expire(f"otp:hphone:{phone}", 3600)
         if hits > OTP_MELIPAYAMAK_HOURLY:
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست کد بیش از حد است؛ بعداً تلاش کن")
+        code = f"{secrets.randbelow(1_000_000):06d}"
         try:
-            code = await melipayamak_otp_service.send_otp(phone)
+            rec_id = await melipayamak_otp_service.send_otp(phone, code)
         except melipayamak_otp_service.OtpSendError:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ارسال کد ناموفق بود، دوباره تلاش کنید") from None
         await redis_client.setex(f"otp:{phone}", OTP_MELIPAYAMAK_TTL, _hash_otp(phone, code))
         await redis_client.setex(f"otp:cool:{phone}", OTP_MELIPAYAMAK_COOLDOWN, "1")
+        await redis_client.setex(f"otp:rec:{phone}", OTP_MELIPAYAMAK_TTL, str(rec_id or ""))
         await redis_client.delete(f"otp:wa:{phone}")
         return {"ok": True}
 
