@@ -440,7 +440,37 @@ FACTORY_ENV_ALLOW = (
 )
 
 
-FACTORY_PYTHON = str(Path(sys.executable).resolve())
+def _factory_python() -> str:
+    """پایتونی که httpx دارد: venv جاری (sys.prefix)؛ در نبودش همان مفسر جاری."""
+    prefix = sys.prefix or ""
+    if prefix and prefix != sys.base_prefix:
+        for candidate in (
+            Path(prefix) / "bin" / "python3.12",
+            Path(prefix) / "bin" / "python3",
+            Path(prefix) / "bin" / "python",
+        ):
+            if candidate.is_file():
+                return str(candidate)
+    here = Path(sys.executable).resolve()
+    for candidate in (here.parent / "python3.12", here.parent / "python3", here.parent / "python"):
+        if candidate.is_file():
+            try:
+                import subprocess as _sp
+
+                probe = _sp.run(
+                    [str(candidate), "-c", "import httpx"],
+                    capture_output=True,
+                    timeout=15,
+                )
+                if probe.returncode == 0:
+                    return str(candidate)
+            except Exception:
+                pass
+            break
+    return str(here)
+
+
+FACTORY_PYTHON = _factory_python()
 
 
 def _factory_env() -> dict[str, str]:
