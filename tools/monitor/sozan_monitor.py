@@ -31,6 +31,7 @@ import sys
 import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 HOME = Path.home()
@@ -42,7 +43,10 @@ STATUS_PAGE = STATE_DIR / "status.html"
 ENV_FILE = HOME / "local-ai" / "config" / "sozan-monitor.env"
 OBSERVE_DB = HOME / "local-ai" / "observe" / "observe.sqlite"
 
-TEHRAN = timezone(timedelta(hours=3), "Asia/Tehran")
+try:
+    TEHRAN = ZoneInfo("Asia/Tehran")
+except Exception:  # noqa: BLE001 — fallback if tzdata is missing
+    TEHRAN = timezone(timedelta(hours=3, minutes=30))
 DOMAIN = "sozan-core.ir"
 CHECK_TIMEOUT = 10
 CERT_WARN_DAYS = 14
