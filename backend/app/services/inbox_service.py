@@ -179,6 +179,8 @@ def _messages(thread: dict) -> list[dict]:
             "sender": thread.get("sender") if inbound else "",
             "auto": bool(msg.get("auto")),
         }
+        if msg.get("trainId"):
+            row["trainId"] = str(msg.get("trainId"))
         if msg.get("mediaKind") and msg.get("mediaName"):
             row["mediaKind"] = msg.get("mediaKind")
             row["mediaName"] = msg.get("mediaName")
@@ -786,6 +788,20 @@ async def maybe_auto_reply(thread_id: str) -> None:
                 return
 
 
+def _label_sent(train_id: str, original_draft: str, sent_text: str) -> None:
+    """A sent draft is the strongest signal: unchanged = accepted as written,
+    edited = the seller's text is the correct answer. Never blocks the send."""
+    try:
+        from app.services.training_log import log_label
+
+        labels = {"accept": True, "sent": True}
+        if sent_text.strip() != original_draft.strip():
+            labels = {"accept": True, "editedText": sent_text.strip()}
+        log_label(train_id, labels)
+    except Exception:
+        pass
+
+
 async def reply(
     thread_id: str,
     text: str,
@@ -819,6 +835,7 @@ async def reply(
                 raise ValueError("پیش‌نویس پیدا نشد")
         sending = deliver and not as_draft
         if target is not None:
+            original_draft = str(target.get("text") or "")
             target["text"] = body
             target["kind"] = "draft" if as_draft and not deliver else "outbound"
             target["status"] = "draft" if as_draft and not deliver else "sending"
@@ -826,6 +843,7 @@ async def reply(
             target["error"] = ""
             msg_id = str(target.get("id") or "")
         else:
+            original_draft = ""
             msg_id = str(uuid4())
             row = {
                 "id": msg_id,
@@ -840,6 +858,16 @@ async def reply(
             target = row
         if auto:
             target["auto"] = True
+        last_draft = thread.get("lastDraft") if isinstance(thread.get("lastDraft"), dict) else {}
+        carried_id = str(last_draft.get("trainId") or "")
+        if carried_id and not str(target.get("trainId") or ""):
+            # The agent left this turn's example id; the draft row carries it for the panel vote.
+            target["trainId"] = carried_id
+        if carried_id:
+            thread["lastDraft"] = {}
+        if sending and str(target.get("trainId") or "") and not target.get("trainLabeled"):
+            _label_sent(str(target["trainId"]), original_draft, body)
+            target["trainLabeled"] = True
         thread["updatedAt"] = now
         thread["messages"] = thread["messages"][-MSG_CAP:]
         _save(data)

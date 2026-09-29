@@ -581,3 +581,99 @@ class InboxSyncDiscardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TrainLabelTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+        self.labels: list[tuple[str, dict]] = []
+        self.label_patch = patch(
+            "app.services.inbox_service._label_sent",
+            lambda train_id, original, sent: self.labels.append((train_id, original, sent)),
+        )
+        self.label_patch.start()
+
+    def tearDown(self) -> None:
+        self.label_patch.stop()
+        self.dir.cleanup()
+
+    def _inbound(self, external: str) -> dict:
+        return inbox_service.inbound(
+            platform="telegram", sender="علی", text="قیمت چنده؟", sender_id="1", chat_id="9", external_id=external
+        )
+
+    def test_auto_draft_carries_the_agent_train_id(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": ""}):
+            created = self._inbound("9:t1")
+            tid = created["thread"]["id"]
+            data = inbox_service._state()
+            data["threads"][0]["lastDraft"] = {"trainId": "ex-123"}
+            inbox_service._save(data)
+            asyncio.run(inbox_service.reply(tid, "پیش‌نویس عامل", deliver=False, as_draft=True, auto=True))
+            shown = inbox_service.get_thread(tid)
+            row = shown["messages"][-1]
+            self.assertEqual(row.get("trainId"), "ex-123")
+            self.assertEqual(inbox_service._state()["threads"][0].get("lastDraft"), {})
+
+    def test_sending_the_draft_unchanged_labels_accept(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": ""}), patch(
+            "app.services.channel_outbound_service.deliver", new=AsyncMock(return_value={"ok": True})
+        ) as send:
+            created = self._inbound("9:t2")
+            tid = created["thread"]["id"]
+            data = inbox_service._state()
+            data["threads"][0]["lastDraft"] = {"trainId": "ex-456"}
+            inbox_service._save(data)
+            asyncio.run(inbox_service.reply(tid, "جواب آماده", deliver=False, as_draft=True, auto=True))
+            draft_row = inbox_service._state()["threads"][0]["messages"][-1]
+            asyncio.run(inbox_service.reply(tid, "جواب آماده", deliver=True, draft_id=draft_row["id"]))
+            labeled = inbox_service._state()["threads"][0]["messages"][-1]
+            self.assertTrue(labeled.get("trainLabeled"))
+        self.assertEqual(self.labels, [("ex-456", "جواب آماده", "جواب آماده")])
+        send.assert_awaited_once()
+
+    def test_sending_an_edited_draft_labels_the_seller_text(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": ""}), patch(
+            "app.services.channel_outbound_service.deliver", new=AsyncMock(return_value={"ok": True})
+        ):
+            created = self._inbound("9:t3")
+            tid = created["thread"]["id"]
+            data = inbox_service._state()
+            data["threads"][0]["lastDraft"] = {"trainId": "ex-789"}
+            inbox_service._save(data)
+            asyncio.run(inbox_service.reply(tid, "جواب عامل", deliver=False, as_draft=True, auto=True))
+            draft_row = inbox_service._state()["threads"][0]["messages"][-1]
+            asyncio.run(inbox_service.reply(tid, "جواب درست‌شدهٔ فروشنده", deliver=True, draft_id=draft_row["id"]))
+        self.assertEqual(self.labels[0][0], "ex-789")
+        self.assertEqual(self.labels[0][2], "جواب درست‌شدهٔ فروشنده")
+
+    def test_the_same_draft_is_never_labeled_twice(self) -> None:
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_service.emit_later"
+        ), patch("app.services.plan_service.current", return_value={"autoReply": ""}), patch(
+            "app.services.channel_outbound_service.deliver", new=AsyncMock(return_value={"ok": True})
+        ):
+            created = self._inbound("9:t4")
+            tid = created["thread"]["id"]
+            row = {
+                "id": "m-draft",
+                "role": "outbound",
+                "kind": "draft",
+                "status": "draft",
+                "text": "پیش‌نویس",
+                "at": 2,
+                "trainId": "ex-cap",
+            }
+            data = inbox_service._state()
+            data["threads"][0]["messages"].append(row)
+            inbox_service._save(data)
+            asyncio.run(inbox_service.reply(tid, "پیش‌نویس", deliver=True, draft_id="m-draft"))
+            asyncio.run(inbox_service.reply(tid, "پیش‌نویس دوباره", deliver=True, draft_id="m-draft"))
+        self.assertEqual(len(self.labels), 1)

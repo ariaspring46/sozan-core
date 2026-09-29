@@ -668,3 +668,70 @@ class InboxAgentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AgentQualityTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.dir.name)
+
+    def tearDown(self) -> None:
+        self.dir.cleanup()
+
+    def _answer(self, text: str, *, shop_url: str = "https://battery.example"):
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            from app.state_store import write_json
+
+            write_json("shop.json", {"url": shop_url, "slug": "sales-battery"})
+            storefront_service.add_product(title="مانتو کرپ", price=1000000, stock=4, sku="m1", colors=["کرم", "سرمه‌ای"])
+            storefront_service.add_product(title="شلوار پارچه‌ای", price=800000, stock=3, sku="s1", colors=["طوسی"])
+            return asyncio.run(inbox_agent_service.answer(text))
+
+    def test_mi_kharam_is_a_buy_request_and_gets_the_receipt_answer(self) -> None:
+        reply = self._answer("مانتو کرپ را همین حالا می‌خرم")
+        self.assertIn("battery.example", reply or "")
+        self.assertIn("کارت‌به‌کارت", reply or "")
+
+    def test_nemi_kharam_is_not_a_buy_request(self) -> None:
+        reply = self._answer("این را نمی‌خرم، گران است")
+        self.assertNotIn("battery.example", reply or "")
+
+    def test_color_question_answers_only_the_named_product(self) -> None:
+        reply = self._answer("مانتو کرپ چه رنگی داره؟")
+        self.assertIn("مانتو کرپ", reply or "")
+        self.assertIn("کرم", reply or "")
+        self.assertNotIn("طوسی", reply or "")
+
+    def test_two_product_question_covers_both(self) -> None:
+        reply = self._answer("مانتو کرپ و شلوار پارچه‌ای موجوده؟")
+        self.assertIn("مانتو کرپ", reply or "")
+        self.assertIn("شلوار پارچه‌ای", reply or "")
+        self.assertIn("۴", reply or "")
+        self.assertIn("۳", reply or "")
+
+    def test_ham_pattern_and_polishi_do_not_confuse_the_agent(self) -> None:
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            from app.state_store import write_json
+
+            write_json("shop.json", {"url": "https://battery.example", "slug": "sales-battery"})
+            storefront_service.add_product(title="عروسک پولیشی خرس", price=500000, stock=7, sku="t1")
+            storefront_service.add_product(title="پازل هزار تکه", price=300000, stock=5, sku="t2")
+            storefront_service.add_product(title="شن‌بازی جادویی", price=200000, stock=2, sku="t3")
+            stock = asyncio.run(inbox_agent_service.answer("عروسک پولیشی خرس دارید؟"))
+            both = asyncio.run(inbox_agent_service.answer("هم پازل هزار تکه هم شن‌بازی جادویی هست؟"))
+        self.assertIn("۷", stock or "")
+        self.assertIn("پازل هزار تکه", both or "")
+        self.assertIn("شن‌بازی جادویی", both or "")
+        self.assertIn("۵", both or "")
+        self.assertIn("۲", both or "")
+

@@ -51,6 +51,9 @@ _BUY_MARKS = (
     "بخرید",
     "بخر",
     "خرید",
+    "میخرم",
+    "میخرید",
+    "میخریم",
     "پول",
     "کارت به کارت",
     "لینک بده",
@@ -77,7 +80,19 @@ def _cloud_base(url: str) -> bool:
 
 def _explicit_buy(text: str) -> bool:
     folded = _norm(text)
-    return any(_norm(mark) in folded for mark in _BUY_MARKS)
+    for mark in _BUY_MARKS:
+        if mark == "پول":
+            # «پولیشی» a payment request نیست؛ تنها واژهٔ مستقل «پول».
+            if _has_word("پول", folded):
+                return True
+            continue
+        index = folded.find(mark)
+        while index != -1:
+            before = folded[index - 1] if index else ""
+            if before != "ن":  # «نمی‌خرم» a buy request نیست
+                return True
+            index = folded.find(mark, index + 1)
+    return False
 
 
 def _mentioned_products(text: str) -> list[dict]:
@@ -91,6 +106,20 @@ def _mentioned_products(text: str) -> list[dict]:
             scored.append((len(hits), item))
     if not scored:
         return _color_matches(folded)
+    if (" و " in folded or re.search(r"هم\s+.+هم\s", folded)) and len(scored) >= 2:
+        # «X و Y» یا «هم X هم Y» — the answer must cover both, not just the best scorer.
+        ordered = sorted(scored, key=lambda pair: -pair[0])
+        picked: list[dict] = []
+        seen: set[str] = set()
+        for _count, item in ordered:
+            key = str(item.get("id") or item.get("title") or "")
+            if key in seen:
+                continue
+            seen.add(key)
+            picked.append(item)
+            if len(picked) == 2:
+                break
+        return picked
     best = max(count for count, _item in scored)
     tier = [item for count, item in scored if count == best]
     if len(tier) == 1:
@@ -722,6 +751,12 @@ def _system(thread: dict | None) -> str:
     from app.services.settings_service import get_settings
     from app.services.voice_service import prompt_block
 
+    try:
+        from app.services.customer_memory_service import _prompt_block as memory_block
+
+        memory = memory_block(thread)
+    except Exception:
+        memory = ""
     cfg = get_settings()
     titles = [str(item.get("title") or "").strip() for item in _products()[:12]]
     titles = [title for title in titles if title]
@@ -735,6 +770,7 @@ def _system(thread: dict | None) -> str:
         "سؤال بیرون از فروش را در یک جمله رد کن. "
         "فقط اگر مشتری آدم یا مدیر یا فروشنده خواست، یا عصبانی بود، بگو همکارم به‌زودی جواب می‌دهد.\n"
         f"{prompt_block()}\n"
+        f"{memory}\n"
         f"فروشگاه: {cfg.get('storeName') or ''} / {cfg.get('storeTagline') or ''}\n"
         f"نام کالاها: {'، '.join(titles) if titles else 'کاتالوگی ثبت نشده'}\n"
         f"{note}"
@@ -867,9 +903,25 @@ def _item_sizes(item: dict) -> str:
 def _catalog_sentence(sentence: str, products: list[dict]) -> str:
     folded = _norm(sentence)
     if "چه رنگی" in folded:
+        named_products = []
+        for item in products:
+            title = _norm(str(item.get("title") or ""))
+            words = [word for word in title.split() if len(word) >= 3 and word not in _TITLE_NOISE]
+            if any(_has_word(word, folded) for word in words):
+                named_products.append(item)
+        if named_products:
+            lines = []
+            for item in named_products:
+                colors = _item_colors(item)
+                title = str(item.get("title") or "")
+                if colors:
+                    lines.append(f"{title} رنگ {'، '.join(colors)}.")
+                else:
+                    lines.append(f"{title} رنگ ثبت‌شده ندارد.")
+            return " ".join(lines)
         named = {
             _norm(color)
-            for item in products
+            for item in _products()
             for color in _item_colors(item)
             if _norm(color) in folded
         }
@@ -1003,7 +1055,7 @@ def _log_train(customer_text: str, thread: dict | None, source: str, reply: str 
     """One training example per turn. Voice never enters the dataset, at all."""
     text = str(reply or "").strip()
     if not text or source == "voice":
-        return
+        return ""
     trace = train_trace.get() or {}
     mark = outcome.get() or {}
     started = float(trace.get("started") or time.monotonic())
@@ -1018,7 +1070,7 @@ def _log_train(customer_text: str, thread: dict | None, source: str, reply: str 
         surface="inbox",
     )
     if example is None:
-        return
+        return ""
     emit_later(kind="train", title="train-example", surface="inbox", payload=example)
     return str(example.get("id") or "")
 
@@ -1030,6 +1082,13 @@ async def answer(customer_text: str, thread: dict | None = None, *, source: str 
     )
     reply = await _answer(customer_text, thread)
     train_id = _log_train(customer_text, thread, source, reply)
+    if source == "real" and str(customer_text or "").strip():
+        try:
+            from app.services import customer_memory_service
+
+            customer_memory_service.remember(thread, customer_text)
+        except Exception:
+            log.warning("customer memory skipped")
     if train_id and isinstance(thread, dict):
         # شناسهٔ نمونه روی ردیف پیش‌نویس می‌نشیند تا 👍/👎 پنل برچسب بزند.
         row = thread.setdefault("lastDraft", {})
