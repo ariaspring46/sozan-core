@@ -22,6 +22,22 @@ class OtpLimitError(ValueError):
 
 SHOP_OTP_IP_HOURLY = 10
 
+
+def _otp_test_window_open() -> bool:
+    import datetime as _dt
+
+    from app.config import settings as _s
+
+    raw = str(_s.otp_test_until or "").strip()
+    if not raw:
+        return False
+    try:
+        until = _dt.date.fromisoformat(raw)
+    except ValueError:
+        return False
+    return _dt.date.today() <= until
+
+
 def _sign(body: str) -> str:
     return hmac.new(settings.jwt_secret.encode(), body.encode(), hashlib.sha256).hexdigest()[:24]
 
@@ -96,6 +112,18 @@ async def send(*, slug: str, phone: str, ip: str = "") -> dict:
             await redis_client.setex(f"shop-otp:{slug}:{receptor}", ttl, code)
             payload["dev_code"] = code
             payload["loginMode"] = "mock"
+            return payload
+        if _otp_test_window_open():
+            await redis_client.setex(f"shop-otp:{slug}:{receptor}", ttl, code)
+            payload["code"] = code
+            payload["loginMode"] = "sms"
+            emit_later(
+                kind="sms",
+                title="otp-test-reveal",
+                surface="storefront",
+                status="ok",
+                payload={"path": "shop"},
+            )
             return payload
         consumed = wallet_service.consume_sms()
         charged = int(consumed.get("charged") or 0)

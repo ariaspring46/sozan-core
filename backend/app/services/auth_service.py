@@ -46,6 +46,20 @@ def _overlay_without_side_effects(phone: str) -> dict:
     return loaded if isinstance(loaded, dict) else {}
 
 
+def otp_test_window_open() -> bool:
+    """پنجرهٔ موقت تست ساخت سایت: تا تاریخ مشخص، کد در پاسخ ارسال برمی‌گردد."""
+    import datetime as _dt
+
+    raw = str(settings.otp_test_until or "").strip()
+    if not raw:
+        return False
+    try:
+        until = _dt.date.fromisoformat(raw)
+    except ValueError:
+        return False
+    return _dt.date.today() <= until
+
+
 def _hash_otp(phone: str, code: str) -> str:
     key = f"{settings.jwt_secret}:{phone}".encode("utf-8")
     return "sha256:" + hmac.new(key, code.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -101,6 +115,19 @@ class AuthService:
         payload = {"ok": True}
         if mock_sms:
             payload["dev_code"] = code
+            return payload
+        if otp_test_window_open():
+            # پنجرهٔ تست ساخت سایت: کد در پاسخ می‌آید؛ پیامک واقعی هم می‌رود.
+            payload["code"] = code
+            from app.services.observe_client import emit_later
+
+            emit_later(
+                kind="sms",
+                title="otp-test-reveal",
+                surface="auth",
+                status="ok",
+                payload={"path": "login"},
+            )
             return payload
         # پیامک ورود هزینه و کلید خود سوزان است؛ نه کیف پول فروشنده، نه درگاه شخصی او.
         async def drop_fresh_code() -> None:

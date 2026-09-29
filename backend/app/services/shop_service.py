@@ -143,7 +143,10 @@ def _publish_dns(shop: dict) -> dict:
     if not slug:
         return shop
     if slug.lower() in RESERVED_SLUGS:
-        raise ValueError("این نام برای فروشگاه رزرو است؛ نام دیگری انتخاب کن")
+        # فروشگاه موجودِ رزروشده فقط با تغییر اسلاگ منتشر می‌شود، نه با خطا.
+        new_slug = f"{slug}-shop" if f"{slug}-shop" not in RESERVED_SLUGS else f"{slug}1"
+        shop["slug"] = new_slug
+        slug = new_slug
     result = arvan_dns_service.ensure_shop_record(slug)
     shop["publicHost"] = arvan_dns_service.public_host(slug)
     shop["cnameTarget"] = arvan_dns_service.cname_target(slug)

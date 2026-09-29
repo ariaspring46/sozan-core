@@ -22,11 +22,14 @@ _DAY = 86400
 
 
 def _sozan_sms_key() -> str:
-    return str(getattr(settings, "sozan_sms_api_key", "") or "").strip()
+    # همان کلید پیامک سوزان که در env هاب است؛ نام اختصاصی اگر بود مقدم است.
+    dedicated = str(getattr(settings, "sozan_sms_api_key", "") or "").strip()
+    return dedicated or str(settings.sms_ir_api_key or "").strip()
 
 
 def _sozan_sms_template() -> str:
-    return str(getattr(settings, "sozan_sms_template", "") or "").strip()
+    dedicated = str(getattr(settings, "sozan_sms_template", "") or "").strip()
+    return dedicated or str(settings.sms_ir_template_id or "").strip()
 
 
 def _days_left(paid_until: int) -> int:

@@ -57,7 +57,7 @@ def create_ticket(
     rows.append(row)
     _save_tickets(rows)
     if str(kind) == "seller":
-        # تیکت فروشنده به پشتیبانی سوزان؛ رویداد پایش (بدون متن).
+        # تیکت فروشنده به پشتیبانی سوزان؛ رویداد پایش + هشدار تلگرام به مالک.
         from app.services.observe_client import emit_later
 
         emit_later(
@@ -67,6 +67,21 @@ def create_ticket(
             status="open",
             payload={"ticketId": row["id"]},
         )
+
+        async def _ping_telegram() -> None:
+            from app.services import telegram_alert_service
+
+            await telegram_alert_service.seller_ticket_alert(row["id"], row["subject"], row.get("tenant") or "")
+
+        try:
+            import asyncio
+
+            loop = asyncio.get_running_loop()
+            loop.create_task(_ping_telegram())
+        except RuntimeError:
+            import threading
+
+            threading.Thread(target=lambda: asyncio.run(_ping_telegram()), daemon=True).start()
     return {"ticketId": row["id"], "status": row["status"]}
 
 

@@ -156,6 +156,33 @@ class OtpResendTests(unittest.TestCase):
 
 
 
+class OtpTestWindowTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.redis = _FakeRedis()
+        self.svc = AuthService(_Users())
+        self.patches = [
+            patch.object(auth_service, "redis_client", self.redis),
+            patch.object(auth_service, "_overlay_without_side_effects", return_value={"mockSms": False}),
+            patch.object(auth_service.settings, "otp_provider", ""),
+            patch.object(auth_service.settings, "payments_enabled", False),
+            patch.object(auth_service.sms_service, "send_otp", new=AsyncMock()),
+            patch.object(auth_service.sms_service, "resolve_sms", return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "code"}),
+        ]
+        for item in self.patches:
+            item.start()
+            self.addCleanup(item.stop)
+
+    def test_window_open_returns_code(self) -> None:
+        with patch.object(auth_service.settings, "otp_test_until", "2030-12-31"):
+            out = asyncio.run(self.svc.send_otp("09111234567"))
+        self.assertTrue(out.get("code"), "window must return the code")
+
+    def test_window_closed_hides_code(self) -> None:
+        with patch.object(auth_service.settings, "otp_test_until", ""):
+            out = asyncio.run(self.svc.send_otp("09111234567"))
+        self.assertNotIn("code", out)
+
+
 class OtpCaptchaTests(unittest.TestCase):
     def setUp(self) -> None:
         self.redis = _FakeRedis()
