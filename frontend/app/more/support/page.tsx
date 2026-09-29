@@ -16,6 +16,7 @@ type Ticket = {
   status: string;
   replies?: { text: string; at: number }[];
   at: number;
+  tenant?: string;
 };
 
 type Receipt = {
@@ -41,18 +42,26 @@ function faTime(at: number) {
 export default function SupportPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
+  const [mine, setMine] = useState<Ticket[]>([]);
+  const [hubView, setHubView] = useState<Ticket[] | null>(null);
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketText, setTicketText] = useState("");
   const [reply, setReply] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const [t, r] = await Promise.all([
+      const [t, r, m, hub] = await Promise.all([
         api<{ tickets: Ticket[] }>("/support/tickets"),
         api<{ receipts: Receipt[] }>("/pay/receipts"),
+        api<{ tickets: Ticket[] }>("/support/my-tickets").catch(() => ({ tickets: [] })),
+        api<{ tickets: Ticket[] }>("/support/hub").catch(() => null),
       ]);
       setTickets(t.tickets || []);
       setReceipts(r.receipts || []);
+      setMine(m.tickets || []);
+      setHubView(hub === null ? null : hub.tickets || []);
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
@@ -73,6 +82,36 @@ export default function SupportPage() {
         body: JSON.stringify({ text, status }),
       });
       setReply((row) => ({ ...row, [id]: "" }));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendToSozan() {
+    if (!ticketSubject.trim() || !ticketText.trim()) return;
+    setBusy(true);
+    try {
+      await api("/support/seller-ticket", {
+        method: "POST",
+        body: JSON.stringify({ subject: ticketSubject.trim(), text: ticketText.trim() }),
+      });
+      setTicketSubject("");
+      setTicketText("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function hubReply(id: string, text: string, status: string) {
+    setBusy(true);
+    try {
+      await api(`/support/hub/${id}/reply`, { method: "POST", body: JSON.stringify({ text, status }) });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
@@ -163,6 +202,47 @@ export default function SupportPage() {
           )}
         </section>
 
+        <section aria-labelledby="sozan-title" className="rounded-2xl border border-line bg-paper p-4 shadow-card">
+          <h2 id="sozan-title" className="font-bold">
+            تیکت به پشتیبانی سوزان
+          </h2>
+          <div className="mt-3 space-y-2">
+            <input
+              className="w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm"
+              placeholder="موضوع"
+              value={ticketSubject}
+              onChange={(e) => setTicketSubject(e.target.value)}
+            />
+            <textarea
+              className="min-h-24 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm"
+              placeholder="مشکل یا پرسش‌ات را بنویس"
+              value={ticketText}
+              onChange={(e) => setTicketText(e.target.value)}
+            />
+            <Button disabled={busy || !ticketSubject.trim() || !ticketText.trim()} onClick={() => void sendToSozan()}>
+              فرستادن به سوزان
+            </Button>
+          </div>
+          {mine.length ? (
+            <ul className="mt-3 space-y-2">
+              {mine.map((row) => (
+                <li key={row.id} className="rounded-xl border border-line bg-canvas p-3 text-sm">
+                  <p className="font-bold">
+                    {row.subject}{" "}
+                    <span className="text-xs font-normal text-muted">· {STATUS_LABEL[row.status] || row.status}</span>
+                  </p>
+                  <p className="mt-1 whitespace-pre-line leading-6">{row.text}</p>
+                  {(row.replies || []).map((rep, idx) => (
+                    <p key={idx} className="mt-2 rounded-lg bg-paper p-2 text-xs leading-6">
+                      پاسخ پشتیبانی: {rep.text}
+                    </p>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+
         <section aria-labelledby="tickets-title" className="rounded-2xl border border-line bg-paper p-4 shadow-card">
           <h2 id="tickets-title" className="font-bold">
             تیکت‌های مشتریان
@@ -205,6 +285,53 @@ export default function SupportPage() {
             <EmptyState title="تیکتی نیست" detail="پیام‌های پشتیبانی مشتریان اینجا می‌آید." />
           )}
         </section>
+        {hubView !== null ? (
+          <section aria-labelledby="hub-title" className="rounded-2xl border border-accent/40 bg-paper p-4 shadow-card">
+            <h2 id="hub-title" className="font-bold">
+              پشتیبانی سوزان — تیکت‌های فروشندگان
+            </h2>
+            {hubView.length ? (
+              <ul className="mt-3 space-y-3">
+                {hubView.map((row) => (
+                  <li key={row.id} className="rounded-xl border border-line bg-canvas p-3 text-sm">
+                    <p className="font-bold">
+                      {row.subject}{" "}
+                      <span className="text-xs font-normal text-muted">
+                        · {STATUS_LABEL[row.status] || row.status} · فروشندهٔ {String(row.tenant || "").slice(0, 4)}
+                        ***
+                      </span>
+                    </p>
+                    <p className="mt-1 whitespace-pre-line leading-6">{row.text}</p>
+                    {(row.replies || []).map((rep, idx) => (
+                      <p key={idx} className="mt-2 rounded-lg bg-paper p-2 text-xs leading-6">
+                        پاسخ قبلی: {rep.text}
+                      </p>
+                    ))}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <input
+                        className="min-w-40 flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+                        placeholder="پاسخ پشتیبانی سوزان"
+                        value={reply[`h-${row.id}`] || ""}
+                        onChange={(e) => setReply((rows) => ({ ...rows, [`h-${row.id}`]: e.target.value }))}
+                      />
+                      <Button
+                        disabled={busy || !(reply[`h-${row.id}`] || "").trim()}
+                        onClick={() => void hubReply(row.id, reply[`h-${row.id}`] || "", "working")}
+                      >
+                        پاسخ
+                      </Button>
+                      <Button variant="ghost" disabled={busy} onClick={() => void hubReply(row.id, "", "closed")}>
+                        بستن
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-xs text-muted">تیکتی نیست.</p>
+            )}
+          </section>
+        ) : null}
       </div>
     </AppShell>
   );

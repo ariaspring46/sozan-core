@@ -38,6 +38,7 @@ def create_ticket(
     phone: str = "",
     order_no: str = "",
     image_name: str = "",
+    kind: str = "storefront",
 ) -> dict:
     row = {
         "id": uuid4().hex[:12],
@@ -46,6 +47,7 @@ def create_ticket(
         "phone": _clean(phone, 20),
         "orderNo": _clean(order_no, 40),
         "image": _clean(image_name, 120),
+        "kind": str(kind or "storefront").strip()[:16],
         "status": "open",
         "replies": [],
         "at": int(time()),
@@ -54,11 +56,32 @@ def create_ticket(
     rows = _tickets()
     rows.append(row)
     _save_tickets(rows)
+    if str(kind) == "seller":
+        # تیکت فروشنده به پشتیبانی سوزان؛ رویداد پایش (بدون متن).
+        from app.services.observe_client import emit_later
+
+        emit_later(
+            kind="support",
+            title="seller-ticket",
+            surface="panel",
+            status="open",
+            payload={"ticketId": row["id"]},
+        )
     return {"ticketId": row["id"], "status": row["status"]}
 
 
-def list_tickets() -> list[dict]:
-    return sorted(_tickets(), key=lambda row: -int(row.get("at") or 0))
+def list_tickets(*, kind: str = "") -> list[dict]:
+    rows = _tickets()
+    wanted = str(kind or "").strip().lower()
+    if wanted:
+        rows = [row for row in rows if str(row.get("kind") or "storefront") == wanted]
+    return sorted(rows, key=lambda row: -int(row.get("at") or 0))
+
+
+def list_all_tickets_for_hub_admin() -> list[dict]:
+    """تیکت‌های فروشندگان به پشتیبانی سوزان؛ فقط مدیر هاب می‌بیند (بدون راز)."""
+    rows = [row for row in _tickets() if str(row.get("kind") or "storefront") == "seller"]
+    return sorted(rows, key=lambda row: -int(row.get("at") or 0))
 
 
 def reply_ticket(ticket_id: str, *, text: str, status: str = "") -> dict:

@@ -102,6 +102,9 @@ async def lifespan(_app: FastAPI):
     poller = asyncio.create_task(_channel_poll_loop())
     housekeeper = asyncio.create_task(_housekeeping_loop())
     rearm = asyncio.create_task(_rearm_inbox())
+    from app.services import renewal_reminder_service
+
+    renewal = asyncio.create_task(renewal_reminder_service.loop())
     loop_watch = start_loop_watch()
     from app.services import image_provider_service, llm_routing_service
 
@@ -114,7 +117,8 @@ async def lifespan(_app: FastAPI):
     probe_task.cancel()
     router_task.cancel()
     loop_watch.cancel()
-    for task in (poller, housekeeper, rearm, probe_task, router_task, loop_watch):
+    renewal.cancel()
+    for task in (poller, housekeeper, rearm, probe_task, router_task, loop_watch, renewal):
         try:
             await task
         except asyncio.CancelledError:

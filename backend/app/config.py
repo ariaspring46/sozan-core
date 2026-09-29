@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     payment_sign_secret: str = ""
     lab_login_until: str = "2026-10-31"
     shop_otp_daily_cap: int = 200
+    sozan_sms_provider: str = "smsir"
+    sozan_sms_api_key: str = ""
+    sozan_sms_template: str = ""
     melipayamak_otp_apikey: str = ""
     melipayamak_otp_base: str = "https://console.melipayamak.com/api/send/otp"
     otp_fixed_accounts: str = ""

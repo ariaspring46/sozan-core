@@ -41,6 +41,54 @@ class FeedbackIn(BaseModel):
     good: bool
 
 
+class SellerTicketIn(BaseModel):
+    subject: str = Field(min_length=2, max_length=120)
+    text: str = Field(min_length=2, max_length=2000)
+
+
+@router.get("/support/my-tickets")
+async def my_seller_tickets(_user=Depends(require_permission("campaigns:read"))):
+    from app.services import support_service
+
+    return {"tickets": support_service.list_tickets(kind="seller")}
+
+
+@router.post("/support/seller-ticket")
+async def create_seller_ticket(body: SellerTicketIn, _user=Depends(require_permission("campaigns:write"))):
+    from app.services import support_service
+
+    return support_service.create_ticket(subject=body.subject, text=body.text, kind="seller")
+
+
+@router.get("/support/hub")
+async def hub_tickets(_user=Depends(require_permission("campaigns:read"))):
+    from app.hub_admin import is_hub_admin
+    from app.services import support_service
+
+    if not is_hub_admin(_user.phone):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "این فهرست برای پشتیبانی سوزان است")
+    return {"tickets": support_service.list_all_tickets_for_hub_admin()}
+
+
+@router.post("/support/hub/{ticket_id}/reply")
+async def hub_ticket_reply(
+    ticket_id: str,
+    body: dict,
+    _user=Depends(require_permission("campaigns:write")),
+):
+    from app.hub_admin import is_hub_admin
+    from app.services import support_service
+
+    if not is_hub_admin(_user.phone):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "این پاسخ برای پشتیبانی سوزان است")
+    try:
+        return support_service.reply_ticket(
+            ticket_id, text=str(body.get("text") or ""), status=str(body.get("status") or "")
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
 @router.post("/feedback")
 async def feedback(body: FeedbackIn, _user=Depends(require_permission("campaigns:write"))):
     from app.services import training_log
