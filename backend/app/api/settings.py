@@ -36,6 +36,19 @@ def _is_hub_admin(user) -> bool:
     return is_hub_admin(user.phone)
 
 
+class FeedbackIn(BaseModel):
+    trainId: str = Field(min_length=4, max_length=80)
+    good: bool
+
+
+@router.post("/feedback")
+async def feedback(body: FeedbackIn, _user=Depends(require_permission("campaigns:write"))):
+    from app.services import training_log
+
+    training_log.log_label(str(body.trainId), {"vote": "up" if body.good else "down"})
+    return {"ok": True}
+
+
 @router.get("")
 async def read_settings(_user=Depends(require_permission("campaigns:read"))) -> dict[str, Any]:
     return public_settings()

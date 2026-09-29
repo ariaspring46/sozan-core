@@ -30,11 +30,12 @@ class WalletPayTests(unittest.TestCase):
         self.assertEqual(route["commissionBps"], 0)
         self.assertEqual(route["merchant"], OWN)
 
-    def test_resolve_hub_when_no_own_merchant(self) -> None:
+    def test_resolve_hub_when_seller_chose_zarinpal_without_own_merchant(self) -> None:
+        """فروشنده درگاه هاب را خواست (zarinpal بدون مرچنت خود) — همان مسیر هاب می‌ماند."""
         with patch.object(payment_service.env, "payments_enabled", True), patch.object(
             payment_service.env, "zarinpal_merchant_id", HUB
         ), patch.object(payment_service.env, "commission_bps", 200):
-            route = payment_service.resolve_sale_gateway({"paymentGateway": "mock"})
+            route = payment_service.resolve_sale_gateway({"paymentGateway": "zarinpal"})
         self.assertEqual(route["owner"], "hub")
         self.assertEqual(route["id"], "zarinpal")
         self.assertEqual(route["commissionBps"], 200)
@@ -49,15 +50,17 @@ class WalletPayTests(unittest.TestCase):
         self.assertTrue(route["dry"])
         self.assertNotIn("merchant", route)
 
-    def test_mock_outside_edge_dry_stays_on_the_hub(self) -> None:
+    def test_gateway_less_shop_goes_to_receipt_not_hub(self) -> None:
+        """تصمیم مالک: پول مشتری از درگاه سوزان عبور نمی‌کند؛ فروشگاه بی‌درگاه روش رسید می‌رود."""
         with patch("app.services.arvan_dns_service.edge_dry", return_value=False), patch.object(
             payment_service.env, "payments_enabled", True
         ), patch.object(payment_service.env, "zarinpal_merchant_id", HUB), patch.object(
             payment_service.env, "commission_bps", 200
         ):
             route = payment_service.resolve_sale_gateway({"paymentGateway": "mock"})
-        self.assertEqual(route["owner"], "hub")
-        self.assertEqual(route["id"], "zarinpal")
+        self.assertEqual(route["owner"], "seller")
+        self.assertEqual(route["id"], "receipt")
+        self.assertEqual(route["commissionBps"], 0)
 
     def test_resolve_own_idpay(self) -> None:
         with patch.object(payment_service.env, "zarinpal_merchant_id", HUB):

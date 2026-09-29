@@ -233,6 +233,9 @@ def resolve_sale_gateway(row: dict | None = None) -> dict:
         }
     if not hub or not payments_enabled():
         raise ValueError(PAYMENT_LATER)
+    if gateway == "mock":
+        # فروشگاه بی‌درگاه: سفارش با روش رسید کارت‌به‌کارت ثبت می‌شود، نه درگاه سوزان.
+        return {"id": "receipt", "owner": "seller", "commissionBps": 0, "sandbox": False}
     return {
         "id": "zarinpal",
         "owner": "hub",

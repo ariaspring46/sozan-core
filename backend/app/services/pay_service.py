@@ -140,6 +140,7 @@ def public_order(row: dict) -> dict:
         "title": row.get("title") or "",
         "amount": int(row.get("amount") or 0),
         "status": row.get("status") or "pending",
+        "gateway": row.get("gateway") or "",
         "channel": row.get("channel") or "",
         "at": int(row.get("at") or 0),
         "payUrl": public_pay_url(str(row.get("id") or "")),
@@ -204,6 +205,18 @@ async def create_order(
         "at": int(time()),
         "phone": phone,
     }
+    if route.get("id") == "receipt":
+        # بی‌درگاه: سفارش ثبت و خریدار به صفحهٔ رسید کارت‌به‌کارت فرستاده می‌شود.
+        url = f"/p/{order_id}"
+        row["gateway"] = "receipt"
+        row["owner"] = "seller"
+        orders = _orders()
+        orders.append(row)
+        _save_orders(orders)
+        out = public_order(row)
+        out["payUrl"] = url
+        out["paymentMethods"] = ["receipt"]
+        return out
     if route.get("dry"):
         url = f"https://dry-mock.invalid/p/{order_id}"
         row["authority"] = order_id
@@ -295,6 +308,9 @@ async def attach_pay_link(
     url = str(order.get("payUrl") or "").strip()
     if not url or url in text:
         return text
+    if str(order.get("gateway") or "") == "receipt":
+        # پیوند نسبت‌دار صفحهٔ رسید با نشانی عمومی کامل می‌شود؛ دایرکت نشانی مطلق می‌بیند.
+        url = public_pay_url(str(order.get("id") or ""))
     return f"{text}\n{url}"[:1000]
 
 
@@ -571,15 +587,19 @@ def review_receipt(*, order_no: str, approve: bool, note: str = "") -> dict:
         if row is None or str(row.get("status") or "") != "awaiting_receipt":
             raise ValueError("رسیدی با این شماره در انتظار نیست")
         if approve:
-            row["status"] = "paid"
             row["gateway"] = "receipt"
             row["receiptStatus"] = "approved"
+            # تأیید رسید = پول رسیده؛ موجودی، فروش و کیف پول با همان مسیر درگاه.
+            _mark_paid(row, ref_id=str(row.get("receiptRef") or "receipt"))
         else:
             row["status"] = "receipt_rejected"
             row["receiptStatus"] = "rejected"
         row["receiptNote"] = str(note or "").strip()[:300]
         _save_orders(orders)
-        return public_order(row)
+        out = public_order(row)
+        if not approve:
+            out["status"] = "receipt_rejected"
+        return out
 
 
 def shop_paid(*, slug: str, order_id: str, amount: int, title: str, customer: str, ref_id: str = "") -> dict:

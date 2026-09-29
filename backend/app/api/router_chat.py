@@ -66,6 +66,33 @@ async def _wait_cached(scope: str, key: str, thread_id: str, stamp: str):
     return None
 
 
+def _log_router_training(user_text: str, out: dict) -> None:
+    """هر نوبت روتر یک نمونهٔ آموزش؛ شناسه‌اش روی پاسخ می‌نشیند تا 👍/👎 برچسب بزند."""
+    try:
+        from app.services import training_log
+
+        rows = out.get("messages") if isinstance(out, dict) else None
+        reply = ""
+        for row in reversed(rows or []):
+            if isinstance(row, dict) and row.get("role") == "assistant":
+                reply = str(row.get("text") or "")
+                break
+        example_id = training_log.log_example(
+            task="router",
+            messages=[{"role": "user", "content": str(user_text or "")}],
+            output={"reply": reply},
+            source="real",
+            surface="router",
+        )
+        if example_id:
+            for row in reversed(rows or []):
+                if isinstance(row, dict) and row.get("role") == "assistant":
+                    row["trainId"] = example_id
+                    break
+    except Exception:
+        pass
+
+
 async def _finish_turn(
     key: str,
     text: str,
@@ -92,6 +119,7 @@ async def _finish_turn(
             idempotency_key=key,
             thread_id=tid,
         )
+        _log_router_training(text, out)
     except router_service.RouterBusy:
         router_service._bind_thread(tid)
         if key and router_service.inflight_key() == key:

@@ -57,12 +57,14 @@ class ShopPayB1Tests(unittest.TestCase):
                             ],
                         )
                     )
-                    url = asyncio.run(pay_service.finish_order(authority="AUTH-CART", ok=True))
+                    # فروشگاه بی‌درگاه: خریدار رسید می‌گذارد و فروشنده تأیید می‌کند
+                    asyncio.run(pay_service.attach_receipt(slug=SLUG, secret=SECRET, order_no=str(order["id"]), upload=None))
+                    paid = pay_service.review_receipt(order_no=str(order["id"]), approve=True, note="")
                 products = {row["id"]: row for row in storefront_service.list_products()["products"]}
                 saved = pay_service.get_order(str(order["id"]))
                 sales = storefront_service.list_sales()["sales"]
                 shown = pay_service.public_order(saved)
-        self.assertIn("pay=ok", url)
+        self.assertEqual(paid["status"], "paid")
         self.assertEqual(sales[0]["source"], "gateway")
         self.assertGreater(int(shown["at"]), 0)
         self.assertEqual(products[first["id"]]["stock"], 3)
@@ -137,14 +139,15 @@ class ShopPayB1Tests(unittest.TestCase):
         self.assertFalse(shop_otp_service.valid_buyer_token(token, slug="shopy", phone="09111234567"))
         self.assertFalse(shop_otp_service.valid_buyer_token(token + "x", slug="shopx", phone="09111234567"))
 
-    def test_mock_outside_edge_dry_still_opens_the_hub_gateway(self) -> None:
+    def test_gateway_less_shop_orders_with_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
                 ctx = _gateway()
                 with ctx[0], ctx[1], ctx[2], patch("app.services.arvan_dns_service.edge_dry", return_value=False):
                     order = asyncio.run(pay_service.create_order(title="سفارش", amount=1000))
-        self.assertIn("zarinpal.com", str(order.get("startPayUrl") or ""))
-        self.assertFalse(str(order.get("payUrl") or "").startswith("https://dry-mock.invalid/"))
+        self.assertEqual(order.get("gateway"), "receipt")
+        self.assertTrue(str(order.get("payUrl") or "").startswith("/p/"))
+        self.assertEqual(order.get("paymentMethods"), ["receipt"])
 
     def test_shop_paid_empty_ref_does_not_match_other_pending(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

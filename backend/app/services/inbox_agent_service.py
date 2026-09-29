@@ -999,7 +999,7 @@ def _policy_reply(thread: dict | None, sentence: str) -> str | None:
     return reply[:1000]
 
 
-def _log_train(customer_text: str, thread: dict | None, source: str, reply: str | None) -> None:
+def _log_train(customer_text: str, thread: dict | None, source: str, reply: str | None) -> str:
     """One training example per turn. Voice never enters the dataset, at all."""
     text = str(reply or "").strip()
     if not text or source == "voice":
@@ -1020,6 +1020,7 @@ def _log_train(customer_text: str, thread: dict | None, source: str, reply: str 
     if example is None:
         return
     emit_later(kind="train", title="train-example", surface="inbox", payload=example)
+    return str(example.get("id") or "")
 
 
 async def answer(customer_text: str, thread: dict | None = None, *, source: str = "") -> str | None:
@@ -1028,7 +1029,12 @@ async def answer(customer_text: str, thread: dict | None = None, *, source: str 
         {"started": time.monotonic(), "teacher": "", "tools": [], "messages": []}
     )
     reply = await _answer(customer_text, thread)
-    _log_train(customer_text, thread, source, reply)
+    train_id = _log_train(customer_text, thread, source, reply)
+    if train_id and isinstance(thread, dict):
+        # شناسهٔ نمونه روی ردیف پیش‌نویس می‌نشیند تا 👍/👎 پنل برچسب بزند.
+        row = thread.setdefault("lastDraft", {})
+        if isinstance(row, dict):
+            row["trainId"] = train_id
     return reply
 
 

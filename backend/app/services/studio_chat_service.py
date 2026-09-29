@@ -1510,6 +1510,21 @@ async def regenerate(*, message_id: str, part: str, campaigns: CampaignService, 
                 row["text"] = reply
 
         result = _update_message(ident, apply)
+        try:
+            from app.services import training_log
+
+            train_id = training_log.log_example(
+                task="caption",
+                messages=[{"role": "user", "content": str(target.get("text") or "کپشن تازه")}],
+                output={"captions": clipped},
+                source="real",
+                surface="studio",
+            )
+            if train_id:
+                apply({"trainId": train_id})
+        except Exception:
+            pass
+
         if campaign_id:
             await campaigns.update_copy(
                 UUID(campaign_id),

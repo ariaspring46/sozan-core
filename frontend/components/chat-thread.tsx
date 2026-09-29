@@ -4,6 +4,7 @@ import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Mic, Paperclip, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ChatAttach } from "@/components/chat-attach";
 import { SozanMark } from "@/components/sozan-mark";
@@ -16,6 +17,7 @@ export type ChatMsg = {
   role: "user" | "assistant";
   text: string;
   at: number;
+  trainId?: string;
   kind?: string;
   confirmId?: string;
   options?: string[];
@@ -78,6 +80,41 @@ function WaitSignal({ label }: { label: string }) {
       </span>
       <p className="text-xs text-warm">{label}</p>
     </div>
+  );
+}
+
+function VoteButtons({ trainId }: { trainId: string }) {
+  const [voted, setVoted] = useState<"" | "up" | "down">("");
+  async function vote(good: boolean) {
+    if (voted) return;
+    setVoted(good ? "up" : "down");
+    try {
+      await api("/settings/feedback", { method: "POST", body: JSON.stringify({ trainId, good }) });
+    } catch {
+      setVoted("");
+    }
+  }
+  return (
+    <span className="flex items-center gap-1">
+      <button
+        type="button"
+        aria-label="پاسخ خوب بود"
+        disabled={voted !== ""}
+        onClick={() => void vote(true)}
+        className={cn("min-h-9 rounded-lg px-2 text-sm", voted === "up" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas")}
+      >
+        👍
+      </button>
+      <button
+        type="button"
+        aria-label="پاسخ خوب نبود"
+        disabled={voted !== ""}
+        onClick={() => void vote(false)}
+        className={cn("min-h-9 rounded-lg px-2 text-sm", voted === "down" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas")}
+      >
+        👎
+      </button>
+    </span>
   );
 }
 
@@ -348,6 +385,7 @@ export function ChatThread({
                     ))}
                   </div>
                 ) : null}
+                {msg.role === "assistant" && msg.trainId ? <VoteButtons trainId={msg.trainId} /> : null}
                 {showTime && msg.at ? (
                   <p className="mt-1 text-[11px] opacity-70">
                     {formatWhen(msg.at)}

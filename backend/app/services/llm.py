@@ -140,8 +140,11 @@ def _is_arvan_url(url: str) -> bool:
 
 def _proxy_for_url(url: str) -> str | None:
     host = _host_of(url)
-    if _is_arvan_url(url) or host == "openrouter.ai" or host.endswith(".openrouter.ai"):
+    if _is_arvan_url(url):
         return None
+    # OpenRouter در صورت نیاز پروکسی اختصاصی خودش را دارد (مثلاً برای مسیر فیلترینگ).
+    if host == "openrouter.ai" or host.endswith(".openrouter.ai"):
+        return (os.environ.get("OPENROUTER_PROXY") or "").strip() or None
     return _cloud_proxy()
 
 
@@ -551,6 +554,9 @@ def _classify_llm_error(exc: Exception) -> str:
         return "timeout"
     if isinstance(exc, httpx.ConnectError):
         return "unreachable"
+    # اتصالِ نیم‌قطعِ میانهٔ پاسخ: گذرا است و ارزش تلاش دوباره دارد.
+    if isinstance(exc, (httpx.ReadError, httpx.WriteError, httpx.RemoteProtocolError)):
+        return "half-closed"
     if isinstance(exc, httpx.HTTPStatusError):
         code = int(getattr(exc.response, "status_code", 0) or 0)
         if code == 429:
@@ -699,7 +705,7 @@ async def _complete_with_route(
         except Exception as exc:
             last_exc = exc
             klass = _classify_llm_error(exc)
-            if attempt < attempts and klass in {"http-5xx", "unreachable"}:
+            if attempt < attempts and klass in {"http-5xx", "unreachable", "half-closed"}:
                 log.warning("llm %s retry after %s", surface, klass)
                 import asyncio
 

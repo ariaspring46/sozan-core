@@ -1399,6 +1399,18 @@ async def apply_live_edit(
         return {"ok": True, "patched": False, "reply": reply, "preview": {}}
     if actions[0].get("type") == "edit_llm":
         return await _apply_llm_edit(shop, prompt, page, target, root)
+    try:
+        from app.services import training_log
+
+        training_log.log_example(
+            task="shop_edit",
+            messages=[{"role": "user", "content": str(prompt or "")[:500]}],
+            output={"applied": True},
+            source="real",
+            surface="shop-edit",
+        )
+    except Exception:
+        pass
     return await _run_action_list(shop, root, actions, prompt=prompt, page=page)
 
 

@@ -31,10 +31,12 @@ _FALSE = {"0", "false", "off", "no", "خاموش"}
 
 
 def consent_enabled() -> bool:
-    """The panel key «کمک به بهتر شدن سوزان». Missing key means on."""
-    try:
-        from app.services.settings_service import get_settings
+    """کلید «کمک به بهتر شدن سوزان»: پنل (training.json) + روی‌نویسی سراسری از تنظیمات."""
+    from app.services.settings_service import allows_training, get_settings
 
+    if not allows_training():
+        return False
+    try:
         raw = get_settings().get(CONSENT_KEY)
     except Exception:
         return True
