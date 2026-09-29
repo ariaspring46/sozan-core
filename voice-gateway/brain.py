@@ -541,7 +541,8 @@ def worth_llm(text: str) -> bool:
 
 def is_carrier_text(text: str) -> bool:
     cleaned = text or ""
-    if any(word in cleaned for word in ("موسیقی", "موزیک", "آهنگ")):
+    # "آهنگ" alone is not a music marker: ringback songs often contain the word.
+    if any(word in cleaned for word in ("موسیقی", "موزیک")):
         return True
     latin = re.sub(r"[^A-Za-z]+", " ", cleaned).strip()
     persian = FA.findall(cleaned)

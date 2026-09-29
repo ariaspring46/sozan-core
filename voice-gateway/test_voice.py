@@ -428,7 +428,14 @@ class SpeechTest(unittest.TestCase):
         self.assertTrue(usable_request(heard))
 
 
-    def test_cloud_ear_keeps_only_verbatim_text(self) -> None:
+    def test_ringback_lyrics_are_not_carrier(self) -> None:
+        from brain import is_carrier_text
+
+        self.assertFalse(is_carrier_text("آهنگ تو رو از پشت سر ممنون ازت گرفتی قلب هامو تو مشتت"))
+        self.assertTrue(is_carrier_text("موزیک پخش می‌شود لطفاً منتظر بمانید"))
+        self.assertTrue(is_carrier_text("در حال حاضر تماس با مشترک مورد نظر امکان‌پذیر نمی‌باشد"))
+
+
         self.assertEqual(clean_ear_text("الو سلام"), "الو سلام")
         self.assertEqual(clean_ear_text("  «سلام، خوبید؟» "), "سلام، خوبید؟")
         self.assertEqual(clean_ear_text("لطفاً فایل صوتی را ارسال کنید تا رونویسی کنم."), "")
