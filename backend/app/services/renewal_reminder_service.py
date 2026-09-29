@@ -53,7 +53,12 @@ async def _send_sms(phone: str, text: str) -> bool:
                 response = await client.post(
                     "https://api.sms.ir/v1/send/verify",
                     headers={"x-api-key": key, "Content-Type": "application/json"},
-                    json={"mobile": phone, "templateId": int(template)},
+                    # قالب تأییدشدهٔ SMS_IR پارامتری است؛ متن ثابت در همان قالب می‌نشیند.
+                    json={
+                        "mobile": phone,
+                        "templateId": int(template),
+                        "parameters": [{"name": "CODE", "value": text[:120]}],
+                    },
                 )
         return response.status_code < 400
     except Exception as exc:
