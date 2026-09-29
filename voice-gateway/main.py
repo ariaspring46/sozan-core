@@ -136,6 +136,9 @@ THINK_WAIT_S = 0.7
 SPEAK_OVER_MS = int(os.environ.get("SPEAK_OVER_MS", "2500"))
 NUDGE_AFTER_S = 5.0
 SALES_HANG_AFTER_S = 6.0
+# If the VAD claims the contact is talking this long with no committed
+# utterance, it is stuck (noise floor over keep_thresh); reset it.
+VAD_STUCK_S = float(os.environ.get("VAD_STUCK_S", "8"))
 ANSWER_SILENCE_S = 25.0
 TX_KEEP = 10
 SIM_ARM_S = 30.0
@@ -547,6 +550,7 @@ class Gateway:
         self._fragment = ""
         self._spoke_at = 0.0
         self._audio_at = 0.0
+        self._vad_stuck_since = 0.0
         self._checked_in = False
         self._heard_person = False
         self._outbound_call = False
@@ -783,6 +787,7 @@ class Gateway:
         self._fragment = ""
         self._spoke_at = time.monotonic()
         self._audio_at = self._spoke_at
+        self._vad_stuck_since = 0.0
         self._checked_in = False
         self._heard_person = False
         self._outbound_call = bool(outbound)
@@ -1125,6 +1130,21 @@ class Gateway:
         if self._sim_call:
             return
         now = time.monotonic()
+        if session._speech:
+            # Contact is supposedly talking. If no utterance commits within
+            # VAD_STUCK_S, the VAD froze on a noisy line: reset so hearing
+            # re-arms instead of decaying into a silent hangup.
+            if self._vad_stuck_since <= 0:
+                self._vad_stuck_since = now
+            elif now - self._vad_stuck_since > VAD_STUCK_S:
+                log.info("vad stuck %.1fs, reset", now - self._vad_stuck_since)
+                session._speech = False
+                session._speech_ms = 0
+                session._silence_ms = 0
+                session._rx_buf.clear()
+                self._vad_stuck_since = 0.0
+            return
+        self._vad_stuck_since = 0.0
         if not self._heard_person:
             if self._idle_since <= 0:
                 self._idle_since = now
