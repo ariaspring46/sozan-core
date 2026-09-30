@@ -521,10 +521,8 @@ async def shop_checkout(
 def shop_config(*, slug: str, secret: str) -> dict:
     tenant = verify_pay_secret(slug, secret)
     with tenant_scope(tenant):
-        overlay = get_settings()
-        gateway = str(overlay.get("paymentGateway") or "").strip().lower()
-        merchant = str(overlay.get("zarinpalMerchantId") or "").strip()
-        methods = ["zarinpal"] if gateway == "zarinpal" and merchant else ["receipt"]
+        # فروشگاه بی‌درگاه (mock) هم رسیده است: پول مشتری هرگز از سوزان نمی‌گذرد.
+        methods = ["receipt"]
         return {"paymentMethods": methods, "slug": slug}
 
 
