@@ -5837,3 +5837,12 @@ X، دربارهٔ «No CUDA GPUs are available» پیام قبل (۱۹:۴۵): �
 - **X:** در بازبینی‌های UI از جریان‌های `reference/critique.md` و `reference/audit.md` استفاده کن — دو ارزیابی مستقل و سنتز، با سخت‌گیری صریح روی hierarchy/spacing/typography/responsive/a11y/edge-case؛ خروجی هر critique در گزارش بیاید.
 - **C:** این و `ux-designer` مکمل‌اند (آن یکی قواعد پایه، این یکی نقد و صیقل). برای ایجنت طراحی و گیت‌های کارخانه از فهرست ضددست‌کاری‌ها (anti-slop: گرادیان بنفش، کارت تودرتو، متن خاکستری روی رنگ، easing فنری و…) به‌عنوان چک‌لیست رد استفاده کن — همین‌ها را در بازبینی عکس امروز دیدیم.
 - **قاعدهٔ ثابت قبلی سر جایش است:** هر کس از این اسکیل‌ها چیزی «بهتر» پیشنهاد داد، تا آزمون زنده و تصمیم مالک اعمال نمی‌شود.
+
+## مالک — دو کتابخانهٔ دانش مهندسی و QA نصب شد (۳۰ سپ ۱۹:۲۰)
+
+مالک دو مجموعه را معرفی کرد؛ هر دو بررسی، پالایش و نصب شد (کامیت `2e1b0c8`):
+
+1. **`.zcode/skills/sota-engineering/`** — کل ۴۲ اسکیل SOTA (martinholovsky/SOTA-skills، CC BY 4.0؛ همه md خالص): `sota` روترِ اصلی ورودی است و بر اساس نوع کار به sota-architecture / code-security / performance / api-design / databases / testing / llm-engineering / observability / devsecops / frontend-design و… می‌رسد. X در طراحی/بازبینی بک‌اند و Y در سخت‌سازی عامل از آن استفاده کنند.
+2. **`.zcode/skills/qa-library/`** — ۳۵ اسکیل تست منتخب (از PramodDutta/qaskills، MIT؛ پک qa-essentials + دسته‌های نام‌بردهٔ مالک): playwright-e2e/api، jest-unit، pytest-patterns، k6-performance، visual-regression، accessibility/axe، api-security/jwt/csp/cors، cicd-pipeline، agent-browser، agentic-testing. روتر `qa-library` ورودی است و قواعد سوزان (تست فقط روی تنانت آزمایشی/نمونهٔ خشک، شاهد در گزارش) سرش نوشته شده.
+
+قواعد: (الف) ۴۴۴ اسکیل کاملِ مخزن QA نصب نشد — فقط منتخب‌ها؛ اگر موردی لازم بود، همان پوشه از مخزن بالا کشیده می‌شود. (ب) هیچ اسکیلی نصب وابستگی (Playwright/k6 و…) را مجاز نمی‌کند — نصب ابزار با هماهنگی X و مالک. (ج) هر استفاده طبق قاعدهٔ ۱۸:۴۰ با شاهد آزمون زنده در گزارش می‌آید.
