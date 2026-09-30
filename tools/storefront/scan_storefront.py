@@ -27,6 +27,13 @@ import sys
 from pathlib import Path
 
 # Phrases no seller types verbatim; safe to ban in served HTML outright.
+GENERIC_SEED_IMAGES = (
+    "mobile-gen-",
+    "laptop-gen-",
+    "product-gen-",
+    "seed-product",
+)
+
 BANNED_HTML = (
     "آزمایشی",
     "پرداخت امن",
@@ -55,6 +62,7 @@ BANNED_SOURCE = (
 
 LATIN_DIGIT = re.compile(r"[0-9]")
 PERSIAN_DIGIT = re.compile(r"[۰-۹]")
+IMG_SRC = re.compile(r'<img[^>]+src="([^"]+)"', re.I)
 PRICE_BLOCK = re.compile(r'data-price="[^"]*"[^>]*>(.*?)</', re.I | re.S)
 DISCOUNT_BADGE = re.compile(r'data-discount-badge="[^"]*"[^>]*>(.*?)</', re.I | re.S)
 ZERO_PRICE = re.compile(r"[۰0]\\s*تومان")
@@ -169,6 +177,24 @@ def scan_html(url: str, pages: list[str], policy: dict | None) -> list[str]:
             text = block.strip()
             if LATIN_DIGIT.search(text):
                 problems.append(f"{where}Latin digits in price text {text[:40]!r}")
+
+        for src in IMG_SRC.findall(html):
+            if any(g in src for g in GENERIC_SEED_IMAGES):
+                problems.append(f"{where}generic seed image on page: {src}")
+                continue
+            if src.startswith("/"):
+                try:
+                    head = subprocess.run(
+                        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+                         "-m", "10", url.rstrip("/") + src],
+                        capture_output=True, text=True, timeout=15,
+                    ).stdout.strip()
+                    if head != "200":
+                        problems.append(f"{where}image not loadable {src} (HTTP {head})")
+                except Exception:  # noqa: BLE001
+                    problems.append(f"{where}image probe failed {src}")
+            elif not src.startswith("data:"):
+                problems.append(f"{where}remote image src: {src[:60]}")
 
         for badge in DISCOUNT_BADGE.findall(html):
             text = badge.strip()
