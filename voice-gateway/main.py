@@ -88,6 +88,7 @@ from sales import (
     sales_ended,
     sales_open,
     greet_line,
+    question_repeat,
     cached_sales_lines,
     too_alike,
     wait_line,
@@ -1261,7 +1262,7 @@ class Gateway:
         extra = self._pending_heard(session)
         if extra:
             heard = f"{heard} {extra}".strip()
-        state.insist = bool(state.prev_heard) and too_alike(state.prev_heard, heard)
+        state.insist = bool(state.prev_heard) and (too_alike(state.prev_heard, heard) or question_repeat(state.prev_heard, heard))
         state.prev_heard = heard
         plan = plan_turn(state, heard)
         if plan.kind == "hold":

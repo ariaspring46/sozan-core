@@ -767,6 +767,21 @@ def feature_line(kind: str) -> str:
     }.get(kind, "")
 
 
+_STOP_WORDS = frozenset({"برای", "که", "رو", "به", "از", "تو", "و", "چی", "چه", "با", "این", "همین", "است", "هست"})
+
+
+def question_repeat(prev: str, heard: str) -> bool:
+    """True when the contact essentially repeats their previous question, so the
+    same answer is allowed again."""
+    import re as _re
+
+    prev_t = {w for w in _re.findall(r"[\u0600-\u06FF]+", prev or "") if w not in _STOP_WORDS and len(w) > 2}
+    if not prev_t:
+        return False
+    heard_t = {w for w in _re.findall(r"[\u0600-\u06FF]+", heard or "") if len(w) > 2}
+    return len(prev_t & heard_t) / len(prev_t) >= 0.5
+
+
 def greet_line() -> str:
     return random.choice(GREET_VARIANTS)
 

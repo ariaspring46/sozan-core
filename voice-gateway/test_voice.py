@@ -76,6 +76,7 @@ from sales import (
     NOTIME_VARIANTS,
     PERM_VARIANTS,
     PAIN_LINE,
+    question_repeat,
     DM_LINE,
     CONTENT_LINE,
     ORDER_LINE,
@@ -914,6 +915,8 @@ class SalesTest(unittest.TestCase):
         self.assertIn(ADDRESS_LINE, lines)
         self.assertTrue(any("تومان" in line for line in lines))
         self.assertIn(PAIN_LINE, lines)
+        self.assertTrue(question_repeat("برای کدوم شرکت کار میکنی", "برای کدوم شرکت کار میکنی سوزان"))
+        self.assertFalse(question_repeat("برای کدوم شرکت کار میکنی", "قیمتش چند است"))
         self.assertEqual(parse_sim_command("SIM"), ("", ""))
         self.assertEqual(parse_sim_command("SIM bag_shop کیف"), ("bag_shop", "کیف"))
         self.assertEqual(parse_sim_command("SIM @kif_shop"), ("kif_shop", ""))
