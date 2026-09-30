@@ -155,7 +155,7 @@ class MelipayamakFlowTests(unittest.TestCase):
     def test_send_stores_hash_not_plaintext(self) -> None:
         with self._mock_provider_code("443322"):
             out = asyncio.run(self.svc.send_otp("09111234567", ip="10.1.1.5"))
-        self.assertEqual(out, {"ok": True})
+        self.assertTrue(out.get("ok"))
         stored = self.redis.store["otp:09111234567"]
         self.assertTrue(stored.startswith("sha256:"))
         self.assertNotIn("443322", stored)
@@ -221,7 +221,9 @@ class MelipayamakFlowTests(unittest.TestCase):
         async def boom(phone: str, otp_code: str) -> str:
             raise melipayamak_otp_service.OtpSendError("credit-or-key")
 
-        with patch.object(melipayamak_otp_service, "send_otp", new=boom):
+        with patch.object(melipayamak_otp_service, "send_otp", new=boom), patch.object(
+            auth_service.settings, "otp_test_until", ""
+        ):
             with self.assertRaises(HTTPException) as ctx:
                 asyncio.run(self.svc.send_otp("09111234567", ip="10.1.1.5"))
         self.assertEqual(ctx.exception.status_code, 502)
