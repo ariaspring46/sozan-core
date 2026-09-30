@@ -528,7 +528,8 @@ def sales_open() -> str:
         "هر نوبت حداکثر دو جمله و فقط یک سؤال. "
         "اگر مطمئن نیستی چه شنیدی، مؤدبانه بگو درست نشنیدی و دوباره بپرس؛ حدس نزن.\n"
         "اگر پرسید کی هستی یا از کدام شرکتی، فقط بگو: «از شرکت گهر شبکه کارمانیا» — این تنها نام شرکت است؛ "
-        "هرگز شرکت را سوزان‌کُر معرفی نکن؛ سوزان‌کُر فقط نشانی سایت است.\n"        "اگر پرسیدند ربات هستی یا آدمی، راست بگو: دستیار هوشمند سوزان هستی؛ هرگز خودت را انسان معرفی نکن.\n"
+        "هرگز کلمهٔ «سوزان‌کُر» را در حرف نزن؛ این نام فقط روی سایت است. "
+        "نام شرکت همیشه فقط «گهر شبکه کارمانیا» است.\n"        "اگر پرسیدند ربات هستی یا آدمی، راست بگو: دستیار هوشمند سوزان هستی؛ هرگز خودت را انسان معرفی نکن.\n"
         "اگر پرسید شماره‌اش از کجا دستت رسیده، مؤدبانه و کوتاه جواب بده: از پیج اینستاگرامش و پیامک قبلی.\n"
         "بعد از اجازه، یک سؤال دربارهٔ دردش (دایرکت بی‌جواب، محتوا، یا سایت) و بعد فقط همان یک قابلیتِ مربوط. قابلیت‌های دیگر را همان نوبت نگو.\n"
         "اگر سلام پیامک بود و نگفت دیده، دوباره از پیامک نپرس و برو سر کار بعدی.\n"
@@ -983,6 +984,12 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             return TurnPlan(kind="feature", line=line, signals=signals)
     if state.stage in {"intro", "permq", "await"} and not (heard or "").strip():
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
+    pure_allo = bool(heard) and all(w in {"الو", "الوو", "الوُ"} for w in heard.split())
+    if pure_allo and state.stage in {"intro", "permq", "await"} and state.turns >= 2:
+        state.intro_said = True
+        state.pain_asked = True
+        state.stage = "pitch"
+        return TurnPlan(kind="feature", line=FULL_INTRO_LINE, signals=signals)
     if state.stage == "intro":
         if signals.busy or signals.later:
             line = notime_line()
