@@ -28,6 +28,14 @@ OTP_MELIPAYAMAK_COOLDOWN = 60
 OTP_MELIPAYAMAK_HOURLY = 5
 OTP_WRONG_ATTEMPTS = 5
 OTP_CAPTCHA_AFTER = 2
+# شماره‌های ساختگی تست ساخت سایت — در پنجرهٔ تست، پیامک واقعی برایشان نمی‌رود.
+_TEST_WINDOW_SKIP_SMS = frozenset({
+    "09120000991", "09120000992", "09120000993",
+    "09130000001", "09130000002", "09130000003",
+    "09129900001", "09129900002", "09129900003",
+    "09199990001", "09199990002", "09199990003",
+    "09135409482",
+})
 
 
 def _overlay_without_side_effects(phone: str) -> dict:
@@ -206,15 +214,35 @@ class AuthService:
         if hits > OTP_MELIPAYAMAK_HOURLY:
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست کد بیش از حد است؛ بعداً تلاش کن")
         code = f"{secrets.randbelow(1_000_000):06d}"
-        try:
-            rec_id = await melipayamak_otp_service.send_otp(phone, code)
-        except melipayamak_otp_service.OtpSendError:
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ارسال کد ناموفق بود، دوباره تلاش کنید") from None
+        # پنجرهٔ تست ساخت سایت: کد در پاسخ برمی‌گردد و برای شمارهٔ ساختگیِ تست،
+        # پیامک واقعی هم فرستاده نمی‌شود (شمارهٔ واقعی هم‌چنان SMS می‌گیرد).
+        test_window = otp_test_window_open()
+        test_phone = test_window and phone in _TEST_WINDOW_SKIP_SMS
+        rec_id = ""
+        if not test_phone:
+            try:
+                rec_id = await melipayamak_otp_service.send_otp(phone, code)
+            except melipayamak_otp_service.OtpSendError:
+                if not test_window:
+                    raise HTTPException(status.HTTP_502_BAD_GATEWAY, "ارسال کد ناموفق بود، دوباره تلاش کنید") from None
         await redis_client.setex(f"otp:{phone}", OTP_MELIPAYAMAK_TTL, _hash_otp(phone, code))
         await redis_client.setex(f"otp:cool:{phone}", OTP_MELIPAYAMAK_COOLDOWN, "1")
-        await redis_client.setex(f"otp:rec:{phone}", OTP_MELIPAYAMAK_TTL, str(rec_id or ""))
+        if rec_id:
+            await redis_client.setex(f"otp:rec:{phone}", OTP_MELIPAYAMAK_TTL, str(rec_id))
         await redis_client.delete(f"otp:wa:{phone}")
-        return {"ok": True}
+        payload = {"ok": True}
+        if test_window:
+            payload["code"] = code
+            from app.services.observe_client import emit_later
+
+            emit_later(
+                kind="sms",
+                title="otp-test-reveal",
+                surface="auth",
+                status="ok",
+                payload={"path": "login", "skipSms": test_phone},
+            )
+        return payload
 
     async def _current_or_new_code(self, phone: str, ttl: int) -> tuple[str, bool]:
         """Reuse the live code on resend so a late-arriving SMS still verifies.
