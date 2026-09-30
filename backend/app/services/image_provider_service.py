@@ -196,9 +196,16 @@ def _product_still(
     force_both_errors: bool = False,
 ) -> dict:
     try:
-        foreground, mask = _cutout(source)
+        foreground, mask = _cutout_with_fallback(source)
     except Exception as exc:
-        log.warning("image cutout failed: %s", type(exc).__name__)
+        log.warning("image cutout failed: %s: %s", type(exc).__name__, str(exc)[:120])
+        emit_later(
+            kind="routing",
+            title="cutout-unavailable",
+            surface="image",
+            status="error",
+            payload={"reason": str(exc)[:80]},
+        )
         return _failed()
     product_width = _opaque_width(mask)
     view = _ask_view(source)
@@ -246,6 +253,89 @@ def _opaque_width(mask: Image.Image) -> int:
     if not box:
         return 0
     return int(box[2] - box[0])
+
+
+async def _cloud_cutout(data: bytes) -> tuple[Image.Image, Image.Image] | None:
+    """برش ابری اگر کلید باشد؛ خروجی PNG با آلفا → ماسک L. خطا None."""
+    from app.services import cloud_cutout_service
+
+    if not cloud_cutout_service.cloud_enabled():
+        return None
+    proxy = (os.environ.get("CHANNEL_PROXY") or "").strip() or None
+    cut, cost = await cloud_cutout_service.remove_background(data, proxy=proxy)
+    try:
+        record = Image.open(BytesIO(cut)).convert("RGBA")
+        alpha = record.split()[-1]
+        original = Image.open(BytesIO(data)).convert("RGB")
+        if alpha.size != original.size:
+            alpha = alpha.resize(original.size, Image.Resampling.LANCZOS)
+        mask = alpha
+        # هزینه در دفتر ابر
+        from app.services import ai_budget_service
+
+        ai_budget_service.record_cost(surface="image", usd=cost)
+        return original, mask
+    except Exception as exc:
+        log.warning("cloud cutout parse failed: %s", type(exc).__name__)
+        return None
+
+
+def _cutout_with_fallback(data: bytes) -> tuple[Image.Image, Image.Image]:
+    """ابر اول؛ محلی فقط پشت فلگ dev (IMAGE_LOCAL=1) — همان الگوی ساخت عکس.
+
+    sync است چون generate_image از to_thread صدا زده می‌شود.
+    """
+    if cloud_cutout_enabled():
+        _cutout_slot()
+        _cutout_slot_enter()
+        try:
+            cloud = asyncio.run(_cloud_cutout(data))
+        except Exception as exc:
+            log.warning("cloud cutout failed: %s: %s", type(exc).__name__, str(exc)[:120])
+            cloud = None
+        finally:
+            _cutout_slot_exit()
+        if cloud is not None:
+            return cloud
+    if os.environ.get("IMAGE_LOCAL") == "1":
+        return _cutout(data)
+    raise RuntimeError("cutout-unavailable: cloud key missing or failed and local engine is dev-only")
+
+
+def cloud_cutout_enabled() -> bool:
+    from app.services import cloud_cutout_service
+
+    return cloud_cutout_service.cloud_enabled()
+
+
+_CUTOUT_ACTIVE = 0
+
+
+def _cutout_slot() -> None:
+    """بیش از N برش همزمان ← پیام صادقانه؛ هاب زیر بار واقعی نفس می‌کشد."""
+    global _CUTOUT_ACTIVE
+    limit = int(os.environ.get("CUTOUT_QUEUE_LIMIT") or 3)
+    if _CUTOUT_ACTIVE >= limit:
+        from app.services.observe_client import emit_later
+
+        emit_later(
+            kind="routing",
+            title="cutout-queue-full",
+            surface="image",
+            status="error",
+            payload={"active": _CUTOUT_ACTIVE, "limit": limit},
+        )
+        raise RuntimeError("cutout-busy")
+
+
+def _cutout_slot_enter() -> None:
+    global _CUTOUT_ACTIVE
+    _CUTOUT_ACTIVE += 1
+
+
+def _cutout_slot_exit() -> None:
+    global _CUTOUT_ACTIVE
+    _CUTOUT_ACTIVE = max(0, _CUTOUT_ACTIVE - 1)
 
 
 def _cutout(data: bytes) -> tuple[Image.Image, Image.Image]:
