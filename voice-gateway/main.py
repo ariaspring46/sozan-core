@@ -1297,8 +1297,19 @@ class Gateway:
         turn_seq = self._sales_turn_seq
 
         def filler() -> None:
-            for delay, guard_kind in ((THINK_WAIT_S, "any"), (2.8, "wait")):
-                time.sleep(delay)
+            # One quick "listening" word, then at most one informative hold line.
+            # Never two generic fillers back to back.
+            time.sleep(THINK_WAIT_S)
+            if (
+                not played_flag["on"]
+                and turn_seq == self._sales_turn_seq
+                and generation == self._call_generation
+                and not session.playing.is_set()
+                and session._play.empty()
+                and not session._speech
+            ):
+                self._speak(session, generation, wait_line(heard), "wait")
+                time.sleep(3.5)
                 if (
                     not played_flag["on"]
                     and turn_seq == self._sales_turn_seq
@@ -1307,9 +1318,7 @@ class Gateway:
                     and session._play.empty()
                     and not session._speech
                 ):
-                    if guard_kind == "wait" and self._last_kind != "wait":
-                        break
-                    self._speak(session, generation, wait_line(heard), "wait")
+                    self._speak(session, generation, "الان می‌گم.", "wait")
 
         if self._last_kind != "wait":
             threading.Thread(target=filler, name="sales-wait", daemon=True).start()
@@ -1434,7 +1443,9 @@ class Gateway:
             cost = float(usage.get("cost") or 0)
         if usage.get("prompt"):
             prompt_n = int(usage.get("prompt") or prompt_n)
-        hangup = plan.hangup or "end" in tags or sales_ended(heard, spoken)
+        hangup = plan.hangup or "end" in tags
+        if not hangup and not wants_bye(heard):
+            hangup = sales_ended(spoken, spoken)  # only our own closing words end it
         log.info(
             "sales llm=%.2f first_token=%.2f first_audio=%.2f prompt_n=%s cost=%.6f model=%s kind=%s line=%s",
             took,

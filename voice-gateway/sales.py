@@ -805,6 +805,7 @@ def cached_sales_lines() -> list[str]:
         FULL_INTRO_LINE,
         NONEED_LINE,
         PAIN_LINE,
+        "الان می‌گم.",
         *GREET_VARIANTS,
         *INTRO_VARIANTS,
         *INTRO_SMS_VARIANTS,
