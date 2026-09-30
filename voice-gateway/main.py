@@ -1565,6 +1565,11 @@ class Gateway:
                 first_audio = time.monotonic() - started
                 played = True
             log.info("say kind=meaning tts=%.2f line=%s", tts_s, text)
+        if not pcm and tts_s:
+            # Streamed sentence spoken once: backfill its cloud audio so the next
+            # occurrence plays instantly from cache.
+            if text not in self._voice:
+                threading.Thread(target=self._prefetch_line, args=(text,), name="sales-tts-backfill", daemon=True).start()
         spoken_parts.append(text)
         return text, raw, tags, spoken_parts, generated, played, first_audio, float(bit.get("first_token_s") or 0), int(bit.get("prompt_n") or 0)
 
