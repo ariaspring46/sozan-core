@@ -17,6 +17,17 @@ class UserRepository:
         result = await self.session.execute(select(User).where(User.phone == phone))
         return result.scalar_one_or_none()
 
+    async def list_all(self) -> list[User]:
+        result = await self.session.execute(select(User).order_by(User.created_at.desc()))
+        return list(result.scalars().all())
+
+    async def set_active(self, phone: str, *, active: bool) -> None:
+        user = await self.get_by_phone(phone)
+        if user is None:
+            return
+        user.is_active = active
+        await self.session.commit()
+
     async def create(self, phone: str, role: str = "admin") -> User:
         user = User(phone=phone, role=role)
         self.session.add(user)
