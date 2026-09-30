@@ -823,7 +823,8 @@ class SalesTest(unittest.TestCase):
                 self.assertLessEqual(len(line.split()), 18)
         for line in (HELLO_LINE, PAIN_LINE, DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE):
             self.assertLessEqual(len(line.split()), 18)
-        self.assertIn("فروشگاه رایگان", FULL_INTRO_LINE)
+        self.assertIn("وب‌سایت رایگان", FULL_INTRO_LINE)
+        self.assertNotIn("از روی پیج شما فروشگاه", FULL_INTRO_LINE)
         self.assertIn("هزینه", FULL_INTRO_LINE)
         self.assertIn("وحشتناک", FULL_INTRO_LINE)
         self.assertIn("کمکتون کنم", FULL_INTRO_LINE)

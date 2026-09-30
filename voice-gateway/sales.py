@@ -64,7 +64,7 @@ HELLO_SMS_LINE = INTRO_SMS_VARIANTS[0]
 FULL_INTRO_LINE = (
     "سوزان دستیار فروش آنلاین‌شاپ‌هاست؛ هزینه رو کم می‌کنه و سرعت فروش رو وحشتناک بالا می‌بره. "
     "دایرکت‌ها رو جواب می‌ده، محتوا می‌سازه، سفارش‌ها رو پیگیری می‌کنه "
-    "و از روی پیج شما فروشگاه رایگان می‌سازه. "
+    "و براتون وب‌سایت رایگان می‌سازه که فروشتون آنلاین هم بره. "
     "مشاوره هم می‌ده و کسب‌وکارتون رو بهتر می‌کنه؛ چرا تو دنیای هوش مصنوعی عقب بمونید؟ "
     "سوالی دارید یا بتونم کمکتون کنم؟"
 )
@@ -992,6 +992,11 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         state.stage = "pitch"
         return TurnPlan(kind="feature", line=FULL_INTRO_LINE, signals=signals)
     if state.stage == "intro":
+        # A bare "الو" is not a greeting reply: re-greet warmly and wait.
+        # Only a real ack (ممنون/خوبم/بله/…) moves to the intro line.
+        if signals.hello and not (signals.ack or signals.yes or signals.goahead):
+            line = greet_line()
+            return TurnPlan(kind="hello", line=line, signals=signals)
         if signals.busy or signals.later:
             line = notime_line()
             state.objection = state.objection or "time"
