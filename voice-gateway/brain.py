@@ -1080,7 +1080,7 @@ class Brain:
             return ""
         if len(pcm16_8k) < 6400:
             return ""
-        model = os.environ.get("CLOUD_EAR_MODEL", "google/gemini-2.5-flash").strip() or "google/gemini-2.5-flash"
+        model = os.environ.get("CLOUD_EAR_MODEL", "google/gemini-2.5-flash-lite").strip() or "google/gemini-2.5-flash-lite"
         try:
             timeout = float(os.environ.get("CLOUD_EAR_TIMEOUT_S", "3"))
         except ValueError:
