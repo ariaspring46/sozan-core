@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     telegram_chat_id: str = ""
     cutout_provider: str = "openrouter"
     cutout_api_key: str = ""
-    cutout_openrouter_model: str = ""
+    cutout_openrouter_model: str = "google/gemini-2.5-flash-image"
     cutout_queue_limit: int = 3
     melipayamak_otp_apikey: str = ""
     melipayamak_username: str = ""
