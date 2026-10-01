@@ -327,3 +327,30 @@ class WalletPayTests(unittest.TestCase):
         hidden = _public_shop({"slug": "demo", "paySecret": "secret-value"})
         self.assertNotIn("paySecret", hidden)
         self.assertEqual(hidden["slug"], "demo")
+
+
+class WithdrawalHistoryTests(unittest.TestCase):
+    def test_pending_survive_the_cap_and_order_is_kept(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09121110000"):
+            old_pending = {"id": "w-pending", "status": "pending", "amount": 5, "at": 1}
+            settled = [{"id": f"w{i}", "status": "paid", "amount": 1, "at": 10 + i} for i in range(100)]
+            write_json("withdrawals.json", [old_pending, *settled])
+            write_json("wallet.json", {"available": 1000, "pendingWithdraw": 5})
+            wallet_service.request_withdraw(amount=100, iban="IR" + "1" * 24, name="x")
+            rows = wallet_service.list_withdrawals()
+        ids = [r["id"] for r in rows]
+        self.assertIn("w-pending", ids)
+        self.assertEqual(sum(1 for r in rows if r["status"] == "paid"), 80)
+        self.assertEqual(ids[0], "w-pending")  # not moved to the front: it was already first
+        paid_positions = [i for i, r in enumerate(rows) if r["status"] == "paid"]
+        self.assertEqual(paid_positions, sorted(paid_positions))
+        self.assertEqual(rows[-1]["status"], "pending")  # the new request stays last
+
+    def test_new_pending_stays_in_last_twenty_view(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09121110000"):
+            settled = [{"id": f"w{i}", "status": "paid", "amount": 1, "at": i} for i in range(30)]
+            write_json("withdrawals.json", settled)
+            write_json("wallet.json", {"available": 1000, "pendingWithdraw": 0})
+            out = wallet_service.request_withdraw(amount=100, iban="IR" + "1" * 24, name="x")
+        shown = [r["id"] for r in out["wallet"]["withdrawals"]]
+        self.assertEqual(shown[0], out["withdraw"]["id"])

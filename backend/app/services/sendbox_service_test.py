@@ -527,3 +527,26 @@ class SendboxServiceTests(unittest.TestCase):
                     row = channel_service.account_for_platform("instagram")
         self.assertIn("instagram=error", url)
         self.assertFalse(row)
+
+
+class WebhookTokenRotationTests(unittest.TestCase):
+    def test_legacy_token_only_accepted_inside_the_window(self) -> None:
+        old = sendbox_service._derive(settings.jwt_secret)
+        with patch.object(settings, "sendbox_webhook_secret", "dedicated-secret-value"), patch.object(
+            settings, "sendbox_webhook_legacy_until", ""
+        ):
+            new = sendbox_service.webhook_secret()
+            self.assertNotEqual(new, old)
+            self.assertTrue(sendbox_service.valid_webhook_token(new))
+            self.assertFalse(sendbox_service.valid_webhook_token(old))
+            self.assertFalse(sendbox_service.valid_webhook_token(""))
+        with patch.object(settings, "sendbox_webhook_secret", "dedicated-secret-value"), patch.object(
+            settings, "sendbox_webhook_legacy_until", "2999-01-01"
+        ):
+            self.assertTrue(sendbox_service.valid_webhook_token(old))
+            self.assertTrue(sendbox_service.valid_webhook_token(sendbox_service.webhook_secret()))
+            self.assertFalse(sendbox_service.valid_webhook_token("wrong"))
+        with patch.object(settings, "sendbox_webhook_secret", ""), patch.object(
+            settings, "sendbox_webhook_legacy_until", "2999-01-01"
+        ):
+            self.assertTrue(sendbox_service.valid_webhook_token(old))  # not rotated yet: old behaviour

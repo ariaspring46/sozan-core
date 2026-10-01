@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     cutout_provider: str = "openrouter"
     cutout_api_key: str = ""
     cutout_openrouter_model: str = "google/gemini-2.5-flash-image"
-    sendbox_webhook_secret: str = ""
     cutout_queue_limit: int = 3
     melipayamak_otp_apikey: str = ""
     melipayamak_username: str = ""
@@ -107,6 +106,9 @@ class Settings(BaseSettings):
     sendbox_base_url: str = "https://api.sendbox.chat/api/v1"
     sendbox_api_key: str = ""
     sendbox_oauth_url: str = ""
+    sendbox_webhook_secret: str = ""
+    # While set to a future ISO date, the old JWT-derived webhook token is accepted too (rotation window).
+    sendbox_webhook_legacy_until: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -271,7 +271,9 @@ async def pay_status(order_id: str, request: Request):
 
 
 @router.get("/p/{order_id}")
-async def start_pay(order_id: str):
+async def start_pay(order_id: str, request: Request):
+    if not _status_rate_allow(client_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "درخواست‌های وضعیت زیاد است؛ کمی بعد دوباره")
     try:
         url = pay_service.start_url(order_id)
     except KeyError as exc:

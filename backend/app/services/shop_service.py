@@ -112,6 +112,12 @@ def _save_shop(shop: dict) -> dict:
     shop["url"] = live_url(shop)
     with tenant_file_lock("shop"):
         write_json("shop.json", shop)
+    slug = str(shop.get("slug") or "").strip()
+    if slug:
+        from app.services import tenant_index_service
+        from app.state_store import current_tenant
+
+        tenant_index_service.upsert(phone=current_tenant(), slug=slug)
     return shop
 
 

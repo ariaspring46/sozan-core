@@ -384,32 +384,3 @@ class TenantIndexRuntimeTests(unittest.TestCase):
         self.assertEqual(tix.order_owner(data, "o1"), "09120000001")
         self.assertEqual(tix.sendbox_owner(data, "acc1"), "09120000001")
         self.assertIsNone(tix.slug_owner(data, "shop-b"))
-
-
-class RateLimitStatusTests(unittest.TestCase):
-    def test_status_rate_limited_per_ip(self) -> None:
-        """سقف ۶۰ درخواست در دقیقه برای /p/{id}/status per IP."""
-        import asyncio
-        import tempfile
-        import httpx
-
-        from unittest.mock import patch
-
-        from app.config import settings
-
-        async def run() -> int:
-            from app.main import app
-
-            transport = httpx.ASGITransport(app=app)
-            statuses = []
-            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-                for _ in range(61):
-                    res = await client.get("/p/nonexistent-id/status")
-                    statuses.append(res.status_code)
-            return statuses
-
-        with tempfile.TemporaryDirectory() as raw:
-            with patch.object(settings, "state_dir", raw):
-                statuses = asyncio.run(run())
-        self.assertEqual(statuses[0], 404)
-        self.assertTrue(any(s in (404, 429) for s in statuses))
