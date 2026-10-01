@@ -56,7 +56,12 @@ def tokens(path: str) -> int:
     return int(ascii_count / 3.2 + (len(text) - ascii_count) / 1.4)
 
 
+NOT_UNIT_TESTS: set[str] = set()
+
+
 def is_test(path: str) -> bool:
+    if path in NOT_UNIT_TESTS:
+        return False
     return path.endswith("_test.py") or Path(path).name.startswith("test_") or "/__tests__/" in path
 
 
@@ -280,6 +285,7 @@ def build(check_only: bool) -> int:
     roles = config["roles"]
     budget = config["budget"]
     never = config["never_read"]
+    NOT_UNIT_TESTS.update(config.get("not_unit_tests", []))
     files = git_files()
     fileset = set(files)
 
@@ -359,6 +365,7 @@ def build(check_only: bool) -> int:
         if not check_only:
             text = role_doc(role, paths, src, rare, tests, skipped, size, needs[rid], needed_by[rid], endpoints[rid], owner, never, budget, row)
             row["iface"] = tokens_of_text(text)
+            text = text.replace("{SELF}", _k(row["iface"]))
             OUT_DIR.mkdir(parents=True, exist_ok=True)
             (OUT_DIR / f"{rid}.md").write_text(text, encoding="utf-8")
 
@@ -381,47 +388,143 @@ def _k(value: int) -> str:
     return f"{value / 1000:.1f}k"
 
 
+GLOBAL_RULES = [
+    "Secrets: never print, commit, log or report the contents of `.env`, `*.env`, tokens, API keys, OTP codes or SIP passwords. Never `cat` an env file; check a variable exists with `grep -c '^NAME=' file`.",
+    "Real people and money: no real customer message, SMS, call, payment, post or publish from tests, experiments or batteries. Use the test tenant, mocks, the dry gateway (`edge_dry`) or simulators.",
+    "Real data: never delete, rewrite or migrate a real seller's files under STATE_DIR on the hub. Tests always run with a temporary `STATE_DIR`.",
+    "Scope: edit only files listed under 'Your files'. A change needed in another role's file is a request in that role's report file, never an edit. Only two exceptions: one bullet in `CHANGELOG.md` (§12) and regenerating `docs/agents/` with `tools/agent_context/build.py` (§15).",
+    "Contracts: anything under 'Your contract' is called by other roles. Do not rename it or change its parameters or return shape without a request acknowledged in their report file.",
+    "Deploy: only X5 deploys to the hub, under `flock /home/ubuntu/.sozan-deploy.lock`. Nobody else SSHes to the hub, restarts its services or edits its files.",
+    "Shared machine: never restart llama-swap or the observe service; never touch GPU slots you do not own.",
+    "Git: never commit to `main`, never force-push a shared branch, never rewrite someone else's history, never discard uncommitted work you did not write. Run `git status` before any git command that changes files.",
+    "Tests: never skip, disable, delete or loosen a test to get green. A failing test is either a real bug or a test that must be fixed for a stated reason.",
+    "Product language: everything a seller or customer sees is Persian. Code, identifiers and commit trailers stay as the surrounding code does.",
+]
+
+
+def _code(lines: list[str]) -> list[str]:
+    return ["```bash", *[line for line in lines if line], "```"]
+
+
+def _backend_test_modules(tests: list[str]) -> list[str]:
+    mods = []
+    for path in tests:
+        if path.startswith("backend/") and path.endswith(".py"):
+            mods.append(".".join(Path(path[len("backend/"):]).with_suffix("").parts))
+    return sorted(mods)
+
+
+def verify_commands(role: dict, tests: list[str]) -> list[str]:
+    rid = role["id"]
+    out: list[str] = []
+    mods = _backend_test_modules(tests)
+    if mods:
+        out += [
+            "# backend: your modules only (fast loop). Python 3.11; deps: pip install -r backend/requirements.txt",
+            "cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \\",
+            "  python3 -m unittest " + " \\\n    ".join(mods) + " 2>&1 | tail -5",
+            "",
+            "# backend: full suite, once before you open a PR (same command as CI and deploy)",
+            "cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \\",
+            "  python3 -m unittest discover -s app -p '*_test.py' -t . 2>&1 | tail -5",
+        ]
+    tools_tests = [p for p in tests if p.startswith("tools/") and p.endswith("_test.py")]
+    for path in tools_tests:
+        out += ["", f"# {path}", f"cd {Path(path).parent} && python3 -m unittest {Path(path).stem} 2>&1 | tail -5"]
+    if rid == "Z":
+        out += ["# voice gateway unit tests (no network, ~1s, expect 'OK')", "cd voice-gateway && python3 -m unittest test_voice 2>&1 | tail -5",
+                "", "# simulated call for one persona (home machine only: needs llama-swap and STT; persona ids p01.. in sim_personas.json)", "cd voice-gateway && python3 sim_run.py p01 2>&1 | tail -30"]
+    if rid == "Y":
+        out += ["", "# sales100 offline structure check (must print: sales100 structure 101/101)", "python3 tools/sales100_battery.py | head -3"]
+    if role.get("frontend"):
+        out += ["", "# frontend: type-check and build (CI runs it). package-lock.json resolves from registry.npmmirror.com;", "# if your network blocks it, do not edit the lockfile: say so in your report and rely on CI.", "cd frontend && npm ci --no-audit --no-fund >/dev/null && npm run build 2>&1 | tail -15"]
+    out += ["", "# ownership and manifests still valid (CI runs this)", "python3 tools/agent_context/build.py --check"]
+    return out
+
+
 def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, endpoints, owner, never, budget, row) -> str:
     rid = role["id"]
-    lines = [
-        f"# {rid} — {role['title']}",
+    report = role.get("report", "")
+    title = role.get("title_en") or role["title"]
+    L: list[str] = [
+        f"# {rid} — {title}",
         "",
-        "<!-- ساخته‌شده با tools/agent_context/build.py؛ دستی ویرایش نکنید. مرزها در tools/agent_context/roles.json -->",
+        f"<!-- {role['title']} · generated by tools/agent_context/build.py from roles.json and the code; do not edit by hand -->",
         "",
-        role.get("summary", ""),
-        "",
+        f"You are programmer **{rid}** on Sozan (`ariaspring46/sozan-core`). This file is your whole harness: rules, files, the signatures you need from other roles, exact commands. Read it once at session start. Do not read other docs, plans or report files unless a step below or the task tells you to.",
     ]
-    if role.get("report"):
-        lines += [f"**گزارش:** فقط به ته `{role['report']}` اضافه کن (`cat >>`)؛ برای دیدن آخرین پیام‌ها فقط `tail -n 60`."]
     if rid == "OWNER":
-        lines += ["", "## فایل‌ها", ""] + [f"- `{p}` ({_k(size[p])})" for p in paths if not p.startswith((".zcode/", ".cursor/", "docs/festival/", "docs/ui-audit-live/"))]
-        return "\n".join(lines) + "\n"
-    lines += [
+        L += ["", "## Files", ""] + [f"- `{p}` ({_k(size[p])})" for p in paths if not p.startswith((".zcode/", ".cursor/", "docs/festival/", "docs/ui-audit-live/"))]
+        return "\n".join(L) + "\n"
+
+    L += ["", "## 1. Mission", "", role.get("mission", role.get("summary", "")), ""]
+    if role.get("plan"):
+        L.append("Plan files (owner's, read-only): " + ", ".join(f"`{p}`" for p in role["plan"]) + ". Read only the section a task cites: `grep -n '^## ' <plan>` then `sed -n 'a,bp'`.")
+    L += [
         "",
-        "## بودجه (توکن تخمینی)",
-        "",
-        "| بخش | توکن |",
-        "|---|---|",
-        f"| هسته (اول هر کار بخوان) | {_k(row['core'])} |",
-        f"| سورس فعال (بخوان فقط آنچه کار لازم دارد) | {_k(row['src'])} |",
-        f"| سورس کم‌کاربرد (rare؛ فقط اگر کار نامش را برد) | {_k(row['rare'])} |",
-        f"| تست‌های مالکیت (فقط تست مربوط را بخوان) | {_k(row['tests'])} |",
-        f"| مال تو ولی هرگز نخوان | {_k(row['skipped'])} |",
-        f"| سقف کانتکست / رزرو عامل | {_k(budget['context'])} / {_k(budget['reserved_for_agent'])} |",
-        "",
-        "## هسته",
+        "## 2. Hard rules (never break; if a task requires breaking one, stop and ask)",
         "",
     ]
-    lines += [f"- `{p}` ({_k(size.get(p, 0))})" for p in role.get("core", [])]
-    lines += ["", "## مال تو (فقط همین‌ها را ویرایش کن)", ""]
+    L += [f"{i}. {r}" for i, r in enumerate(GLOBAL_RULES, 1)]
+    if role.get("rules"):
+        L += ["", f"**{rid}-specific:**", ""]
+        L += [f"{i}. {r}" for i, r in enumerate(role["rules"], len(GLOBAL_RULES) + 1)]
+
+    L += [
+        "",
+        "## 3. Session start (at most 5 tool calls, before touching any file)",
+        "",
+        *_code([
+            "git status --short | head -20          # someone else's uncommitted work? leave it alone",
+            "git log --oneline -5",
+            "git fetch -q origin main && git log --oneline HEAD..origin/main | head",
+            f"tail -n 60 {report}                    # requests addressed to you; never read the whole file" if report else "",
+        ]),
+        "",
+        "Then restate the task in one sentence and list the 1–3 files from §6 you expect to change. If the task needs a file you do not own, go to §13 now instead of starting.",
+        "",
+        "## 4. Work loop",
+        "",
+        "1. **Locate** with `grep -n` inside your files only. Read the function you need with `sed -n 'a,bp' file`, not the whole file. Signatures from other roles are in §7; do not open their files.",
+        "2. **Plan** in at most 5 lines: what changes, which test proves it.",
+        "3. **Reproduce first** for a bug: a failing test (or probe) before the fix.",
+        "4. **Edit** the smallest change that does the job. Match the surrounding code: naming, comment density, Persian user-facing text.",
+        "5. **Verify** with §11, your modules first, then the full suite once before the PR. Show only the tail of test output.",
+        "6. **Review your own diff**: `git diff --stat`, then `git diff -- <file>` per file. Look for a secret, a debug print, a changed contract (§10), a file outside §6.",
+        "7. **Commit and report** (§12, §13). Stop when the definition of done (§15) holds. Do not polish beyond the task.",
+        "",
+        "## 5. Context budget",
+        "",
+        f"Context window {_k(budget['context'])}; about {_k(budget['reserved_for_agent'])} is used by the agent's own system prompt and tools. This file is ~{{SELF}} tokens. Your core files total {_k(row['core'])}.",
+        "",
+        "- Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.",
+        "- Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.",
+        "- Do not re-read a file you just edited; do not read a file to 'understand the project'.",
+        "- Never read: " + ", ".join(f"`{p}`" for p in never) + ". Report files: only `tail -n 60`, only append.",
+        "- If the conversation is getting long, finish the current step, commit, append a short report, and continue in a new session from §3.",
+        "",
+        "## 6. Your files",
+        "",
+        "| set | tokens | how to use |",
+        "|---|---|---|",
+        f"| core | {_k(row['core'])} | the files most tasks touch; read the relevant one first |",
+        f"| active | {_k(row['src'])} | yours to edit; read only what the task needs |",
+        f"| rare | {_k(row['rare'])} | yours; read only when the task names it |",
+        f"| tests | {_k(row['tests'])} | read only the test of the module you change |",
+        "",
+        "**Core:**",
+        "",
+    ]
+    L += [f"- `{p}` ({_k(size.get(p, 0))})" for p in role.get("core", [])]
+    L += ["", "**Active (you may edit):**", ""]
     groups: dict[str, list[str]] = defaultdict(list)
     for p in src:
         groups[str(Path(p).parent)].append(p)
     for folder in sorted(groups):
         items = ", ".join(f"`{Path(p).name}` ({_k(size[p])})" for p in sorted(groups[folder], key=lambda q: -size[q]))
-        lines.append(f"- `{folder}/`: {items}")
+        L.append(f"- `{folder}/`: {items}")
     if rare:
-        lines += ["", "**کم‌کاربرد (rare)** — مال تو، ولی فقط وقتی کار صریحاً به آن اشاره کند بخوان:", ""]
+        L += ["", "**Rare (yours; only when the task names it):**", ""]
         rgroups: dict[str, list[str]] = defaultdict(list)
         for p in rare:
             top = p.split("/")[0]
@@ -430,110 +533,169 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
         for key in sorted(rgroups):
             items = rgroups[key]
             if len(items) > 6:
-                lines.append(f"- `{key}/` ({len(items)} فایل، {_k(sum(size[p] for p in items))})")
+                L.append(f"- `{key}/` ({len(items)} files, {_k(sum(size[p] for p in items))})")
             else:
-                lines.append(f"- `{key}/`: " + ", ".join(f"`{Path(p).name}` ({_k(size[p])})" for p in items))
+                L.append(f"- `{key}/`: " + ", ".join(f"`{Path(p).name}` ({_k(size[p])})" for p in items))
     if tests:
-        lines += ["", "**تست‌ها:** " + ", ".join(f"`{Path(p).name}`" for p in tests)]
+        L += ["", "**Tests:** " + ", ".join(f"`{p}`" for p in tests)]
     if skipped:
-        lines += ["", "**مال تو ولی نخوان** (ساختگی/حجیم؛ فقط با اسکریپت عوض کن): " + ", ".join(f"`{p}` ({_k(size[p])})" for p in skipped)]
+        L += ["", "**Yours but never read** (generated or huge; change only through its script): " + ", ".join(f"`{p}` ({_k(size[p])})" for p in skipped)]
+    L += ["", "Every other file in the repo belongs to another role (see `docs/agents/README.md`)."]
 
-    if role.get("external"):
-        lines += ["", "## قرارداد بیرون از import (HTTP، فایل، سرویس)", ""] + [f"- {item}" for item in role["external"]]
-    lines += [
-        "",
-        "## آنچه از دیگران لازم داری (فایلشان را باز نکن؛ امضا همین‌جاست)",
-        "",
-    ]
+    L += ["", "## 7. What you use from other roles (do not open their files; signatures are here)", ""]
     if not needs:
-        lines.append("هیچ.")
+        L.append("Nothing.")
     for dep in sorted(needs, key=lambda d: (owner[d], d)):
         names = sorted(n for n in needs[dep] if n)
-        lines.append(f"**`{dep}`** — صاحب: {owner[dep]}")
+        L.append(f"**`{dep}`** — owner {owner[dep]}")
         if not names:
-            lines.append("- (کل ماژول import می‌شود؛ فقط نام‌های بالا)")
+            L.append("- module imported; no names used directly")
             continue
-        lines.append("```")
+        L.append("```")
         for name in names:
-            sig = signature(dep, name) if dep.endswith(".py") else ts_signature(dep, name)
-            lines.append(sig)
-        lines.append("```")
+            L.append(signature(dep, name) if dep.endswith(".py") else ts_signature(dep, name))
+        L.append("```")
     if endpoints:
-        lines += ["", "**API بک‌اند که صفحه‌هایت صدا می‌زنند** (شکل پاسخ را از صاحبش بپرس، فایل را کامل نخوان):", ""]
+        L += ["", "**Backend endpoints your pages call** (ask the owner for the response shape; do not read the file):", ""]
         for target in sorted(endpoints):
-            lines.append(f"- {', '.join(f'`{e}`' for e in sorted(endpoints[target]))} ← `{target}` ({owner[target]})")
+            L.append(f"- {', '.join(f'`{e}`' for e in sorted(endpoints[target]))} → `{target}` ({owner[target]})")
 
-    lines += [
-        "",
-        "## قرارداد تو با دیگران (بدون هماهنگی امضا را عوض نکن)",
-        "",
-    ]
-    if not needed_by:
-        lines.append("هیچ‌کس مستقیم صدا نمی‌زند.")
+    L += ["", "## 8. Contracts outside imports (HTTP, files, services)", ""]
+    L += [f"- {item}" for item in role.get("external", [])] or ["None."]
+
+    local = role.get("git_mode") == "local"
+    L += ["", "## 9. Who reviews and merges", ""]
+    if local:
+        L.append("Your plan's git rule applies: you rebase on fresh `main` and merge locally only after tests and the stage's acceptance condition pass; nothing is pushed to `origin` until the owner says so. The owner decides product questions and gives every 'go' for live or costly actions.")
+    else:
+        L.append("A reviewer (ناظر) reviews line by line and is the only one who merges (squash into `main`). You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.")
+
+    L += ["", "## 10. Your contract (others call these; change only after their ack)", ""]
     contract: dict[str, list[str]] = defaultdict(list)
     for key, users in needed_by.items():
         path, name = key.split("::", 1)
         if name != "*":
             contract[path].append(f"`{name}` ← {', '.join(sorted(users))}")
+    if not contract:
+        L.append("No other role calls your code directly.")
     for path in sorted(contract):
-        lines.append(f"- `{path}`: " + "؛ ".join(sorted(contract[path])))
+        L.append(f"- `{path}`: " + "; ".join(sorted(contract[path])))
 
-    lines += [
+    L += ["", "## 11. Verify (exact commands)", ""] + _code(verify_commands(role, tests))
+    if role.get("gates"):
+        L += ["", "**Merge gates** (all must hold before you ask for review):", ""] + [f"- {g}" for g in role["gates"]]
+
+    branch = role.get("branch", "")
+    L += [
         "",
-        "## قاعدهٔ مصرف توکن",
+        "## 12. Git and PR",
         "",
-        "1. اول هر کار: همین فایل + فقط فایل‌های «هسته» که به کار مربوط است. فایل بزرگ را با `grep -n` پیدا کن و با `sed -n 'a,bp'` فقط بازه را بخوان.",
-        "2. فایل دیگران را باز نکن؛ امضای لازم بالاست. اگر امضا کافی نبود، از صاحبش در فایل گزارشش بپرس.",
-        "3. تست: فقط ماژول خودت، مثلاً `python -m unittest app.services.<module>_test`؛ سوییت کامل فقط پیش از PR، و فقط خلاصه: `... 2>&1 | tail -5`.",
-        "4. هرگز این‌ها را نخوان: " + ", ".join(f"`{p}`" for p in never) + ".",
-        "5. خروجی ابزار را کوتاه کن: `| head`، `| tail`، `git diff --stat` پیش از `git diff`.",
+        *_code([
+            "git fetch -q origin main",
+            (f"git switch -c {branch} origin/main      # new branch per issue" if "<" in branch
+             else f"git switch {branch} && git rebase origin/main      # your long-lived branch (create once with: git switch -c {branch} origin/main)") if branch else "",
+            "git add <only the files you changed>    # never `git add -A`",
+            "git commit -m '<Persian one-line summary>'",
+            "" if local else (f"git push -u origin {branch}" if branch else ""),
+            "# no push: when tests and the acceptance condition pass, `git rebase origin/main` and tell the owner in your report" if local else "",
+        ]),
+        "",
+        "- One topic per branch and PR. Rebase on fresh `main` before asking for review if `main` moved; resolve conflicts only inside your files.",
+        "- Add one bullet for your change under a dated heading at the top of `CHANGELOG.md`: read only `head -20 CHANGELOG.md`, insert with an editor; never rewrite other bullets.",
+        ("- No PR unless the owner asks for one; if asked, the body follows `.github/pull_request_template.md` (Persian)." if local else "- PR body follows `.github/pull_request_template.md` (Persian): خلاصه، چرا، فایل‌های اصلی، تست، ریسک، تغییرات این مرحله، ادغام."),
+        "- Commit messages and PR text never contain secrets, phone numbers or customer text.",
     ]
-    return "\n".join(lines) + "\n"
+
+    L += ["", "## 13. Reporting and asking other roles", ""]
+    if report:
+        L += [
+            f"Your report file is `{report}`. Append only; never edit earlier text:",
+            "",
+            *_code([
+                f"cat >> {report} <<'EOF'",
+                "",
+                f"## {rid} — <topic> (<YYYY-MM-DD HH:MM Tehran>)",
+                "- done: <what changed, one line per item>",
+                "- tests: <command> → <N tests OK / failures>",
+                "- branch/PR: <branch or link>",
+                "- needs: <request to a role, or 'none'>",
+                "EOF",
+            ]),
+            "",
+            "To ask another role, append to **their** report file (see `docs/agents/README.md`) a heading `## " + rid + " → <ROLE>: <topic>` with: the exact file and function, the change you need, why, and how you will test it. Then continue with work that does not depend on it, or stop.",
+            "Keep reports short: no pasted code, no full test logs, no secrets, no customer or phone data.",
+        ]
+
+    L += [
+        "",
+        "## 14. Stop and ask (do not guess) when",
+        "",
+        "- the task needs a file outside §6 or a change to §10;",
+        "- a hard rule in §2 would be broken, or something costs real money, contacts real people or touches live data;",
+        "- the same test fails twice after a fix you believed in;",
+        "- the task is ambiguous in a way that changes what you build;",
+        "- you would have to read more than ~40k tokens of files to continue.",
+        "",
+        f"Write the question in `{report}` (or to the owner in the chat that started you), then stop." if report else "Ask in the chat that started you, then stop.",
+        "",
+        "## 15. Definition of done",
+        "",
+        "- The change does what the task says, and only that; every changed file is in §6.",
+        "- A test covers the new behaviour or the fixed bug; your module tests and the full suite pass (§11).",
+        "- `python3 tools/agent_context/build.py --check` passes. If you changed a signature listed in §10 or an import across roles, you ran `python3 tools/agent_context/build.py` and committed the updated `docs/agents/`.",
+        "- Merge gates in §11 hold, or the report says exactly which gate is waiting on whom.",
+        "- CHANGELOG bullet, " + ("branch rebased on fresh `main` (not pushed unless the owner said so)" if local else "PR opened from your branch") + ", report appended.",
+    ]
+    return "\n".join(L) + "\n"
 
 
 def index_doc(rows, roles, budget, never) -> str:
-    lines = [
-        "# مرز کار ۸ برنامه‌نویس (عامل ۱۲۸k)",
+    reports = {role["id"]: role.get("report", "") for role in roles}
+    titles = {role["id"]: role.get("title_en") or role["title"] for role in roles}
+    L = [
+        "# Sozan — 8 programmers, one harness each",
         "",
-        "<!-- ساخته‌شده با tools/agent_context/build.py؛ دستی ویرایش نکنید -->",
+        "<!-- generated by tools/agent_context/build.py; do not edit by hand -->",
         "",
-        "هر فایل گیت دقیقاً یک صاحب دارد (`roles.json`). هر عامل فقط فایل نقش خودش در این پوشه را می‌خواند؛ امضای فایل‌های دیگران داخل همان فایل است.",
+        "Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Each agent reads only its own file below: it is the complete harness (rules, files, signatures it needs from others, exact commands).",
         "",
-        "| نقش | عنوان | هسته | سورس فعال | کم‌کاربرد | تست | مانیفست | گزارش |",
+        "| role | area | harness | core | active | rare | tests | report file |",
         "|---|---|---|---|---|---|---|---|",
     ]
-    reports = {role["id"]: role.get("report", "") for role in roles}
     for row in rows:
         if row["id"] == "OWNER":
             continue
-        lines.append(
-            f"| [{row['id']}]({row['id']}.md) | {row['title']} | {_k(row['core'])} | {_k(row['src'])} | {_k(row['rare'])} | {_k(row['tests'])} | {_k(row['iface'])} | `{reports[row['id']]}` |"
-        )
-    lines += [
+        L.append(f"| {row['id']} | {titles[row['id']]} | [{row['id']}.md]({row['id']}.md) ({_k(row['iface'])}) | {_k(row['core'])} | {_k(row['src'])} | {_k(row['rare'])} | {_k(row['tests'])} | `{reports[row['id']]}` |")
+    L += [
         "",
-        f"اعداد توکن تخمینی و محافظه‌کارانه‌اند. سقف کانتکست {_k(budget['context'])}؛ {_k(budget['reserved_for_agent'])} برای پرامپت سیستم و ابزار عامل کنار گذاشته شده؛ هستهٔ هر نقش زیر {_k(budget['core_max'])} است.",
+        f"Token counts are conservative estimates. Context {_k(budget['context'])}; {_k(budget['reserved_for_agent'])} reserved for the agent's own prompt; core kept under {_k(budget['core_max'])}, active source under {_k(budget['owned_source_max'])}.",
         "",
-        "**هیچ عاملی نخواند:** " + ", ".join(f"`{p}`" for p in never),
+        "## Starting an agent",
         "",
-        "تغییر مرز: `roles.json` را عوض کن، `python3 tools/agent_context/build.py` بزن. CI با `--check` فایل بی‌صاحب یا دوصاحبه را رد می‌کند.",
-        "",
-        "## شروع هر عامل (کم‌مصرف)",
-        "",
-        "پیام اول هر نشست، فقط همین (به‌جای «پروژه را بررسی کن»):",
+        "First message of every session, nothing more:",
         "",
         "```",
-        "تو برنامه‌نویس <ID> هستی. فقط docs/agents/<ID>.md را بخوان و طبق آن کار کن.",
-        "کار: <یک جمله>. فایل‌های مربوط: <۱ تا ۳ مسیر از بخش «مال تو»>.",
-        "بیرون از «مال تو» چیزی را ویرایش نکن؛ اگر لازم شد در فایل گزارشت بنویس.",
+        "You are programmer <ROLE>. Read docs/agents/<ROLE>.md and follow it exactly.",
+        "Task: <one sentence>. Likely files: <1-3 paths from its §6>.",
         "```",
         "",
-        "## قاعدهٔ گزارش",
+        "If your agent tool loads a project instruction file automatically (CLAUDE.md, AGENTS.md, .cursor rules), point it at the role file instead of copying it, so there is one source.",
         "",
-        "- هر نقش فایل گزارش خودش را دارد (ستون «گزارش»). `talk.md` (حدود ۲۹۰k توکن، بیشتر از کل کانتکست) بایگانی است و هیچ عاملی آن را نمی‌خواند.",
-        "- افزودن فقط با `cat >> <file> <<'EOF'`؛ خواندن فقط `tail -n 60`. هرگز کل فایل گزارش را نخوان یا بازنویسی نکن.",
-        "- درخواست از نقش دیگر: یک بند `## <ID من> → <ID او>: …` ته فایل گزارش **او**.",
+        "## Reports",
+        "",
+        "- One report file per role (table). `talk.md` (~290k tokens, larger than a whole context) is an archive: no agent reads it.",
+        "- Append with `cat >> file <<'EOF'`; read with `tail -n 60`; never rewrite.",
+        "- Requests go to the **receiver's** file: `## <FROM> → <TO>: <topic>`.",
+        "",
+        "## Never read (all roles)",
+        "",
+        ", ".join(f"`{p}`" for p in never),
+        "",
+        "## Changing boundaries",
+        "",
+        "Edit `tools/agent_context/roles.json`, run `python3 tools/agent_context/build.py`, commit `docs/agents/`. CI runs `--check` and fails on an unowned or double-owned file or a core over budget.",
     ]
-    return "\n".join(lines) + "\n"
+    return "\n".join(L) + "\n"
 
 
 if __name__ == "__main__":

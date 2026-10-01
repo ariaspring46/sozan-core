@@ -97,6 +97,23 @@
         "tools/qa_battery.py",
         "tools/agentic_probes/p_router.py",
         "tools/agentic_probes/p_router_lock.py"
+      ],
+      "title_en": "Router, panel chat and panel shell",
+      "branch": "x1/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Own the panel chat brain: one model call per turn picks a tool name; code extracts arguments; every write tool goes through a confirm card. Own the shared panel frame (app-shell, lib/api.ts, ui/, theme, Next config) that every page sits on.",
+      "frontend": true,
+      "gates": [
+        "qa50 router battery 50/50 on two consecutive runs on the hub's parallel instance whenever router_service.py, turn_parse.py, router_embed.py, backend/app/data/router_*.json or the LLM env changes. You cannot run it (it needs the hub); ask X5 in talk-x5.md and wait for the result before asking for merge."
+      ],
+      "rules": [
+        "The model only picks a tool NAME. Prices, text and targets come from the user's sentence via code. Never add free-form string arguments that the model fills.",
+        "Every tool in WRITE_TOOLS must create a confirm card; it runs only on a matching, unexpired confirmId.",
+        "router_intent_vectors.json is generated: change router_intents.json and run backend/scripts/refresh_router_intents.py (needs the bge-m3 embed service). Never hand-edit or read the vectors file.",
+        "frontend/lib/api.ts, components/ui/*, app-shell.tsx are used by every page: keep exported names and props backward compatible; a breaking change needs a note to every role that imports it (see 'Your contract').",
+        "Panel copy is Persian, right-to-left, Persian digits where the page already uses them."
       ]
     },
     {
@@ -184,6 +201,23 @@
         "tools/agentic_probes/p_budget_image.py",
         "tools/agentic_probes/p_tenant_thread.py",
         "deploy/sozan-worker.service"
+      ],
+      "title_en": "Studio, images and brand content",
+      "branch": "x2/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Own content creation: studio chat (captions, posts, stories), still/scene image generation with the vision guard, cutout, compose to video, campaigns, publishing to channels, brand identity, the public landing/legal pages and the promo-engine.",
+      "frontend": true,
+      "gates": [
+        "qa_image_battery (tools/qa_image_battery.py) green when image_provider_service.py, cloud_cutout_service.py or compose_pipeline.py changes. It spends real cloud money: ask the owner in talk-x2.md to run it; never run it yourself."
+      ],
+      "rules": [
+        "Every cloud image or vision call goes through the AI budget gate (_image_budget_capped / llm._budget_capped). No new cloud call without it.",
+        "Never publish a real post or send to a real audience in tests or experiments; studio_publish_service calls are mocked in tests.",
+        "The vision guard rejects only on an explicit 'no'; keep first and second pass consistent.",
+        "Heavy work runs in the worker (SOZAN_WORKER=1, job_queue) or asyncio.to_thread; never block the API event loop.",
+        "promo-engine/, brand/, campaigns/ are Sozan's own marketing material: touch only when the task names them."
       ]
     },
     {
@@ -232,6 +266,21 @@
       "rare": [
         "deploy/sozan-unipile-socks.service",
         "backend/app/services/whatsapp_service.py"
+      ],
+      "title_en": "Channels, messaging, SMS and onboarding",
+      "branch": "x3/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Own every connection to the outside messaging world: Instagram/Telegram/WhatsApp/Sendbox/Unipile connect and verify, inbound webhooks and polling, inbound media, outbound send, page scan into the catalog, SMS and SMS OTP, owner Telegram alerts, and the new-seller onboarding flow.",
+      "frontend": true,
+      "gates": [],
+      "rules": [
+        "Inbound customer messages are handed to the inbox only through inbox_service.inbound / handle_inbound (owner Y). Never answer customers from channel code.",
+        "Never message a real customer, send a real SMS or post to a real channel from tests or experiments: mock the HTTP client (channel_http) in tests.",
+        "TELEGRAM_BOT_TOKEN is the owner-alert bot only; the shared seller bot is TELEGRAM_HUB_BOT_TOKEN and is never polled for DMs.",
+        "Respect existing poll intervals and backoff (Instagram >= 30s, 3 failures -> 300s); never tighten them.",
+        "Webhook secrets and OAuth tokens never appear in logs, events, reports or test output."
       ]
     },
     {
@@ -268,8 +317,25 @@
         "tools/agentic_probes/p_loop_block.py"
       ],
       "external": [
-        "کارخانهٔ ساخت (صاحب C، بیرون از مخزن): اسکریپت `settings.factory_script` با زیرفرمان‌های `status --job-id <id>` و `start ... --detach` برای ساخت؛ خروجی آخرین خط JSON. فایل job: `<fastpath>/jobs/<id>.json`. قالب این JSON را بدون هماهنگی با C عوض نکن.",
-        "فایل‌هایی از ویترین که ویرایشگر patch می‌کند و قالب‌شان مال C است: `lib/brand.ts`، `lib/nav.ts`، `app/brand-vars.css`، `public/brand-vars.css`، `public/storefront-flags.json`، `public/catalog.json`، `public/pages/*.json`، `public/images/hero.png`."
+        "Factory CLI (owner C, outside the repo): `settings.factory_script` with `status --job-id <id>` and `start ... --detach`; the last stdout line is JSON. Job file `<fastpath>/jobs/<id>.json`. Do not change how you parse these without C's ack.",
+        "Storefront files the editor patches follow C's template: `lib/brand.ts`, `lib/nav.ts`, `app/brand-vars.css`, `public/brand-vars.css`, `public/storefront-flags.json`, `public/catalog.json`, `public/pages/*.json`, `public/images/hero.png`."
+      ],
+      "title_en": "Shop build and live editing",
+      "branch": "x4/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Own the hub side of storefront building (calling the factory, job status, per-shop nginx map) and live editing of a running storefront: intent -> actions -> patch -> publish -> verify -> rollback, one-step undo, and the shop workspace.",
+      "frontend": true,
+      "gates": [
+        "Edits must be tried on the test shop azmaish-panl (test account) before any live shop, and only after the owner says go in talk-x4.md."
+      ],
+      "rules": [
+        "Never trigger a full rebuild ('دوباره بساز') of a real seller's live storefront; only reviseOnly updates.",
+        "A rolled-back turn must leave the build directory byte-identical to before: restore changed files, delete files the turn created, restore hero.png, remove .sozan-turn-*.",
+        "Never block the API event loop: factory calls go through asyncio.to_thread or read the job file directly.",
+        "The factory CLI and job JSON format belong to C; the patched storefront files (lib/brand.ts, lib/nav.ts, public/*.json ...) follow C's template. Ask C before assuming a new file layout.",
+        "The model never writes TSX: edit_llm returns JSON actions that go through the same patchers and verify."
       ]
     },
     {
@@ -379,8 +445,26 @@
         "tools/agentic_probes/p_outbox_chain_loop.py"
       ],
       "external": [
-        "تنها منتشرکنندهٔ هاب: `flock /home/ubuntu/.sozan-deploy.lock` و `deploy/deploy-api.sh` / `deploy-panel.sh`. نقش‌های دیگر deploy نمی‌کنند.",
-        "سرویس observe روی ماشین خانه (`POST {observe}/sozan/events`) و پراکسی LLM؛ قالب envelope در `pipeline_release.envelope` قرارداد همهٔ نقش‌هاست."
+        "Only deployer: `flock /home/ubuntu/.sozan-deploy.lock` with `deploy/deploy-api.sh` / `deploy/deploy-panel.sh`.",
+        "observe service on the home machine (`POST {observe}/sozan/events`) and the LLM proxy; the event envelope (`pipeline_release.envelope`) is a contract for every role.",
+        "Batteries run on the hub's parallel instance (port 8013): `tools/qa50_battery.py` for X1, `tools/sales100_battery.py --live` for Y. You run them on request and append the one-line summary to the requester's report file."
+      ],
+      "title_en": "Platform, accounts, billing and deploy",
+      "branch": "x5/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Own the shared core every role depends on (LLM routing and calls, tenant state, locks, observe events, AI budget, config, app startup), login/OTP, plans, subscription payments and wallet, hub admin, settings, CI, and deployment. You are the only role that deploys to the hub.",
+      "frontend": true,
+      "gates": [
+        "Before every deploy: full backend suite green (deploy/deploy-api.sh runs it with STATE_DIR and SOZAN_OBSERVE_OUTBOX=0). Deploy only with the owner's explicit go."
+      ],
+      "rules": [
+        "Deploy only under the lock: flock /home/ubuntu/.sozan-deploy.lock with deploy/deploy-api.sh or deploy/deploy-panel.sh. Deploy from git (a merged main), never from a dirty tree.",
+        "state_store, tenant_lock, llm, observe_client, config are imported by every role: never rename or change the signature of anything listed in 'Your contract' without a request in each affected role's report file first.",
+        "Tenant isolation: every read/write goes through state_store with the tenant ContextVar; background threads must copy the context (contextvars.copy_context()).",
+        "The AI budget gate stays fail-open on internal errors but must emit budget-check-failed; never remove the company daily cap.",
+        "Run the batteries other roles ask for (qa50, sales100 live) on the hub's parallel instance and append the summary line to the requester's report file."
       ]
     },
     {
@@ -438,8 +522,27 @@
         "deploy/sozan-battery.timer"
       ],
       "external": [
-        "Chroma (فعلاً نصب نشده؛ `deploy/sozan-chroma.service`). کلید پایگاه فقط از `memory_key()`.",
-        "مسیر `/settings/sales-policy` در `backend/app/api/settings.py` (صاحب X5) فرم سیاست فروش تو را ذخیره می‌کند؛ تغییر شکلش با هماهنگی X5."
+        "Chroma (not installed yet; `deploy/sozan-chroma.service`). Database key only from `memory_key()`.",
+        "`/settings/sales-policy` in `backend/app/api/settings.py` (owner X5) saves your sales-policy form; change its shape only with X5."
+      ],
+      "title_en": "Automated seller (DM agent) and training data",
+      "branch": "feat/sales-agent-<n>",
+      "plan": [
+        "sales-agent-plan.md",
+        "finetune-data-plan.md"
+      ],
+      "mission": "Own the DM inbox and the agent that answers customers: auto-reply modes, the tool loop (stock, order_status, payment_link), number/claim guards, sales policy, customer memory, Chroma shop memory, PII masking, brand tone, and the core of the fine-tune data pipeline.",
+      "frontend": true,
+      "gates": [
+        "Any change to inbox_agent_service.py, inbox_service.py, sales_policy_service.py, claims_guard.py or pii_mask.py: sales100 100/100 on two consecutive live runs on the parallel instance (sales-agent-plan.md §3.7). 99/100 means no merge. Ask X5 to run it.",
+        "Offline structure check you can run: python3 tools/sales100_battery.py (must print 'sales100 structure 101/101')."
+      ],
+      "rules": [
+        "Every price, stock count, order status and payment link comes from a tool result in the same turn; the number guard must reject anything else, including '۱٬۵۰۰٬۰۰۰' and 'یک و نیم میلیون' forms.",
+        "Customer text passes pii_mask before any cloud model; training examples only with consent (training_log.consent_enabled) and never from source='voice'.",
+        "At most one successful payment_link per customer turn; never a link for an out-of-stock item or qty above stock.",
+        "No real customer message, real payment or real post in tests: use the test tenant and the dry gateway (edge_dry).",
+        "Chroma database key comes only from memory_key(); never from user or model input."
       ]
     },
     {
@@ -470,10 +573,31 @@
         "voice-gateway/systemd/**"
       ],
       "external": [
-        "HTTP به هاب: `GET {SOZAN_API}/billing/plans` (قیمت پلن‌ها؛ صاحب X5، `backend/app/api/billing.py`) و `GET {SOZAN_API}/health` (فیلد `paymentReady`؛ صاحب X5، `backend/app/main.py`).",
-        "llama-swap روی ماشین خانه: فقط اسلات `ornith-phone` و `/v1/audio/speech`، `/v1/embeddings` (bge-m3، فقط خواندنی). به اسلات‌های دیگر و ری‌استارت llama-swap دست نزن.",
-        "فایل DNC: `~/local-ai/config/sozan-dnc.txt`؛ لاگ تماس `~/local-ai/sozan-voice-log/calls.jsonl` (دسترسی 600)."
-      ]
+        "HTTP to the hub: `GET {SOZAN_API}/billing/plans` (plan prices; owner X5, `backend/app/api/billing.py`) and `GET {SOZAN_API}/health` (field `paymentReady`; owner X5, `backend/app/main.py`). If either fails, say no price.",
+        "llama-swap on the home machine: only the `ornith-phone` slot, plus `/v1/audio/speech` and `/v1/embeddings` (bge-m3, read-only use).",
+        "DNC file `~/local-ai/config/sozan-dnc.txt`; call log `~/local-ai/sozan-voice-log/calls.jsonl` (mode 600, stays on that machine)."
+      ],
+      "title_en": "Phone voice agent",
+      "branch": "feat/voice-z",
+      "plan": [
+        "voice-agent-plan.md"
+      ],
+      "mission": "Own the phone line end to end: SIP/RTP gateway, STT/TTS, the support and sales call brain, the sales state machine, simulators and evaluation, and outbound call campaigns.",
+      "frontend": false,
+      "gates": [
+        "Any change to the sales flow (sales.py, brain.py, meaning.py, knowledge.py): simulated calls on the home machine (needs llama-swap and STT) for the personas the task touches, e.g. `cd voice-gateway && python3 sim_run.py p01`, plus the acceptance condition (شرط قبولی) of the voice-agent-plan.md section you are working on.",
+        "loopback_test.py places a real local SIP call against a running gateway: run it only on the home machine with the phone service up and no live call in progress."
+      ],
+      "rules": [
+        "No real call without the owner's permission; campaign_run.py --dial only after the owner writes 'شروع کمپین' in voice-agent-talk.md. Test with sim_run.py / sim_call.py.",
+        "DNC is sacred: 'زنگ نزنید' or similar -> number written to the DNC file immediately, never called again; keep its test.",
+        "Calls only inside campaign windows (currently 10-13 and 16-20 Tehran) with the daily cap and spacing in campaign_run.py.",
+        "Honesty: if asked, it is 'دستیار صوتی سوزان', never a human; no invented prices, codes or claims. Prices come only from GET /billing/plans.",
+        "GPU: only Vulkan1 and the ornith-phone slot and sozan-voice* units are yours. Never restart llama-swap or touch qwen3.5-9b, bge-m3 or other slots. Restart the phone service only when no call is in progress.",
+        "Never write a caller's number or words into a report; counts, times and call ids only.",
+        "Git (voice-agent-plan.md §0.9): work on feat/voice-z; rebase on a fresh main and merge only after tests and the stage's acceptance condition pass; do not push to origin unless the owner says so."
+      ],
+      "git_mode": "local"
     },
     {
       "id": "C",
@@ -515,9 +639,27 @@
         "tools/storefront/**"
       ],
       "external": [
-        "کار اصلی بیرون از مخزن: `/home/demon/local-ai/smoke-workspace/site-builder/**` (قالب‌ها، گیت کیفیت، `tools/sozan_factory_fastpath.py`). خروجی JSON زیرفرمان `status` و فایل job را X4 می‌خواند؛ قالبشان قرارداد است.",
-        "ویترین زنده این مسیرهای هاب را صدا می‌زند و همه مال توست: `/p/catalog-ids`، `/p/shop-config`، `/p/shop/checkout`، `/p/shop/paid`، `/p/otp/*`، `/p/tickets`، `/catalog/*`.",
-        "ابزارهای `tools/monitor/**` و `tools/storefront/**` روی شاخهٔ `feat/storefront-c` هستند؛ بعد از merge خودکار مال تو می‌شوند."
+        "Main work outside the repo: `/home/demon/local-ai/smoke-workspace/site-builder/**` (templates, quality gate, `tools/sozan_factory_fastpath.py`). X4 reads the `status` JSON and the job file: their fields are a contract.",
+        "The live storefront calls these hub routes, all yours: `/p/catalog-ids`, `/p/shop-config`, `/p/shop/checkout`, `/p/shop/paid`, `/p/otp/*`, `/p/tickets`, `/catalog/*`.",
+        "`tools/monitor/**` and `tools/storefront/**` live on branch `feat/storefront-c`; after merge they are yours automatically."
+      ],
+      "title_en": "Storefronts, catalog, customer orders, domains, support, monitoring",
+      "branch": "feat/storefront-c",
+      "plan": [
+        "storefront-plan.md",
+        "monitoring-plan.md"
+      ],
+      "mission": "Own everything about a seller's live storefront and its customers: catalog and stock, sync to the storefront, customer orders and payment (/p/), receipts, custom domains and Arvan DNS, shop settings, support tickets; and outside the repo the factory, templates, quality gate and monitoring.",
+      "frontend": true,
+      "gates": [
+        "Template or factory changes: tried on the test shop azmaish-panl first and checked at 390px and 1440px widths before touching any live shop."
+      ],
+      "rules": [
+        "Never delete or rewrite a real seller's catalog, orders or shop data. Never run a full rebuild on a live storefront; template updates must not touch the catalog.",
+        "Customer payments: test only with the dry gateway (edge_dry) or the test account; never a real charge.",
+        "DNS: changes only through arvan_dns_service; the dns-watch self-heal is the only automatic DNS write allowed.",
+        "Monitoring is read-only: no automatic restart or repair (except the DNS self-heal); no customer or seller text, phone numbers or keys in metrics, alerts or the status page.",
+        "Factory CLI output (status JSON, job file) is read by X4: keep its fields stable or announce changes in talk-x4.md."
       ]
     },
     {
@@ -541,9 +683,21 @@
         ".github/ISSUE_TEMPLATE/**",
         ".github/pull_request_template.md",
         ".zcode/**",
-        ".cursor/**"
+        ".cursor/**",
+        "AGENTS.md",
+        "CLAUDE.md"
       ],
-      "rare": []
+      "rare": [],
+      "title_en": "Owner and planner (not a programmer)",
+      "branch": "",
+      "plan": [],
+      "mission": "Plans, team rules and reference docs.",
+      "frontend": false,
+      "gates": [],
+      "rules": []
     }
+  ],
+  "not_unit_tests": [
+    "voice-gateway/loopback_test.py"
   ]
 }
