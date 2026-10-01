@@ -866,7 +866,7 @@ _NOT_A_BUILD = ("وضعیت", "صندوق", "خوانده")
 
 def _live_root():
     from app.services.shop_edit_service import build_dir_for
-    from app.services.shop_service import _shop
+    from app.services.shop_service import current_shop as _shop
 
     return build_dir_for(_shop())
 
@@ -877,7 +877,7 @@ def _force_shop_build(spoken: str) -> bool:
         return False
     if _BUILD_SIGNAL.search(text) is None:
         return False
-    from app.services.shop_service import _shop
+    from app.services.shop_service import current_shop as _shop
 
     shop = _shop()
     if not isinstance(shop, dict):
@@ -887,7 +887,7 @@ def _force_shop_build(spoken: str) -> bool:
 
 def _route_shop(name: str, spoken: str, view_path: str, view_target: str) -> tuple[str, str]:
     from app.services.shop_intent_service import catalog_add
-    from app.services.shop_service import _explicit_build
+    from app.services.shop_service import explicit_build as _explicit_build
 
     if _force_shop_build(spoken):
         return "shop_chat", ""
@@ -910,7 +910,7 @@ def _route_shop(name: str, spoken: str, view_path: str, view_target: str) -> tup
     if _explicit_build(spoken):
         return "shop_chat", ""
     if name in {"edit_shop", "add_product"}:
-        from app.services.shop_service import _shop
+        from app.services.shop_service import current_shop as _shop
 
         idle = not str((_shop() or {}).get("slug") or "").strip()
         if idle:
@@ -1266,7 +1266,7 @@ async def _run_tool(
     spoken = (source_text or "").strip()[:4000]
     if name == "edit_shop":
         from app.services.shop_edit_service import apply_live_edit
-        from app.services.shop_service import _shop
+        from app.services.shop_service import current_shop as _shop
 
         actions = [item for item in _shop_actions(spoken, view_path, view_target) if str(item.get("type") or "") in _MUTATIONS]
         removes = [item for item in actions if str(item.get("type") or "") == "remove_product"]
@@ -1278,7 +1278,7 @@ async def _run_tool(
         return str(out.get("reply") or "این تغییر روی صفحه اعمال نشد."), {}
     if name == "add_product":
         from app.services.shop_edit_service import apply_live_edit
-        from app.services.shop_service import _catalog_add_reply, _shop
+        from app.services.shop_service import catalog_add_reply as _catalog_add_reply, current_shop as _shop
 
         actions = [item for item in _shop_actions(spoken, view_path, view_target) if str(item.get("type") or "") == "add_product"]
         if not actions:
@@ -1526,7 +1526,7 @@ def _ask_message(args: dict) -> tuple[str, list[str]]:
 
 
 def _remove_from_catalog(actions: list[dict]) -> str:
-    from app.services.shop_service import _shop, _shop_is_live
+    from app.services.shop_service import current_shop as _shop, shop_is_live as _shop_is_live
     from app.services.storefront_service import list_products, remove_product_by_title
 
     titles = [str(item.get("title") or "").strip() for item in actions if str(item.get("title") or "").strip()]
@@ -1558,7 +1558,7 @@ def _remove_from_catalog(actions: list[dict]) -> str:
 
 def route_tool(spoken: str, view_path: str = "", view_target: str = "") -> str:
     from app.services.shop_intent_service import catalog_add
-    from app.services.shop_service import _explicit_rebuild
+    from app.services.shop_service import explicit_rebuild as _explicit_rebuild
     from app.services.turn_parse import parse_turn
 
     kinds = {str(item.get("type") or "") for item in _shop_actions(spoken, view_path, view_target)}
@@ -1821,7 +1821,7 @@ async def _execute(
             _append("assistant", blocked)
             _emit("router-tool", {"tool": name, "level": "read", "applied": False})
             return snapshot()
-    from app.services.shop_service import _explicit_rebuild
+    from app.services.shop_service import explicit_rebuild as _explicit_rebuild
 
     rebuild_card = name == "shop_chat" and _explicit_rebuild(spoken)
     if name in WRITE_TOOLS or rebuild_card:
@@ -1869,3 +1869,13 @@ async def _execute(
     _remember_content(extra)
     _emit("router-tool", {"tool": name, "level": _tool_level(name)})
     return snapshot()
+
+# ---- Public API for other roles (docs/agents). Wrappers call the private names at call time, so tests that patch those still work.
+
+def bind_thread_id(thread_id: str) -> None:
+    """Bind a router thread for code outside a chat turn (the studio worker)."""
+    _THREAD.set(str(thread_id or ""))
+
+
+def remember_content(extra: dict) -> None:
+    _remember_content(extra)

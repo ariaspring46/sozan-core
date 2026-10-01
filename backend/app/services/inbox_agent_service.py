@@ -574,9 +574,9 @@ def _looks_like_claim(text: str) -> bool:
 
 
 def _shop_url() -> str:
-    from app.services.shop_service import _shop, live_url
+    from app.services.shop_service import current_shop, live_url
 
-    return live_url(_shop()).strip().rstrip("/")
+    return live_url(current_shop()).strip().rstrip("/")
 
 
 def _public_shop_url() -> str:

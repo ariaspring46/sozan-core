@@ -40,7 +40,7 @@ git fetch -q origin main && git log --oneline HEAD..origin/main | head
 tail -n 60 sales-agent-talk.md                    # requests addressed to you; never read the whole file
 ```
 
-Then restate the task in one sentence and list the 1–3 files from §6 you expect to change. If the task needs a file you do not own, go to §13 now instead of starting.
+Then restate the task in one sentence and list the 1–3 files from §6 you expect to change, and which flows in §16 they belong to. If the task needs a file you do not own, go to §13 now instead of starting.
 
 ## 4. Work loop
 
@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~6.7k tokens. Your core files total 32.5k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~8.3k tokens. Your core files total 32.5k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -115,6 +115,54 @@ def public_order(row: dict) -> dict
 ```
 def list_products() -> dict
 ```
+**`frontend/components/app-shell.tsx`** — owner U
+```
+export function AppShell(
+```
+**`frontend/components/empty-state.tsx`** — owner U
+```
+export function EmptyState(
+```
+**`frontend/components/field.tsx`** — owner U
+```
+export function Field({ label, children }: { label: string; children: React.ReactNode })
+```
+**`frontend/components/ui/button.tsx`** — owner U
+```
+export function Button(
+```
+**`frontend/components/ui/card.tsx`** — owner U
+```
+export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>)
+```
+**`frontend/components/ui/input.tsx`** — owner U
+```
+export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)
+```
+**`frontend/components/ui/select.tsx`** — owner U
+```
+export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)
+```
+**`frontend/lib/api.ts`** — owner U
+```
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T>
+```
+**`frontend/lib/digits.ts`** — owner U
+```
+export function formatWhen(at: number): string
+export function money(amount: number): string
+export function parseNonNegativeInt(raw: string): number | null
+```
+**`frontend/lib/idempotency.ts`** — owner U
+```
+export function emptyIdempotencySlot(): IdempotencySlot
+export function finishIdempotencyKey(slot: IdempotencySlot, err?: unknown): void
+export function takeIdempotencyKey(slot: IdempotencySlot, stamp: string): string
+```
+**`frontend/lib/utils.ts`** — owner U
+```
+export function cn(...inputs: ClassValue[])
+```
 **`backend/app/services/persian_text.py`** — owner X1
 ```
 def guard_output(text: str, *, finish: str='', limit: int=800) -> str
@@ -123,58 +171,10 @@ def guard_output(text: str, *, finish: str='', limit: int=800) -> str
 ```
 def cosine(left: list[float], right: list[float]) -> float
 ```
-**`frontend/components/app-shell.tsx`** — owner X1
-```
-export function AppShell(
-```
 **`frontend/components/chat-thread.tsx`** — owner X1
 ```
 export type ChatMsg =
 export function ChatThread(
-```
-**`frontend/components/empty-state.tsx`** — owner X1
-```
-export function EmptyState(
-```
-**`frontend/components/field.tsx`** — owner X1
-```
-export function Field({ label, children }: { label: string; children: React.ReactNode })
-```
-**`frontend/components/ui/button.tsx`** — owner X1
-```
-export function Button(
-```
-**`frontend/components/ui/card.tsx`** — owner X1
-```
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>)
-```
-**`frontend/components/ui/input.tsx`** — owner X1
-```
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)
-```
-**`frontend/components/ui/select.tsx`** — owner X1
-```
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)
-```
-**`frontend/lib/api.ts`** — owner X1
-```
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T>
-```
-**`frontend/lib/digits.ts`** — owner X1
-```
-export function formatWhen(at: number): string
-export function money(amount: number): string
-export function parseNonNegativeInt(raw: string): number | null
-```
-**`frontend/lib/idempotency.ts`** — owner X1
-```
-export function emptyIdempotencySlot(): IdempotencySlot
-export function finishIdempotencyKey(slot: IdempotencySlot, err?: unknown): void
-export function takeIdempotencyKey(slot: IdempotencySlot, stamp: string): string
-```
-**`frontend/lib/utils.ts`** — owner X1
-```
-export function cn(...inputs: ClassValue[])
 ```
 **`backend/app/services/channel_outbound_service.py`** — owner X3
 ```
@@ -204,7 +204,7 @@ export function ChannelAlert({ inset = true }: { inset?: boolean })
 ```
 **`backend/app/services/shop_service.py`** — owner X4
 ```
-def _shop() -> dict
+def current_shop() -> dict
 def live_url(shop: dict) -> str
 ```
 **`backend/app/config.py`** — owner X5
@@ -317,6 +317,8 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
 cd tools && python3 -m unittest train_nightly_test 2>&1 | tail -5
 # sales100 offline structure check (must print: sales100 structure 101/101)
 python3 tools/sales100_battery.py | head -3
+# UI rules (U1-U7): must print 'ui_check: 0 problem(s)'
+python3 tools/ui_check.py | tail -5
 # frontend: type-check and build (CI runs it). package-lock.json resolves from registry.npmmirror.com;
 # if your network blocks it, do not edit the lockfile: say so in your report and rely on CI.
 cd frontend && npm ci --no-audit --no-fund >/dev/null && npm run build 2>&1 | tail -15
@@ -374,7 +376,84 @@ Write the question in `sales-agent-talk.md` (or to the owner in the chat that st
 ## 15. Definition of done
 
 - The change does what the task says, and only that; every changed file is in §6.
-- A test covers the new behaviour or the fixed bug; your module tests and the full suite pass (§11).
+- A test covers the new behaviour or the fixed bug; your module tests, the flow tests of every §16 flow your change touches, and the full suite pass (§11, §16).
+- No runtime state file rule in §17 is broken; frontend changes pass the UI rules in §18.
 - `python3 tools/agent_context/build.py --check` passes. If you changed a signature listed in §10 or an import across roles, you ran `python3 tools/agent_context/build.py` and committed the updated `docs/agents/`.
 - Merge gates in §11 hold, or the report says exactly which gate is waiting on whom.
 - CHANGELOG bullet, PR opened from your branch, report appended.
+
+## 16. System duties: the flows you are part of
+
+The system works only if every step of every flow keeps its promise. When your change touches a step below, run that whole flow's tests (other roles' tests too: run them, do not read them). A red test in another role's module caused by your change is yours to fix in your files, or to report to its owner before merging.
+
+**F1 — Customer DM → automatic reply**
+
+- X3: channel webhook/poll → inbox_service.handle_inbound
+- Y: maybe_auto_reply → inbox_agent_service.answer (tools, guards) ← **you**
+- C: payment_link → pay_service.create_order
+- X3: reply delivered by the channel adapter
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.inbox_service_test app.services.inbox_agent_service_test app.services.telegram_inbox_test app.services.sendbox_service_test app.services.channel_poll_service_test app.api.inbox_dry_test app.services.customer_memory_service_test 2>&1 | tail -3
+```
+
+**F2 — Seller panel chat → tool**
+
+- U: chat frame, api()
+- X1: router turn: tool choice, confirm card, lock
+- X4/X2/X5/Y: the tool runs: edit_shop, studio_chat, settings, auto-reply ← **you**
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_embed_test 2>&1 | tail -3
+```
+
+**F9 — Shared core: tenant state, LLM, budget, events**
+
+- X5: state_store, tenant_lock, llm, ai_budget, observe_client
+- X1/X2/X3/X4/Y/C: call state_store, llm, observe_client, ai_budget through their public API ← **you**
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.state_store_test app.services.tenant_lock_test app.services.llm_test app.services.llm_routing_service_test app.services.ai_budget_service_test app.services.observe_client_test app.services.pipeline_release_test app.services.agentic_regressions_test 2>&1 | tail -3
+```
+
+**F10 — Panel UI**
+
+- U: tokens, components, shell, api.ts
+- all frontend roles: their pages ← **you**
+```bash
+python3 tools/ui_check.py
+cd frontend && npm run build 2>&1 | tail -15
+```
+
+## 17. Shared files and how to use them
+
+| file | owner | rule |
+|---|---|---|
+| `CHANGELOG.md` | everyone | Append one bullet for your change under today's dated heading (`head -20` to see it). Never edit other bullets. |
+| `docs/agents/**` | generated | Never hand-edit. Run `python3 tools/agent_context/build.py` and commit the result in the same PR when you change a cross-role import, contract or route. |
+| `docs/agents/contracts.json` | generated | Snapshot of every cross-role signature. CI fails if code and snapshot differ: regenerate, and the reviewer sees the contract change in the diff. |
+| `tools/agent_context/roles.json` | OWNER | Boundaries. Ask the owner to move a file between roles. |
+| `talk-*.md, *-talk.md` | each role | Your own file: append only. Another role's file: append a `## FROM → TO:` request only. |
+| `backend/requirements.txt` | X5 | New Python dependency: request from X5 with the reason and pinned version. |
+| `frontend/package.json, package-lock.json` | U | New npm dependency: request from U. |
+| `backend/app/config.py, .env.example` | X5 | New setting/env var: request from X5 with name, default and who reads it. Never put a value in git. |
+| `.github/workflows/**` | X5 | CI changes: request from X5. |
+| `STATE_DIR/tenants/<phone>/*.json (runtime)` | see table | A file with more than one writer role must be written with `state_store.update_json(name, mutate, default, lock=...)` or inside `tenant_file_lock(...)`. `build.py --check` fails otherwise. |
+
+**Runtime state files (STATE_DIR/tenants/<phone>/) you share with other roles:**
+
+| file | writers | readers | your rule |
+|---|---|---|---|
+| `inbox.json` | Y | X5 | you are the only writer; keep the shape stable for the readers |
+| `voice.json` | Y | X1 | you are the only writer; keep the shape stable for the readers |
+
+## 18. UI rules (owner: U; checked by `tools/ui_check.py`)
+
+1. Use design tokens and components/ui/*; no new hex colours or one-off button styles (tools/ui_check.py).
+2. RTL and Persian: Persian copy, Persian digits for numbers sellers see, no left-aligned layouts.
+3. Mobile first: the page works at 390px with no horizontal scroll; check 1440px too.
+4. Every async view has loading, empty and error states (use components/empty-state.tsx).
+5. Accessibility: <img alt>, aria-label on icon-only buttons, rel="noreferrer" on target=_blank, visible focus.
+6. Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host.
+
+Visual change to a shared component, token or the shell: request it from U in `talk-u.md`; do not copy and restyle a component inside your page.

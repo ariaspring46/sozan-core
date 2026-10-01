@@ -278,6 +278,65 @@ def api_file(endpoint: str, prefixes: dict[str, str]) -> str | None:
     return prefixes.get(best) if best else None
 
 
+# ---------- runtime state files ----------
+
+STATE_IO = re.compile(r"\b(read_json|write_json|update_json)\(\s*([A-Z_][A-Z0-9_]*|[\"'][\w\-.]+[\"'])")
+CONST_FILE = re.compile(r"^([A-Z_][A-Z0-9_]*)\s*=\s*[\"']([\w\-.]+\.jsonl?)[\"']", re.M)
+LOCK_EXEMPT = {"backend/app/tenant_migrate.py"}  # one-time migration, runs alone
+
+
+def state_files(owner: dict[str, str]) -> dict[str, dict]:
+    """{state file: {"w": {role: [(path, line, locked)]}, "r": {role}}} from read_json/write_json/update_json calls."""
+    table: dict[str, dict] = {}
+    for path, rid in owner.items():
+        if not (path.startswith("backend/") and path.endswith(".py")) or is_test(path):
+            continue
+        text = (ROOT / path).read_text(encoding="utf-8")
+        consts = dict(CONST_FILE.findall(text))
+        lines = text.splitlines()
+        for match in STATE_IO.finditer(text):
+            name = match.group(2).strip("'\"")
+            name = consts.get(name, name)
+            if not name.endswith((".json", ".jsonl")):
+                continue
+            row = table.setdefault(name, {"w": defaultdict(list), "r": set()})
+            if match.group(1) == "read_json":
+                row["r"].add(rid)
+                continue
+            line = text.count("\n", 0, match.start()) + 1
+            window = "\n".join(lines[max(0, line - 12) : line])
+            locked = match.group(1) == "update_json" or "tenant_file_lock(" in window or "shared_lock(" in window
+            row["w"][rid].append((path, line, locked))
+    return table
+
+
+def lock_problems(table: dict[str, dict]) -> list[str]:
+    out = []
+    for name, row in sorted(table.items()):
+        if len(row["w"]) < 2:
+            continue
+        for rid, sites in row["w"].items():
+            for path, line, locked in sites:
+                if not locked and path not in LOCK_EXEMPT:
+                    out.append(f"قفل: {name} چند نویسنده دارد ({', '.join(sorted(row['w']))}) ولی {path}:{line} ({rid}) بی‌قفل می‌نویسد؛ update_json یا tenant_file_lock")
+    return out
+
+
+CONTRACTS_FILE = OUT_DIR / "contracts.json"
+
+
+def contract_snapshot(needed_by: dict, owner: dict[str, str]) -> dict[str, dict]:
+    snap: dict[str, dict] = {}
+    for rid in sorted(needed_by):
+        for key in sorted(needed_by[rid]):
+            path, name = key.split("::", 1)
+            if name == "*":
+                continue
+            sig = signature(path, name) if path.endswith(".py") else ts_signature(path, name)
+            snap[key] = {"owner": rid, "users": sorted(needed_by[rid][key]), "signature": sig.split("  # ")[0]}
+    return snap
+
+
 # ---------- build ----------
 
 def build(check_only: bool) -> int:
@@ -336,6 +395,17 @@ def build(check_only: bool) -> int:
                 for name in names or {"*"}:
                     needed_by[dep_owner][f"{dep}::{name}"].add(rid)
 
+    global CTX
+    state = state_files(owner)
+    problems += lock_problems(state)
+    snap = contract_snapshot(needed_by, owner)
+    if check_only:
+        old = json.loads(CONTRACTS_FILE.read_text(encoding="utf-8")) if CONTRACTS_FILE.is_file() else {}
+        changed = sorted(k for k in set(old) | set(snap) if old.get(k, {}).get("signature") != snap.get(k, {}).get("signature"))
+        for key in changed[:20]:
+            problems.append(f"قرارداد عوض شد (build.py را اجرا و docs/agents را commit کن): {key}")
+    CTX = {"config": config, "state": state, "owner": owner, "roles": roles}
+
     report_rows = []
     for role in roles:
         rid = role["id"]
@@ -371,12 +441,16 @@ def build(check_only: bool) -> int:
 
     if not check_only:
         (OUT_DIR / "README.md").write_text(index_doc(report_rows, roles, budget, never), encoding="utf-8")
+        CONTRACTS_FILE.write_text(json.dumps(snap, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
 
     for line in problems:
         print(line, file=sys.stderr)
     for row in report_rows:
         print(f"{row['id']:>5}  هسته {row['core']:>6}  فعال {row['src']:>6}  کم‌کاربرد {row.get('rare', 0):>6}  تست {row['tests']:>6}  نخوان {row['skipped']:>7}  مانیفست {row['iface']:>5}")
     return 1 if problems else 0
+
+
+CTX: dict = {}
 
 
 def tokens_of_text(text: str) -> int:
@@ -437,6 +511,7 @@ def verify_commands(role: dict, tests: list[str]) -> list[str]:
     if rid == "Y":
         out += ["", "# sales100 offline structure check (must print: sales100 structure 101/101)", "python3 tools/sales100_battery.py | head -3"]
     if role.get("frontend"):
+        out += ["", "# UI rules (U1-U7): must print 'ui_check: 0 problem(s)'", "python3 tools/ui_check.py | tail -5"]
         out += ["", "# frontend: type-check and build (CI runs it). package-lock.json resolves from registry.npmmirror.com;", "# if your network blocks it, do not edit the lockfile: say so in your report and rely on CI.", "cd frontend && npm ci --no-audit --no-fund >/dev/null && npm run build 2>&1 | tail -15"]
     out += ["", "# ownership and manifests still valid (CI runs this)", "python3 tools/agent_context/build.py --check"]
     return out
@@ -481,7 +556,7 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
             f"tail -n 60 {report}                    # requests addressed to you; never read the whole file" if report else "",
         ]),
         "",
-        "Then restate the task in one sentence and list the 1–3 files from §6 you expect to change. If the task needs a file you do not own, go to §13 now instead of starting.",
+        "Then restate the task in one sentence and list the 1–3 files from §6 you expect to change, and which flows in §16 they belong to. If the task needs a file you do not own, go to §13 now instead of starting.",
         "",
         "## 4. Work loop",
         "",
@@ -641,23 +716,76 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
         "## 15. Definition of done",
         "",
         "- The change does what the task says, and only that; every changed file is in §6.",
-        "- A test covers the new behaviour or the fixed bug; your module tests and the full suite pass (§11).",
+        "- A test covers the new behaviour or the fixed bug; your module tests, the flow tests of every §16 flow your change touches, and the full suite pass (§11, §16).",
+        "- No runtime state file rule in §17 is broken; frontend changes pass the UI rules in §18.",
         "- `python3 tools/agent_context/build.py --check` passes. If you changed a signature listed in §10 or an import across roles, you ran `python3 tools/agent_context/build.py` and committed the updated `docs/agents/`.",
         "- Merge gates in §11 hold, or the report says exactly which gate is waiting on whom.",
         "- CHANGELOG bullet, " + ("branch rebased on fresh `main` (not pushed unless the owner said so)" if local else "PR opened from your branch") + ", report appended.",
     ]
+    L += system_sections(role, paths)
     return "\n".join(L) + "\n"
+
+
+def _flow_cmd(flow: dict) -> list[str]:
+    cmds = []
+    if flow.get("tests"):
+        cmds.append("cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \\")
+        cmds.append("  python3 -m unittest " + " ".join(flow["tests"]) + " 2>&1 | tail -3")
+    cmds += flow.get("commands", [])
+    return cmds
+
+
+def system_sections(role: dict, paths: list[str]) -> list[str]:
+    rid = role["id"]
+    cfg = CTX["config"]
+    L: list[str] = ["", "## 16. System duties: the flows you are part of", ""]
+    L.append("The system works only if every step of every flow keeps its promise. When your change touches a step below, run that whole flow's tests (other roles' tests too: run them, do not read them). A red test in another role's module caused by your change is yours to fix in your files, or to report to its owner before merging.")
+    mine = [f for f in cfg.get("flows", []) if any(rid in step[0].split("/") or step[0] == "all" or (step[0] == "all frontend roles" and role.get("frontend")) for step in f["steps"])]
+    for flow in mine:
+        L += ["", f"**{flow['id']} — {flow['title']}**", ""]
+        for who, what in flow["steps"]:
+            mark = " ← **you**" if rid in who.split("/") or who == "all" or (who == "all frontend roles" and role.get("frontend")) else ""
+            L.append(f"- {who}: {what}{mark}")
+        cmd = _flow_cmd(flow)
+        if cmd:
+            L += _code(cmd)
+    if not mine:
+        L.append("\nNo shared flow.")
+
+    L += ["", "## 17. Shared files and how to use them", "", "| file | owner | rule |", "|---|---|---|"]
+    for name, who, rule in cfg.get("shared_files", []):
+        L.append(f"| `{name}` | {who} | {rule} |")
+    state = CTX["state"]
+    rows = []
+    for name, row in sorted(state.items()):
+        writers = sorted(row["w"])
+        readers = sorted(row["r"] - set(row["w"]))
+        if rid not in writers and rid not in readers:
+            continue
+        if writers == [rid] and not readers:
+            continue
+        shared = len(writers) > 1
+        how = "write only with `update_json(..., lock=...)` or inside `tenant_file_lock`" if shared and rid in writers else ("read-only for you; never write it" if rid not in writers else "you are the only writer; keep the shape stable for the readers")
+        rows.append(f"| `{name}` | {', '.join(writers) or '-'} | {', '.join(readers) or '-'} | {how} |")
+    if rows:
+        L += ["", "**Runtime state files (STATE_DIR/tenants/<phone>/) you share with other roles:**", "", "| file | writers | readers | your rule |", "|---|---|---|---|", *rows]
+    if role.get("frontend"):
+        L += ["", "## 18. UI rules (owner: U; checked by `tools/ui_check.py`)", ""]
+        L += [f"{i}. {r}" for i, r in enumerate(cfg.get("ui_rules", []), 1)]
+        if rid != "U":
+            L.append("\nVisual change to a shared component, token or the shell: request it from U in `talk-u.md`; do not copy and restyle a component inside your page.")
+    return L
 
 
 def index_doc(rows, roles, budget, never) -> str:
     reports = {role["id"]: role.get("report", "") for role in roles}
     titles = {role["id"]: role.get("title_en") or role["title"] for role in roles}
     L = [
-        "# Sozan — 8 programmers, one harness each",
+        "# Sozan — 9 programmers, one harness each",
         "",
         "<!-- generated by tools/agent_context/build.py; do not edit by hand -->",
         "",
-        "Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Each agent reads only its own file below: it is the complete harness (rules, files, signatures it needs from others, exact commands).",
+        "Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Each agent reads only its own file below: it is the complete harness (rules, files, signatures it needs from others, the flows it is part of, shared-file rules, exact commands).",
         "",
         "| role | area | harness | core | active | rare | tests | report file |",
         "|---|---|---|---|---|---|---|---|",
@@ -690,6 +818,24 @@ def index_doc(rows, roles, budget, never) -> str:
         "## Never read (all roles)",
         "",
         ", ".join(f"`{p}`" for p in never),
+        "",
+        "## System flows (who does which step; each harness §16 has the test command)",
+        "",
+        "| flow | steps |",
+        "|---|---|",
+        *[f"| {f['id']} {f['title']} | " + " → ".join(f"{who}" for who, _ in f["steps"]) + " |" for f in CTX["config"].get("flows", [])],
+        "",
+        "## Shared files",
+        "",
+        "| file | owner | rule |",
+        "|---|---|---|",
+        *[f"| `{n}` | {w} | {r} |" for n, w, r in CTX["config"].get("shared_files", [])],
+        "",
+        "**Runtime state files with more than one role** (writers must lock; `build.py --check` enforces it):",
+        "",
+        "| file | writers | readers |",
+        "|---|---|---|",
+        *[f"| `{n}` | {', '.join(sorted(r['w']))} | {', '.join(sorted(r['r'] - set(r['w']))) or '-'} |" for n, r in sorted(CTX["state"].items()) if len(set(r["w"]) | r["r"]) > 1],
         "",
         "## Changing boundaries",
         "",

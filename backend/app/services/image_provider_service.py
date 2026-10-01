@@ -1154,9 +1154,9 @@ def _host(url: str) -> str:
 
 
 def _image_budget_capped() -> str | None:
-    from app.services.llm import _budget_capped
+    from app.services.llm import budget_capped
 
-    return _budget_capped("image")
+    return budget_capped("image")
 
 
 def _emit_usage(*, model: str, provider: str, cost: float | None, nbytes: int) -> None:

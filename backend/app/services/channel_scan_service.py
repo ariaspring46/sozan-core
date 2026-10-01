@@ -1282,3 +1282,20 @@ def brief_for_shop() -> str:
         f"کالاهای پیدا شده:\n{catalog}\n"
         f"همین کاتالوگ را استفاده کن. نگو به پیج یا اینستاگرام دسترسی نداری. از همین عکس‌های کانال برای کارت کالا استفاده کن. تصویر ساختگی نساز."
     )
+
+# ---- Public API for other roles (docs/agents). Wrappers call the private names at call time, so tests that patch those still work.
+
+def scan_dir() -> Path:
+    return _scan_dir()
+
+
+def unattributed_dir() -> Path:
+    return _unattributed_dir()
+
+
+def category_from_text(text: str) -> str:
+    return _category_from_text(text)
+
+
+def looks_like_product_title(title: str) -> bool:
+    return _looks_like_product_title(title)

@@ -219,6 +219,39 @@ class ShopEditRollbackTests(_StateCase):
         self.assertTrue((root / ".sozan-test/public/images/hero.png").is_file())
 
 
+class SharedStateFileTests(_StateCase):
+    def test_concurrent_writers_keep_each_others_keys(self) -> None:
+        import threading
+
+        from app.state_store import tenant_scope, update_json
+
+        def writer(key: str) -> None:
+            with tenant_scope(TENANT):
+                for i in range(40):
+                    update_json("shop.json", lambda shop, i=i: shop.__setitem__(key, i), {}, lock="shop")
+
+        threads = [threading.Thread(target=writer, args=(k,)) for k in ("brand", "paySecret", "status")]
+        for item in threads:
+            item.start()
+        for item in threads:
+            item.join()
+        shop = read_json("shop.json", {})
+        self.assertEqual({k: shop.get(k) for k in ("brand", "paySecret", "status")}, {"brand": 39, "paySecret": 39, "status": 39})
+
+    def test_pay_secret_and_store_name_do_not_clobber(self) -> None:
+        from app.services import pay_service, settings_service
+
+        write_json("shop.json", {"slug": "demo", "status": "ready"})
+        secret = pay_service.ensure_pay_secret()
+        with patch.object(settings_service, "plan_service", create=True):
+            settings_service.save_settings({"storeName": "گالری"})
+        shop = read_json("shop.json", {})
+        self.assertEqual(shop.get("paySecret"), secret)
+        self.assertEqual(shop.get("brand"), "گالری")
+        self.assertEqual(shop.get("status"), "ready")
+        self.assertEqual(pay_service.ensure_pay_secret(), secret)
+
+
 class RouterTraceTests(_StateCase):
     def test_trace_rotates(self) -> None:
         from app.state_store import tenant_dir

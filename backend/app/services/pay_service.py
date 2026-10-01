@@ -453,16 +453,14 @@ def find_tenant_by_slug(slug: str) -> str | None:
 
 
 def ensure_pay_secret() -> str:
-    shop = read_json("shop.json", {})
-    if not isinstance(shop, dict):
-        shop = {}
-    secret = str(shop.get("paySecret") or "").strip()
-    if secret:
-        return secret
-    secret = secrets.token_urlsafe(24)
-    shop["paySecret"] = secret
-    write_json("shop.json", shop)
-    return secret
+    from app.state_store import update_json
+
+    def _secret(shop: dict) -> None:
+        if not str(shop.get("paySecret") or "").strip():
+            shop["paySecret"] = secrets.token_urlsafe(24)
+
+    # shop.json is also written by the build (X4) and settings (X5): locked update.
+    return str(update_json("shop.json", _secret, {}, lock="shop").get("paySecret") or "")
 
 
 def verify_pay_secret(slug: str, secret: str) -> str:

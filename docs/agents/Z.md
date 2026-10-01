@@ -42,7 +42,7 @@ git fetch -q origin main && git log --oneline HEAD..origin/main | head
 tail -n 60 voice-agent-talk.md                    # requests addressed to you; never read the whole file
 ```
 
-Then restate the task in one sentence and list the 1–3 files from §6 you expect to change. If the task needs a file you do not own, go to §13 now instead of starting.
+Then restate the task in one sentence and list the 1–3 files from §6 you expect to change, and which flows in §16 they belong to. If the task needs a file you do not own, go to §13 now instead of starting.
 
 ## 4. Work loop
 
@@ -56,7 +56,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~3.9k tokens. Your core files total 30.9k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~4.6k tokens. Your core files total 30.9k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -172,7 +172,35 @@ Write the question in `voice-agent-talk.md` (or to the owner in the chat that st
 ## 15. Definition of done
 
 - The change does what the task says, and only that; every changed file is in §6.
-- A test covers the new behaviour or the fixed bug; your module tests and the full suite pass (§11).
+- A test covers the new behaviour or the fixed bug; your module tests, the flow tests of every §16 flow your change touches, and the full suite pass (§11, §16).
+- No runtime state file rule in §17 is broken; frontend changes pass the UI rules in §18.
 - `python3 tools/agent_context/build.py --check` passes. If you changed a signature listed in §10 or an import across roles, you ran `python3 tools/agent_context/build.py` and committed the updated `docs/agents/`.
 - Merge gates in §11 hold, or the report says exactly which gate is waiting on whom.
 - CHANGELOG bullet, branch rebased on fresh `main` (not pushed unless the owner said so), report appended.
+
+## 16. System duties: the flows you are part of
+
+The system works only if every step of every flow keeps its promise. When your change touches a step below, run that whole flow's tests (other roles' tests too: run them, do not read them). A red test in another role's module caused by your change is yours to fix in your files, or to report to its owner before merging.
+
+**F8 — Phone sales call**
+
+- Z: SIP call → sales state machine → LLM/TTS ← **you**
+- X5: GET /billing/plans and /health for prices
+```bash
+cd voice-gateway && python3 -m unittest test_voice 2>&1 | tail -5
+```
+
+## 17. Shared files and how to use them
+
+| file | owner | rule |
+|---|---|---|
+| `CHANGELOG.md` | everyone | Append one bullet for your change under today's dated heading (`head -20` to see it). Never edit other bullets. |
+| `docs/agents/**` | generated | Never hand-edit. Run `python3 tools/agent_context/build.py` and commit the result in the same PR when you change a cross-role import, contract or route. |
+| `docs/agents/contracts.json` | generated | Snapshot of every cross-role signature. CI fails if code and snapshot differ: regenerate, and the reviewer sees the contract change in the diff. |
+| `tools/agent_context/roles.json` | OWNER | Boundaries. Ask the owner to move a file between roles. |
+| `talk-*.md, *-talk.md` | each role | Your own file: append only. Another role's file: append a `## FROM → TO:` request only. |
+| `backend/requirements.txt` | X5 | New Python dependency: request from X5 with the reason and pinned version. |
+| `frontend/package.json, package-lock.json` | U | New npm dependency: request from U. |
+| `backend/app/config.py, .env.example` | X5 | New setting/env var: request from X5 with name, default and who reads it. Never put a value in git. |
+| `.github/workflows/**` | X5 | CI changes: request from X5. |
+| `STATE_DIR/tenants/<phone>/*.json (runtime)` | see table | A file with more than one writer role must be written with `state_store.update_json(name, mutate, default, lock=...)` or inside `tenant_file_lock(...)`. `build.py --check` fails otherwise. |

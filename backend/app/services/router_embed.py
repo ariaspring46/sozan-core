@@ -15,7 +15,9 @@ from pathlib import Path
 
 import httpx
 
-from app.services.llm import CLOUD_UA, _auth_scheme, _emit_usage, route_for_surface
+from app.services.llm import CLOUD_UA, route_for_surface
+from app.services.llm import auth_scheme as _auth_scheme
+from app.services.llm import emit_usage as _emit_usage
 from app.services.observe_client import emit_later
 
 log = logging.getLogger("sozan.router.embed")

@@ -40,7 +40,7 @@ git fetch -q origin main && git log --oneline HEAD..origin/main | head
 tail -n 60 storefront-talk.md                    # requests addressed to you; never read the whole file
 ```
 
-Then restate the task in one sentence and list the 1–3 files from §6 you expect to change. If the task needs a file you do not own, go to §13 now instead of starting.
+Then restate the task in one sentence and list the 1–3 files from §6 you expect to change, and which flows in §16 they belong to. If the task needs a file you do not own, go to §13 now instead of starting.
 
 ## 4. Work loop
 
@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~6.9k tokens. Your core files total 19.8k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.0k tokens. Your core files total 19.8k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -67,21 +67,21 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 19.8k | the files most tasks touch; read the relevant one first |
-| active | 56.2k | yours to edit; read only what the task needs |
+| active | 56.3k | yours to edit; read only what the task needs |
 | rare | 0.0k | yours; read only when the task names it |
-| tests | 16.5k | read only the test of the module you change |
+| tests | 16.2k | read only the test of the module you change |
 
 **Core:**
 
 - `backend/app/services/storefront_service.py` (5.5k)
-- `backend/app/services/pay_service.py` (7.8k)
+- `backend/app/services/pay_service.py` (7.7k)
 - `backend/app/api/storefront.py` (2.9k)
-- `backend/app/api/pay.py` (3.6k)
+- `backend/app/api/pay.py` (3.7k)
 
 **Active (you may edit):**
 
-- `backend/app/api/`: `pay.py` (3.6k), `storefront.py` (2.9k)
-- `backend/app/services/`: `pay_service.py` (7.8k), `storefront_service.py` (5.5k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `shop_otp_service.py` (1.8k), `support_service.py` (1.6k)
+- `backend/app/api/`: `pay.py` (3.7k), `storefront.py` (2.9k)
+- `backend/app/services/`: `pay_service.py` (7.7k), `storefront_service.py` (5.5k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `shop_otp_service.py` (1.8k), `support_service.py` (1.6k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.2k)
 - `frontend/app/p/[id]/`: `page.tsx` (0.8k)
@@ -96,70 +96,74 @@ Every other file in the repo belongs to another role (see `docs/agents/README.md
 
 ## 7. What you use from other roles (do not open their files; signatures are here)
 
-**`backend/app/services/persian_text.py`** — owner X1
-```
-def sanitize_persian(text: str, *, limit: int=80) -> str
-```
-**`frontend/components/app-shell.tsx`** — owner X1
+**`frontend/components/app-shell.tsx`** — owner U
 ```
 export function AppShell(
 ```
-**`frontend/components/empty-state.tsx`** — owner X1
+**`frontend/components/auth-image.tsx`** — owner U
+```
+export function AuthImage(
+```
+**`frontend/components/empty-state.tsx`** — owner U
 ```
 export function EmptyState(
 ```
-**`frontend/components/field.tsx`** — owner X1
+**`frontend/components/field.tsx`** — owner U
 ```
 export function Field({ label, children }: { label: string; children: React.ReactNode })
 ```
-**`frontend/components/ui/button.tsx`** — owner X1
+**`frontend/components/sozan-mark.tsx`** — owner U
+```
+export function SozanMark({ className, glow = true }: { className?: string; glow?: boolean })
+```
+**`frontend/components/ui/button.tsx`** — owner U
 ```
 export function Button(
 ```
-**`frontend/components/ui/card.tsx`** — owner X1
+**`frontend/components/ui/card.tsx`** — owner U
 ```
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>)
 ```
-**`frontend/components/ui/input.tsx`** — owner X1
+**`frontend/components/ui/input.tsx`** — owner U
 ```
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)
 ```
-**`frontend/components/ui/select.tsx`** — owner X1
+**`frontend/components/ui/select.tsx`** — owner U
 ```
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)
 ```
-**`frontend/components/ui/textarea.tsx`** — owner X1
+**`frontend/components/ui/textarea.tsx`** — owner U
 ```
 export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>)
 ```
-**`frontend/lib/api.ts`** — owner X1
+**`frontend/lib/api.ts`** — owner U
 ```
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T>
 export function catalogImageUrl(name: string): string
 export function fileUrl(campaignId: string, relPath: string): string
 export function getApiBase(): string
 ```
-**`frontend/lib/digits.ts`** — owner X1
+**`frontend/lib/digits.ts`** — owner U
 ```
 export function money(amount: number): string
 export function parseNonNegativeInt(raw: string): number | null
 export function priceText(price: number, label?: string): string
+```
+**`backend/app/services/persian_text.py`** — owner X1
+```
+def sanitize_persian(text: str, *, limit: int=80) -> str
 ```
 **`backend/app/services/product_image_service.py`** — owner X2
 ```
 def remove_if_unreferenced(name: str) -> bool
 def store(data: bytes, content_type: str, filename: str) -> str
 ```
-**`frontend/components/sozan-mark.tsx`** — owner X2
-```
-export function SozanMark({ className, glow = true }: { className?: string; glow?: boolean })
-```
 **`backend/app/services/channel_scan_service.py`** — owner X3
 ```
-def _looks_like_product_title(title: str) -> bool
-def _scan_dir() -> Path
-def _unattributed_dir() -> Path
+def looks_like_product_title(title: str) -> bool
 def product_title_from_caption(caption: str, brand: str='') -> str | None
+def scan_dir() -> Path
+def unattributed_dir() -> Path
 ```
 **`backend/app/services/chat_media_service.py`** — owner X3
 ```
@@ -184,12 +188,12 @@ def write_catalog_json(root: Path, products: list[dict]) -> Path
 **`backend/app/services/shop_service.py`** — owner X4
 ```
 PROTECTED_SHOP_SLUGS = frozenset({'joahr-froshi', 'cahrm-srai-pars'})
-def _bump_pending(shop: dict) -> dict
-def _factory_category_slug(category_fa: str) -> str
-def _factory_item_sub(title: str, category_fa: str) -> tuple[str, str]
-def _shop() -> dict
-def _shop_is_live(shop: dict) -> bool
+def bump_pending(shop: dict) -> dict
 def bump_pending_build() -> None
+def current_shop() -> dict
+def factory_category_slug(category_fa: str) -> str
+def factory_item_sub(title: str, category_fa: str) -> tuple[str, str]
+def shop_is_live(shop: dict) -> bool
 ```
 **`backend/app/client_ip.py`** — owner X5
 ```
@@ -256,9 +260,8 @@ def get_settings() -> dict
 ```
 **`backend/app/services/tenant_index_service.py`** — owner X5
 ```
-def load() -> dict
-def rebuild(all_rows: list[tuple[str, dict]]) -> dict  # Full rebuild from (phone, {shop, orders}) pairs.
-def slug_owner(index: dict, slug: str) -> str | None
+def lookup(kind: str, key: str, verify: Callable[[str], bool]) -> str | None  # Phone that owns `key`, or None. `verify` checks the tenant's own file.
+def upsert(*, phone: str, slug: str='', order_id: str='', sendbox_id: str='') -> None  # Record a fresh fact. Never raises: the index heals itself on a miss.
 ```
 **`backend/app/services/tenant_lock.py`** — owner X5
 ```
@@ -277,11 +280,8 @@ def iter_tenants() -> list[str]
 def read_json(name: str, default: Any, *, shared: bool=False) -> Any
 def shared_lock() -> Iterator[None]
 def tenant_scope(phone: str) -> Iterator[None]
+def update_json(name: str, mutate, default: Any, *, lock: str) -> Any  # Read-modify-write one tenant file under its tenant_file_lock.
 def write_json(name: str, payload: Any, *, shared: bool=False) -> None
-```
-**`frontend/components/auth-image.tsx`** — owner X5
-```
-export function AuthImage(
 ```
 
 **Backend endpoints your pages call** (ask the owner for the response shape; do not read the file):
@@ -310,7 +310,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `backend/app/services/support_service.py`: `create_ticket` ← X5; `list_all_tickets_for_hub_admin` ← X5; `list_tickets` ← X5; `reply_hub_ticket` ← X5
 - `frontend/components/domain-menu.tsx`: `DomainMenu` ← X4; `ShopState` ← X4; `shopHostLabel` ← X4; `shopPublicUrl` ← X4
 - `frontend/components/shop-settings-form.tsx`: `ShopSettingsForm` ← X5
-- `frontend/lib/site-host.ts`: `isPanelHost` ← X2; `panelOriginFromHost` ← X2
+- `frontend/lib/site-host.ts`: `isPanelHost` ← U; `panelOriginFromHost` ← U
 
 ## 11. Verify (exact commands)
 
@@ -327,6 +327,8 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
 # backend: full suite, once before you open a PR (same command as CI and deploy)
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
   python3 -m unittest discover -s app -p '*_test.py' -t . 2>&1 | tail -5
+# UI rules (U1-U7): must print 'ui_check: 0 problem(s)'
+python3 tools/ui_check.py | tail -5
 # frontend: type-check and build (CI runs it). package-lock.json resolves from registry.npmmirror.com;
 # if your network blocks it, do not edit the lockfile: say so in your report and rely on CI.
 cd frontend && npm ci --no-audit --no-fund >/dev/null && npm run build 2>&1 | tail -15
@@ -383,7 +385,107 @@ Write the question in `storefront-talk.md` (or to the owner in the chat that sta
 ## 15. Definition of done
 
 - The change does what the task says, and only that; every changed file is in §6.
-- A test covers the new behaviour or the fixed bug; your module tests and the full suite pass (§11).
+- A test covers the new behaviour or the fixed bug; your module tests, the flow tests of every §16 flow your change touches, and the full suite pass (§11, §16).
+- No runtime state file rule in §17 is broken; frontend changes pass the UI rules in §18.
 - `python3 tools/agent_context/build.py --check` passes. If you changed a signature listed in §10 or an import across roles, you ran `python3 tools/agent_context/build.py` and committed the updated `docs/agents/`.
 - Merge gates in §11 hold, or the report says exactly which gate is waiting on whom.
 - CHANGELOG bullet, PR opened from your branch, report appended.
+
+## 16. System duties: the flows you are part of
+
+The system works only if every step of every flow keeps its promise. When your change touches a step below, run that whole flow's tests (other roles' tests too: run them, do not read them). A red test in another role's module caused by your change is yours to fix in your files, or to report to its owner before merging.
+
+**F1 — Customer DM → automatic reply**
+
+- X3: channel webhook/poll → inbox_service.handle_inbound
+- Y: maybe_auto_reply → inbox_agent_service.answer (tools, guards)
+- C: payment_link → pay_service.create_order ← **you**
+- X3: reply delivered by the channel adapter
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.inbox_service_test app.services.inbox_agent_service_test app.services.telegram_inbox_test app.services.sendbox_service_test app.services.channel_poll_service_test app.api.inbox_dry_test app.services.customer_memory_service_test 2>&1 | tail -3
+```
+
+**F3 — Onboarding → first storefront**
+
+- X3: onboard_service.complete → channel_scan_service.start_scan
+- C: catalog (storefront_service) and DNS (arvan_dns_service) ← **you**
+- X4: shop_service.start_build → factory
+- C: factory build and live storefront ← **you**
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.onboard_service_test app.services.channel_scan_service_test app.services.storefront_service_test app.services.shop_service_test app.services.shop_pipeline_e2e_test app.services.arvan_dns_service_test app.services.catalog_sync_service_test 2>&1 | tail -3
+```
+
+**F4 — Live storefront edit**
+
+- X1: router routes the sentence to edit_shop
+- X4: apply_live_edit: patch → publish → verify → rollback
+- C: catalog sync to the live storefront ← **you**
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.shop_edit_service_test app.services.shop_edit_verify_test app.services.shop_intent_service_test app.services.catalog_sync_service_test app.services.agentic_regressions_test 2>&1 | tail -3
+```
+
+**F6 — Storefront customer purchase**
+
+- C: /p/ checkout → gateway → mark paid → receipt ← **you**
+- C: stock and catalog sync ← **you**
+- X3: customer OTP by SMS
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.pay_service_test app.api.pay_status_rate_test app.services.shop_otp_service_test app.services.storefront_service_test 2>&1 | tail -3
+```
+
+**F9 — Shared core: tenant state, LLM, budget, events**
+
+- X5: state_store, tenant_lock, llm, ai_budget, observe_client
+- X1/X2/X3/X4/Y/C: call state_store, llm, observe_client, ai_budget through their public API ← **you**
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.state_store_test app.services.tenant_lock_test app.services.llm_test app.services.llm_routing_service_test app.services.ai_budget_service_test app.services.observe_client_test app.services.pipeline_release_test app.services.agentic_regressions_test 2>&1 | tail -3
+```
+
+**F10 — Panel UI**
+
+- U: tokens, components, shell, api.ts
+- all frontend roles: their pages ← **you**
+```bash
+python3 tools/ui_check.py
+cd frontend && npm run build 2>&1 | tail -15
+```
+
+## 17. Shared files and how to use them
+
+| file | owner | rule |
+|---|---|---|
+| `CHANGELOG.md` | everyone | Append one bullet for your change under today's dated heading (`head -20` to see it). Never edit other bullets. |
+| `docs/agents/**` | generated | Never hand-edit. Run `python3 tools/agent_context/build.py` and commit the result in the same PR when you change a cross-role import, contract or route. |
+| `docs/agents/contracts.json` | generated | Snapshot of every cross-role signature. CI fails if code and snapshot differ: regenerate, and the reviewer sees the contract change in the diff. |
+| `tools/agent_context/roles.json` | OWNER | Boundaries. Ask the owner to move a file between roles. |
+| `talk-*.md, *-talk.md` | each role | Your own file: append only. Another role's file: append a `## FROM → TO:` request only. |
+| `backend/requirements.txt` | X5 | New Python dependency: request from X5 with the reason and pinned version. |
+| `frontend/package.json, package-lock.json` | U | New npm dependency: request from U. |
+| `backend/app/config.py, .env.example` | X5 | New setting/env var: request from X5 with name, default and who reads it. Never put a value in git. |
+| `.github/workflows/**` | X5 | CI changes: request from X5. |
+| `STATE_DIR/tenants/<phone>/*.json (runtime)` | see table | A file with more than one writer role must be written with `state_store.update_json(name, mutate, default, lock=...)` or inside `tenant_file_lock(...)`. `build.py --check` fails otherwise. |
+
+**Runtime state files (STATE_DIR/tenants/<phone>/) you share with other roles:**
+
+| file | writers | readers | your rule |
+|---|---|---|---|
+| `channel-scan.json` | X3 | C | read-only for you; never write it |
+| `pay-orders.json` | C | X5 | you are the only writer; keep the shape stable for the readers |
+| `shop.json` | C, X4, X5 | X1 | write only with `update_json(..., lock=...)` or inside `tenant_file_lock` |
+| `support-tickets.json` | C | X5 | you are the only writer; keep the shape stable for the readers |
+
+## 18. UI rules (owner: U; checked by `tools/ui_check.py`)
+
+1. Use design tokens and components/ui/*; no new hex colours or one-off button styles (tools/ui_check.py).
+2. RTL and Persian: Persian copy, Persian digits for numbers sellers see, no left-aligned layouts.
+3. Mobile first: the page works at 390px with no horizontal scroll; check 1440px too.
+4. Every async view has loading, empty and error states (use components/empty-state.tsx).
+5. Accessibility: <img alt>, aria-label on icon-only buttons, rel="noreferrer" on target=_blank, visible focus.
+6. Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host.
+
+Visual change to a shared component, token or the shell: request it from U in `talk-u.md`; do not copy and restyle a component inside your page.

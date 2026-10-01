@@ -1082,7 +1082,7 @@ def _ensure_generated_catalog_photos(payload: dict) -> dict:
     items = payload.get("items") if isinstance(payload.get("items"), list) else []
     if not items:
         return payload
-    dest = channel_scan_service._scan_dir()
+    dest = channel_scan_service.scan_dir()
     for idx, item in enumerate(items[:8], start=1):
         if not isinstance(item, dict):
             continue
@@ -1112,7 +1112,7 @@ def _factory_catalog_payload() -> dict:
     shop = _shop()
     hide_prices = bool(shop.get("hidePrices"))
     products = storefront_service.list_products().get("products") or []
-    scan = channel_scan_service._scan_dir()
+    scan = channel_scan_service.scan_dir()
     items: list[dict] = []
     cats: list[str] = []
     for row in products[:24]:
@@ -1222,7 +1222,7 @@ def _factory_prompt(user_text: str) -> str:
         lines.append(bit)
     catalog = "\n".join(lines) or "کالایی در کاتالوگ نیست"
     grouped = "، ".join(cats) or "بدون دسته"
-    images_dir = str(channel_scan_service._scan_dir())
+    images_dir = str(channel_scan_service.scan_dir())
     extra = "قیمت روی کارت کالا ننویس.\n" if hide_prices else ""
     from app.services import shop_workspace_service
 
@@ -1247,7 +1247,7 @@ def _publish_catalog_images(shop: dict) -> None:
     slug = str(shop.get("slug") or "").strip()
     if not slug or slug in PROTECTED_SHOP_SLUGS:
         return
-    source = channel_scan_service._scan_dir()
+    source = channel_scan_service.scan_dir()
     root = shop_edit_service.build_dir_for(shop)
     for row in storefront_service.list_products().get("products") or []:
         name = Path(str(row.get("image") or "")).name
@@ -1624,7 +1624,7 @@ def _add_media_product(text: str, media: dict) -> str:
     name = str(media.get("name") or "")
     if name:
         src = chat_media_service.resolve(name)
-        dest = channel_scan_service._scan_dir() / Path(name).name
+        dest = channel_scan_service.scan_dir() / Path(name).name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
         image = dest.name
@@ -1636,7 +1636,7 @@ def _add_media_product(text: str, media: dict) -> str:
         image=image,
         source="chat",
         description=blob[:400],
-        category=channel_scan_service._category_from_text(blob)
+        category=channel_scan_service.category_from_text(blob)
         or next(
             (
                 str(row.get("category") or "").strip()
@@ -1995,3 +1995,36 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
             }
         },
     )
+
+# ---- Public API for other roles (docs/agents). Wrappers call the private names at call time, so tests that patch those still work.
+
+def current_shop() -> dict:
+    return _shop()
+
+
+def shop_is_live(shop: dict) -> bool:
+    return _shop_is_live(shop)
+
+
+def bump_pending(shop: dict) -> dict:
+    return _bump_pending(shop)
+
+
+def factory_category_slug(category_fa: str) -> str:
+    return _factory_category_slug(category_fa)
+
+
+def factory_item_sub(title: str, category_fa: str) -> tuple[str, str]:
+    return _factory_item_sub(title, category_fa)
+
+
+def explicit_build(text: str) -> bool:
+    return _explicit_build(text)
+
+
+def explicit_rebuild(text: str) -> bool:
+    return _explicit_rebuild(text)
+
+
+def catalog_add_reply(text: str) -> str | None:
+    return _catalog_add_reply(text)
