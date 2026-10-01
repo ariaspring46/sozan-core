@@ -371,6 +371,24 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
     return panel_pay_url(order_id, "ok")
 
 
+def _resync_storefront_after_paid() -> None:
+    """کاتالوگ استاتیک ویترین بعد از تغییر موجودی هم‌گام شود."""
+    try:
+        from app.services.catalog_sync_service import sync_live
+
+        sync_live()
+    except Exception as exc:
+        from app.services.observe_client import emit_later
+
+        emit_later(
+            kind="shop",
+            title="storefront-resync-failed",
+            surface="shop",
+            status="failed",
+            payload={"error": type(exc).__name__},
+        )
+
+
 def _mark_paid(row: dict, *, ref_id: str) -> None:
     if str(row.get("status") or "") == "paid":
         return
@@ -395,6 +413,7 @@ def _mark_paid(row: dict, *, ref_id: str) -> None:
         channel=str(row.get("channel") or "دایرکت"),
         source="gateway",
     )
+    _resync_storefront_after_paid()
     for line in _stock_lines(row):
         product_id = str(line["productId"])
         try:
@@ -575,7 +594,10 @@ def list_receipts() -> list[dict]:
         ]
 
 
-def review_receipt(*, order_no: str, approve: bool, note: str = "") -> dict:
+def review_receipt(*, order_no: str, approve: bool | None = None, note: str = "", decision: str = "") -> dict:
+    if approve is None:
+        # قرارداد UI «decision» است؛ approve سازگاری قدیمی
+        approve = str(decision or "").strip().lower() in {"approve", "approved", "ok", "accept"}
     with tenant_scope(current_tenant()):
         orders = _orders()
         row = next(

@@ -115,8 +115,14 @@ async def panel_review_receipt(
     _user=Depends(require_permission("campaigns:write")),
 ):
     try:
+        approve = body.get("approve")
+        if approve is None:
+            approve = body.get("decision")
         return pay_service.review_receipt(
-            order_no=order_no, approve=bool(body.get("approve")), note=str(body.get("note") or "")
+            order_no=order_no,
+            approve=bool(approve) if approve is not None else None,
+            note=str(body.get("note") or ""),
+            decision=str(body.get("decision") or ""),
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
