@@ -29,6 +29,7 @@ DEFAULT_MODEL = "black-forest-labs/flux.2-klein-4b"
 DEFAULT_EDIT_MODEL = "bytedance-seed/seedream-4.5"
 DEFAULT_FALLBACK_MODEL = "Gemini-3.1-Flash-Image-Preview"
 POST_SIZE = (1080, 1080)
+PORTRAIT_POST_SIZE = (1080, 1350)
 STORY_SIZE = (1080, 1920)
 HARD_EDIT_MARKS = ("ویرایش عکس", "عکس را ویرایش", "همین عکس را")
 DEFAULT_CUTOUT = "isnet-general-use"
@@ -50,7 +51,8 @@ class ImageHttpError(Exception):
 
 def snap_size(width: int, height: int) -> tuple[int, int]:
     if int(height) > int(width):
-        return STORY_SIZE
+        # 4:5 پست اینستاگرام است؛ فقط نسبت‌های باریک‌تر از 7:5 استوری می‌شوند.
+        return STORY_SIZE if int(height) * 5 >= int(width) * 7 else PORTRAIT_POST_SIZE
     return POST_SIZE
 
 
@@ -776,6 +778,13 @@ def _complete(
         raise
 
 
+def _aspect_of(size: tuple[int, int]) -> str:
+    width, height = int(size[0]), int(size[1])
+    if height > width:
+        return "9:16" if height * 5 >= width * 7 else "4:5"
+    return "1:1"
+
+
 def _body(model: str, prompt: str, size: tuple[int, int], source: bytes) -> dict:
     text = (prompt or DEFAULT_STILL)[:800]
     if source:
@@ -790,7 +799,7 @@ def _body(model: str, prompt: str, size: tuple[int, int], source: bytes) -> dict
         "model": model,
         "messages": [{"role": "user", "content": content}],
         "modalities": ["image"],
-        "image_config": {"aspect_ratio": "9:16" if size[1] > size[0] else "1:1"},
+        "image_config": {"aspect_ratio": _aspect_of(size)},
     }
 
 
