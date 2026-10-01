@@ -25,3 +25,6 @@
 
 ## C
 اول `docs/agents/C.md`. فایل‌های حیاتی‌ات: `storefront_service.py`، `pay_service.py`، `api/storefront.py`، `api/pay.py` (+ کارخانهٔ قالب‌ها و `frontend/app/p/**`). گزارش: `storefront-talk.md`. نکتهٔ نقش: بازسازی کامل روی ویترین زنده ممنوع (فقط قالب+سیاست+سینک)؛ DNS فقط خشک (`SOZAN_EDGE_DRY`)؛ عکس کالا مسیر ابری است؛ هر UI با قاعدهٔ ۱۸:۴۰ آزمون زنده می‌گیرد.
+
+## U
+اول `docs/agents/U.md` را کامل بخوان — کل هارنس توست (مرز فایل‌ها، توکن‌های طراحی، قواعد، دستور تست). گزارش: `talk-u.md`. شاخه: `u/<شماره>-<موضوع>`. فایل‌های حیاتی: `frontend/app/globals.css`، `frontend/tailwind.config.js`، `frontend/components/app-shell.tsx`، `frontend/lib/api.ts`، `frontend/components/ui/button.tsx`. نکتهٔ نقش: تو **قواعد و بلوک‌های سازنده** را می‌سازی؛ صفحات فیچر مال نقش‌های فیچر است. پذیرش UI: آزمون زنده ۳۹۰/۱۴۴۰ + کیبورد + کنتراست + `tools/ui_check.py`. اولین کار تو: نقد صفحهٔ محصول galri-simargh در talk.md (۲ اکت) — دکمهٔ سبدِ مرده، گالری، breadcrumb، جای‌نگه‌دار بی‌عکس.
