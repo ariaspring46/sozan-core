@@ -1,0 +1,23 @@
+<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8">
+<style>
+@font-face{font-family:Estedad;src:url(../../frontend/public/fonts/estedad-arabic.woff2);font-weight:100 900}
+*{margin:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;background:#1F1B18;overflow:hidden;font-family:Estedad,sans-serif}
+.f{position:relative;width:1080px;height:1920px;
+ background:radial-gradient(ellipse 620px 620px at 540px 760px,rgba(232,168,124,.28),rgba(196,92,38,.10) 55%,transparent 75%),
+ radial-gradient(ellipse 1100px 1500px at 540px 960px,transparent 55%,rgba(0,0,0,.45)),#1F1B18}
+.mark{position:absolute;left:300px;top:540px;width:480px;height:480px;filter:drop-shadow(0 0 60px rgba(196,92,38,.45))}
+.name{position:absolute;top:1060px;width:100%;text-align:center;font-weight:800;font-size:150px;color:#F6EFE6;line-height:1}
+.tag{position:absolute;top:1260px;width:100%;text-align:center;font-weight:500;font-size:50px;color:#E8A87C}
+.url{position:absolute;top:1350px;width:100%;text-align:center;font-weight:400;font-size:38px;color:#F6EFE6;opacity:.7;direction:ltr;letter-spacing:2px}
+.grain{position:absolute;inset:0;opacity:.07;mix-blend-mode:overlay}
+</style>
+<div class="f">
+<svg class="mark" viewBox="0 0 240 240"><defs><mask id="cut"><rect width="240" height="240" fill="#fff"/>
+<path fill="#000" transform="translate(-18 -69.4) scale(1.15)" d="M120 112C126 128 146 138 146 160C146 176 134 186 120 186C106 186 94 176 94 162C94 150 102 144 106 136C109 143 113 147 117 148C120 136 116 124 120 112Z"/></mask></defs>
+<g mask="url(#cut)" fill="#C45C26"><rect x="16" y="20" width="208" height="164" rx="56"/><path d="M142 170C146 200 166 216 198 224C186 208 184 190 190 170Z"/></g></svg>
+<div class="name">سوزان</div>
+<div class="tag">چراغِ دکانت، همیشه روشن</div>
+<div class="url">sozan-core.ir</div>
+<svg class="grain" width="1080" height="1920"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>
+</div></html>
