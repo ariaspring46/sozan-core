@@ -27,8 +27,9 @@ class Settings(BaseSettings):
     sozan_sms_template: str = ""
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
-    cutout_provider: str = "clipdrop"
+    cutout_provider: str = "openrouter"
     cutout_api_key: str = ""
+    cutout_openrouter_model: str = ""
     cutout_queue_limit: int = 3
     melipayamak_otp_apikey: str = ""
     melipayamak_username: str = ""

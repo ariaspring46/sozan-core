@@ -2,6 +2,12 @@
 
 هر برنچ یک بند تاریخ‌دار اینجاست. رمز، توکن و `.env` ننویس.
 
+## 2026-10-01 — برش پس‌زمینه با همان کلید OpenRouter (تصمیم مالک ۰۹:۳۰)
+
+- `CUTOUT_PROVIDER` پیش‌فرض `openrouter` شد؛ ClipDrop/removebg/photoroom همچنان به‌عنوان گزینه با env باقی‌اند
+- مدل ویرایش پیش‌فرض: gemini-2.5-flash-image-preview (با `CUTOUT_OPENROUTER_MODEL` قابل تغییر)؛ خروجی با آلفا مستقیم پذیرفته می‌شود و پس‌زمینهٔ سفید یکدست با flood-fill قطعی شفاف می‌شود
+- هزینهٔ هر برش از usage.cost در دفتر ابر می‌نشیند
+
 ## 2026-09-30 — برش پس‌زمینهٔ کالا ابری شد
 
 - `CUTOUT_PROVIDER` (پیش‌فرض clipdrop؛ removebg/photoroom هم هست) + `CUTOUT_API_KEY` در env هاب؛ ترافیک از CHANNEL_PROXY

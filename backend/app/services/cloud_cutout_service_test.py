@@ -22,6 +22,7 @@ class CloudCutoutTests(unittest.TestCase):
         for key, value in (
             ("cutout_provider", "clipdrop"),
             ("cutout_api_key", "CUTOUT-KEY-123"),
+            ("cloud_llm_url", "https://openrouter.ai/api/v1"),
         ):
             patcher = patch.object(settings, key, value)
             patcher.start()
@@ -64,7 +65,7 @@ class CloudCutoutTests(unittest.TestCase):
                 asyncio.run(cloud_cutout_service.remove_background(b"input"))
         self.emit.assert_called_once()
         payload = self.emit.call_args.kwargs.get("payload") or {}
-        self.assertEqual(payload.get("http"), 402)
+        self.assertEqual(payload.get("returnCode"), "http-402")
 
     def test_disabled_without_key(self) -> None:
         with patch.object(settings, "cutout_api_key", ""):
@@ -104,7 +105,7 @@ class CutoutFallbackTests(unittest.TestCase):
 
     def test_alpha_matches_local_shape(self) -> None:
         # قرارداد آلفا: خروجی ابری L-mask هم‌اندازهٔ عکس اصلی می‌شود (همان شکل isnet)
-        import asyncio
+        import contextlib
         import io
 
         from PIL import Image
@@ -123,11 +124,15 @@ class CutoutFallbackTests(unittest.TestCase):
             return out.getvalue(), 0.005
 
         patches = [
-            patch.object(settings, "cutout_api_key", "TESTKEY"),
+            patch.object(settings, "cutout_provider", "openrouter"),
+            patch.object(settings, "cloud_llm_url", "https://openrouter.ai/api/v1"),
+            patch.dict(
+                "os.environ",
+                {"open_router_api_token": "OR-T", "CLOUD_LLM_URL": "https://openrouter.ai/api/v1"},
+                clear=False,
+            ),
             patch.object(cc, "remove_background", new=fake_remove),
         ]
-        import contextlib
-
         with contextlib.ExitStack() as stack:
             for item in patches:
                 stack.enter_context(item)
