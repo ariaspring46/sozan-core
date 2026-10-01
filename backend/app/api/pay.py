@@ -94,7 +94,7 @@ async def storefront_ticket(
     if not tenant:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "فروشگاه پیدا نشد")
     image_name = ""
-    if file is not None and file.filename:
+    if file is not None and file.filename and file.size != 0:
         data = await file.read()
         if len(data) > 4_000_000:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "عکس بزرگ‌تر از حد مجاز است")
