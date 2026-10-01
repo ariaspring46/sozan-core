@@ -16,6 +16,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r backend/requirements.txt
+      # Every tracked file must have exactly one owner role (docs/agents).
+      - run: python3 tools/agent_context/build.py --check
       # Same command as deploy/deploy-api.sh; STATE_DIR keeps background writes out of backend/data.
       - name: unit tests
         working-directory: backend
