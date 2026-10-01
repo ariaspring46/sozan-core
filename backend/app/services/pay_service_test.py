@@ -387,29 +387,48 @@ class TenantIndexRuntimeTests(unittest.TestCase):
 
 
 class RateLimitStatusTests(unittest.TestCase):
-    def test_status_rate_limited_per_ip(self) -> None:
-        """سقف ۶۰ درخواست در دقیقه برای /p/{id}/status per IP."""
+    class _Redis:
+        def __init__(self) -> None:
+            self.hits: dict[str, int] = {}
+
+        async def incr(self, key: str) -> int:
+            self.hits[key] = self.hits.get(key, 0) + 1
+            return self.hits[key]
+
+        async def expire(self, key: str, seconds: int) -> None:
+            return None
+
+    def test_status_poll_is_limited_per_ip(self) -> None:
+        """سقف ۶۰ درخواست در دقیقه برای هر IP؛ IP دیگر آزاد است."""
         import asyncio
-        import tempfile
-        import httpx
 
         from unittest.mock import patch
 
-        from app.config import settings
+        from app.services import pay_service
 
-        async def run() -> int:
-            from app.main import app
+        redis = self._Redis()
 
-            transport = httpx.ASGITransport(app=app)
-            statuses = []
-            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-                for _ in range(61):
-                    res = await client.get("/p/nonexistent-id/status")
-                    statuses.append(res.status_code)
-            return statuses
+        async def run() -> tuple[list[bool], bool]:
+            with patch("app.redis_client.redis_client", redis):
+                first = [await pay_service.allow_status_poll("10.0.0.1") for _ in range(pay_service.STATUS_POLL_LIMIT + 1)]
+                other = await pay_service.allow_status_poll("10.0.0.2")
+            return first, other
 
-        with tempfile.TemporaryDirectory() as raw:
-            with patch.object(settings, "state_dir", raw):
-                statuses = asyncio.run(run())
-        self.assertEqual(statuses[0], 404)
-        self.assertTrue(any(s in (404, 429) for s in statuses))
+        first, other = asyncio.run(run())
+        self.assertTrue(all(first[: pay_service.STATUS_POLL_LIMIT]))
+        self.assertFalse(first[-1])
+        self.assertTrue(other)
+
+    def test_status_poll_fails_open_without_redis(self) -> None:
+        import asyncio
+
+        from unittest.mock import patch
+
+        from app.services import pay_service
+
+        class Broken:
+            async def incr(self, key: str) -> int:
+                raise ConnectionError("down")
+
+        with patch("app.redis_client.redis_client", Broken()):
+            self.assertTrue(asyncio.run(pay_service.allow_status_poll("10.0.0.1")))

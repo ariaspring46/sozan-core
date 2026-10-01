@@ -32,17 +32,36 @@ def oauth_base() -> str:
     return (settings.sendbox_oauth_url or "").strip()
 
 
+def _derive(source: str) -> str:
+    return hmac.new(source.encode(), b"sendbox-webhook", hashlib.sha256).hexdigest()
+
+
 def webhook_secret() -> str:
-    # جدا از JWT_SECRET؛ اگر SENDBOX_WEBHOOK_SECRET ست نشده باشد رفتار قدیمی
+    # جدا از JWT_SECRET؛ اگر SENDBOX_WEBHOOK_SECRET ست نشده باشد رفتار قدیمی.
     dedicated = str(settings.sendbox_webhook_secret or "").strip()
-    source = dedicated.encode() if dedicated else settings.jwt_secret.encode()
-    return hmac.new(source, b"sendbox-webhook", hashlib.sha256).hexdigest()
+    return _derive(dedicated or settings.jwt_secret)
+
+
+def _legacy_window_open() -> bool:
+    import datetime as _dt
+
+    raw = str(settings.sendbox_webhook_legacy_until or "").strip()
+    try:
+        return _dt.date.today() <= _dt.date.fromisoformat(raw)
+    except ValueError:
+        return False
 
 
 def valid_webhook_token(token: str) -> bool:
     got = str(token or "").strip()
-    want = webhook_secret()
-    return bool(got) and hmac.compare_digest(got, want)
+    if not got:
+        return False
+    if hmac.compare_digest(got, webhook_secret()):
+        return True
+    # دورهٔ چرخش: توکن قدیمی (مشتق از JWT) تا تاریخ LEGACY_UNTIL هم قبول است.
+    if str(settings.sendbox_webhook_secret or "").strip() and _legacy_window_open():
+        return hmac.compare_digest(got, _derive(settings.jwt_secret))
+    return False
 
 
 def webhook_url() -> str:
@@ -312,12 +331,13 @@ def tenant_for_sendbox_account(account_id: str) -> str:
     ident = str(account_id or "").strip()
     if not ident:
         return ""
-    for phone in iter_tenants():
+    from app.services import tenant_index_service
+
+    def owns(phone: str) -> bool:
         with tenant_scope(phone):
-            for row in channel_service.iter_accounts():
-                if channel_service.sendbox_account_id(row) == ident:
-                    return phone
-    return ""
+            return any(channel_service.sendbox_account_id(row) == ident for row in channel_service.iter_accounts())
+
+    return tenant_index_service.lookup("sendbox", ident, owns) or ""
 
 
 def bind_instagram(*, account_id: str, phone: str, handle: str = "") -> dict:
@@ -343,6 +363,9 @@ def bind_instagram(*, account_id: str, phone: str, handle: str = "") -> dict:
             {"ok": True, "connected": True, "handle": name, "display": name, "error": ""},
         )
         _kick_scan(handle=name, sendbox_id=ident)
+        from app.services import tenant_index_service
+
+        tenant_index_service.upsert(phone=tenant, sendbox_id=ident)
         return verified
 
 

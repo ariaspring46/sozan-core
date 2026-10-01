@@ -74,54 +74,64 @@ def outbox_path() -> Any:
 
 
 _OUTBOX_MAX_ROWS = 2000
+_OUTBOX_KEEP_ROWS = 1600  # after a trim: room for ~400 appends before the next rewrite
+_OUTBOX_MAX_BYTES = 2_000_000
 _OUTBOX_COOLDOWN = 30.0
 _flush_cooldown_until = 0.0
+_outbox_lock = threading.Lock()
+_outbox_rows: dict[str, int] = {}
+_dropped_pending = 0
+
+
+def _read_lines(path: Any) -> list[str]:
+    if not path.is_file():
+        return []
+    return [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _write_lines(path: Any, lines: list[str]) -> None:
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+    tmp.replace(path)
+    _outbox_rows[str(path)] = len(lines)
 
 
 def _append_outbox(body: dict[str, Any]) -> None:
+    """One cheap append. The file is rewritten only when it passes the cap, and
+    then down to 80%, so a long tunnel outage costs O(1) per event, not O(n).
+    It never emits an event itself: the drop count is reported after the next
+    successful flush (an event here would be queued here again, forever)."""
+    global _dropped_pending
     row = dict(body)
     row.setdefault("queuedAt", time.time())
     row.setdefault("attempts", 0)
+    line = json.dumps(row, ensure_ascii=False)
     try:
-        path = outbox_path()
-        existing: list[str] = []
-        dropped = 0
-        if path.is_file():
-            existing = path.read_text(encoding="utf-8").splitlines()
-        over = len(existing) + 1 - _OUTBOX_MAX_ROWS
-        if over > 0:
-            # سقف صف: قدیمی‌ترین‌ها دور ریخته می‌شوند؛ تازه‌ها می‌مانند.
-            dropped = over
-            existing = existing[over:]
-        with path.open("w", encoding="utf-8") as handle:
-            if dropped:
-                handle.write(json.dumps({"dropped": dropped, "queuedAt": time.time()}) + "\n")
-            for line in existing:
+        with _outbox_lock:
+            path = outbox_path()
+            key = str(path)
+            if key not in _outbox_rows:
+                _outbox_rows[key] = len(_read_lines(path))
+            with path.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
-            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-        if dropped:
-            emit_later(kind="observe", title="observe-outbox-dropped", surface="observe", status="error", payload={"dropped": dropped})
+            _outbox_rows[key] += 1
+            if _outbox_rows[key] > _OUTBOX_MAX_ROWS or path.stat().st_size > _OUTBOX_MAX_BYTES:
+                lines = _read_lines(path)
+                keep = lines[-_OUTBOX_KEEP_ROWS:]
+                _dropped_pending += len(lines) - len(keep)
+                _write_lines(path, keep)
     except Exception:
         pass
 
 
 def _rewrite_outbox(rows: list[dict[str, Any]]) -> None:
-    path = outbox_path()
-    if not rows:
-        path.write_text("", encoding="utf-8")
-        return
-    path.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
+    with _outbox_lock:
+        _write_lines(outbox_path(), [json.dumps(row, ensure_ascii=False) for row in rows])
 
 
 def load_outbox() -> list[dict[str, Any]]:
-    path = outbox_path()
-    if not path.is_file():
-        return []
     rows: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
+    for line in _read_lines(outbox_path()):
         try:
             item = json.loads(line)
         except json.JSONDecodeError:
@@ -141,28 +151,44 @@ async def _post_event(body: dict[str, Any]) -> bool:
 
 
 async def flush_outbox(limit: int = 40) -> int:
-    global _flush_cooldown_until
+    """Send up to `limit` queued events. Rows appended while we were sending stay."""
+    global _flush_cooldown_until, _dropped_pending
     if time.time() < _flush_cooldown_until:
         return 0
-    rows = load_outbox()
-    if not rows:
+    with _outbox_lock:
+        lines = _read_lines(outbox_path())
+    if not lines:
         return 0
-    kept: list[dict[str, Any]] = []
+    done: set[str] = set()
     sent = 0
-    for index, row in enumerate(rows):
-        if index >= limit:
-            kept.append(row)
+    for line in lines[:limit]:
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            done.add(line)  # garbage is not worth retrying
             continue
-        ok = await _post_event(row)
-        if ok:
+        if not isinstance(row, dict) or ("dropped" in row and len(row) <= 2):
+            done.add(line)
+            continue
+        if await _post_event(row):
             sent += 1
-            continue
-        row["attempts"] = int(row.get("attempts") or 0) + 1
-        kept.append(row)
-    _rewrite_outbox(kept)
-    if sent == 0 and kept:
+            done.add(line)
+    if done:
+        with _outbox_lock:
+            path = outbox_path()
+            _write_lines(path, [item for item in _read_lines(path) if item not in done])
+    if sent == 0 and len(done) < len(lines):
         # تونل قطع است؛ ۳۰ ثانیه دوباره فایل را باز نکن.
         _flush_cooldown_until = time.time() + _OUTBOX_COOLDOWN
+    if sent and _dropped_pending:
+        count, _dropped_pending = _dropped_pending, 0
+        await emit(
+            kind="observe",
+            title="observe-outbox-dropped",
+            surface="observe",
+            status="error",
+            payload={"dropped": count},
+        )
     return sent
 
 

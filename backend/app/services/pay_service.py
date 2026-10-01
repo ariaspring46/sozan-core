@@ -51,6 +51,32 @@ def _save_orders(rows: list[dict]) -> None:
     write_json("pay-orders.json", (keep + done)[-400:])
 
 
+def _append_order(row: dict) -> None:
+    orders = _orders()
+    orders.append(row)
+    _save_orders(orders)
+    from app.services import tenant_index_service
+
+    tenant_index_service.upsert(phone=str(row.get("phone") or current_tenant()), order_id=str(row.get("id") or ""))
+
+
+STATUS_POLL_LIMIT = 60
+
+
+async def allow_status_poll(ip: str) -> bool:
+    """Public order pages are unauthenticated: at most 60 hits a minute per visitor IP."""
+    from app.redis_client import redis_client
+
+    try:
+        key = f"pay:st:{ip or 'no-ip'}"
+        hits = await redis_client.incr(key)
+        if hits == 1:
+            await redis_client.expire(key, 60)
+        return hits <= STATUS_POLL_LIMIT
+    except Exception:
+        return True  # بدون Redis سقف نمی‌ماند، اما صفحهٔ پرداخت نمی‌ایستد
+
+
 def _pending() -> dict:
     stored = read_json("pay-pending.json", {}, shared=True)
     return stored if isinstance(stored, dict) else {}
@@ -126,12 +152,18 @@ def locate_order(order_id: str) -> tuple[str, dict] | None:
     wanted = str(order_id or "").strip()
     if not wanted:
         return None
-    for phone in iter_tenants():
+    from app.services import tenant_index_service
+
+    def has_order(phone: str) -> bool:
         with tenant_scope(phone):
-            row = get_order(wanted)
-            if row:
-                return phone, row
-    return None
+            return get_order(wanted) is not None
+
+    phone = tenant_index_service.lookup("order", wanted, has_order)
+    if not phone:
+        return None
+    with tenant_scope(phone):
+        row = get_order(wanted)
+    return (phone, row) if row else None
 
 
 def public_order(row: dict) -> dict:
@@ -210,9 +242,7 @@ async def create_order(
         url = f"/p/{order_id}"
         row["gateway"] = "receipt"
         row["owner"] = "seller"
-        orders = _orders()
-        orders.append(row)
-        _save_orders(orders)
+        _append_order(row)
         out = public_order(row)
         out["payUrl"] = url
         out["paymentMethods"] = ["receipt"]
@@ -221,9 +251,7 @@ async def create_order(
         url = f"https://dry-mock.invalid/p/{order_id}"
         row["authority"] = order_id
         row["startPayUrl"] = url
-        orders = _orders()
-        orders.append(row)
-        _save_orders(orders)
+        _append_order(row)
         out = public_order(row)
         out["payUrl"] = url
         return out
@@ -251,9 +279,7 @@ async def create_order(
         row["apiKey"] = str(route.get("apiKey") or "")
     if not row["authority"] or not row["startPayUrl"]:
         raise ValueError("درگاه شناسه پرداخت نداد")
-    orders = _orders()
-    orders.append(row)
-    _save_orders(orders)
+    _append_order(row)
     _put_pending(row["authority"], {"phone": phone, "orderId": order_id, "gateway": route["id"]})
     return public_order(row)
 
@@ -435,26 +461,12 @@ def find_tenant_by_slug(slug: str) -> str | None:
         return None
     from app.services import tenant_index_service
 
-    data = tenant_index_service.load()
-    phone = tenant_index_service.slug_owner(data, wanted)
-    if phone:
+    def owns_slug(phone: str) -> bool:
         with tenant_scope(phone):
             shop = read_json("shop.json", {})
-            if isinstance(shop, dict) and str(shop.get("slug") or "").strip() == wanted:
-                return phone
-    # فهرست کهنه بود — یک بار پیمایش کامل و ترمیم
-    found = None
-    rows = []
-    for p_phone in iter_tenants():
-        with tenant_scope(p_phone):
-            shop = read_json("shop.json", {})
-            slug_now = str(shop.get("slug") or "").strip()
-            orders = [str(r.get("id") or "") for r in read_json("pay-orders.json", []) if isinstance(r, dict)]
-            rows.append((p_phone, {"shop": shop, "orderIds": orders}))
-            if slug_now == wanted and found is None:
-                found = p_phone
-    tenant_index_service.rebuild(rows)
-    return found
+        return isinstance(shop, dict) and str(shop.get("slug") or "").strip() == wanted
+
+    return tenant_index_service.lookup("slug", wanted, owns_slug)
 
 
 def ensure_pay_secret() -> str:

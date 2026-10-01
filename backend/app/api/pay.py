@@ -236,7 +236,9 @@ async def shop_otp_verify(body: ShopOtpVerifyIn):
 
 
 @router.get("/p/{order_id}/status")
-async def pay_status(order_id: str):
+async def pay_status(order_id: str, request: Request):
+    if not await pay_service.allow_status_poll(client_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست بیش از حد است")
     found = pay_service.locate_order(order_id)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "سفارش پیدا نشد")
@@ -245,7 +247,9 @@ async def pay_status(order_id: str):
 
 
 @router.get("/p/{order_id}")
-async def start_pay(order_id: str):
+async def start_pay(order_id: str, request: Request):
+    if not await pay_service.allow_status_poll(client_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست بیش از حد است")
     try:
         url = pay_service.start_url(order_id)
     except KeyError as exc:

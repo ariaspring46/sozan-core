@@ -203,9 +203,13 @@ def request_withdraw(*, amount: int, iban: str, name: str = "") -> dict:
             rows = []
         rows.append(row)
         # درخواست‌های در انتظار هرگز حذف نمی‌شوند؛ فقط تاریخچهٔ رسیدگی‌شده به ۸۰ آخر محدود است.
-        pending = [r for r in rows if str(r.get("status") or "") == "pending"]
         settled = [r for r in rows if str(r.get("status") or "") != "pending"]
-        write_json("withdrawals.json", (pending + settled[-80:]))
+        keep_settled = {id(r) for r in settled[-80:]}
+        # ترتیب زمانی حفظ می‌شود (کیف «۲۰ تای آخر» را نشان می‌دهد)؛ pending هرگز حذف نمی‌شود.
+        write_json(
+            "withdrawals.json",
+            [r for r in rows if str(r.get("status") or "") == "pending" or id(r) in keep_settled],
+        )
         _append("withdraw_hold", -amount, order_id=row["id"], note=sheba)
         return {"withdraw": row, "wallet": snapshot()}
 

@@ -95,6 +95,12 @@ async def lifespan(_app: FastAPI):
 
     migrate_files()
     await migrate_campaign_ids()
+    try:
+        from app.services import tenant_index_service
+
+        tenant_index_service.build_all()
+    except Exception:
+        log.exception("tenant index build failed; lookups will rebuild on first miss")
     from app.services import router_service
 
     router_service.clear_dead_busy()
