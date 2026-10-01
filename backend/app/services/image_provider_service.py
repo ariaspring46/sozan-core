@@ -19,6 +19,7 @@ log = logging.getLogger("sozan.image")
 
 FAIL_TEXT = "ساخت تصویر الان ممکن نیست، چند دقیقهٔ دیگر دوباره بگو"
 SUBJECT_FAIL = "تصویر با کالای درخواستی جور نشد، دوباره بگو"
+BUDGET_FAIL = "سقف هزینهٔ هوش مصنوعی امروز پر شده؛ ساخت تصویر فردا دوباره باز می‌شود"
 DEFAULT_STILL = (
     "cinematic product still life on a clean studio surface, soft directional light, "
     "empty shop, no people, no text, no logos"
@@ -121,6 +122,14 @@ def generate_image(
         _emit_failed("plan", DEFAULT_EDIT_MODEL)
         return _finish(_failed())
     chosen = model_for(edit=scene, plan=plan_id)
+    capped = _image_budget_capped()
+    if capped:
+        # Images are the most expensive cloud call; the same tenant/company cap as text applies.
+        _emit_failed(f"budget-{capped}", chosen)
+        out = _failed()
+        out["message"] = BUDGET_FAIL
+        last_error = "budget"
+        return _finish(out)
 
     def once(prompt_text: str) -> dict:
         if raw and not scene:
@@ -934,9 +943,10 @@ def _apply_guard(result: dict, subject: str, remake) -> dict:
     if second.get("png"):
         second_ok, second_cost = _ask_subject(second["png"], name)
     total = _add_cost(cost, second_cost)
-    if second_ok is True:
+    # Same rule as the first pass: only an explicit "no" rejects; an unreachable guard does not.
+    if second.get("png") and second_ok is not False:
         second = dict(second)
-        second["guard"] = True
+        second["guard"] = second_ok
         second["guard_cost"] = total
         second["cost"] = _add_cost(result.get("cost"), second.get("cost"))
         return second
@@ -1027,7 +1037,8 @@ def _same_product_guard(source: bytes, result: dict, remake) -> dict:
     if second.get("png"):
         second_ok, second_cost = _ask_same(source, second["png"])
     total = _add_cost(cost, second_cost)
-    if second_ok is True:
+    # Same rule as the first pass: only an explicit "no" rejects; an unreachable guard does not.
+    if second.get("png") and second_ok is not False:
         kept = dict(second)
         kept["guard_cost"] = _add_cost(kept.get("guard_cost"), total)
         kept["cost"] = _add_cost(result.get("cost"), second.get("cost"))
@@ -1140,6 +1151,12 @@ def _proxy_for(url: str) -> str | None:
 
 def _host(url: str) -> str:
     return (urlparse(url).hostname or "").lower()
+
+
+def _image_budget_capped() -> str | None:
+    from app.services.llm import _budget_capped
+
+    return _budget_capped("image")
 
 
 def _emit_usage(*, model: str, provider: str, cost: float | None, nbytes: int) -> None:

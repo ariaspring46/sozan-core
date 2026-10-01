@@ -12,7 +12,7 @@ import httpx
 
 from app.config import settings
 from app.services import ai_budget_service
-from app.services.observe_client import emit_later, llm_headers
+from app.services.observe_client import emit_later, llm_headers, safe_text
 
 log = logging.getLogger("sozan.llm")
 
@@ -192,8 +192,16 @@ def _budget_capped(surface: str) -> str | None:
     """Cloud is skipped when the tenant or company hit its cap. Voice never blocks."""
     try:
         reason = ai_budget_service.cloud_blocked(surface=surface)
-    except Exception:
+    except Exception as exc:
+        # Still fail-open (a broken ledger must not silently downgrade every reply), but visible.
         log.warning("ai-budget check failed; cloud stays allowed", exc_info=True)
+        emit_later(
+            kind="ai-budget",
+            title="budget-check-failed",
+            surface=surface,
+            status="error",
+            payload={"errorClass": type(exc).__name__},
+        )
         return None
     if reason:
         emit_later(
@@ -593,7 +601,7 @@ def report_llm_fail(
             "errorClass": error_class,
             "detail": (detail or "")[:400],
             "requestId": request_id,
-            "prompt": (prompt or "")[:240],
+            "prompt": safe_text(prompt, 240),
         },
     )
 

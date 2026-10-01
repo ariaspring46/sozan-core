@@ -24,6 +24,12 @@ def _payload(blob: bytes, *, cost: float = 0.014, provider: str = "Together") ->
 
 
 class ImageCutoverTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Routing/provider behaviour only; the budget gate has its own test (agentic_regressions_test).
+        cap = patch("app.services.image_provider_service._image_budget_capped", return_value=None)
+        cap.start()
+        self.addCleanup(cap.stop)
+
     def test_parse_data_uri_and_body_is_image_only(self) -> None:
         blob = _png()
         parsed = image_provider_service._image_bytes(_payload(blob))

@@ -1,3 +1,5 @@
+import asyncio
+
 from pydantic import BaseModel, Field
 
 from app.api.chat_payload import read_chat_payload
@@ -20,7 +22,7 @@ class BuildIn(BaseModel):
 
 @router.get("")
 async def get_shop(_user=Depends(require_permission("campaigns:read"))):
-    return shop_service.snapshot()
+    return await asyncio.to_thread(shop_service.snapshot)
 
 
 def _idempotency_key(request: Request) -> str:
@@ -57,17 +59,18 @@ async def shop_build(request: Request, body: BuildIn, _user=Depends(require_perm
     cached = idempotency_service.recall("shop-build", key, stamp)
     if cached is not None:
         return cached
-    shop = shop_service.snapshot()["shop"]
+    shop = (await asyncio.to_thread(shop_service.snapshot))["shop"]
     if not shop.get("slug") and not onboard_service.brief_ready():
         return {
             "result": {"ok": False, "error": "اول در چت بگو چه سایتی می‌خواهی؛ سبک و رنگ لازم است."},
-            **shop_service.snapshot(),
+            **(await asyncio.to_thread(shop_service.snapshot)),
         }
-    result = shop_service.start_build(
+    result = await asyncio.to_thread(
+        shop_service.start_build,
         prompt=body.prompt or shop.get("brand") or "",
         rebuild=bool(body.rebuild and shop.get("slug")),
         revise_only=True if body.reviseOnly else (False if body.rebuild else None),
     )
-    out = {"result": result, **shop_service.snapshot()}
+    out = {"result": result, **(await asyncio.to_thread(shop_service.snapshot))}
     idempotency_service.put("shop-build", key, out, stamp)
     return out

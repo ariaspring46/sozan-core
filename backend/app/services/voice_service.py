@@ -131,4 +131,5 @@ async def learn(*, platform: str, handle: str, samples: str) -> dict:
 async def draft_reply(customer_text: str, thread: dict | None = None) -> str | None:
     from app.services.inbox_agent_service import answer
 
-    return await answer(customer_text, thread=thread, source="voice")
+    # The inbox auto-reply is a real customer turn. "voice" is reserved for the phone line.
+    return await answer(customer_text, thread=thread, source="real")

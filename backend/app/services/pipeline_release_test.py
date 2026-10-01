@@ -45,7 +45,7 @@ class ObserveOutboxTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-                with patch.object(observe_client, "_post_event", side_effect=fail):
+                with patch.object(observe_client, "_post_event", side_effect=fail), patch.object(observe_client, "OUTBOX_ENABLED", True):
                     asyncio.run(observe_client.emit(kind="chat", title="missed", surface="shop"))
                 rows = observe_client.load_outbox()
         self.assertEqual(len(rows), 1)

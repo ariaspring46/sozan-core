@@ -8,14 +8,29 @@ from app.config import settings
 EVENT_VERSION = 1
 BEHAVIOR_VERSION = "2026.09.16-pipeline"
 
-_HUB_FILES = (
-    Path(__file__).resolve().parent / "observe_client.py",
-    Path(__file__).resolve().parent / "shop_service.py",
-    Path(__file__).resolve().parent / "shop_edit_service.py",
-    Path(__file__).resolve().parent / "channel_scan_service.py",
-    Path(__file__).resolve().parent / "shop_intent_service.py",
-    Path(__file__).resolve().parent / "shop_route_service.py",
+_HERE = Path(__file__).resolve().parent
+_HUB_FILES = tuple(
+    _HERE / name
+    for name in (
+        "observe_client.py",
+        "shop_service.py",
+        "shop_edit_service.py",
+        "channel_scan_service.py",
+        "shop_intent_service.py",
+        "shop_route_service.py",
+        # The agents themselves: a change here must change the release id on their events.
+        "router_service.py",
+        "router_embed.py",
+        "turn_parse.py",
+        "llm.py",
+        "inbox_agent_service.py",
+        "studio_chat_service.py",
+        "image_provider_service.py",
+        "claims_guard.py",
+    )
 )
+_DATA_DIR = _HERE.parent / "data"
+_digest_cache: dict[tuple, str] = {}
 
 
 def _file_digest(path: Path) -> str:
@@ -26,12 +41,29 @@ def _file_digest(path: Path) -> str:
     return digest.hexdigest()[:16]
 
 
+def _release_files() -> list[Path]:
+    data = sorted(_DATA_DIR.glob("*.json")) if _DATA_DIR.is_dir() else []
+    return [*_HUB_FILES, *data, settings.factory_script]
+
+
 def hub_release_id() -> str:
-    parts = [_file_digest(path) for path in _HUB_FILES]
-    factory = settings.factory_script
-    parts.append(_file_digest(factory))
-    joined = "|".join(parts).encode()
-    return hashlib.sha256(joined).hexdigest()[:20]
+    files = _release_files()
+    stamp = []
+    for path in files:
+        try:
+            info = path.stat()
+            stamp.append((str(path), info.st_mtime_ns, info.st_size))
+        except OSError:
+            stamp.append((str(path), 0, -1))
+    key = tuple(stamp)
+    cached = _digest_cache.get(key)
+    if cached:
+        return cached
+    joined = "|".join(_file_digest(path) for path in files).encode()
+    value = hashlib.sha256(joined).hexdigest()[:20]
+    _digest_cache.clear()
+    _digest_cache[key] = value
+    return value
 
 
 def envelope(

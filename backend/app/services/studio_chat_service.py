@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from app.services.campaign_service import CampaignService
 from app.services.claims_guard import check as _claim_check
 from app.services.llm import complete_json
-from app.services.observe_client import emit_later
+from app.services.observe_client import emit_later, safe_text
 from app.services.persian_text import guard_output, sanitize_persian
 from app.services.tenant_lock import tenant_file_lock
 from app.state_store import read_json, write_json
@@ -1197,7 +1197,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         title="studio-user",
         conversation_id="studio",
         turn_id=user_msg["id"],
-        payload={"role": "user", "text": spoken, "id": user_msg["id"]},
+        payload={"role": "user", "text": safe_text(spoken), "id": user_msg["id"]},
     )
     if _is_greeting(spoken) and not media:
         assistant = {

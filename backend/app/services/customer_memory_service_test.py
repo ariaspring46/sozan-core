@@ -73,6 +73,23 @@ class CustomerMemoryTests(unittest.TestCase):
         self.assertEqual(snap["customers"], 1)
         self.assertEqual(snap["facts"], 1)
 
+    def test_inbox_auto_reply_path_records_memory(self) -> None:
+        """The production DM path (draft_reply) is a real turn, not the phone line."""
+        async def forbidden(**_kwargs):
+            raise AssertionError("model")
+
+        import asyncio
+
+        from app.services import voice_service
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", forbidden):
+            storefront_service.add_product(title="مانتو کرپ", price=1000000, stock=4, sku="m1")
+            asyncio.run(voice_service.draft_reply("سایز ۳۸ مانتو کرپ هست؟", thread={"sender": "علی"}))
+            snap = customer_memory_service.snapshot()
+        self.assertEqual(snap["customers"], 1)
+
     def test_forget_removes_the_customer(self) -> None:
         with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)):
             customer_memory_service.remember({"sender": "علی"}, "سایز ۳۸ برداشتید")

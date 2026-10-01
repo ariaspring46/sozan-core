@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from app.config import settings
 from app.services.llm import complete_chat
-from app.services.observe_client import emit_later
+from app.services.observe_client import emit_later, safe_text
 from app.services.pipeline_release import BEHAVIOR_VERSION, hub_release_id
 from app.services.plan_service import allow_new_site, record_site
 from app.services.settings_service import get_settings
@@ -817,9 +817,12 @@ def _factory_status(shop: dict) -> dict:
     )
     if not job_id:
         return empty
-    result = _run_factory(["status", "--job-id", job_id])
+    # The job file is what the factory writes; read it directly and spawn the factory
+    # process (a blocking call on the API event loop) only when there is no file.
+    local = _read_job_file(job_id)
+    result = {} if local else _run_factory(["status", "--job-id", job_id])
     if str(result.get("status") or "") in {"", "missing"}:
-        local = _read_job_file(job_id) or _latest_job_for_slug(str(shop.get("slug") or ""))
+        local = local or _latest_job_for_slug(str(shop.get("slug") or ""))
         if local:
             status = str(local.get("status") or "idle")
             if status == "done":
@@ -1756,13 +1759,13 @@ def _pack(shop: dict, rows: list[dict], assistant: dict | None = None, extra: di
                 kind="chat",
                 surface="shop",
                 title="shop-user",
-                payload={"role": "user", "text": str(user.get("text") or ""), "id": str(user.get("id") or "")},
+                payload={"role": "user", "text": safe_text(user.get("text")), "id": str(user.get("id") or "")},
             )
         emit_later(
             kind="chat",
             surface="shop",
             title="shop-assistant",
-            payload={"role": "assistant", "text": str(assistant.get("text") or ""), "id": str(assistant.get("id") or "")},
+            payload={"role": "assistant", "text": safe_text(assistant.get("text")), "id": str(assistant.get("id") or "")},
         )
     return payload
 

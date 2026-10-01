@@ -214,18 +214,3 @@ def parse_turn(text: str) -> Turn:
         handmade=bool(re.search(r"دست[\s\u200c-]*ساز", raw)),
         formal=any(mark in raw for mark in ("رسمی‌تر", "رسمی تر")),
     )
-
-
-def spec_state(*, idle: bool, card_open: bool, composing: bool) -> str:
-    if card_open:
-        return "card_open"
-    if composing:
-        return "composing"
-    if idle:
-        return "idle"
-    return "built"
-
-
-def spec_note(state: str, key: str) -> str:
-    row = (spec().get("states") or {}).get(state) or {}
-    return str(row.get(key) or "")

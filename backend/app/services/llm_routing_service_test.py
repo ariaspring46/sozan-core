@@ -74,6 +74,12 @@ class RoutingServiceTests(unittest.TestCase):
 
 
 class ImageProviderTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # Routing/provider behaviour only; the budget gate has its own test (agentic_regressions_test).
+        cap = patch("app.services.image_provider_service._image_budget_capped", return_value=None)
+        cap.start()
+        self.addCleanup(cap.stop)
+
     def test_local_path_posts_observe(self) -> None:
         from app.services import image_provider_service
 

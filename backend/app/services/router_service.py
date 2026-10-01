@@ -54,6 +54,7 @@ DAILY_COMPLETION = 12000
 REPLY_TOKENS = 150
 ROUTER_LLM_TIMEOUT = 45
 HEARTBEAT_SECS = 20
+TRACE_MAX_BYTES = 2_000_000
 CARD_TTL = 86400  # ۲۴ ساعت — ثانیه نبود (ریویو Z)
 CARD_EXPIRED = "کارت قبلی منقضی شد؛ دوباره بگو."
 STILL_WRITING = "هنوز جواب قبلی را می‌نویسم."
@@ -71,7 +72,6 @@ _TOOL_RANK = {
     "status": 3,
     "inbox_status": 3,
 }
-_TURN_LOCKS: dict[str, asyncio.Lock] = {}
 _THREAD: ContextVar[str] = ContextVar("router_thread", default="")
 _TURN_TRACE: ContextVar[dict | None] = ContextVar("router_turn_trace", default=None)
 
@@ -108,6 +108,12 @@ def _flush_trace(out: dict) -> None:
     from app.state_store import tenant_dir
 
     path = tenant_dir() / "router-turns.jsonl"
+    try:
+        if path.stat().st_size > TRACE_MAX_BYTES:
+            # One rotated generation is enough for debugging; the disk stays bounded.
+            path.replace(path.with_name("router-turns.1.jsonl"))
+    except FileNotFoundError:
+        pass
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(safe, ensure_ascii=False) + "\n")
 _PERSIAN = re.compile(r"[\u0600-\u06FF]")
@@ -236,15 +242,6 @@ SYSTEM = (
 
 class RouterBusy(RuntimeError):
     """Another router turn for this tenant is still running."""
-
-
-def turn_lock() -> asyncio.Lock:
-    key = f"{current_tenant() or '_none'}:{_THREAD.get() or '_'}"
-    lock = _TURN_LOCKS.get(key)
-    if lock is None:
-        lock = asyncio.Lock()
-        _TURN_LOCKS[key] = lock
-    return lock
 
 
 def _msg_name(tid: str) -> str:
@@ -1677,6 +1674,10 @@ async def _execute(
         tool = str(pending.get("tool") or "")
         _commit("assistant", "باشه، انجامش نمی‌دهم.", clear_pending=True)
         _emit("router-cancel", {"tool": tool})
+        return snapshot()
+    if confirm_id and pending.get("id") == confirm_id and not _card_open(pending):
+        _commit("assistant", CARD_EXPIRED, clear_pending=True)
+        _emit("router-card-expired", {"tool": str(pending.get("tool") or "")})
         return snapshot()
     if confirm_id and pending.get("id") == confirm_id:
         name = str(pending.get("tool") or "")

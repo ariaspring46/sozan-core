@@ -49,7 +49,7 @@ with tenant_scope("09120001111"), patch.object(settings, "state_dir", tempfile.m
     print("3 .sozan-turn-* dirs left after 5 edits:", len(list(root.glob(".sozan-turn-*"))))
     # 4) a storefront with 45 component files: is public/pages/about.json in the snapshot?
     root = make_root(n_components=45)
-    print("4 files snapshotted:", len(se._copy_files(root)), "| about.json included:", any(p.name == "about.json" for p in se._copy_files(root)))
+    print("4 patcher file list (capped):", len(se._copy_files(root)), "| about.json in it:", any(p.name == "about.json" for p in se._copy_files(root)))
     run(root, [{"type": "create_page", "tag": "a", "file": "public/pages/about.json", "new": '{"t":"NEW"}'},
                {"type": "replace_text", "tag": "b", "file": "app/page.tsx", "new": "x"}], verify_fail_on("b"))
     print("  about.json after rolled-back turn:", (root / "public/pages/about.json").read_text())

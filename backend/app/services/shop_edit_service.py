@@ -240,7 +240,7 @@ def _page_file(build_dir: Path, page: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def _copy_files(root: Path) -> list[Path]:
+def _copy_files(root: Path, limit: int | None = 40) -> list[Path]:
     files: list[Path] = []
     for rel in (
         "lib/brand.ts",
@@ -262,7 +262,37 @@ def _copy_files(root: Path) -> list[Path]:
     pages = root / "public" / "pages"
     if pages.is_dir():
         files.extend(path for path in pages.glob("*.json") if path.is_file())
-    return files[:40]
+    return files if limit is None else files[:limit]
+
+
+HERO_REL = "public/images/hero.png"
+_TREE_DIRS = ("app", "components", "lib", "public/pages")
+
+
+def _edit_tree(root: Path) -> set[str]:
+    """Every file an edit action may create, so a rollback can remove the new ones."""
+    found: set[str] = set()
+    for folder in _TREE_DIRS:
+        base = root / folder
+        if base.is_dir():
+            found.update(path.relative_to(root).as_posix() for path in base.rglob("*") if path.is_file())
+    public = root / "public"
+    if public.is_dir():
+        found.update(path.relative_to(root).as_posix() for path in public.glob("*.json") if path.is_file())
+    return found
+
+
+def remove_new_files(root: Path, before: set[str]) -> list[str]:
+    removed: list[str] = []
+    for rel in sorted(_edit_tree(root) - before):
+        (root / rel).unlink(missing_ok=True)
+        removed.append(rel)
+    for rel in removed:
+        parent = (root / rel).parent
+        while parent != root and parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
+    return removed
 
 
 def patch_selected_text(root: Path, target: str, new: str) -> bool:
@@ -385,7 +415,12 @@ def snapshot_edit_files(root: Path, dest_name: str = PREV_DIR) -> None:
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
     skip = {PREV_DIR, FRAME_DIR}
-    for path in _copy_files(root):
+    # No 40-file cap here: a file left out of the snapshot cannot be rolled back.
+    paths = _copy_files(root, limit=None)
+    hero = root / HERO_REL
+    if hero.is_file():
+        paths.append(hero)
+    for path in paths:
         rel = path.relative_to(root)
         if rel.parts[0] in skip or str(rel.parts[0]).startswith(".sozan-"):
             continue
@@ -1171,10 +1206,6 @@ async def _run_action_list(
     prompt: str,
     page: str,
 ) -> dict:
-    from app.services import shop_workspace_service, storefront_service
-    from app.services.shop_edit_verify import RUNTIME_VERIFY_KINDS, fetch_shop_runtime, verify_action
-    from app.services.shop_service import _save_shop
-
     turn_id = str(uuid4())
     expected_rev = int(shop.get("siteRevision") or 0)
     from app.services.shop_service import _shop as _fresh_shop
@@ -1189,6 +1220,54 @@ async def _run_action_list(
             "reply": "سایت تازه ساخته شد. دستور را دوباره بفرست.",
             "preview": {},
         }
+    pending_before = int(shop.get("pendingBuild") or 0)
+    hero = root / HERO_REL
+    hero_mtime = hero.stat().st_mtime if hero.is_file() else None
+    turn_snap = f".sozan-turn-{turn_id[:8]}"
+    tree_before = _edit_tree(root)
+    hero_before = hero.read_bytes() if hero.is_file() else None
+    snapshot_edit_files(root, turn_snap)
+    try:
+        return await _run_actions_in_turn(
+            shop, root, actions, prompt=prompt, page=page, turn_id=turn_id, turn_snap=turn_snap,
+            tree_before=tree_before, hero_before=hero_before, hero_mtime=hero_mtime, pending_before=pending_before,
+        )
+    finally:
+        # The per-turn snapshot is only needed during the turn; .sozan-prev keeps the undo copy.
+        shutil.rmtree(root / turn_snap, ignore_errors=True)
+
+
+def _rollback_turn(shop: dict, root: Path, turn_snap: str, published: list[str], tree_before: set[str], hero_before: bytes | None) -> None:
+    _restore_and_republish(shop, root, turn_snap, published)
+    remove_new_files(root, tree_before)
+    hero = root / HERO_REL
+    now = hero.read_bytes() if hero.is_file() else None
+    if now != hero_before:
+        if hero_before is None:
+            hero.unlink(missing_ok=True)
+        else:
+            hero.write_bytes(hero_before)
+            publish_shop_hero(shop, hero)
+
+
+async def _run_actions_in_turn(
+    shop: dict,
+    root: Path,
+    actions: list[dict],
+    *,
+    prompt: str,
+    page: str,
+    turn_id: str,
+    turn_snap: str,
+    tree_before: set[str],
+    hero_before: bytes | None,
+    hero_mtime: float | None,
+    pending_before: int,
+) -> dict:
+    from app.services import shop_workspace_service, storefront_service
+    from app.services.shop_edit_verify import RUNTIME_VERIFY_KINDS, fetch_shop_runtime, verify_action
+    from app.services.shop_service import _save_shop
+
     lines: list[str] = []
     previews: dict = {}
     any_ok = False
@@ -1196,11 +1275,6 @@ async def _run_action_list(
     needs_rebuild = False
     created_ok: set[str] = set()
     published_rels: list[str] = []
-    pending_before = int(shop.get("pendingBuild") or 0)
-    hero = root / "public" / "images" / "hero.png"
-    hero_mtime = hero.stat().st_mtime if hero.is_file() else None
-    turn_snap = f".sozan-turn-{turn_id[:8]}"
-    snapshot_edit_files(root, turn_snap)
     overlay = has_runtime_overlay(root)
     chrome = has_runtime_chrome(root)
     mutating = {
@@ -1299,13 +1373,12 @@ async def _run_action_list(
                 created_ok.add(str(action.get("kind") or ""))
         else:
             any_fail = True
-            _restore_and_republish(shop, root, turn_snap, published_rels)
+            _rollback_turn(shop, root, turn_snap, published_rels, tree_before, hero_before)
             shop["hidePrices"] = hide_before
             _save_shop(shop)
             break
     reply = " ".join(line for line in lines if line).strip()
     if any_fail:
-        _restore_and_republish(shop, root, turn_snap, published_rels)
         shop["pendingBuild"] = pending_before
         _save_shop(shop)
         return {
@@ -1399,19 +1472,21 @@ async def apply_live_edit(
         return {"ok": True, "patched": False, "reply": reply, "preview": {}}
     if actions[0].get("type") == "edit_llm":
         return await _apply_llm_edit(shop, prompt, page, target, root)
+    result = await _run_action_list(shop, root, actions, prompt=prompt, page=page)
     try:
         from app.services import training_log
 
+        # Logged after the run: a rolled-back edit must not become a positive example.
         training_log.log_example(
             task="shop_edit",
             messages=[{"role": "user", "content": str(prompt or "")[:500]}],
-            output={"applied": True},
+            output={"applied": bool(result.get("patched")) and not result.get("rolledBack")},
             source="real",
             surface="shop-edit",
         )
     except Exception:
         pass
-    return await _run_action_list(shop, root, actions, prompt=prompt, page=page)
+    return result
 
 
 async def _apply_llm_edit(shop: dict, prompt: str, page: str, target: str, root: Path) -> dict:

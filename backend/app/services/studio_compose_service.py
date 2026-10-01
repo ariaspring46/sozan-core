@@ -233,6 +233,8 @@ async def _run(
 
                         if last_error == "subject":
                             raise RuntimeError("subject-failed")
+                        if last_error == "budget":
+                            raise RuntimeError("budget-failed")
                         raise RuntimeError("still-failed")
                     from app.services import image_provider_service
 
@@ -274,7 +276,11 @@ async def _run(
             detail = "تصویر خام"
             if isinstance(exc, HTTPException):
                 detail = str(exc.detail or detail)
-            if "subject-failed" in str(exc):
+            if "budget-failed" in str(exc):
+                from app.services.image_provider_service import BUDGET_FAIL
+
+                error = BUDGET_FAIL
+            elif "subject-failed" in str(exc):
                 from app.services.image_provider_service import SUBJECT_FAIL
 
                 error = SUBJECT_FAIL

@@ -24,7 +24,7 @@ async def main():
     took = time.perf_counter() - t0
     await asyncio.sleep(0.05)
     t.cancel()
-    print(f"3 concurrent GET /shop took {took:.2f}s (serial, not parallel); worst event-loop stall: {max(gaps):.2f}s")
+    print(f"3 concurrent GET /shop took {took:.2f}s (~1s each => they ran in parallel; ~3s => serial); worst event-loop stall: {max(gaps):.2f}s")
 
 with patch.object(settings, "state_dir", str(tmp / "state")), patch.object(type(settings), "factory_script", property(lambda s: script)), \
      patch.object(shop_service, "FACTORY_PYTHON", sys.executable), tenant_scope("09120001111"):
