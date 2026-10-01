@@ -28,10 +28,11 @@ Plan files (owner's, read-only): `voice-agent-plan.md`. Read only the section a 
 11. No real call without the owner's permission; campaign_run.py --dial only after the owner writes 'شروع کمپین' in voice-agent-talk.md. Test with sim_run.py / sim_call.py.
 12. DNC is sacred: 'زنگ نزنید' or similar -> number written to the DNC file immediately, never called again; keep its test.
 13. Calls only inside campaign windows (currently 10-13 and 16-20 Tehran) with the daily cap and spacing in campaign_run.py.
-14. Honesty: if asked, it is 'دستیار صوتی سوزان', never a human; no invented prices, codes or claims. Prices come only from GET /billing/plans.
+14. Honesty: the opening says Sozan is an AI (hook sentence first, then DISCLOSE_LINE with «هوش مصنوعی»), and any 'are you a robot/human?' gets a plain yes-AI answer (ROBOT_LINE). Never imply a human. No invented prices, codes, customers or claims; prices only from GET /billing/plans.
 15. GPU: only Vulkan1 and the ornith-phone slot and sozan-voice* units are yours. Never restart llama-swap or touch qwen3.5-9b, bge-m3 or other slots. Restart the phone service only when no call is in progress.
 16. Never write a caller's number or words into a report; counts, times and call ids only.
 17. Git (voice-agent-plan.md §0.9): work on feat/voice-z; rebase on a fresh main and merge only after tests and the stage's acceptance condition pass; do not push to origin unless the owner says so.
+18. Personal facts come only from enrich_campaign.py (page bio read before the campaign, cached 14 days, phones/links stripped). The call may use at most one fact per turn, never reads the bio aloud, never mentions follower counts. Run enrichment only from the home machine through SOZAN_IG_PROXY, never against a real page in tests (tests use a fake fetcher).
 
 ## 3. Session start (at most 5 tool calls, before touching any file)
 
@@ -56,7 +57,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~4.6k tokens. Your core files total 30.9k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~4.8k tokens. Your core files total 33.4k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -68,28 +69,28 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 30.9k | the files most tasks touch; read the relevant one first |
-| active | 78.6k | yours to edit; read only what the task needs |
-| rare | 23.1k | yours; read only when the task names it |
-| tests | 12.5k | read only the test of the module you change |
+| core | 33.4k | the files most tasks touch; read the relevant one first |
+| active | 79.1k | yours to edit; read only what the task needs |
+| rare | 29.4k | yours; read only when the task names it |
+| tests | 14.8k | read only the test of the module you change |
 
 **Core:**
 
-- `voice-gateway/sales.py` (15.5k)
+- `voice-gateway/sales.py` (18.0k)
 - `voice-gateway/brain.py` (15.4k)
 
 **Active (you may edit):**
 
-- `voice-gateway/`: `main.py` (18.2k), `sales.py` (15.5k), `brain.py` (15.4k), `sip.py` (9.8k), `audio_codec.py` (4.1k), `sozanvoice.md` (3.8k), `meaning.py` (3.3k), `knowledge.py` (3.2k), `heard_bank.py` (2.4k), `campaign_run.py` (1.3k), `voice_status.py` (1.2k), `.env.example` (0.5k)
+- `voice-gateway/`: `main.py` (18.7k), `sales.py` (18.0k), `brain.py` (15.4k), `sip.py` (9.8k), `audio_codec.py` (4.1k), `sozanvoice.md` (3.8k), `meaning.py` (3.3k), `knowledge.py` (3.2k), `heard_bank.py` (2.4k), `.env.example` (0.5k)
 
 **Rare (yours; only when the task names it):**
 
-- `voice-gateway/` (11 files, 22.7k)
+- `voice-gateway/` (14 files, 29.0k)
 - `voice-gateway/systemd/`: `sozan-voice-llm.service` (0.3k), `sozan-voice.service` (0.1k)
 
 **Tests:** `voice-gateway/test_voice.py`
 
-**Yours but never read** (generated or huge; change only through its script): `voice-agent-talk.md` (50.4k), `voice-gateway/sales-holdout.jsonl` (4.0k), `voice-gateway/sales-train.jsonl` (115.2k)
+**Yours but never read** (generated or huge; change only through its script): `voice-agent-talk.md` (51.0k), `voice-gateway/sales-holdout.jsonl` (4.0k), `voice-gateway/sales-train.jsonl` (115.2k)
 
 Every other file in the repo belongs to another role (see `docs/agents/README.md`).
 
@@ -102,6 +103,7 @@ Nothing.
 - HTTP to the hub: `GET {SOZAN_API}/billing/plans` (plan prices; owner X5, `backend/app/api/billing.py`) and `GET {SOZAN_API}/health` (field `paymentReady`; owner X5, `backend/app/main.py`). If either fails, say no price.
 - llama-swap on the home machine: only the `ornith-phone` slot, plus `/v1/audio/speech` and `/v1/embeddings` (bge-m3, read-only use).
 - DNC file `~/local-ai/config/sozan-dnc.txt`; call log `~/local-ai/sozan-voice-log/calls.jsonl` (mode 600, stays on that machine).
+- Instagram (shared with X3): `voice-gateway/enrich_campaign.py` uses the same `i.instagram.com` endpoints and app user-agent as `backend/app/services/channel_scan_service.py::_instagram_page`. If Instagram changes them, X3 and Z change together.
 
 ## 9. Who reviews and merges
 
@@ -184,8 +186,10 @@ The system works only if every step of every flow keeps its promise. When your c
 
 **F8 — Phone sales call**
 
+- Z: enrich_campaign.py reads each page bio once → personal opening (hook + AI disclosure + permission) ← **you**
 - Z: SIP call → sales state machine → LLM/TTS ← **you**
 - X5: GET /billing/plans and /health for prices
+- X3: Instagram endpoint shared with the page scan
 ```bash
 cd voice-gateway && python3 -m unittest test_voice 2>&1 | tail -5
 ```

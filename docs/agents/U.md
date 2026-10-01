@@ -69,7 +69,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 9.7k | the files most tasks touch; read the relevant one first |
-| active | 31.9k | yours to edit; read only what the task needs |
+| active | 33.6k | yours to edit; read only what the task needs |
 | rare | 15.9k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
@@ -83,6 +83,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Active (you may edit):**
 
+- `./`: `talk-u.md` (1.7k)
 - `frontend/`: `tailwind.config.js` (0.4k), `package.json` (0.2k), `tsconfig.json` (0.2k), `next.config.ts` (0.0k)
 - `frontend/app/`: `globals.css` (5.1k), `page.tsx` (0.5k), `layout.tsx` (0.5k)
 - `frontend/components/`: `landing-page.tsx` (12.4k), `app-shell.tsx` (2.8k), `getting-started.tsx` (2.2k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)

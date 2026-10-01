@@ -28,16 +28,26 @@ FIXED_SALES_LINES = frozenset(
 )
 
 BYE_LINE = "خداحافظ، روزتون خوش!"
-HELLO_LINE = (
-    "سوزان دستیار فروش آنلاین‌شاپ‌هاست؛ "
-    "دایرکت‌ها را جواب می‌دهد، محتوا می‌سازد، سفارش را پیگیری می‌کند."
+# Everything below is spoken: colloquial Tehran register (رو، می‌ده، می‌سازه), never written Persian.
+# Opening = greeting + one personal hook from the page bio + AI disclosure + permission question.
+GREET_OPEN = "سلام، وقتتون بخیر!"
+HOOK_GENERIC = "پیج اینستاگرامتون رو دیدم."
+DISCLOSE_LINE = "من سوزانم، دستیار فروشِ هوش مصنوعی؛ سی ثانیه وقت دارید بگم چرا زنگ زدم؟"
+HELLO_LINE = f"{GREET_OPEN} {HOOK_GENERIC} {DISCLOSE_LINE}"
+HELLO_SMS_LINE = f"{GREET_OPEN} احتمالاً پیامک سوزان به دستتون رسیده. {DISCLOSE_LINE}"
+# After a yes: one tailored value sentence and one open discovery question (never a menu).
+VALUE_GENERIC = (
+    "خلاصه‌ش اینه که سوزان دستیار فروش پیج‌های اینستاگرامیه؛ دایرکت جواب می‌ده، پست می‌سازه، سفارش‌ها رو نگه می‌داره. "
+    "الان بیشترین وقتتون پای کدوم کار می‌ره؟"
 )
-HELLO_SMS_LINE = "سلام، از سوزان تماس می‌گیرم؛ احتمالاً پیامکمون به دستتون رسیده."
-PAIN_LINE = "دایرکت بی‌جوابه، محتوا می‌خواید، یا سایت؟"
-DM_LINE = "دایرکت اینستا و تلگرام را با لحن خودتون جواب می‌دهد؛ خودکار فقط پرو مکس."
-CONTENT_LINE = "استودیو پست، استوری، عکس کالا و کپشن تبلیغ را می‌سازد."
-ORDER_LINE = "سفارش را پیگیری می‌کند و فروش و موجودی انبار را ثبت می‌کند."
-SITE_LINE = "فروشگاه را از روی همان پیج می‌سازد و شروعش رایگان است."
+PAIN_LINE = VALUE_GENERIC
+BUSY_LINE = "حتماً، مزاحمتون نمی‌شم! فقط اسمش یادتون بمونه: سوزان کُر دات آی‌آر، شروعش رایگانه. روزتون خوش!"
+DECLINE_LINE = "چشم، ممنون که جواب دادید. روزتون خوش!"
+ROBOT_LINE = "بله، من هوش مصنوعی‌ام، دستیار فروش سوزان. اجازه می‌دید سی ثانیه بگم به چه دردتون می‌خوره؟"
+DM_LINE = "سوزان دایرکت اینستا و تلگرامتون رو با لحن خودتون جواب می‌ده؛ روزی حدوداً چندتا دایرکت دارید؟"
+CONTENT_LINE = "استودیوی سوزان پست و استوری و کپشن تبلیغ می‌سازه؛ الان محتوا رو خودتون درست می‌کنید؟"
+ORDER_LINE = "سفارش‌ها و فروش و موجودی انبار رو براتون نگه می‌داره؛ الان سفارش‌ها رو کجا ثبت می‌کنید؟"
+SITE_LINE = "از روی همین پیج یه فروشگاه اینترنتی می‌سازه و شروعش رایگانه؛ الان سایت جدا دارید؟"
 FEATURE_LINES = (DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE)
 BUY_LINE = "رایگان شروع می‌کنید، برید تو سایت سوزان کُر، sozan-core.ir، و دکمهٔ ورود رو بزنید."
 EXPLAIN = (
@@ -466,61 +476,71 @@ def fallback_line(state: SalesState, heard: str) -> str:
 
 def sales_open() -> str:
     return (
-        "تو سوزان هستی، زن، گرم، پرانرژی، کاملاً خودمونی با خطاب «شما». "
-        "زنگ زدی خود سوزان را معرفی کنی.\n"
-        "سوزان دستیار فروش آنلاین‌شاپ‌هاست، نه فقط سازندهٔ سایت. فقط همین‌ها را بگو، چون همین‌ها کار می‌کنند:\n"
-        "جواب دایرکت مشتری در اینستاگرام و تلگرام، با لحن خود فروشنده. پیش‌نویس هست. پاسخ خودکار فقط پرو مکس.\n"
-        "فروشگاه اینترنتی از روی همان پیج. شروعش رایگان است. نگو سایت همان لحظه حاضر است.\n"
-        "استودیو: پست، استوری، عکس کالا و کپشن برای تبلیغ.\n"
-        "سفارش و فروش: پیگیری سفارش مشتری، ثبت فروش، و موجودی انبار.\n"
-        "رزرو و نوبت‌دهی نداریم. نگو مشتری از سایت رزرو می‌کند.\n"
-        "نگو وب‌سایت نامحدود. لینک را در واتساپ و دایرکت و پیامک نفرست.\n"
+        "تو سوزانی: دستیار فروشِ هوش مصنوعی و یه بازاریاب تلفنی خبره. زن، گرم، باحوصله و خوش‌برخورد؛ "
+        "خودمونی با خطاب «شما». مثل یه آدمِ باتجربه حرف بزن، ولی هیچ‌وقت نگو آدمی.\n"
+        "صداقت: تو هوش مصنوعی هستی و اول تماس این را گفتی. اگر پرسیدند ربات یا آدمی، رک بگو هوش مصنوعی‌ام، دستیار فروش سوزان، بعد کار را ادامه بده.\n"
+        "هدف تماس: طرف دلش بخواد خودش سوزان رو رایگان امتحان کنه (sozan-core.ir، دکمهٔ ورود). فروش زوری نه؛ کمک.\n"
+        "روش یه فروشندهٔ خبره:\n"
+        "۱. گوش بده و با حرف خودش جواب بده: کلمهٔ خودش را تکرار کن («پس دایرکت‌ها زیاده...»). اول همان سؤالش را جواب بده.\n"
+        "۲. هر نوبت فقط یک سؤال باز، دربارهٔ کار خودش: روزی چندتا دایرکت؟ سفارش‌ها کجا ثبت می‌شه؟ محتوا رو کی می‌سازه؟ منوی چندگزینه‌ای نده.\n"
+        "۳. فقط همان یک قابلیتی را بگو که به دردش می‌خورد، با نتیجه‌اش برای او (مشتری منتظر نمی‌مونه، وقتتون آزاد می‌شه)، نه فهرست امکانات.\n"
+        "۴. اعتراض: اول حق بده، بعد یک زاویهٔ تازه، بعد یک سؤال یا دعوت کوچک. بحث نکن، فوریت ساختگی نساز.\n"
+        "۵. وقتی علاقه نشان داد (پرسید چطوری، کجا، قیمت)، آدرس را یک بار بگو: sozan-core.ir، دکمهٔ ورود، شروعش رایگانه. "
+        "اگر تا نوبت ششم آدرس گفته نشده و هنوز گفتگو گرم است، یک بار بگو. بعد از گفتن تکرار نکن مگر بپرسند.\n"
+        "۶. اگر گفت وقت ندارد یا نمی‌خواهد، احترام بگذار، تشکر کن و تمام کن.\n"
+        "زبان گفتاری تهرانی برای تلفن: «رو» نه «را»، «می‌ده، می‌سازه، می‌خواید» نه «می‌دهد، می‌سازد». "
+        "حداکثر دو جملهٔ کوتاه، روی هم زیر بیست کلمه. جمله را نیمه رها نکن. برای شور «!» و برای سؤال «؟»؛ سه‌نقطه نه.\n"
+        "خطاب «تو» ممنوع: پیجتون، سایتتون، برید، بزنید، می‌رید، خودتون.\n"
+        "سوزان دستیار فروش آنلاین‌شاپ‌هاست. فقط همین‌ها را بگو چون همین‌ها کار می‌کنند:\n"
+        "جواب دایرکت مشتری در اینستاگرام و تلگرام با لحن خود فروشنده؛ پیش‌نویس هست و پاسخ خودکار فقط در پرو مکس.\n"
+        "وبسایت و فروشگاه اینترنتی از روی همان پیج؛ شروعش رایگان است. نگو همان لحظه حاضر است.\n"
+        "استودیو: پست، استوری، عکس کالا و کپشن تبلیغ.\n"
+        "سفارش و فروش: پیگیری سفارش، ثبت فروش، موجودی انبار.\n"
+        "رزرو و نوبت‌دهی نداریم. نگو وب‌سایت نامحدود.\n"
         + payment_clause()
-        + "روش: یک جملهٔ معرفی، بعد یک سؤال دربارهٔ دردش (دایرکت بی‌جواب، محتوا، یا سایت)، "
-        "بعد فقط همان یک قابلیت. قابلیت‌های دیگر را همان نوبت نگو.\n"
-        "اگر سلام پیامک بود و نگفت دیده، دوباره از پیامک نپرس و برو سر معرفی.\n"
-        "از جواب دایرکت حرف بزن. قاعدهٔ قدیمیِ حرف نزدن از دایرکت لغو است.\n"
-        "هر نوبت یک جمله، حداکثر هجده کلمه. "
-        "اول همان سؤال را جواب بده، بعد فقط یک قدم جلوتر برو، هر بار فقط یک سؤال.\n"
-        "خطاب تو ممنوع: نگو پیجت، سایتت، برو، بزن، می‌ری، می‌زنی، خودت. "
-        "بگو پیجتون، سایتتون، برید، بزنید، می‌رید، می‌زنید، خودتون.\n"
-        "بگو می‌سازه، رو، برید، بزنید. رسمی حرف نزن. جمله را وسطش رها نکن.\n"
-        "برای شور از ! و برای سؤال از ؟ استفاده کن. سه‌نقطه نگذار.\n"
-        "نوبت سوم حتماً sozan-core.ir و دکمهٔ ورود و رایگان بودن را بگو اگر هنوز نگفتی. "
-        "اگر قبلاً گفتی تکرار نکن مگر بپرسند آدرس کجاست.\n"
-        "اگر گفت بلد نیستم، بگو لازم نیست بلد باشید، فقط اسم پیج را در سایت می‌نویسید.\n"
-        "اگر گفت اعتماد ندارم، بگو خودتان سایت را باز کنید و ببینید، رایگان است.\n"
-        "اگر گفت سایت دارم، بگو فرق این است که محصولات از خود پیج اینستا می‌آید.\n"
-        "اگر گفت رباتی، راست بگو دستیار صوتی سوزانی و بعد کار را بگو.\n"
-        "لینک را توی این تماس نخواه. نگو همین‌جا بنویسد. نگو این تماس خود پنل است. "
-        "عکس و اسم پیج را پشت تلفن نخواه. اسم طرف را نساز. دروغ نگو. شماره و رمز و کارت نخواه. "
-        "واتساپ و دایرکت و پیامک نفرست؛ بگو تو تماس لینک نمی‌فرستم، خودتان سایت را باز کنید.\n"
-        "نگو مشتری‌ها باید شماره بدهند.\n"
-        "اگر پرسید شماره را از کجا آوردی، راست بگو: از بین پیج‌های فروشگاهی اینستاگرام زنگ می‌زنم، جزئیات لیست را نمی‌گویم. "
-        "اگر دوباره همان را پرسید، همان جواب را بده و بعد آدرس سایت را بگو.\n"
-        "اگر گفت مغازه ندارم، اشتباه گرفتید، شرکت است، دانشجو است، اینستاگرام ندارد، یا زنگ نزنید، عذرخواهی کن و فقط خداحافظی کن. سایت را پیشنهاد نکن.\n"
         + price_clause()
-        + "اگر مستقیم پرسید رباتی، راست بگو: دستیار صوتی سوزانم.\n"
-        "وقتی کار تمام است فقط بنویس [پایان]. وقتی هدیه مناسب است فقط بنویس [هدیه]. "
-        "کد تخفیف را خودت نساز.\n"
-        "نمونه‌های زیر فقط لحن‌اند، از بر تکرارشان نکن:\n"
-        "مشتری: دایرکت‌ها بی‌جواب می‌مونن. → دایرکت اینستا و تلگرام را با لحن خودتون جواب می‌دهد.\n"
-        "مشتری: محتوا چی؟ → استودیو پست و استوری و کپشن را می‌سازد.\n"
-        "مشتری: پیجمو چجوری بدم؟ → تو تماس نمی‌خواد. برید sozan-core.ir، ورود رو بزنید، اونجا اسم پیج رو می‌نویسید.\n"
-        "مشتری: گرونه. → ساخت وبسایت کلاً رایگانه؛ پول فقط برای پرو، اونم اگه بخواید.\n"
-        "مشتری: بعداً. → باشه. یادتون باشه sozan-core.ir، دکمه ورود. [هدیه]\n"
-        "مشتری: رباتی؟ → دستیار صوتی سوزانم. خود سایت رو که باز کنید دست خودتونه.\n"
-        "مشتری: لینکو بفرست. → تو تماس لینک نمی‌فرستم. خودتون sozan-core.ir رو باز کنید و ورود رو بزنید.\n"
-        "مشتری: سایت دارم. → سوزان مخصوص پیج اینستاست؛ محصولات رو خودش از پیجتون می‌آره.\n"
-        "مشتری: بلد نیستم. → لازم نیست بلد باشید، فقط اسم پیجتون رو تو سایت می‌زنید.\n"
-        "اعتراض‌ها: نگرانی را قبول کن، یک زاویهٔ تازه بگو، دعوت کوچک بکن. فوریت ساختگی نگو."
+        + "مرزها: لینک را در تماس، واتساپ، دایرکت یا پیامک نفرست؛ خودشان سایت را باز می‌کنند. "
+        "اسم، عکس، پیج، شماره، رمز، کارت یا کد از طرف نخواه. اسم طرف را نساز. مشتری‌های ساختگی، آمار ساختگی و قول ساختگی نگو. "
+        "نگو مشتری‌ها باید شماره بدهند. کد تخفیف را خودت نساز.\n"
+        "اگر پرسید شماره را از کجا آوردی: از بین پیج‌های فروشگاهی اینستاگرام؛ اگر نخواهد دیگر زنگ نمی‌زنیم.\n"
+        "اگر گفت مغازه ندارد، اشتباه گرفتید، شرکت یا دانشجو است، اینستاگرام ندارد، یا زنگ نزنید: عذرخواهی و خداحافظی؛ چیزی پیشنهاد نکن.\n"
+        "وقتی کار تمام است فقط بنویس [پایان]. وقتی هدیه مناسب است فقط بنویس [هدیه].\n"
+        "نمونهٔ لحن (از بر تکرار نکن):\n"
+        "مشتری: آره، دایرکتام زیاده. → پس وقت زیادی پای دایرکت می‌ره! سوزان با لحن خودتون جواب می‌ده؛ روزی حدوداً چندتا دارید؟\n"
+        "مشتری: سایت دارم. → چه خوب! سوزان کنار همون سایت دایرکت و محتوا رو جلو می‌بره؛ الان پست‌ها رو کی می‌سازه؟\n"
+        "مشتری: گرونه. → حق دارید! ساخت وبسایت کلاً رایگانه؛ پول فقط برای پرو، اونم اگه خواستید.\n"
+        "مشتری: بلد نیستم. → لازم نیست بلد باشید؛ فقط اسم پیجتون رو می‌زنید، بقیه‌ش با سوزانه.\n"
+        "مشتری: رباتی؟ → بله، هوش مصنوعی‌ام، دستیار فروش سوزان. سؤالتون رو بپرسید، دقیق جواب می‌دم!\n"
+        "مشتری: باشه، کجا برم؟ → sozan-core.ir، دکمهٔ ورود رو بزنید، رایگان شروع می‌کنید!\n"
+        "مشتری: بعداً. → حتماً! فقط sozan-core.ir یادتون بمونه. [هدیه]"
     )
 
 
 def sales_brief(card: ShopCard) -> str:
-    product = card.product or "کالا"
+    facts = [f"پیج اینستاگرام: {card.instagram}"]
+    if card.name:
+        facts.append(f"اسم پیج: {card.name}")
+    if card.product:
+        facts.append(f"چه می‌فروشد: {card.product}")
+    if card.city:
+        facts.append(f"شهر: {card.city}")
+    meaning = {
+        "dm_orders": "سفارش را از دایرکت می‌گیرد",
+        "ships": "به همهٔ شهرها ارسال دارد",
+        "physical": "مغازهٔ حضوری هم دارد",
+        "has_site": "سایت جدا دارد",
+        "wholesale": "عمده هم می‌فروشد",
+        "handmade": "کار دست‌ساز است",
+        "whatsapp_orders": "سفارش را از واتساپ هم می‌گیرد",
+    }
+    notes = [meaning[item] for item in card.signals if item in meaning]
+    if notes:
+        facts.append("از بیو پیج: " + "، ".join(notes))
     return sales_open() + (
-        f"\nفقط بدان با که حرف می‌زنی: پیج {card.instagram}، فروش {product}. این را تعریف نکن."
+        "\nدربارهٔ کسی که با او حرف می‌زنی (از بیو پیجش، قبل از تماس خوانده شده):\n- "
+        + "\n- ".join(facts)
+        + "\nاز این‌ها طبیعی برای شخصی‌سازی استفاده کن، هر نوبت حداکثر یکی. بیو را از رو نخوان، "
+        "فالوئر و جزئیات شخصی نگو، و چیزی که این‌جا نیست دربارهٔ پیجش ادعا نکن."
     )
 
 
@@ -544,6 +564,11 @@ class SalesState:
     said: list[str] = field(default_factory=list)
     interrupted: str = ""
     refused_cta: bool = False
+    opening: str = ""
+    value_line: str = ""
+    value_kind: str = ""
+    awaiting_permission: bool = False
+    pitched: set[str] = field(default_factory=set)
 
     def stage_fa(self) -> str:
         return _STAGE_FA.get(self.stage, self.stage)
@@ -618,7 +643,7 @@ def read_signals(heard: str) -> Signals:
     later = any(part in blob for part in ("بعدا", "بعداً", "الان نه", "وقت ندارم", "سردم"))
     trust = any(part in blob for part in ("اعتماد", "کلاه", "مطمئن", "درست میگی"))
     agree = any(part in blob for part in ("باشه", "چشم", "اوکی", "میرم", "می‌رم", "باز کردم", "زدم ورود", "آره میام"))
-    robot = any(part in blob for part in ("ربات", "هوش مصنوعی", "ماشینی", "واقعی هستی"))
+    robot = any(part in blob for part in ("ربات", "هوش مصنوعی", "ماشینی", "واقعی هستی", "آدمی", "آدم هستی", "ضبط شده"))
     has_site = any(part in blob for part in ("سایت دارم", "سایتم هست", "وبسایت دارم"))
     cant = any(part in blob for part in ("بلد نیست", "نمی‌دونم", "نمیدونم", "سخته", "سختِ"))
     time = any(part in blob for part in ("وقت ندار", "سرم شلوغ", "طول می‌کشه", "طول میکشه"))
@@ -708,10 +733,67 @@ def cached_sales_lines() -> list[str]:
     return [line for line in dict.fromkeys(lines) if (line or "").strip()]
 
 
+_PERSIAN_RE = re.compile(r"[\u0600-\u06FF]")
+
+
+def spoken_name(card: ShopCard | None) -> str:
+    """A page name the TTS can say: Persian letters only, short; else empty."""
+    name = re.sub(r"[^\u0600-\u06FF\u200c\s]", " ", (card.name if card else "") or "")
+    name = re.sub(r"\s+", " ", name).strip()
+    if not name or len(name.split()) > 4 or not _PERSIAN_RE.search(name):
+        return ""
+    return name
+
+
+def hook_for(card: ShopCard | None) -> str:
+    """One true, specific sentence from the page bio. Never invented: only facts enrich_campaign found."""
+    if card is None:
+        return HOOK_GENERIC
+    page = f"پیج {spoken_name(card)} رو دیدم" if spoken_name(card) else "پیج اینستاگرامتون رو دیدم"
+    signals = set(card.signals or ())
+    if "dm_orders" in signals:
+        return f"{page}؛ دیدم سفارش‌ها رو از دایرکت می‌گیرید."
+    if "ships" in signals:
+        return f"{page}؛ دیدم به همه‌جای ایران ارسال دارید."
+    if "physical" in signals:
+        return f"{page}؛ دیدم فروشگاه حضوری هم دارید."
+    product = re.sub(r"[^\u0600-\u06FF\u200c\s]", " ", card.product or "").strip()
+    if product and len(product.split()) <= 3:
+        return f"{page}؛ دیدم {product} کار می‌کنید."
+    return f"{page}."
+
+
 def hello_for(card: ShopCard | None) -> str:
-    if card is not None and card.sms_sent:
+    """Opening: greeting, the personal hook, then the AI disclosure and a permission question."""
+    if card is None:
+        return HELLO_LINE
+    if card.sms_sent and not (card.name or card.signals):
         return HELLO_SMS_LINE
-    return HELLO_LINE
+    return f"{GREET_OPEN} {hook_for(card)} {DISCLOSE_LINE}"
+
+
+def value_kind_for(card: ShopCard | None) -> str:
+    """The feature the value line already pitched, so the same pitch is never repeated."""
+    signals = set((card.signals if card else ()) or ())
+    if "dm_orders" in signals:
+        return "dm"
+    if "ships" in signals:
+        return "site"
+    return ""
+
+
+def value_for(card: ShopCard | None) -> str:
+    """After they say yes: the one benefit that fits what their page shows, then an open question."""
+    signals = set((card.signals if card else ()) or ())
+    if "dm_orders" in signals:
+        return "خلاصه‌ش: سوزان دایرکت‌های پیجتون رو با لحن خودتون جواب می‌ده که مشتری منتظر نمونه. الان جواب دایرکت‌ها با خودتونه؟"
+    if "ships" in signals:
+        return "خلاصه‌ش: سوزان از روی همین پیج یه فروشگاه اینترنتی می‌سازه که مشتری شهرهای دیگه خودش سفارش بده. الان سفارش‌ها رو چطوری می‌گیرید؟"
+    if "has_site" in signals:
+        return "خلاصه‌ش: سوزان دایرکت و محتوای پیج رو کنار سایتتون جلو می‌بره. الان بیشتر وقتتون پای دایرکته یا محتوا؟"
+    if "physical" in signals:
+        return "خلاصه‌ش: سوزان فروش اینستاگرامیِ مغازه‌تون رو جلو می‌بره، از جواب دایرکت تا پست. الان پیج رو خودتون می‌چرخونید؟"
+    return VALUE_GENERIC
 
 
 def wants_address(heard: str) -> bool:
@@ -722,20 +804,20 @@ def wants_address(heard: str) -> bool:
 
 
 def objection_line(signals: Signals, heard: str) -> str | None:
-    tail = "برید sozan-core.ir، دکمهٔ ورود رو بزنید، رایگانه."
+    """Acknowledge, reframe, hand the turn back. The address comes when they lean in, not on every objection."""
     blob = heard or ""
     if "واتس" in blob:
-        return f"تو تماس لینک نمی‌فرستم. خودتون {tail}"
+        return "تو تماس لینک نمی‌فرستم، ولی آدرسش راحته: سوزان کُر دات آی‌آر، دکمهٔ ورود."
     if signals.trust:
-        return f"حق دارید. خودتون سایت رو باز کنید و ببینید. {tail}"
+        return "حق دارید، منم بودم همینو می‌پرسیدم. برای همین شروعش رایگانه که اول خودتون امتحانش کنید."
     if signals.cant:
-        return f"لازم نیست بلد باشید. فقط اسم پیجتون رو تو سایت می‌نویسید. {tail}"
+        return "اصلاً لازم نیست بلد باشید؛ فقط اسم پیجتون رو می‌زنید، بقیه‌ش با سوزانه."
     if signals.has_site:
-        return f"فرق سوزان اینه که محصولات از خود پیج اینستاگرام می‌آد. {tail}"
+        return "چه خوب! سوزان جای سایتتون نمیاد؛ دایرکت و محتوای پیج رو جلو می‌بره، محصولات رو هم از خود پیج برمی‌داره."
     if signals.robot:
-        return "دستیار صوتی سوزانم. " + tail
+        return ROBOT_LINE
     if signals.source:
-        return f"از بین پیج‌های فروشگاهی اینستاگرام زنگ می‌زنم. {tail}"
+        return "از بین پیج‌های فروشگاهی اینستاگرام پیداتون کردم؛ اگه نخواید، دیگه تماس نمی‌گیرم."
     return None
 
 
@@ -792,10 +874,10 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
                 state.stage = "cta"
                 return TurnPlan(kind="address", line=priced, signals=signals)
             return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
-        if state.sms_sent:
-            return TurnPlan(kind="hello", line=HELLO_SMS_LINE, signals=signals)
+        state.awaiting_permission = True
         state.intro_said = True
-        return TurnPlan(kind="hello", line=HELLO_LINE, signals=signals)
+        opening = state.opening or (HELLO_SMS_LINE if state.sms_sent else HELLO_LINE)
+        return TurnPlan(kind="hello", line=opening, signals=signals)
     if signals.bye:
         line = BYE_LINE if (state.refused_cta or not state.linked) else CLOSE_LINE
         return TurnPlan(kind="close", line=line, hangup=True, signals=signals)
@@ -803,6 +885,25 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     if signals.wrong:
         return TurnPlan(kind="close", line=BYE_LINE, hangup=True, signals=signals)
+    if state.awaiting_permission:
+        if signals.robot:
+            return TurnPlan(kind="feature", line=ROBOT_LINE, signals=signals)
+        if signals.refuse:
+            state.awaiting_permission = False
+            return TurnPlan(kind="close", line=DECLINE_LINE, hangup=True, signals=signals)
+        if (signals.later or signals.time) and not signals.price:
+            state.awaiting_permission = False
+            return TurnPlan(kind="close", line=BUSY_LINE, hangup=True, signals=signals)
+        if not signals.price and objection_line(signals, heard) is None and not wants_address(heard):
+            state.awaiting_permission = False
+            kind = pain_kind(heard)
+            line = feature_line(kind) or state.value_line or VALUE_GENERIC
+            state.pitched.add(kind or state.value_kind)
+            state.intro_said = True
+            state.pain_asked = True
+            state.stage = "pitch" if kind else "discover"
+            return TurnPlan(kind="feature", line=line, signals=signals)
+        state.awaiting_permission = False
     if signals.price:
         priced = price_spoken_line(heard)
         state.stage = "cta"
@@ -824,8 +925,9 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             state.stage = "cta"
             return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
     kind = pain_kind(heard)
-    line = feature_line(kind)
+    line = feature_line(kind) if kind not in state.pitched else ""
     if line:
+        state.pitched.add(kind)
         state.intro_said = True
         state.pain_asked = True
         state.stage = "pitch"
@@ -1145,7 +1247,14 @@ class ShopCard:
     instagram: str
     product: str
     sms_sent: bool = False
+    # From enrich_campaign.py (the page bio, read before the campaign). Empty when not enriched.
+    name: str = ""
+    city: str = ""
+    signals: tuple[str, ...] = ()
+    bio: str = ""
 
+
+PROFILE_SIGNALS = frozenset({"dm_orders", "ships", "physical", "has_site", "wholesale", "handmade", "whatsapp_orders"})
 
 DNC_PATH = Path.home() / "local-ai" / "config" / "sozan-dnc.txt"
 CAMPAIGN_PATH = Path.home() / "local-ai" / "config" / "sozan-campaign.json"
@@ -1176,6 +1285,17 @@ def load_campaign(path: Path) -> dict[str, ShopCard]:
         handle = str(row.get("instagram", "")).strip().lstrip("@")
         product = str(row.get("product", "")).strip()
         sms_sent = bool(row.get("smsSent"))
+        profile = row.get("profile") if isinstance(row.get("profile"), dict) else {}
+        if not profile.get("ok"):
+            profile = {}
         if phone and handle:
-            found[phone] = ShopCard(instagram=handle, product=product, sms_sent=sms_sent)
+            found[phone] = ShopCard(
+                instagram=handle,
+                product=product or str(profile.get("product") or "").strip(),
+                sms_sent=sms_sent,
+                name=str(profile.get("name") or "").strip()[:60],
+                city=str(profile.get("city") or "").strip()[:30],
+                signals=tuple(str(item) for item in (profile.get("signals") or []) if str(item) in PROFILE_SIGNALS),
+                bio=str(profile.get("bio") or "").strip()[:240],
+            )
     return found

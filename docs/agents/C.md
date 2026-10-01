@@ -90,7 +90,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
 
-**Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (26.4k)
+**Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (27.6k)
 
 Every other file in the repo belongs to another role (see `docs/agents/README.md`).
 

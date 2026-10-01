@@ -40,10 +40,17 @@ class ImageCutoverTests(unittest.TestCase):
         self.assertEqual(body["image_config"]["aspect_ratio"], "1:1")
         story = image_provider_service._body("black-forest-labs/flux.2-klein-4b", "mug", (1080, 1920), b"")
         self.assertEqual(story["image_config"]["aspect_ratio"], "9:16")
+        portrait = image_provider_service._body("black-forest-labs/flux.2-klein-4b", "mug", (1080, 1350), b"")
+        self.assertEqual(portrait["image_config"]["aspect_ratio"], "4:5")
 
     def test_size_snaps_to_post_or_story(self) -> None:
         self.assertEqual(image_provider_service.snap_size(1280, 720), (1080, 1080))
         self.assertEqual(image_provider_service.snap_size(400, 1800), (1080, 1920))
+
+    def test_portrait_post_stays_4_5(self) -> None:
+        self.assertEqual(image_provider_service.snap_size(1080, 1350), (1080, 1350))
+        self.assertEqual(image_provider_service.snap_size(900, 1125), (1080, 1350))
+        self.assertEqual(image_provider_service.snap_size(1080, 1920), (1080, 1920))
 
     def test_fresh_scene_label_stays_on_klein(self) -> None:
         calls = []
