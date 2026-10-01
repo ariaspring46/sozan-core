@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="سوزان">
+  <defs>
+    <mask id="cut">
+      <rect width="240" height="240" fill="#fff"/>
+      <path fill="#000" transform="translate(-18 -69.4) scale(1.15)"
+            d="M120 112C126 128 146 138 146 160C146 176 134 186 120 186C106 186 94 176 94 162C94 150 102 144 106 136C109 143 113 147 117 148C120 136 116 124 120 112Z"/>
+    </mask>
+  </defs>
+  <g mask="url(#cut)" fill="#C45C26">
+    <rect x="16" y="20" width="208" height="164" rx="56"/>
+    <path d="M142 170C146 200 166 216 198 224C186 208 184 190 190 170Z"/>
+  </g>
+</svg>
