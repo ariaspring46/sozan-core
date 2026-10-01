@@ -89,6 +89,10 @@ class ImageCutoverTests(unittest.TestCase):
         self.assertFalse(image_provider_service.is_hard_edit("رسمی‌تر کن"))
 
     def test_cutout_releases_the_session(self) -> None:
+        import importlib.util
+
+        if importlib.util.find_spec("rembg") is None:
+            self.skipTest("rembg نصب نیست (وابستگی محیط)")
         buf = BytesIO()
         Image.new("RGBA", (8, 8), (1, 2, 3, 255)).save(buf, "PNG")
         with patch("rembg.new_session", return_value=object()) as made, patch(

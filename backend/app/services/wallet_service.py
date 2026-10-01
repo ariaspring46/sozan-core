@@ -202,7 +202,10 @@ def request_withdraw(*, amount: int, iban: str, name: str = "") -> dict:
         if not isinstance(rows, list):
             rows = []
         rows.append(row)
-        write_json("withdrawals.json", rows[-80:])
+        # درخواست‌های در انتظار هرگز حذف نمی‌شوند؛ فقط تاریخچهٔ رسیدگی‌شده به ۸۰ آخر محدود است.
+        pending = [r for r in rows if str(r.get("status") or "") == "pending"]
+        settled = [r for r in rows if str(r.get("status") or "") != "pending"]
+        write_json("withdrawals.json", (pending + settled[-80:]))
         _append("withdraw_hold", -amount, order_id=row["id"], note=sheba)
         return {"withdraw": row, "wallet": snapshot()}
 

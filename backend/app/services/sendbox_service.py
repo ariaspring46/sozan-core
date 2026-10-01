@@ -33,7 +33,10 @@ def oauth_base() -> str:
 
 
 def webhook_secret() -> str:
-    return hmac.new(settings.jwt_secret.encode(), b"sendbox-webhook", hashlib.sha256).hexdigest()
+    # جدا از JWT_SECRET؛ اگر SENDBOX_WEBHOOK_SECRET ست نشده باشد رفتار قدیمی
+    dedicated = str(settings.sendbox_webhook_secret or "").strip()
+    source = dedicated.encode() if dedicated else settings.jwt_secret.encode()
+    return hmac.new(source, b"sendbox-webhook", hashlib.sha256).hexdigest()
 
 
 def valid_webhook_token(token: str) -> bool:

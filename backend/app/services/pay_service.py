@@ -433,12 +433,28 @@ def find_tenant_by_slug(slug: str) -> str | None:
     wanted = slug.strip()
     if not wanted:
         return None
-    for phone in iter_tenants():
+    from app.services import tenant_index_service
+
+    data = tenant_index_service.load()
+    phone = tenant_index_service.slug_owner(data, wanted)
+    if phone:
         with tenant_scope(phone):
             shop = read_json("shop.json", {})
             if isinstance(shop, dict) and str(shop.get("slug") or "").strip() == wanted:
                 return phone
-    return None
+    # فهرست کهنه بود — یک بار پیمایش کامل و ترمیم
+    found = None
+    rows = []
+    for p_phone in iter_tenants():
+        with tenant_scope(p_phone):
+            shop = read_json("shop.json", {})
+            slug_now = str(shop.get("slug") or "").strip()
+            orders = [str(r.get("id") or "") for r in read_json("pay-orders.json", []) if isinstance(r, dict)]
+            rows.append((p_phone, {"shop": shop, "orderIds": orders}))
+            if slug_now == wanted and found is None:
+                found = p_phone
+    tenant_index_service.rebuild(rows)
+    return found
 
 
 def ensure_pay_secret() -> str:
