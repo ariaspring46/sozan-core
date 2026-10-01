@@ -111,6 +111,11 @@ def _shop() -> dict:
 def _save_shop(shop: dict) -> dict:
     shop["url"] = live_url(shop)
     with tenant_file_lock("shop"):
+        # ensure_pay_secret ممکن است هم‌زمان با ساخت، secret را نوشته باشد؛ ذخیرهٔ وضعیت
+        # با دیکشنری کهنه نباید آن را پاک کند (وگرنه /p این فروشگاه می‌بندد).
+        existing = read_json("shop.json", {})
+        if isinstance(existing, dict) and existing.get("paySecret") and not shop.get("paySecret"):
+            shop["paySecret"] = existing["paySecret"]
         write_json("shop.json", shop)
     slug = str(shop.get("slug") or "").strip()
     if slug:
