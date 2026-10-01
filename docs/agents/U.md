@@ -69,7 +69,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 9.7k | the files most tasks touch; read the relevant one first |
-| active | 30.5k | yours to edit; read only what the task needs |
+| active | 31.9k | yours to edit; read only what the task needs |
 | rare | 15.9k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
@@ -88,6 +88,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/components/`: `landing-page.tsx` (12.4k), `app-shell.tsx` (2.8k), `getting-started.tsx` (2.2k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
 - `frontend/components/ui/`: `button.tsx` (0.2k), `textarea.tsx` (0.1k), `select.tsx` (0.1k), `input.tsx` (0.1k), `card.tsx` (0.1k)
 - `frontend/lib/`: `api.ts` (1.2k), `theme.ts` (0.7k), `use-app-viewport.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.3k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
+- `tools/`: `ui_check.py` (1.4k)
 
 **Rare (yours; only when the task names it):**
 

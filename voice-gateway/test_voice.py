@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import array
 import json
+import tempfile
 import os
 import time
 import unittest
@@ -443,7 +444,8 @@ class SalesTest(unittest.TestCase):
 
     def test_brief_names_the_shop_and_is_not_a_script(self) -> None:
         brief = sales_brief(ShopCard("kif_shop", "کیف چرم"))
-        self.assertIn("سوزان هستی", brief)
+        self.assertIn("تو سوزانی", brief)
+        self.assertIn("هوش مصنوعی", brief)
         opened = sales_open()
         self.assertIn("آنلاین‌شاپ", opened)
         self.assertIn("وبسایت", opened)
@@ -454,7 +456,7 @@ class SalesTest(unittest.TestCase):
         self.assertIn("!", opened)
         self.assertNotIn("…", opened)
         self.assertIn("kif_shop", brief)
-        self.assertIn("تعریف نکن", brief)
+        self.assertIn("بیو را از رو نخوان", brief)
         self.assertNotIn("پیجت را دیدم", brief)
         for line in FIXED_SALES_LINES:
             self.assertNotIn(line, brief)
@@ -532,9 +534,9 @@ class SalesTest(unittest.TestCase):
         self.assertEqual(gift_line(), "")
         self.assertFalse(gift_allowed(state, read_signals("گرونه")))
         self.assertIn("sozan-core.ir", CLOSE_LINE)
-        self.assertIn("دایرکت", HELLO_LINE)
-        self.assertIn("سفارش", HELLO_LINE)
-        self.assertLessEqual(len(HELLO_LINE.split()), 18)
+        self.assertIn("هوش مصنوعی", HELLO_LINE)
+        self.assertTrue(HELLO_LINE.endswith("؟"))
+        self.assertLessEqual(len(HELLO_LINE.split()), 30)
         self.assertNotIn("پیجت ", HELLO_LINE)
         self.assertNotIn("کور", ADDRESS_LINE)
         self.assertIn("کُر", ADDRESS_LINE)
@@ -606,7 +608,9 @@ class SalesTest(unittest.TestCase):
         trust = plan_turn(worried, "از کجا اعتماد کنم درست کار می‌کنه")
         self.assertEqual(trust.kind, "address")
         self.assertIn("حق دارید", trust.line or "")
-        self.assertIn("sozan-core.ir", trust.line or "")
+        # An objection is acknowledged and reframed; the address is not pushed on every objection.
+        self.assertIn("رایگان", trust.line or "")
+        self.assertNotIn("sozan-core.ir", trust.line or "")
         cant = plan_turn(worried, "من اصلاً بلد نیستم سایت بسازم سخت نیست")
         self.assertEqual(cant.kind, "address")
         self.assertIn("لازم نیست", cant.line or "")
@@ -782,23 +786,27 @@ class SalesTest(unittest.TestCase):
         self.assertIn("کُر", missed.line or "")
 
     def test_intro_asks_one_pain_and_sms_does_not_insist(self) -> None:
-        for line in (HELLO_LINE, HELLO_SMS_LINE, PAIN_LINE, DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE):
-            self.assertLessEqual(len(line.split()), 18)
+        for line in (DM_LINE, CONTENT_LINE, ORDER_LINE, SITE_LINE):
+            self.assertLessEqual(len(line.split()), 20)
+            self.assertTrue(line.endswith("؟"), line)
+        for line in (HELLO_LINE, HELLO_SMS_LINE, PAIN_LINE):
+            self.assertLessEqual(len(line.split()), 30)
         opened = sales_open()
         self.assertIn("دستیار فروش", opened)
         self.assertIn("پرو مکس", opened)
         self.assertIn("لینک پرداخت داخل گفتگو را نگو", opened)
-        self.assertIn("لغو است", opened)
+        self.assertIn("جواب دایرکت", opened)
         set_payment_fetcher(lambda: True)
         self.assertIn("داخل همان گفتگو", sales_open())
         sms = SalesState(sms_sent=True)
         first = plan_turn(sms, "الو")
         self.assertEqual(first.line, HELLO_SMS_LINE)
         note_spoken(sms, HELLO_SMS_LINE)
+        # The opening already introduced Sozan and asked permission: any reply gets the value line once.
         second = plan_turn(sms, "سلام")
-        self.assertEqual(second.line, HELLO_LINE)
+        self.assertEqual(second.line, PAIN_LINE)
         self.assertNotIn("پیامک", second.line or "")
-        note_spoken(sms, HELLO_LINE)
+        note_spoken(sms, PAIN_LINE)
         third = plan_turn(sms, "دایرکت‌هام مونده")
         self.assertEqual(third.line, DM_LINE)
         site = plan_turn(SalesState(greeted=True, intro_said=True, pain_asked=True), "یه سایت می‌خوام")
@@ -825,6 +833,137 @@ class SalesTest(unittest.TestCase):
         self.assertEqual(parse_sim_command("SIM @kif_shop"), ("kif_shop", ""))
         self.assertEqual(parse_sim_command("DIAL 0912"), ("", ""))
         self.assertEqual(parse_sim_command("sim gold طلا"), ("gold", "طلا"))
+
+
+class OpeningAndProfileTest(unittest.TestCase):
+    """Personal hook from the page bio, AI disclosure after it, permission, then a tailored value line."""
+
+    def setUp(self) -> None:
+        set_plans_fetcher(lambda: PLAN_FIXTURE)
+
+    def tearDown(self) -> None:
+        reset_plan_cache()
+
+    def test_opening_hook_then_ai_disclosure_then_permission(self) -> None:
+        import sales
+
+        card = ShopCard("ava_bags", "کیف چرم", name="گالری کیف آوا", signals=("dm_orders",))
+        opening = sales.hello_for(card)
+        self.assertTrue(opening.startswith("سلام"))
+        self.assertIn("گالری کیف آوا", opening)
+        self.assertIn("از دایرکت", opening)
+        self.assertIn("هوش مصنوعی", opening)
+        self.assertLess(opening.index("گالری کیف آوا"), opening.index("هوش مصنوعی"))
+        self.assertTrue(opening.endswith("؟"))
+        self.assertLessEqual(len(opening.split()), 30)
+        latin = sales.hello_for(ShopCard("ava_bags", "", name="Ava Bags"))
+        self.assertNotRegex(latin, r"[A-Za-z]")
+        self.assertIn("پیج اینستاگرامتون", latin)
+        self.assertIn("کیف چرم کار می‌کنید", sales.hello_for(ShopCard("x", "کیف چرم")))
+        self.assertEqual(sales.hello_for(None), HELLO_LINE)
+
+    def test_permission_paths(self) -> None:
+        import sales
+
+        card = ShopCard("ava_bags", "کیف چرم", name="گالری کیف آوا", signals=("dm_orders",))
+
+        def fresh() -> SalesState:
+            state = SalesState(opening=sales.hello_for(card), value_line=sales.value_for(card))
+            hello = plan_turn(state, "الو بفرمایید")
+            self.assertEqual(hello.line, state.opening)
+            note_spoken(state, hello.line)
+            return state
+
+        yes = plan_turn(fresh(), "بله بفرمایید")
+        self.assertEqual(yes.line, sales.value_for(card))
+        self.assertIn("دایرکت", yes.line or "")
+        self.assertTrue((yes.line or "").endswith("؟"))
+        busy = plan_turn(fresh(), "الان وقت ندارم سرم شلوغه")
+        self.assertTrue(busy.hangup)
+        self.assertEqual(busy.line, sales.BUSY_LINE)
+        no = plan_turn(fresh(), "نمیخوام ممنون")
+        self.assertTrue(no.hangup)
+        self.assertEqual(no.line, sales.DECLINE_LINE)
+        self.assertNotIn("sozan", no.line or "")
+        robot_state = fresh()
+        robot = plan_turn(robot_state, "شما رباتی؟")
+        self.assertEqual(robot.line, sales.ROBOT_LINE)
+        self.assertIn("هوش مصنوعی", robot.line or "")
+        note_spoken(robot_state, robot.line or "")
+        after = plan_turn(robot_state, "باشه بگو")
+        self.assertEqual(after.line, sales.value_for(card))
+        pain = plan_turn(fresh(), "آره دایرکتام خیلی زیاده")
+        self.assertEqual(pain.line, sales.DM_LINE)
+        # A topic already pitched is never pitched again: their answer goes to the model.
+        told = fresh()
+        told.value_kind = "dm"
+        note_spoken(told, plan_turn(told, "بگید").line or "")
+        answered = plan_turn(told, "روزی پنجاه تا دایرکت دارم")
+        self.assertEqual(answered.kind, "model")
+
+    def test_brief_carries_bio_facts_not_raw_bio(self) -> None:
+        card = ShopCard("ava_bags", "کیف چرم", name="گالری کیف آوا", city="تهران", signals=("ships", "physical"))
+        brief = sales_brief(card)
+        self.assertIn("گالری کیف آوا", brief)
+        self.assertIn("تهران", brief)
+        self.assertIn("به همهٔ شهرها ارسال دارد", brief)
+        self.assertIn("مغازهٔ حضوری هم دارد", brief)
+        self.assertIn("هوش مصنوعی", brief)
+
+    def test_campaign_profile_is_loaded_and_whitelisted(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "campaign.json"
+            path.write_text(json.dumps({"source": "instagram-shops", "contacts": [
+                {"phone": "09121234567", "instagram": "ava_bags", "product": "",
+                 "profile": {"ok": True, "name": "گالری کیف آوا", "city": "تهران", "product": "کیف",
+                             "signals": ["dm_orders", "hack"], "bio": "کیف چرم"}},
+                {"phone": "09121234568", "instagram": "gone_page", "profile": {"ok": False}},
+            ]}, ensure_ascii=False), encoding="utf-8")
+            found = load_campaign(path)
+        card = found["09121234567"]
+        self.assertEqual(card.name, "گالری کیف آوا")
+        self.assertEqual(card.signals, ("dm_orders",))
+        self.assertEqual(card.product, "کیف")
+        self.assertEqual(found["09121234568"].signals, ())
+
+    def test_enrich_reads_bio_safely_offline(self) -> None:
+        import enrich_campaign as enrich
+
+        user = {
+            "full_name": "گالری کیف آوا 👜",
+            "biography": "👜 کیف چرم دست‌ساز\n📍تهران، پاساژ کوروش\nارسال به سراسر کشور\nسفارش فقط از دایرکت\n0912 123 4567\nwww.avabags.ir",
+            "external_url": "https://avabags.ir",
+        }
+        profile = enrich.profile_from_user(user)
+        self.assertEqual(profile["name"], "گالری کیف آوا")
+        self.assertEqual(profile["city"], "تهران")
+        self.assertNotIn("0912", profile["bio"])
+        self.assertNotIn("4567", profile["bio"])
+        self.assertNotIn("avabags", profile["bio"])
+        self.assertEqual(set(profile["signals"]), {"dm_orders", "ships", "physical", "has_site", "handmade"})
+        self.assertNotIn("has_site", enrich.bio_signals("سفارش", external_url="https://linktr.ee/x"))
+
+        calls = []
+
+        def fake_get(url, proxy):
+            calls.append(url)
+            if "rate_me" in url:
+                return 429, b""
+            return 200, json.dumps({"data": {"user": user}}).encode()
+
+        spec = {"contacts": [
+            {"phone": "09121111111", "instagram": "ava_bags"},
+            {"phone": "09122222222", "instagram": "fresh_page", "profile": {"ok": True, "fetchedAt": "2999-01-01T00:00:00+00:00"}},
+            {"phone": "09123333333", "instagram": "rate_me"},
+            {"phone": "09124444444", "instagram": "never_reached"},
+        ]}
+        counts = enrich.enrich(spec, max_fetch=10, refresh_days=14, proxy="", get=fake_get, sleep=lambda _s: None)
+        self.assertEqual(counts["ok"], 1)
+        self.assertEqual(counts["rateLimited"], 1)
+        self.assertTrue(spec["contacts"][0]["profile"]["ok"])
+        self.assertNotIn("never_reached", " ".join(calls))
+        self.assertFalse(any("fresh_page" in url for url in calls))
+        self.assertIsNone(enrich.fetch_user("bad handle!", "", fake_get))
 
 
 if __name__ == "__main__":

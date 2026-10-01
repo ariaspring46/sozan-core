@@ -102,7 +102,10 @@ def main() -> int:
     open_now = within_hours(spec)
     used = calls_today()
     cap = int(spec.get("daily_cap") or 20)
+    profiled = sum(1 for row in rows if isinstance(row.get("profile"), dict) and row["profile"].get("ok"))
     print(f"contacts {len(rows)} hours={'open' if open_now else 'closed'} today={used}/{cap} gap_s={spec.get('gap_s') or 45}")
+    if profiled < len(rows):
+        print(f"profiles {profiled}/{len(rows)}: run `python3 enrich_campaign.py` first so the opening can be personal")
     if not args.dial:
         for row in rows[:10]:
             print(normalize_dial(str(row.get("phone") or "")), row.get("instagram") or "")

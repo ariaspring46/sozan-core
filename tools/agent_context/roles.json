@@ -55,7 +55,8 @@
         "tools/qa50_battery.py",
         "tools/qa_battery.py",
         "tools/agentic_probes/p_router.py",
-        "tools/agentic_probes/p_router_lock.py"
+        "tools/agentic_probes/p_router_lock.py",
+        "talk-x1.md"
       ],
       "rare": [
         "backend/app/data/**",
@@ -131,7 +132,8 @@
         "tools/qa_image_battery.json",
         "tools/qa_image_battery.py",
         "tools/agentic_probes/p_budget_image.py",
-        "tools/agentic_probes/p_tenant_thread.py"
+        "tools/agentic_probes/p_tenant_thread.py",
+        "talk-x2.md"
       ],
       "rare": [
         "promo-engine/**",
@@ -207,7 +209,8 @@
         "backend/app/services/onboard_service.py",
         "backend/app/api/onboard.py",
         "frontend/app/onboard/**",
-        "frontend/components/onboard-gate.tsx"
+        "frontend/components/onboard-gate.tsx",
+        "talk-x3.md"
       ],
       "rare": [
         "deploy/sozan-unipile-socks.service",
@@ -227,6 +230,9 @@
         "TELEGRAM_BOT_TOKEN is the owner-alert bot only; the shared seller bot is TELEGRAM_HUB_BOT_TOKEN and is never polled for DMs.",
         "Respect existing poll intervals and backoff (Instagram >= 30s, 3 failures -> 300s); never tighten them.",
         "Webhook secrets and OAuth tokens never appear in logs, events, reports or test output."
+      ],
+      "external": [
+        "Instagram endpoints and app user-agent in `channel_scan_service.py` (IG_APP_UA, `i.instagram.com/api/v1/...`) are also used by Z's `voice-gateway/enrich_campaign.py`; when you change them, tell Z in voice-agent-talk.md."
       ]
     },
     {
@@ -255,7 +261,8 @@
         "frontend/components/shop-live-build.tsx",
         "tools/agentic_probes/p_shop_edit.py",
         "tools/agentic_probes/p_shop_create_page.py",
-        "tools/agentic_probes/p_loop_block.py"
+        "tools/agentic_probes/p_loop_block.py",
+        "talk-x4.md"
       ],
       "rare": [
         "tools/agentic_probes/p_shop_edit.py",
@@ -364,7 +371,8 @@
         "tools/agentic_probes/run_all.sh",
         "tools/agentic_probes/p_outbox_chain.py",
         "tools/agentic_probes/p_outbox_chain_loop.py",
-        "tools/agent_context/build.py"
+        "tools/agent_context/build.py",
+        "talk-x5.md"
       ],
       "rare": [
         "deploy/**",
@@ -510,12 +518,16 @@
         "voice-gateway/loopback_test.py",
         "voice-gateway/sozan-phone-read.pdf",
         "voice-gateway/campaign.example.json",
-        "voice-gateway/systemd/**"
+        "voice-gateway/systemd/**",
+        "voice-gateway/enrich_campaign.py",
+        "voice-gateway/campaign_run.py",
+        "voice-gateway/voice_status.py"
       ],
       "external": [
         "HTTP to the hub: `GET {SOZAN_API}/billing/plans` (plan prices; owner X5, `backend/app/api/billing.py`) and `GET {SOZAN_API}/health` (field `paymentReady`; owner X5, `backend/app/main.py`). If either fails, say no price.",
         "llama-swap on the home machine: only the `ornith-phone` slot, plus `/v1/audio/speech` and `/v1/embeddings` (bge-m3, read-only use).",
-        "DNC file `~/local-ai/config/sozan-dnc.txt`; call log `~/local-ai/sozan-voice-log/calls.jsonl` (mode 600, stays on that machine)."
+        "DNC file `~/local-ai/config/sozan-dnc.txt`; call log `~/local-ai/sozan-voice-log/calls.jsonl` (mode 600, stays on that machine).",
+        "Instagram (shared with X3): `voice-gateway/enrich_campaign.py` uses the same `i.instagram.com` endpoints and app user-agent as `backend/app/services/channel_scan_service.py::_instagram_page`. If Instagram changes them, X3 and Z change together."
       ],
       "title_en": "Phone voice agent",
       "branch": "feat/voice-z",
@@ -532,10 +544,11 @@
         "No real call without the owner's permission; campaign_run.py --dial only after the owner writes 'شروع کمپین' in voice-agent-talk.md. Test with sim_run.py / sim_call.py.",
         "DNC is sacred: 'زنگ نزنید' or similar -> number written to the DNC file immediately, never called again; keep its test.",
         "Calls only inside campaign windows (currently 10-13 and 16-20 Tehran) with the daily cap and spacing in campaign_run.py.",
-        "Honesty: if asked, it is 'دستیار صوتی سوزان', never a human; no invented prices, codes or claims. Prices come only from GET /billing/plans.",
+        "Honesty: the opening says Sozan is an AI (hook sentence first, then DISCLOSE_LINE with «هوش مصنوعی»), and any 'are you a robot/human?' gets a plain yes-AI answer (ROBOT_LINE). Never imply a human. No invented prices, codes, customers or claims; prices only from GET /billing/plans.",
         "GPU: only Vulkan1 and the ornith-phone slot and sozan-voice* units are yours. Never restart llama-swap or touch qwen3.5-9b, bge-m3 or other slots. Restart the phone service only when no call is in progress.",
         "Never write a caller's number or words into a report; counts, times and call ids only.",
-        "Git (voice-agent-plan.md §0.9): work on feat/voice-z; rebase on a fresh main and merge only after tests and the stage's acceptance condition pass; do not push to origin unless the owner says so."
+        "Git (voice-agent-plan.md §0.9): work on feat/voice-z; rebase on a fresh main and merge only after tests and the stage's acceptance condition pass; do not push to origin unless the owner says so.",
+        "Personal facts come only from enrich_campaign.py (page bio read before the campaign, cached 14 days, phones/links stripped). The call may use at most one fact per turn, never reads the bio aloud, never mentions follower counts. Run enrichment only from the home machine through SOZAN_IG_PROXY, never against a real page in tests (tests use a fake fetcher)."
       ],
       "git_mode": "local"
     },
@@ -664,7 +677,8 @@
         "frontend/components/auth-media.tsx",
         "docs/ui-ux-audit.md",
         "docs/ui-audit-live.md",
-        "tools/ui_check.py"
+        "tools/ui_check.py",
+        "talk-u.md"
       ],
       "rare": [
         "frontend/public/**",
@@ -991,11 +1005,19 @@
       "steps": [
         [
           "Z",
+          "enrich_campaign.py reads each page bio once → personal opening (hook + AI disclosure + permission)"
+        ],
+        [
+          "Z",
           "SIP call → sales state machine → LLM/TTS"
         ],
         [
           "X5",
           "GET /billing/plans and /health for prices"
+        ],
+        [
+          "X3",
+          "Instagram endpoint shared with the page scan"
         ]
       ],
       "tests": [],
