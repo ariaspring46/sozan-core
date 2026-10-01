@@ -73,12 +73,36 @@ def outbox_path() -> Any:
     return path
 
 
+_OUTBOX_MAX_ROWS = 2000
+_OUTBOX_COOLDOWN = 30.0
+_flush_cooldown_until = 0.0
+
+
 def _append_outbox(body: dict[str, Any]) -> None:
     row = dict(body)
     row.setdefault("queuedAt", time.time())
     row.setdefault("attempts", 0)
-    with outbox_path().open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    try:
+        path = outbox_path()
+        existing: list[str] = []
+        dropped = 0
+        if path.is_file():
+            existing = path.read_text(encoding="utf-8").splitlines()
+        over = len(existing) + 1 - _OUTBOX_MAX_ROWS
+        if over > 0:
+            # سقف صف: قدیمی‌ترین‌ها دور ریخته می‌شوند؛ تازه‌ها می‌مانند.
+            dropped = over
+            existing = existing[over:]
+        with path.open("w", encoding="utf-8") as handle:
+            if dropped:
+                handle.write(json.dumps({"dropped": dropped, "queuedAt": time.time()}) + "\n")
+            for line in existing:
+                handle.write(line + "\n")
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        if dropped:
+            emit_later(kind="observe", title="observe-outbox-dropped", surface="observe", status="error", payload={"dropped": dropped})
+    except Exception:
+        pass
 
 
 def _rewrite_outbox(rows: list[dict[str, Any]]) -> None:
@@ -117,6 +141,9 @@ async def _post_event(body: dict[str, Any]) -> bool:
 
 
 async def flush_outbox(limit: int = 40) -> int:
+    global _flush_cooldown_until
+    if time.time() < _flush_cooldown_until:
+        return 0
     rows = load_outbox()
     if not rows:
         return 0
@@ -133,6 +160,9 @@ async def flush_outbox(limit: int = 40) -> int:
         row["attempts"] = int(row.get("attempts") or 0) + 1
         kept.append(row)
     _rewrite_outbox(kept)
+    if sent == 0 and kept:
+        # تونل قطع است؛ ۳۰ ثانیه دوباره فایل را باز نکن.
+        _flush_cooldown_until = time.time() + _OUTBOX_COOLDOWN
     return sent
 
 

@@ -45,7 +45,12 @@ class TicketIn(BaseModel):
 
 
 @router.get("/p/catalog-ids")
-async def catalog_ids(slug: str = Query(default=""), secret: str = Query(default="")):
+async def catalog_ids(
+    slug: str = Query(default=""),
+    secret: str = Query(default=""),
+    x_sozan_store_secret: str = Header(default=""),
+):
+    secret = x_sozan_store_secret or secret
     try:
         return pay_service.catalog_ids(slug=slug, secret=secret)
     except ValueError as exc:
@@ -53,7 +58,12 @@ async def catalog_ids(slug: str = Query(default=""), secret: str = Query(default
 
 
 @router.get("/p/shop-config")
-async def shop_config(slug: str = Query(default=""), secret: str = Query(default="")):
+async def shop_config(
+    slug: str = Query(default=""),
+    secret: str = Query(default=""),
+    x_sozan_store_secret: str = Header(default=""),
+):
+    secret = x_sozan_store_secret or secret
     try:
         return pay_service.shop_config(slug=slug, secret=secret)
     except ValueError as exc:

@@ -320,3 +320,96 @@ class ShopPayB1Tests(unittest.TestCase):
                 pending = read_json("pay-pending.json", {}, shared=True)
         self.assertIn("pay=missing", url)
         self.assertNotIn("AUTH-GONE", pending)
+
+
+class TenantIndexTests(unittest.TestCase):
+    def test_index_lookup_skips_full_scan(self) -> None:
+        """د۱: جست‌وجو با فهرست پر، پیمایش همهٔ مستأجرها را صدا نمی‌زند."""
+        import asyncio
+        import tempfile
+
+        from unittest.mock import patch
+
+        from app.services import pay_service
+        from app.services import tenant_index_service
+
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                write_json("shop.json", {"slug": SLUG, "paySecret": SECRET})
+                data = tenant_index_service._empty()
+                data["slug"][SLUG] = PHONE
+                data["builtAt"] = 1
+                tenant_index_service._save(data)
+                called = {"n": 0}
+
+                def counting_iter():
+                    called["n"] += 1
+                    yield PHONE
+
+                with patch.object(pay_service, "iter_tenants", counting_iter):
+                    phone = pay_service.find_tenant_by_slug(SLUG)
+                self.assertEqual(phone, PHONE)
+                self.assertEqual(called["n"], 0)  # پیمایش کامل نشد
+
+    def test_index_repairs_stale_row(self) -> None:
+        import asyncio
+        import tempfile
+
+        from unittest.mock import patch
+
+        from app.services import pay_service
+        from app.services import tenant_index_service
+
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                write_json("shop.json", {"slug": SLUG, "paySecret": SECRET})
+            data = tenant_index_service._empty()
+            data["slug"][SLUG] = "09120000099"  # ردیف کهنه/غلط
+            tenant_index_service._save(data)
+            with patch.object(settings, "state_dir", raw):
+                phone = pay_service.find_tenant_by_slug(SLUG)
+                self.assertEqual(phone, PHONE)
+                fixed = tenant_index_service.load()
+                self.assertEqual(fixed["slug"][SLUG], PHONE)
+
+
+class TenantIndexRuntimeTests(unittest.TestCase):
+    def test_rebuild_and_owners(self) -> None:
+        from app.services import tenant_index_service as tix
+
+        data = tix.rebuild([
+            ("09120000001", {"shop": {"slug": "shop-a"}, "orderIds": ["o1"], "sendboxIds": ["acc1"]}),
+        ])
+        self.assertEqual(tix.slug_owner(data, "shop-a"), "09120000001")
+        self.assertEqual(tix.order_owner(data, "o1"), "09120000001")
+        self.assertEqual(tix.sendbox_owner(data, "acc1"), "09120000001")
+        self.assertIsNone(tix.slug_owner(data, "shop-b"))
+
+
+class RateLimitStatusTests(unittest.TestCase):
+    def test_status_rate_limited_per_ip(self) -> None:
+        """سقف ۶۰ درخواست در دقیقه برای /p/{id}/status per IP."""
+        import asyncio
+        import tempfile
+        import httpx
+
+        from unittest.mock import patch
+
+        from app.config import settings
+
+        async def run() -> int:
+            from app.main import app
+
+            transport = httpx.ASGITransport(app=app)
+            statuses = []
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+                for _ in range(61):
+                    res = await client.get("/p/nonexistent-id/status")
+                    statuses.append(res.status_code)
+            return statuses
+
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw):
+                statuses = asyncio.run(run())
+        self.assertEqual(statuses[0], 404)
+        self.assertTrue(any(s in (404, 429) for s in statuses))

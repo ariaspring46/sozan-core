@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     cutout_provider: str = "openrouter"
     cutout_api_key: str = ""
     cutout_openrouter_model: str = "google/gemini-2.5-flash-image"
+    sendbox_webhook_secret: str = ""
     cutout_queue_limit: int = 3
     melipayamak_otp_apikey: str = ""
     melipayamak_username: str = ""
