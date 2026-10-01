@@ -16,3 +16,16 @@
 - done: contracts.json (۲۷۲۵ خط) کامل خوانده شد؛ قراردادهای متعلق به X1 استخراج شد (read_chat_payload، router_chat::router، guard_output، sanitize_persian، cosine، bind_thread_id، clear_dead_busy، remember_content، thread_campaign_id، parse_turn، ChatMsg، ChatThread).
 - ملاحظه: contracts.json (تازه‌تر، کامیت c0d4db6) و roles.json پوستهٔ مشترک پنل (app-shell، ui/*، lib/api.ts، digits، idempotency، utils، empty-state، field، getting-started، theme-toggle، sozan-mark) را مال U می‌دانند؛ اما X1.md و پیام شروع مالک (03b21b0: «پوستهٔ مشترک پنل هم مال توست») آن‌ها را مال X1 می‌دانند. build.py --check سبز است.
 - needs: مالک — مرز قطعی را تأیید کند: پوستهٔ پنل با X1 است یا U؟ تا تعیین تکلیف، بدون تأیید در آن فایل‌ها دست نمی‌زنم.
+
+## X1 — همگام‌سازی با مرز تازه و دو قاعدهٔ مالک (2026-10-02 00:18 تهران)
+- done: پرسش مرزی گزارش قبل پس گرفته شد — هارنس تازه (X1.md @ HEAD) و contracts.json یک‌صدا هستند: پوستهٔ مشترک پنل و کیت UI (app-shell، ui/*، globals.css، lib/api.ts، digits، idempotency، utils، empty-state، field، getting-started، theme-toggle، panel-home، sozan-mark) مال U است؛ درخواست‌های آینده به talk-u.md. نسخهٔ X1.md که اول نشست خوانده بودم کهنه بود (پول وسط نشست رسیده بود).
+- done: فهرست فعلی فایل‌های من ثبت شد: هسته (router_service، turn_parse، router_chat، chat-thread، app/chat/page)؛ فعال (+talk-x1.md، chat_payload، router_embed، persian_text، fallback_tally، typing-hints، chat-attach، qa50_battery.py)؛ rare روتر و باتری‌ها؛ ۵ فایل تست. دو قاعدهٔ مالک (شاخهٔ x1/*، فرمان update) دریافت شد.
+- ملاحظه: fetch/push به گیت‌هاب بلاک است (همان محدودیت احراز هویت که X2 هم گزارش کرده)؛ شاخهٔ تازه از HEAD محلی ساخته می‌شود و پوش/مرج نیاز به auth مالک دارد.
+- needs: مالک — کارت تسک در talk-x1.md نیست؛ نخستین کارت را بدهید تا روی شاخهٔ x1/ شروع کنم.
+
+## مالک (به قلم برنامه‌ریز) — نخستین کارت تسک تو (۳ اکت 10-02 00:31)
+
+1. **ریویوی تغییرات مشاور در دامنه‌ات:** کامیت‌های  و خط hello-aqbd92 `router_service.py` (۲۸ خط) و `turn_parse.py` را دست زده‌اند — خط‌به‌خط ریویو کن؛ qa50 را محلی بزن (انتظار ۵۰/۵۰) و هر رگرسیون را با شاهد گزارش کن.
+2. **تست سرتاسری چت پنل** از مرورگر واقعی در سه عرض (۱۴۴۰/۳۹۰/۳۲۰): چت، کارت تأیید، پیوست، تایپینگ-هینت — با اسکرین‌شات (قاعدهٔ ۱۸:۴۰).
+3. **ناسازگاری با contracts.json** (مثلاً مالکیت sozan-mark/typing-hints که به U منتقل شده) را فهرست کن.
+**احراز گیت‌هاب:** فعلاً کامیت را روی شاخهٔ `x1/*` محلی بزن و در گزارش بنویس؛ پوش را برنامه‌ریز با توکن انجام می‌دهد.
