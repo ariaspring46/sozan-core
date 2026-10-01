@@ -60,23 +60,6 @@ def _append_order(row: dict) -> None:
     tenant_index_service.upsert(phone=str(row.get("phone") or current_tenant()), order_id=str(row.get("id") or ""))
 
 
-STATUS_POLL_LIMIT = 60
-
-
-async def allow_status_poll(ip: str) -> bool:
-    """Public order pages are unauthenticated: at most 60 hits a minute per visitor IP."""
-    from app.redis_client import redis_client
-
-    try:
-        key = f"pay:st:{ip or 'no-ip'}"
-        hits = await redis_client.incr(key)
-        if hits == 1:
-            await redis_client.expire(key, 60)
-        return hits <= STATUS_POLL_LIMIT
-    except Exception:
-        return True  # بدون Redis سقف نمی‌ماند، اما صفحهٔ پرداخت نمی‌ایستد
-
-
 def _pending() -> dict:
     stored = read_json("pay-pending.json", {}, shared=True)
     return stored if isinstance(stored, dict) else {}

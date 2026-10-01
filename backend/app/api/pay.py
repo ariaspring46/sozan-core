@@ -1,4 +1,7 @@
 import json
+import threading
+import time
+from collections import deque
 
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
@@ -9,6 +12,27 @@ from app.security import require_permission
 from app.services import pay_service
 
 router = APIRouter(tags=["pay"])
+
+_status_hits: dict[str, deque[float]] = {}
+_status_lock = threading.Lock()
+STATUS_RATE_LIMIT = 60
+STATUS_RATE_WINDOW = 60.0
+
+
+def _status_rate_allow(ip: str) -> bool:
+    """Sliding window per visitor IP; the map is capped so a flood of unique
+    spoofed IPs cannot grow it without bound."""
+    now = time.monotonic()
+    with _status_lock:
+        if len(_status_hits) > 10_000:
+            _status_hits.clear()
+        hits = _status_hits.setdefault(ip, deque())
+        while hits and now - hits[0] > STATUS_RATE_WINDOW:
+            hits.popleft()
+        if len(hits) >= STATUS_RATE_LIMIT:
+            return False
+        hits.append(now)
+        return True
 
 
 class ShopLine(BaseModel):
@@ -237,8 +261,8 @@ async def shop_otp_verify(body: ShopOtpVerifyIn):
 
 @router.get("/p/{order_id}/status")
 async def pay_status(order_id: str, request: Request):
-    if not await pay_service.allow_status_poll(client_ip(request)):
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست بیش از حد است")
+    if not _status_rate_allow(client_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "درخواست‌های وضعیت زیاد است؛ کمی بعد دوباره")
     found = pay_service.locate_order(order_id)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "سفارش پیدا نشد")
@@ -248,8 +272,8 @@ async def pay_status(order_id: str, request: Request):
 
 @router.get("/p/{order_id}")
 async def start_pay(order_id: str, request: Request):
-    if not await pay_service.allow_status_poll(client_ip(request)):
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "تعداد درخواست بیش از حد است")
+    if not _status_rate_allow(client_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "درخواست‌های وضعیت زیاد است؛ کمی بعد دوباره")
     try:
         url = pay_service.start_url(order_id)
     except KeyError as exc:
