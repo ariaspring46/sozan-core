@@ -1,6 +1,20 @@
 {
   "source": "instagram-shops",
   "contacts": [
-    {"phone": "09120000000", "instagram": "example_shop", "product": "کیف چرم", "smsSent": false}
+    {"phone": "09120000000", "instagram": "example_shop", "product": "کیف چرم", "smsSent": false},
+    {
+      "phone": "09120000001",
+      "instagram": "example_gallery",
+      "product": "",
+      "smsSent": false,
+      "profile": {
+        "ok": true,
+        "name": "گالری نمونه",
+        "city": "تهران",
+        "bio": "کیف چرم دست‌ساز ارسال به سراسر کشور سفارش از دایرکت",
+        "signals": ["dm_orders", "ships", "handmade"],
+        "fetchedAt": "2026-10-01T12:00:00+00:00"
+      }
+    }
   ]
 }

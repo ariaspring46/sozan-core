@@ -83,6 +83,8 @@ from sales import (
     sales_ended,
     sales_open,
     hello_for,
+    value_for,
+    value_kind_for,
     cached_sales_lines,
     too_alike,
     wait_line,
@@ -548,8 +550,10 @@ class Gateway:
         self._think_i = 0
         self._nudge_i = 0
         self._nudge_count = 0
-        campaign_file = CAMPAIGN_PATH if CAMPAIGN_PATH.is_file() else Path(__file__).with_name("campaign.json")
-        self._campaign = load_campaign(campaign_file)
+        self._campaign_file = CAMPAIGN_PATH if CAMPAIGN_PATH.is_file() else Path(__file__).with_name("campaign.json")
+        self._campaign_mtime = 0.0
+        self._campaign = {}
+        self._reload_campaign()
         self._pending_sales: ShopCard | None = None
         self._peer_number = ""
         self._sales_card: ShopCard | None = None
@@ -680,9 +684,11 @@ class Gateway:
                     continue
                 key = normalize_dial(number)
                 self._peer_number = key
+                self._reload_campaign()
                 self._pending_sales = self._campaign.get(key)
                 self._outbound_pitch = True
                 greet = hello_for(self._pending_sales)
+                self._prerender([greet, value_for(self._pending_sales)])
                 brief = sales_brief(self._pending_sales) if self._pending_sales else sales_open()
                 try:
                     self.brain.warm_sales(brief, greet)
@@ -693,6 +699,35 @@ class Gateway:
                     self._pending_sales = None
                     self._outbound_pitch = False
                 conn.send(f"{placed or 'busy'}\n".encode())
+
+    def _reload_campaign(self) -> None:
+        """enrich_campaign.py rewrites the file between calls; pick up its profiles without a restart."""
+        try:
+            mtime = self._campaign_file.stat().st_mtime
+        except OSError:
+            return
+        if mtime != self._campaign_mtime:
+            self._campaign = load_campaign(self._campaign_file)
+            self._campaign_mtime = mtime
+
+    def _prerender(self, lines: list[str]) -> None:
+        """Synthesize this call's personal lines while the phone rings, so the opening is not late."""
+
+        def run() -> None:
+            for line in lines:
+                if not (line or "").strip() or line in self._voice:
+                    continue
+                try:
+                    pcm = self.brain.prefetch_cloud(line) if tts_model() else b""
+                    if not pcm:
+                        pcm, _ = self.brain.synthesize(line, cloud=False)
+                except Exception:
+                    log.warning("prerender failed", exc_info=True)
+                    continue
+                if pcm:
+                    self._voice[line] = pcm
+
+        threading.Thread(target=run, name="sozan-prerender", daemon=True).start()
 
     def _arm_sim(self, raw: str) -> str:
         instagram, product = parse_sim_command(raw)
@@ -737,7 +772,16 @@ class Gateway:
         self._sales_card = card
         self._sales_brief = sales_brief(card) if card else (sales_open() if outbound else "")
         self._sales_state = "live" if self._sales_brief else ""
-        self._sales = SalesState(sms_sent=bool(card and card.sms_sent)) if self._sales_state else None
+        self._sales = (
+            SalesState(
+                sms_sent=bool(card and card.sms_sent),
+                opening=hello_for(card),
+                value_line=value_for(card),
+                value_kind=value_kind_for(card),
+            )
+            if self._sales_state
+            else None
+        )
         self._sales_pitched = False
         self._sales_said = set()
         self._sales_greeted = False
