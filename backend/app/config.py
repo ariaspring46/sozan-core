@@ -21,11 +21,13 @@ class Settings(BaseSettings):
     payment_sign_secret: str = ""
     lab_login_until: str = "2026-10-31"
     otp_test_until: str = ""
+    otp_test_phones: str = ""
     shop_otp_daily_cap: int = 200
     sozan_sms_provider: str = "smsir"
     sozan_sms_api_key: str = ""
     sozan_sms_template: str = ""
-    telegram_bot_token: str = ""
+    telegram_bot_token: str = ""  # only the owner alert bot (telegram_alert_service)
+    telegram_hub_bot_token: str = ""  # shared bot offered to sellers; never the alert bot
     telegram_chat_id: str = ""
     cutout_provider: str = "openrouter"
     cutout_api_key: str = ""
@@ -43,7 +45,6 @@ class Settings(BaseSettings):
     zarinpal_merchant_id: str = ""
     zarinpal_amount_unit: str = "rial"
     payments_enabled: bool = True
-    telegram_bot_token: str = ""
     telegram_bot_handle: str = ""
     telegram_post_target: str = ""
     plan_price_pro: int = 1_414_000
@@ -60,6 +61,7 @@ class Settings(BaseSettings):
     sms_quota_free: int = 50
     sms_quota_pro: int = 500
     sms_quota_promax: int = 2000
+    trusted_ip_header: str = ""
     cors_origins: str = "http://127.0.0.1:3000,http://localhost:3000"
     campaigns_dir: str = str(ROOT / "campaigns")
     fonts_dir: str = str(ROOT / "brand" / "fonts")
@@ -108,6 +110,18 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [x.strip() for x in self.cors_origins.split(",") if x.strip()]
+
+    @property
+    def otp_test_phone_set(self) -> frozenset[str]:
+        from app.phone import normalize_phone
+
+        out: set[str] = set()
+        for part in self.otp_test_phones.split(","):
+            try:
+                out.add(normalize_phone(part))
+            except ValueError:
+                continue
+        return frozenset(out)
 
     @property
     def otp_fixed_map(self) -> dict[str, str]:

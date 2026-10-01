@@ -77,7 +77,6 @@ async def _rearm_inbox() -> None:
             log.exception("inbox rearm failed")
 
 
-@asynccontextmanager
 def _security_guard() -> None:
     """شروع production با کلید نمونه/کوتاه یا otp_dev روشن رد می‌شود."""
     secret = str(settings.jwt_secret or "")
@@ -87,6 +86,7 @@ def _security_guard() -> None:
         raise RuntimeError("OTP_DEV must be off in production (PAYMENTS_ENABLED=1)")
 
 
+@asynccontextmanager
 async def lifespan(_app: FastAPI):
     _security_guard()
     async with engine.begin() as conn:

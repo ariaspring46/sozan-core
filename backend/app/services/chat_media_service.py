@@ -82,17 +82,23 @@ def copy_file(path: Path, *, sweep: bool = True) -> dict:
 
 
 def _referenced_names(root: Path) -> set[str]:
+    """Every file name mentioned anywhere in this tenant's state files.
+
+    Receipts live in pay-orders.json, ticket images in support-tickets.json,
+    customer media in inbox.json, shop chat in shop-messages.json. A file any of
+    them names must never be swept as abandoned.
+    """
     names: set[str] = set()
     if not root.is_dir():
         return names
-    for path in list(root.glob("router-*-messages.json")) + [root / "studio-messages.json"]:
+    for path in root.glob("*.json"):
         if not path.is_file():
             continue
         try:
             text = path.read_text(encoding="utf-8")
         except OSError:
             continue
-        for token in text.replace('"', " ").split():
+        for token in text.replace('"', " ").replace(",", " ").split():
             if "." in token:
                 names.add(Path(token).name)
     return names

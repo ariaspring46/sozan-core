@@ -176,10 +176,29 @@ class OtpTestWindowTests(unittest.TestCase):
             item.start()
             self.addCleanup(item.stop)
 
-    def test_window_open_returns_code(self) -> None:
+    def test_window_open_returns_code_for_test_phone_only(self) -> None:
+        with patch.object(auth_service.settings, "otp_test_until", "2030-12-31"):
+            out = asyncio.run(self.svc.send_otp("09130000001"))
+        self.assertTrue(out.get("code"), "a fake test phone gets the code")
+
+    def test_window_never_reveals_code_for_real_phone(self) -> None:
         with patch.object(auth_service.settings, "otp_test_until", "2030-12-31"):
             out = asyncio.run(self.svc.send_otp("09111234567"))
-        self.assertTrue(out.get("code"), "window must return the code")
+        self.assertNotIn("code", out)
+
+    def test_window_never_reveals_code_for_hub_admin(self) -> None:
+        with patch.object(auth_service.settings, "otp_test_until", "2030-12-31"), patch.object(
+            auth_service.settings, "admin_phone", "09130000002"
+        ):
+            out = asyncio.run(self.svc.send_otp("09130000002"))
+        self.assertNotIn("code", out)
+
+    def test_extra_test_phone_from_env(self) -> None:
+        with patch.object(auth_service.settings, "otp_test_until", "2030-12-31"), patch.object(
+            auth_service.settings, "otp_test_phones", "09191112222"
+        ):
+            out = asyncio.run(self.svc.send_otp("09191112222"))
+        self.assertTrue(out.get("code"))
 
     def test_window_closed_hides_code(self) -> None:
         with patch.object(auth_service.settings, "otp_test_until", ""):

@@ -68,6 +68,20 @@ def otp_test_window_open() -> bool:
     return _dt.date.today() <= until
 
 
+def otp_test_reveal_allowed(phone: str) -> bool:
+    """کد فقط برای شماره‌های ساختگیِ تست و فقط در پنجرهٔ تست در پاسخ می‌آید.
+
+    شمارهٔ واقعی و مدیر هاب هرگز؛ وگرنه هر کسی می‌توانست به‌جای هر فروشنده وارد شود.
+    """
+    if not otp_test_window_open():
+        return False
+    from app.hub_admin import is_hub_admin
+
+    if is_hub_admin(phone):
+        return False
+    return phone in _TEST_WINDOW_SKIP_SMS or phone in settings.otp_test_phone_set
+
+
 def _hash_otp(phone: str, code: str) -> str:
     key = f"{settings.jwt_secret}:{phone}".encode("utf-8")
     return "sha256:" + hmac.new(key, code.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -124,8 +138,8 @@ class AuthService:
         if mock_sms:
             payload["dev_code"] = code
             return payload
-        if otp_test_window_open():
-            # پنجرهٔ تست ساخت سایت: کد در پاسخ می‌آید؛ پیامک واقعی هم می‌رود.
+        if otp_test_reveal_allowed(phone):
+            # پنجرهٔ تست ساخت سایت، فقط شمارهٔ ساختگی: کد در پاسخ می‌آید.
             payload["code"] = code
             from app.services.observe_client import emit_later
 
@@ -216,8 +230,8 @@ class AuthService:
         code = f"{secrets.randbelow(1_000_000):06d}"
         # پنجرهٔ تست ساخت سایت: کد در پاسخ برمی‌گردد و برای شمارهٔ ساختگیِ تست،
         # پیامک واقعی هم فرستاده نمی‌شود (شمارهٔ واقعی هم‌چنان SMS می‌گیرد).
-        test_window = otp_test_window_open()
-        test_phone = test_window and phone in _TEST_WINDOW_SKIP_SMS
+        test_window = otp_test_reveal_allowed(phone)
+        test_phone = test_window
         rec_id = ""
         if not test_phone:
             try:

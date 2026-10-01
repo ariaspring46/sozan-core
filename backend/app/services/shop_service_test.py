@@ -328,6 +328,20 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 self.assertFalse(saved["cnameOk"])
                 self.assertEqual(saved["cnameSetup"]["host"], "shop.example.com")
 
+    def test_set_domain_rejects_host_claimed_by_another_shop(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw):
+                with tenant_scope("09135409482"):
+                    write_json("shop.json", {**shop_service.DEFAULT_SHOP, "slug": "a", "domain": "mine.example.com"})
+                with tenant_scope("09121112222"):
+                    write_json("shop.json", {**shop_service.DEFAULT_SHOP, "slug": "b", "port": 12380})
+                    with self.assertRaises(ValueError) as ctx:
+                        shop_service.set_domain("https://Mine.Example.com/")
+                    self.assertIn("دیگری", str(ctx.exception))
+                    self.assertNotEqual(shop_service._shop().get("domain"), "mine.example.com")
+                with tenant_scope("09135409482"):
+                    self.assertEqual(shop_service.domain_owner("mine.example.com"), "09135409482")
+
     def test_set_domain_sozan_host_skips_cname_setup(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):

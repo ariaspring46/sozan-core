@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.client_ip import client_ip
 from app.database import get_session
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -37,7 +38,7 @@ async def otp_captcha(phone: str):
 
 @router.post("/otp/send")
 async def otp_send(request: Request, body: OtpSendIn, service: AuthService = Depends(_auth)):
-    ip = request.client.host if request.client else ""
+    ip = client_ip(request)
     return await service.send_otp(
         body.phone,
         ip=ip,

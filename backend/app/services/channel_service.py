@@ -83,7 +83,7 @@ def _save(rows: list[dict]) -> None:
 def _hub_telegram_token() -> str:
     from app.config import settings as env
 
-    return str(env.telegram_bot_token or "").strip()
+    return str(env.telegram_hub_bot_token or "").strip()
 
 
 def _credentials(row: dict) -> dict:
@@ -106,6 +106,17 @@ def credentials_for(row: dict) -> dict:
         if token:
             creds = {**creds, "botToken": token}
     return creds
+
+
+def uses_hub_bot(row: dict) -> bool:
+    """Telegram row with no bot of its own: it only borrows the shared hub bot to post.
+
+    A bot shared by many sellers must never be polled for messages; every seller
+    would pull everyone's customers.
+    """
+    if str(row.get("platform") or "") != "telegram":
+        return False
+    return not _credentials(row).get("botToken") and bool(_hub_telegram_token())
 
 
 def token_for(row: dict) -> str:
@@ -210,7 +221,7 @@ def list_accounts() -> dict:
             item["hubBot"] = True
             item["help"] = (
                 "بات سوزان روی هاب آماده است. بات را ادمین کانال یا گروه کن و آیدی همان کانال را در مقصد پست بگذار. "
-                "توکن BotFather لازم نیست مگر بخواهی بات خودت را وصل کنی."
+                "برای انتشار پست توکن BotFather لازم نیست؛ برای دریافت دایرکت تلگرام باید بات خودت را وصل کنی."
             )
             for field in item["fields"]:
                 if field["key"] == "botToken":

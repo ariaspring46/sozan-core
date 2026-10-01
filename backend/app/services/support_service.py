@@ -11,7 +11,7 @@ import re
 from time import time
 from uuid import uuid4
 
-from app.state_store import current_tenant, read_json, write_json
+from app.state_store import current_tenant, iter_tenants, read_json, tenant_scope, write_json
 
 TICKET_FILE = "support-tickets.json"
 TICKET_STATUSES = ("open", "working", "closed")
@@ -94,12 +94,36 @@ def list_tickets(*, kind: str = "") -> list[dict]:
 
 
 def list_all_tickets_for_hub_admin() -> list[dict]:
-    """تیکت‌های فروشندگان به پشتیبانی سوزان؛ فقط مدیر هاب می‌بیند (بدون راز)."""
-    rows = [row for row in _tickets() if str(row.get("kind") or "storefront") == "seller"]
-    return sorted(rows, key=lambda row: -int(row.get("at") or 0))
+    """تیکت‌های همهٔ فروشندگان به پشتیبانی سوزان؛ فقط مدیر هاب می‌بیند (بدون راز)."""
+    out: list[dict] = []
+    for phone in iter_tenants():
+        with tenant_scope(phone):
+            for row in _tickets():
+                if str(row.get("kind") or "storefront") == "seller":
+                    out.append({**row, "tenant": phone})
+    return sorted(out, key=lambda row: -int(row.get("at") or 0))
 
 
-def reply_ticket(ticket_id: str, *, text: str, status: str = "") -> dict:
+def reply_hub_ticket(ticket_id: str, *, text: str, status: str = "") -> dict:
+    """پاسخ مدیر به تیکت یک فروشنده؛ تیکت در پوشهٔ همان فروشنده می‌ماند."""
+    ident = str(ticket_id or "").strip()
+    for phone in iter_tenants():
+        with tenant_scope(phone):
+            row = next(
+                (
+                    item
+                    for item in _tickets()
+                    if str(item.get("id")) == ident and str(item.get("kind") or "storefront") == "seller"
+                ),
+                None,
+            )
+            if row is None:
+                continue
+            return {**reply_ticket(ident, text=text, status=status, by="support"), "tenant": phone}
+    raise ValueError("تیکت پیدا نشد")
+
+
+def reply_ticket(ticket_id: str, *, text: str, status: str = "", by: str = "seller") -> dict:
     ident = str(ticket_id or "").strip()
     rows = _tickets()
     row = next((item for item in rows if str(item.get("id")) == ident), None)
@@ -107,7 +131,7 @@ def reply_ticket(ticket_id: str, *, text: str, status: str = "") -> dict:
         raise ValueError("تیکت پیدا نشد")
     message = _clean(text, 2000)
     if message:
-        row.setdefault("replies", []).append({"text": message, "at": int(time()), "by": "seller"})
+        row.setdefault("replies", []).append({"text": message, "at": int(time()), "by": by})
     wanted = str(status or "").strip().lower()
     if wanted in TICKET_STATUSES:
         row["status"] = wanted

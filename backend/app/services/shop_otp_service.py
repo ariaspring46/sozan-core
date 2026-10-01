@@ -10,7 +10,13 @@ from app.phone import normalize_phone
 from app.redis_client import redis_client
 from app.services.observe_client import emit_later
 from app.services import sms_service, wallet_service
-from app.services.auth_service import OTP_SEND_LIMIT, OTP_SEND_WINDOW, OTP_VERIFY_LIMIT, OTP_VERIFY_WINDOW
+from app.services.auth_service import (
+    OTP_SEND_LIMIT,
+    OTP_SEND_WINDOW,
+    OTP_VERIFY_LIMIT,
+    OTP_VERIFY_WINDOW,
+    otp_test_reveal_allowed,
+)
 from app.services.pay_service import find_tenant_by_slug
 from app.services.settings_service import get_settings
 from app.state_store import tenant_scope
@@ -21,21 +27,6 @@ class OtpLimitError(ValueError):
 
 
 SHOP_OTP_IP_HOURLY = 10
-
-
-def _otp_test_window_open() -> bool:
-    import datetime as _dt
-
-    from app.config import settings as _s
-
-    raw = str(_s.otp_test_until or "").strip()
-    if not raw:
-        return False
-    try:
-        until = _dt.date.fromisoformat(raw)
-    except ValueError:
-        return False
-    return _dt.date.today() <= until
 
 
 def _sign(body: str) -> str:
@@ -113,7 +104,7 @@ async def send(*, slug: str, phone: str, ip: str = "") -> dict:
             payload["dev_code"] = code
             payload["loginMode"] = "mock"
             return payload
-        if _otp_test_window_open():
+        if otp_test_reveal_allowed(receptor):
             await redis_client.setex(f"shop-otp:{slug}:{receptor}", ttl, code)
             payload["code"] = code
             payload["loginMode"] = "sms"

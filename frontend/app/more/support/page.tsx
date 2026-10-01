@@ -55,8 +55,8 @@ export default function SupportPage() {
       const [t, r, m, hub] = await Promise.all([
         api<{ tickets: Ticket[] }>("/support/tickets"),
         api<{ receipts: Receipt[] }>("/pay/receipts"),
-        api<{ tickets: Ticket[] }>("/support/my-tickets").catch(() => ({ tickets: [] })),
-        api<{ tickets: Ticket[] }>("/support/hub").catch(() => null),
+        api<{ tickets: Ticket[] }>("/settings/support/my-tickets").catch(() => ({ tickets: [] })),
+        api<{ tickets: Ticket[] }>("/settings/support/hub").catch(() => null),
       ]);
       setTickets(t.tickets || []);
       setReceipts(r.receipts || []);
@@ -94,7 +94,7 @@ export default function SupportPage() {
     if (!ticketSubject.trim() || !ticketText.trim()) return;
     setBusy(true);
     try {
-      await api("/support/seller-ticket", {
+      await api("/settings/support/seller-ticket", {
         method: "POST",
         body: JSON.stringify({ subject: ticketSubject.trim(), text: ticketText.trim() }),
       });
@@ -111,7 +111,7 @@ export default function SupportPage() {
   async function hubReply(id: string, text: string, status: string) {
     setBusy(true);
     try {
-      await api(`/support/hub/${id}/reply`, { method: "POST", body: JSON.stringify({ text, status }) });
+      await api(`/settings/support/hub/${id}/reply`, { method: "POST", body: JSON.stringify({ text, status }) });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");

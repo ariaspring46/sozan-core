@@ -82,7 +82,7 @@ async def hub_ticket_reply(
     if not is_hub_admin(_user.phone):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "این پاسخ برای پشتیبانی سوزان است")
     try:
-        return support_service.reply_ticket(
+        return support_service.reply_hub_ticket(
             ticket_id, text=str(body.get("text") or ""), status=str(body.get("status") or "")
         )
     except ValueError as exc:

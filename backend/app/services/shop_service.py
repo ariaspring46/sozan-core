@@ -404,11 +404,34 @@ def snapshot() -> dict:
     return {"shop": _public_shop(shop), "messages": rows, "scan": channel_scan_service.scan_status(), "build": build}
 
 
+def domain_owner(host: str) -> str:
+    """Tenant phone that already claimed this host (as domain or public host), else ''."""
+    from app.state_store import iter_tenants, read_json, tenant_scope
+
+    wanted = str(host or "").strip().lower().rstrip(".")
+    if not wanted:
+        return ""
+    for phone in iter_tenants():
+        with tenant_scope(phone):
+            row = read_json("shop.json", {})
+        if not isinstance(row, dict):
+            continue
+        for key in ("domain", "publicHost"):
+            if str(row.get(key) or "").strip().lower().rstrip(".") == wanted:
+                return phone
+    return ""
+
+
 def set_domain(domain: str) -> dict:
     from app.services import arvan_dns_service
+    from app.state_store import current_tenant
 
     shop = _shop()
     host = arvan_dns_service.hostname(domain)
+    if host:
+        owner = domain_owner(host)
+        if owner and owner != current_tenant():
+            raise ValueError("این دامنه برای فروشگاه دیگری ثبت شده است.")
     slug = str(shop.get("slug") or "").strip()
     public = str(shop.get("publicHost") or "").strip()
     shop["domain"] = host or public

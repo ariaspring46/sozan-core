@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
+from app.client_ip import client_ip
 from app.security import require_permission
 from app.services import pay_service
 
@@ -140,7 +141,7 @@ async def panel_review_receipt(
 async def panel_tickets(_user=Depends(require_permission("campaigns:read"))):
     from app.services import support_service
 
-    return {"tickets": support_service.list_tickets()}
+    return {"tickets": support_service.list_tickets(kind="storefront")}
 
 
 @router.post("/support/tickets/{ticket_id}/reply")
@@ -168,7 +169,7 @@ async def shop_checkout(request: Request, body: ShopCheckoutIn):
             name=body.name,
             phone=body.phone,
             lines=[item.model_dump() for item in body.lines],
-            ip=request.client.host if request.client else "",
+            ip=client_ip(request),
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
@@ -204,7 +205,7 @@ async def shop_otp_send(request: Request, body: ShopOtpSendIn):
 
     try:
         return await shop_otp_service.send(
-            slug=body.slug, phone=body.phone, ip=request.client.host if request.client else ""
+            slug=body.slug, phone=body.phone, ip=client_ip(request)
         )
     except shop_otp_service.OtpLimitError as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc

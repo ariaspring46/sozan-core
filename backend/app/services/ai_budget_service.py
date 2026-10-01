@@ -25,7 +25,7 @@ _KEEP_DAYS = 8
 
 DEFAULTS: dict[str, Any] = {
     # Proposal numbers; the owner approves or edits ai-budget.json in place.
-    "company": {"dailyUsd": 3.0},
+    "company": {"dailyUsd": 10.0},
     # Owner-approved 2026-09-28: monthly cloud spend = 30% of the discounted
     # plan price; weekly = /4, daily = weekly/3, at ~230,000 toman per USD.
     "plans": {

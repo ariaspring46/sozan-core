@@ -58,7 +58,7 @@ async def _after_connect(account: dict, *, samples: str, row: dict) -> dict:
             extra["instagram"] = {"ok": True, "imported": 0, "webhook": True}
         elif channel_service.unipile_account_id(row) or token:
             extra["instagram"] = {"ok": False, "imported": 0, "error": channel_service.IG_RECONNECT}
-    if platform == "telegram" and token:
+    if platform == "telegram" and token and not channel_service.uses_hub_bot(row):
         extra["telegram"] = await telegram_service.pull_updates(token=token, handle=handle)
     return extra
 
@@ -174,6 +174,11 @@ async def sync_channel(account_id: str, _user=Depends(require_permission("campai
             return {"ok": True, "imported": 0, "webhook": True}
         raise HTTPException(status.HTTP_400_BAD_REQUEST, channel_service.IG_RECONNECT)
     if platform == "telegram":
+        if channel_service.uses_hub_bot(row):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "بات مشترک سوزان فقط برای ارسال پست است؛ برای دایرکت تلگرام بات خودت را وصل کن.",
+            )
         return await telegram_service.pull_updates(token=channel_service.token_for(row), handle=handle)
     raise HTTPException(status.HTTP_400_BAD_REQUEST, "همگام‌سازی این کانال هنوز وصل نیست")
 

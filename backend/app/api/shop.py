@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from app.api.chat_payload import read_chat_payload
 from app.security import require_permission
 from app.services import idempotency_service, onboard_service, shop_service
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 router = APIRouter(prefix="/shop", tags=["shop"])
 
@@ -43,7 +43,10 @@ async def shop_chat(request: Request, _user=Depends(require_permission("campaign
 
 @router.patch("/domain")
 async def shop_domain(body: DomainIn, _user=Depends(require_permission("campaigns:write"))):
-    return shop_service.set_domain(body.domain)
+    try:
+        return shop_service.set_domain(body.domain)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.post("/build")

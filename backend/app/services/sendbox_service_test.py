@@ -418,9 +418,9 @@ class SendboxServiceTests(unittest.TestCase):
         fake.__aenter__.return_value = fake
         fake.__aexit__.return_value = False
         fake.put = AsyncMock(return_value=SimpleNamespace(status_code=200))
-        with patch.object(settings, "sendbox_api_key", "key"), patch(
-            "app.services.sendbox_service._client", return_value=fake
-        ):
+        with patch.object(settings, "sendbox_api_key", "key"), patch.object(
+            settings, "sendbox_oauth_url", "https://oauth.example/login"
+        ), patch("app.services.sendbox_service._client", return_value=fake):
             asyncio.run(sendbox_service.set_account_active(account_id="acc-1", active=False))
         fake.put.assert_awaited_once()
         url = fake.put.await_args.args[0]

@@ -126,5 +126,10 @@ class AiBudgetTests(unittest.TestCase):
         self.assertEqual(row["weeklyCapUsd"], 2.0)
 
 
+class CompanyCapDefaultTests(unittest.TestCase):
+    def test_company_daily_cap_is_ten_dollars(self) -> None:
+        self.assertEqual(ai_budget_service.DEFAULTS["company"]["dailyUsd"], 10.0)
+
+
 if __name__ == "__main__":
     unittest.main()

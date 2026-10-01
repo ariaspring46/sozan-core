@@ -137,3 +137,33 @@ class ShopOtpHardeningTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShopOtpWindowTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.redis = _FakeRedis()
+        self.patches = [
+            patch.object(shop_otp_service, "redis_client", self.redis),
+            patch.object(shop_otp_service, "find_tenant_by_slug", return_value="09135409482"),
+            patch.object(shop_otp_service, "get_settings", return_value={"mockSms": False, "otpTtlSeconds": 300}),
+            patch.object(shop_otp_service.settings, "otp_test_until", "2030-12-31"),
+            patch.object(shop_otp_service, "emit_later"),
+            patch.object(shop_otp_service.wallet_service, "consume_sms", return_value={"charged": 0}),
+            patch.object(shop_otp_service.sms_service, "send_otp", new=AsyncMock()),
+            patch.object(
+                shop_otp_service.sms_service,
+                "resolve_sms",
+                return_value={"provider": "smsir", "api_key": "k", "template_id": "1", "token_name": "c"},
+            ),
+        ]
+        for item in self.patches:
+            item.start()
+            self.addCleanup(item.stop)
+
+    def test_real_buyer_phone_never_gets_code_in_response(self) -> None:
+        out = asyncio.run(shop_otp_service.send(slug="shopx", phone="09111234567", ip="10.2.2.2"))
+        self.assertNotIn("code", out)
+
+    def test_fake_test_phone_gets_code(self) -> None:
+        out = asyncio.run(shop_otp_service.send(slug="shopx", phone="09130000001", ip="10.2.2.3"))
+        self.assertTrue(out.get("code"))

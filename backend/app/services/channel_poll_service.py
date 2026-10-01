@@ -79,6 +79,8 @@ async def poll_tenant() -> None:
         if not token:
             continue
         if platform == "telegram":
+            if channel_service.uses_hub_bot(row):
+                continue
             if not plan_service.current().get("dmSync"):
                 continue
             key = _poll_key(phone, platform, handle)

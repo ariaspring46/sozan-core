@@ -269,6 +269,9 @@ async def sync_now() -> dict:
         platform = str(row.get("platform") or "")
         if platform == "telegram":
             saw_telegram = True
+            if channel_service.uses_hub_bot(row):
+                hints.append("بات مشترک سوزان فقط برای ارسال پست است؛ برای دایرکت تلگرام بات خودت را وصل کن.")
+                continue
             token = channel_service.token_for(row)
             if not token:
                 errors.append("توکن بات تلگرام نیست. از بیشتر → کانال‌ها وصل کن.")
@@ -540,7 +543,8 @@ def inbound(
         conversation_id=str(thread.get("id") or ""),
         turn_id=str((thread["messages"] or [{}])[-1].get("id") or ""),
         operation_id=ext,
-        payload={"role": "inbound", "text": body, "platform": key, "sender": who, "threadId": thread.get("id")},
+        # متن و نام مشتری به observe نمی‌رود (حریم خصوصی)؛ فقط شکل رویداد.
+        payload={"role": "inbound", "chars": len(body), "platform": key, "threadId": thread.get("id")},
     )
     return {"thread": _summary(thread), "messages": _messages(thread), "duplicate": False}
 
