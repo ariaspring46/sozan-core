@@ -17,7 +17,7 @@ async def handle(job: dict) -> None:
     tenant = str(job.get("tenant") or "")
     message_id = str(job.get("studioMessageId") or "")
     with tenant_scope(tenant):
-        router_service._THREAD.set(str(job.get("thread") or ""))
+        router_service.bind_thread_id(str(job.get("thread") or ""))
         try:
             async with SessionLocal() as session:
                 service = CampaignService(
@@ -28,7 +28,7 @@ async def handle(job: dict) -> None:
                 media = job.get("media") if isinstance(job.get("media"), dict) else None
                 cid = str(job.get("campaignId") or "")
                 if cid:
-                    router_service._remember_content({"campaignId": cid})
+                    router_service.remember_content({"campaignId": cid})
                 out = await studio_chat_service.chat(
                     str(job.get("spoken") or ""),
                     service,
@@ -37,7 +37,7 @@ async def handle(job: dict) -> None:
                 )
                 done = str((out or {}).get("campaignId") or cid)
                 if done:
-                    router_service._remember_content({"campaignId": done})
+                    router_service.remember_content({"campaignId": done})
         except Exception:
             log.exception("studio job failed")
             if message_id:

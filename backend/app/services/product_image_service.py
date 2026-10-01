@@ -41,7 +41,7 @@ def store(data: bytes, content_type: str, filename: str) -> str:
             (max(1, int(width * scale)), max(1, int(height * scale))),
             Image.Resampling.LANCZOS,
         )
-    from app.services.channel_scan_service import _scan_dir
+    from app.services.channel_scan_service import scan_dir as _scan_dir
 
     name = f"{uuid4().hex}.jpg"
     dest = _scan_dir() / name
@@ -50,7 +50,7 @@ def store(data: bytes, content_type: str, filename: str) -> str:
 
 
 def remove_if_unreferenced(name: str) -> bool:
-    from app.services.channel_scan_service import _scan_dir
+    from app.services.channel_scan_service import scan_dir as _scan_dir
 
     safe = Path(str(name or "")).name
     if not safe:

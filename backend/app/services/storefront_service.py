@@ -78,7 +78,7 @@ def _require_image(name: str) -> str:
         return ""
     if safe != Path(str(name)).name:
         raise ValueError("نام تصویر نامعتبر است")
-    from app.services.channel_scan_service import _scan_dir
+    from app.services.channel_scan_service import scan_dir as _scan_dir
 
     path = _scan_dir() / safe
     if not path.is_file():
@@ -250,7 +250,7 @@ def clear_scanned_catalog() -> None:
 
 
 def retitle_scanned_from_captions() -> int:
-    from app.services.channel_scan_service import _looks_like_product_title, product_title_from_caption
+    from app.services.channel_scan_service import looks_like_product_title as _looks_like_product_title, product_title_from_caption
 
     rows = _list("products.json")
     changed = 0

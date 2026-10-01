@@ -18,6 +18,8 @@ jobs:
       - run: pip install -r backend/requirements.txt
       # Every tracked file must have exactly one owner role (docs/agents).
       - run: python3 tools/agent_context/build.py --check
+      # Static UI/UX rules U1-U7 (owner: U).
+      - run: python3 tools/ui_check.py
       # Same command as deploy/deploy-api.sh; STATE_DIR keeps background writes out of backend/data.
       - name: unit tests
         working-directory: backend

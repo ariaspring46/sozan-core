@@ -1,0 +1,2722 @@
+{
+ "backend/app/api/brand.py::router": {
+  "owner": "X2",
+  "signature": "router = APIRouter(prefix='/brand', tags=['brand'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/campaigns.py::router": {
+  "owner": "X2",
+  "signature": "router = APIRouter(prefix='/campaigns', tags=['campaigns'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/channels.py::router": {
+  "owner": "X3",
+  "signature": "router = APIRouter(prefix='/channels', tags=['channels'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/chat_media.py::router": {
+  "owner": "X3",
+  "signature": "router = APIRouter(prefix='/chat-media', tags=['chat-media'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/chat_payload.py::read_chat_payload": {
+  "owner": "X1",
+  "signature": "async def read_chat_payload(request: Request) -> tuple[str, dict | None, str, str, str, str, str]",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/api/inbox.py::router": {
+  "owner": "Y",
+  "signature": "router = APIRouter(prefix='/inbox', tags=['inbox'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/onboard.py::router": {
+  "owner": "X3",
+  "signature": "router = APIRouter(prefix='/onboard', tags=['onboard'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/pay.py::router": {
+  "owner": "C",
+  "signature": "router = APIRouter(tags=['pay'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/public_media.py::router": {
+  "owner": "X3",
+  "signature": "router = APIRouter(tags=['public-media'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/router_chat.py::router": {
+  "owner": "X1",
+  "signature": "router = APIRouter(prefix='/chat', tags=['chat'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/shop.py::router": {
+  "owner": "X4",
+  "signature": "router = APIRouter(prefix='/shop', tags=['shop'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/storefront.py::router": {
+  "owner": "C",
+  "signature": "router = APIRouter(tags=['storefront'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/studio.py::router": {
+  "owner": "X2",
+  "signature": "router = APIRouter(prefix='/studio', tags=['studio'])",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/client_ip.py::client_ip": {
+  "owner": "X5",
+  "signature": "def client_ip(request: Request) -> str",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings": {
+  "owner": "X5",
+  "signature": "settings = Settings()",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/config.py::settings.arvan_api_key": {
+  "owner": "X5",
+  "signature": "Settings.arvan_api_key: str = ''",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings.arvan_origin_ip": {
+  "owner": "X5",
+  "signature": "Settings.arvan_origin_ip: str = ''",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings.arvan_origin_port": {
+  "owner": "X5",
+  "signature": "Settings.arvan_origin_port: int = 80",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings.arvan_zone": {
+  "owner": "X5",
+  "signature": "Settings.arvan_zone: str = 'sozan-core.ir'",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings.audio_bed_path": {
+  "owner": "X5",
+  "signature": "def Settings.audio_bed_path(self) -> Path",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/config.py::settings.brand_path": {
+  "owner": "X5",
+  "signature": "def Settings.brand_path(self) -> Path",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/config.py::settings.campaigns_path": {
+  "owner": "X5",
+  "signature": "def Settings.campaigns_path(self) -> Path",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/config.py::settings.channel_proxy": {
+  "owner": "X5",
+  "signature": "Settings.channel_proxy: str = ''",
+  "users": [
+   "X2",
+   "X3",
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.chat_llm_model": {
+  "owner": "X5",
+  "signature": "Settings.chat_llm_model: str = 'qwen3.8-27b'",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/config.py::settings.cloud_llm_model": {
+  "owner": "X5",
+  "signature": "Settings.cloud_llm_model: str = 'DeepSeek-V4-Pro'",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.cloud_llm_proxy": {
+  "owner": "X5",
+  "signature": "Settings.cloud_llm_proxy: str = ''",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.cloud_llm_token": {
+  "owner": "X5",
+  "signature": "Settings.cloud_llm_token: str = Field(default='', validation_alias=AliasChoices('CLOUD_LLM_TOKEN', 'OLLAMA_API_KEY'))",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.cloud_llm_url": {
+  "owner": "X5",
+  "signature": "Settings.cloud_llm_url: str = ''",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.cutout_api_key": {
+  "owner": "X5",
+  "signature": "Settings.cutout_api_key: str = ''",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/config.py::settings.cutout_openrouter_model": {
+  "owner": "X5",
+  "signature": "Settings.cutout_openrouter_model: str = 'google/gemini-2.5-flash-image'",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/config.py::settings.cutout_provider": {
+  "owner": "X5",
+  "signature": "Settings.cutout_provider: str = 'openrouter'",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/config.py::settings.factory_script": {
+  "owner": "X5",
+  "signature": "def Settings.factory_script(self) -> Path",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.fonts_path": {
+  "owner": "X5",
+  "signature": "def Settings.fonts_path(self) -> Path",
+  "users": [
+   "X2",
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.gateway_sozan_url": {
+  "owner": "X5",
+  "signature": "Settings.gateway_sozan_url: str = ''",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.instagram_app_id": {
+  "owner": "X5",
+  "signature": "Settings.instagram_app_id: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.instagram_app_secret": {
+  "owner": "X5",
+  "signature": "Settings.instagram_app_secret: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.instagram_redirect_uri": {
+  "owner": "X5",
+  "signature": "Settings.instagram_redirect_uri: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.jwt_secret": {
+  "owner": "X5",
+  "signature": "Settings.jwt_secret: str = 'change-me-to-a-long-random-secret'",
+  "users": [
+   "C",
+   "X3",
+   "Y"
+  ]
+ },
+ "backend/app/config.py::settings.local_llm_token": {
+  "owner": "X5",
+  "signature": "Settings.local_llm_token: str = 'sk-local'",
+  "users": [
+   "X2",
+   "Y"
+  ]
+ },
+ "backend/app/config.py::settings.local_llm_url": {
+  "owner": "X5",
+  "signature": "Settings.local_llm_url: str = 'http://127.0.0.1:9292/v1'",
+  "users": [
+   "X2",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/config.py::settings.melipayamak_body_id": {
+  "owner": "X5",
+  "signature": "Settings.melipayamak_body_id: str = '547036'",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.melipayamak_otp_apikey": {
+  "owner": "X5",
+  "signature": "Settings.melipayamak_otp_apikey: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.melipayamak_pattern_base": {
+  "owner": "X5",
+  "signature": "Settings.melipayamak_pattern_base: str = 'https://api.payamak-panel.com/post/send.asmx'",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.melipayamak_username": {
+  "owner": "X5",
+  "signature": "Settings.melipayamak_username: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.otp_dev": {
+  "owner": "X5",
+  "signature": "Settings.otp_dev: bool = False",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings.otp_ttl_seconds": {
+  "owner": "X5",
+  "signature": "Settings.otp_ttl_seconds: int = 300",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings.panel_url": {
+  "owner": "X5",
+  "signature": "Settings.panel_url: str = 'https://app.sozan-core.ir'",
+  "users": [
+   "C",
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.payment_sign_secret": {
+  "owner": "X5",
+  "signature": "Settings.payment_sign_secret: str = ''",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings.public_api_url": {
+  "owner": "X5",
+  "signature": "Settings.public_api_url: str = 'https://api.sozan-core.ir'",
+  "users": [
+   "C",
+   "X3",
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.sendbox_api_key": {
+  "owner": "X5",
+  "signature": "Settings.sendbox_api_key: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.sendbox_base_url": {
+  "owner": "X5",
+  "signature": "Settings.sendbox_base_url: str = 'https://api.sendbox.chat/api/v1'",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.sendbox_oauth_url": {
+  "owner": "X5",
+  "signature": "Settings.sendbox_oauth_url: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.sendbox_webhook_secret": {
+  "owner": "X5",
+  "signature": "Settings.sendbox_webhook_secret: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.shop_otp_daily_cap": {
+  "owner": "X5",
+  "signature": "Settings.shop_otp_daily_cap: int = 200",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/config.py::settings.sms_ir_api_key": {
+  "owner": "X5",
+  "signature": "Settings.sms_ir_api_key: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.sms_ir_template_id": {
+  "owner": "X5",
+  "signature": "Settings.sms_ir_template_id: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.sms_ir_token_name": {
+  "owner": "X5",
+  "signature": "Settings.sms_ir_token_name: str = 'Code'",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.sms_provider": {
+  "owner": "X5",
+  "signature": "Settings.sms_provider: str = 'smsir'",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.sozan_npm_proxy": {
+  "owner": "X5",
+  "signature": "Settings.sozan_npm_proxy: str = ''",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/config.py::settings.state_dir": {
+  "owner": "X5",
+  "signature": "Settings.state_dir: str = str(ROOT / 'backend' / 'data')",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/config.py::settings.state_path": {
+  "owner": "X5",
+  "signature": "def Settings.state_path(self) -> Path",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.telegram_hub_bot_token": {
+  "owner": "X5",
+  "signature": "Settings.telegram_hub_bot_token: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.unipile_api_key": {
+  "owner": "X5",
+  "signature": "Settings.unipile_api_key: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.unipile_dsn": {
+  "owner": "X5",
+  "signature": "Settings.unipile_dsn: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/config.py::settings.unipile_proxy": {
+  "owner": "X5",
+  "signature": "Settings.unipile_proxy: str = ''",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/database.py::SessionLocal": {
+  "owner": "X5",
+  "signature": "SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)",
+  "users": [
+   "X1",
+   "X2"
+  ]
+ },
+ "backend/app/database.py::get_session": {
+  "owner": "X5",
+  "signature": "async def get_session() -> AsyncSession",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Asset": {
+  "owner": "X5",
+  "signature": "class Asset(Base)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Asset.campaign_id": {
+  "owner": "X5",
+  "signature": "Asset.campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id'))",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Asset.kind": {
+  "owner": "X5",
+  "signature": "Asset.kind: Mapped[str] = mapped_column(String(24))",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Campaign": {
+  "owner": "X5",
+  "signature": "class Campaign(Base)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Campaign.assets": {
+  "owner": "X5",
+  "signature": "Campaign.assets: Mapped[list['Asset']] = relationship(back_populates='campaign', cascade='all, delete-orphan')",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Campaign.copies": {
+  "owner": "X5",
+  "signature": "Campaign.copies: Mapped[list['CopyVariant']] = relationship(back_populates='campaign', cascade='all, delete-orphan')",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Campaign.created_at": {
+  "owner": "X5",
+  "signature": "Campaign.created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Campaign.id": {
+  "owner": "X5",
+  "signature": "Campaign.id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::Campaign.slug": {
+  "owner": "X5",
+  "signature": "Campaign.slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::CopyVariant": {
+  "owner": "X5",
+  "signature": "class CopyVariant(Base)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::CopyVariant.campaign_id": {
+  "owner": "X5",
+  "signature": "CopyVariant.campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id'))",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::CopyVariant.channel": {
+  "owner": "X5",
+  "signature": "CopyVariant.channel: Mapped[str] = mapped_column(String(24))",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::CopyVariant.format": {
+  "owner": "X5",
+  "signature": "CopyVariant.format: Mapped[str] = mapped_column(String(32))",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/models/user.py::User": {
+  "owner": "X5",
+  "signature": "class User(Base)",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/phone.py::normalize_digits": {
+  "owner": "X5",
+  "signature": "def normalize_digits(raw: str) -> str",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/phone.py::normalize_phone": {
+  "owner": "X5",
+  "signature": "def normalize_phone(raw: str) -> str",
+  "users": [
+   "C",
+   "X3"
+  ]
+ },
+ "backend/app/redis_client.py::redis_client": {
+  "owner": "X5",
+  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "users": [
+   "C",
+   "X2",
+   "X3"
+  ]
+ },
+ "backend/app/redis_client.py::redis_client.brpop": {
+  "owner": "X5",
+  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/redis_client.py::redis_client.delete": {
+  "owner": "X5",
+  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "users": [
+   "C",
+   "X3"
+  ]
+ },
+ "backend/app/redis_client.py::redis_client.expire": {
+  "owner": "X5",
+  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/redis_client.py::redis_client.get": {
+  "owner": "X5",
+  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "users": [
+   "C",
+   "X3"
+  ]
+ },
+ "backend/app/redis_client.py::redis_client.incr": {
+  "owner": "X5",
+  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/redis_client.py::redis_client.lpush": {
+  "owner": "X5",
+  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/redis_client.py::redis_client.setex": {
+  "owner": "X5",
+  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "users": [
+   "C",
+   "X3"
+  ]
+ },
+ "backend/app/repositories/brand_repository.py::BrandRepository": {
+  "owner": "X2",
+  "signature": "class BrandRepository",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/repositories/campaign_repository.py::AssetRepository": {
+  "owner": "X2",
+  "signature": "class AssetRepository",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/repositories/campaign_repository.py::CampaignRepository": {
+  "owner": "X2",
+  "signature": "class CampaignRepository",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/repositories/campaign_repository.py::CopyRepository": {
+  "owner": "X2",
+  "signature": "class CopyRepository",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/schemas.py::CampaignCreateIn": {
+  "owner": "X5",
+  "signature": "class CampaignCreateIn(BaseModel)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/schemas.py::CampaignOut": {
+  "owner": "X5",
+  "signature": "class CampaignOut(BaseModel)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/schemas.py::CampaignUpdateIn": {
+  "owner": "X5",
+  "signature": "class CampaignUpdateIn(BaseModel)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/schemas.py::ImportSlugIn": {
+  "owner": "X5",
+  "signature": "class ImportSlugIn(BaseModel)",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/security.py::require_permission": {
+  "owner": "X5",
+  "signature": "def require_permission(code: str)",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/ai_budget_service.py::record_cost": {
+  "owner": "X5",
+  "signature": "def record_cost(*, surface: str, usd: float, tenant: str | None=None) -> None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::check_cname": {
+  "owner": "C",
+  "signature": "def check_cname(domain: str, slug: str) -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::cname_target": {
+  "owner": "C",
+  "signature": "def cname_target(slug: str) -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::edge_dry": {
+  "owner": "C",
+  "signature": "def edge_dry() -> bool",
+  "users": [
+   "X4",
+   "X5",
+   "Y"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::ensure_shop_record": {
+  "owner": "C",
+  "signature": "def ensure_shop_record(slug: str) -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::hostname": {
+  "owner": "C",
+  "signature": "def hostname(domain: str) -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::is_zone_host": {
+  "owner": "C",
+  "signature": "def is_zone_host(host: str) -> bool",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::public_host": {
+  "owner": "C",
+  "signature": "def public_host(slug: str) -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::start_cname_setup": {
+  "owner": "C",
+  "signature": "def start_cname_setup(domain: str, slug: str='') -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/arvan_dns_service.py::zone": {
+  "owner": "C",
+  "signature": "def zone() -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/auth_service.py::OTP_SEND_LIMIT": {
+  "owner": "X5",
+  "signature": "OTP_SEND_LIMIT = 5",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/auth_service.py::OTP_SEND_WINDOW": {
+  "owner": "X5",
+  "signature": "OTP_SEND_WINDOW = 900",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/auth_service.py::OTP_VERIFY_LIMIT": {
+  "owner": "X5",
+  "signature": "OTP_VERIFY_LIMIT = 5",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/auth_service.py::OTP_VERIFY_WINDOW": {
+  "owner": "X5",
+  "signature": "OTP_VERIFY_WINDOW = 300",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/auth_service.py::otp_test_reveal_allowed": {
+  "owner": "X5",
+  "signature": "def otp_test_reveal_allowed(phone: str) -> bool",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/brand_service.py::BrandService": {
+  "owner": "X2",
+  "signature": "class BrandService",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/campaign_service.py::CampaignService": {
+  "owner": "X2",
+  "signature": "class CampaignService",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/catalog_sync_service.py::sync_live": {
+  "owner": "C",
+  "signature": "def sync_live(*, changed_images: list[str] | None=None) -> dict",
+  "users": [
+   "X1",
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_outbound_service.py::deliver": {
+  "owner": "X3",
+  "signature": "async def deliver(*, platform: str, sender_id: str, chat_id: str, text: str) -> None",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/channel_poll_service.py::poll_all": {
+  "owner": "X3",
+  "signature": "async def poll_all() -> None",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::brief_for_shop": {
+  "owner": "X3",
+  "signature": "def brief_for_shop() -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::category_from_text": {
+  "owner": "X3",
+  "signature": "def category_from_text(text: str) -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::get_scan": {
+  "owner": "X3",
+  "signature": "def get_scan() -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::looks_like_product_title": {
+  "owner": "X3",
+  "signature": "def looks_like_product_title(title: str) -> bool",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::parse_caption_price": {
+  "owner": "X3",
+  "signature": "def parse_caption_price(text: str) -> tuple[int, str]",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::product_title_from_caption": {
+  "owner": "X3",
+  "signature": "def product_title_from_caption(caption: str, brand: str='') -> str | None",
+  "users": [
+   "C",
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::scan_dir": {
+  "owner": "X3",
+  "signature": "def scan_dir() -> Path",
+  "users": [
+   "C",
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::scan_status": {
+  "owner": "X3",
+  "signature": "def scan_status() -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::site_type_hint": {
+  "owner": "X3",
+  "signature": "def site_type_hint() -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::start_scan": {
+  "owner": "X3",
+  "signature": "def start_scan(accounts: list[dict]) -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::unattributed_dir": {
+  "owner": "X3",
+  "signature": "def unattributed_dir() -> Path",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/channel_service.py::IG_RECONNECT": {
+  "owner": "X3",
+  "signature": "IG_RECONNECT = 'این پیج را دوباره با ورود رسمی وصل کن.'",
+  "users": [
+   "X2",
+   "Y"
+  ]
+ },
+ "backend/app/services/channel_service.py::PLATFORMS": {
+  "owner": "X3",
+  "signature": "PLATFORMS = {key: spec['label'] for key, spec in SPECS.items()}",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/channel_service.py::PLATFORMS.get": {
+  "owner": "X3",
+  "signature": "PLATFORMS = {key: spec['label'] for key, spec in SPECS.items()}",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/channel_service.py::account_for_platform": {
+  "owner": "X3",
+  "signature": "def account_for_platform(platform: str) -> dict | None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/channel_service.py::credentials_for": {
+  "owner": "X3",
+  "signature": "def credentials_for(row: dict) -> dict",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/channel_service.py::is_connected": {
+  "owner": "X3",
+  "signature": "def is_connected(row: dict) -> bool",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/channel_service.py::iter_accounts": {
+  "owner": "X3",
+  "signature": "def iter_accounts() -> list[dict]",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/channel_service.py::list_accounts": {
+  "owner": "X3",
+  "signature": "def list_accounts() -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/channel_service.py::post_target_for": {
+  "owner": "X3",
+  "signature": "def post_target_for(row: dict) -> str",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/channel_service.py::publish_targets": {
+  "owner": "X3",
+  "signature": "def publish_targets() -> list[dict]",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/channel_service.py::sendbox_account_id": {
+  "owner": "X3",
+  "signature": "def sendbox_account_id(row: dict) -> str",
+  "users": [
+   "X2",
+   "Y"
+  ]
+ },
+ "backend/app/services/channel_service.py::token_for": {
+  "owner": "X3",
+  "signature": "def token_for(row: dict) -> str",
+  "users": [
+   "X2",
+   "Y"
+  ]
+ },
+ "backend/app/services/channel_service.py::uses_hub_bot": {
+  "owner": "X3",
+  "signature": "def uses_hub_bot(row: dict) -> bool",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/chat_media_service.py::caption": {
+  "owner": "X3",
+  "signature": "def caption(kind: str) -> str",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/chat_media_service.py::copy_file": {
+  "owner": "X3",
+  "signature": "def copy_file(path: Path, *, sweep: bool=True) -> dict",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/chat_media_service.py::kind_of": {
+  "owner": "X3",
+  "signature": "def kind_of(content_type: str, filename: str) -> str | None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/chat_media_service.py::resolve": {
+  "owner": "X3",
+  "signature": "def resolve(name: str) -> Path",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/services/chat_media_service.py::save": {
+  "owner": "X3",
+  "signature": "def save(filename: str, data: bytes, content_type: str, *, sweep: bool=True) -> dict",
+  "users": [
+   "C",
+   "X1",
+   "X2"
+  ]
+ },
+ "backend/app/services/chat_media_service.py::spoken_text": {
+  "owner": "X3",
+  "signature": "def spoken_text(text: str, media: dict | None) -> str",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/services/claims_guard.py::check": {
+  "owner": "Y",
+  "signature": "async def check(text: str, facts: str, complete: Callable[..., Awaitable[dict]] | None=None) -> list[str]",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/idempotency_service.py::body_stamp": {
+  "owner": "X5",
+  "signature": "def body_stamp(raw: bytes) -> str",
+  "users": [
+   "X1",
+   "X2",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/idempotency_service.py::put": {
+  "owner": "X5",
+  "signature": "def put(scope: str, key: str, payload: Any, stamp: str='') -> None",
+  "users": [
+   "X1",
+   "X2",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/idempotency_service.py::recall": {
+  "owner": "X5",
+  "signature": "def recall(scope: str, key: str, stamp: str) -> Any | None",
+  "users": [
+   "X1",
+   "X2",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/image_provider_service.py::generate_still": {
+  "owner": "X2",
+  "signature": "def generate_still(prompt: str, *, width: int=1080, height: int=1080, edit: bool=False, plan: str='', source: bytes | None=None, force_primary_error: bool=False, force_both_errors: bool=False, subject: str='', edit_kind: str='') -> bytes",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/image_provider_service.py::probe_ollama_cloud_once": {
+  "owner": "X2",
+  "signature": "async def probe_ollama_cloud_once() -> dict",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/inbox_service.py::expire_stale_sending": {
+  "owner": "Y",
+  "signature": "def expire_stale_sending(stale_sec: int=SENDING_STALE_SEC) -> int",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/inbox_service.py::handle_inbound": {
+  "owner": "Y",
+  "signature": "async def handle_inbound(*, platform: str, sender: str, text: str, sender_id: str='', chat_id: str='', external_id: str='', media: dict | None=None) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/inbox_service.py::list_publish_audience": {
+  "owner": "Y",
+  "signature": "def list_publish_audience(*, platform: str, q: str='', limit: int=24) -> list[dict]",
+  "users": [
+   "X1",
+   "X2"
+  ]
+ },
+ "backend/app/services/inbox_service.py::list_threads": {
+  "owner": "Y",
+  "signature": "def list_threads(*, q: str='', platform: str='', status_filter: str='') -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/inbox_service.py::rearm_pending_auto_replies": {
+  "owner": "Y",
+  "signature": "async def rearm_pending_auto_replies() -> int",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/inbox_service.py::save_auto_reply": {
+  "owner": "Y",
+  "signature": "def save_auto_reply(mode: str) -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/inbox_service.py::unread_count": {
+  "owner": "Y",
+  "signature": "def unread_count() -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/job_queue.py::enqueue": {
+  "owner": "X2",
+  "signature": "async def enqueue(payload: dict) -> str",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/llm.py::ARVAN_HOST_SUFFIX": {
+  "owner": "X5",
+  "signature": "ARVAN_HOST_SUFFIX = 'arvancloudai.ir'",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/llm.py::CLOUD_UA": {
+  "owner": "X5",
+  "signature": "CLOUD_UA = 'curl/8.5.0'",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/llm.py::INBOX_TURN_BUDGET": {
+  "owner": "X5",
+  "signature": "INBOX_TURN_BUDGET = 30.0",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/llm.py::LLM_BAD_JSON": {
+  "owner": "X5",
+  "signature": "LLM_BAD_JSON = {'reply': 'مدل پاسخ خوانا نداد. پیام را کوتاه\\u200cتر دوباره بفرست.', 'error': 'llm_bad_json'}",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/llm.py::auth_scheme": {
+  "owner": "X5",
+  "signature": "def auth_scheme(value: object) -> str",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/llm.py::budget_capped": {
+  "owner": "X5",
+  "signature": "def budget_capped(surface: str) -> str | None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/llm.py::complete_chat": {
+  "owner": "X5",
+  "signature": "async def complete_chat(*, system: str, turns: list[dict], surface: str='shop') -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/llm.py::complete_json": {
+  "owner": "X5",
+  "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict",
+  "users": [
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/llm.py::complete_tools": {
+  "owner": "X5",
+  "signature": "async def complete_tools(*, messages: list[dict], tools: list[dict], temperature: float=0.2, max_tokens: int=ROUTER_MAX_TOKENS, timeout: float | None=None, surface: str='router') -> dict",
+  "users": [
+   "X1",
+   "Y"
+  ]
+ },
+ "backend/app/services/llm.py::emit_usage": {
+  "owner": "X5",
+  "signature": "def emit_usage(*, surface: str, model: str, payload: dict, latency_ms: float=0) -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/llm.py::route_for_surface": {
+  "owner": "X5",
+  "signature": "def route_for_surface(surface: str) -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/llm.py::spoken_model_reply": {
+  "owner": "X5",
+  "signature": "def spoken_model_reply(text: str) -> str",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/melipayamak_otp_service.py::OtpSendError": {
+  "owner": "X3",
+  "signature": "class OtpSendError(RuntimeError)",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/melipayamak_otp_service.py::send_otp": {
+  "owner": "X3",
+  "signature": "async def send_otp(phone: str, code: str) -> str",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/observe_client.py::emit_later": {
+  "owner": "X5",
+  "signature": "def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, surface: str='', component: str='', stage: str='', status: str='', conversation_id: str='', turn_id: str='', operation_id: str='', job_id: str='', scan_id: str='', parent_id: str='', event_id: str='', started_at: float | None=None, duration_ms: int | None=None) -> None",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/observe_client.py::observe_base": {
+  "owner": "X5",
+  "signature": "def observe_base() -> str",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/observe_client.py::safe_text": {
+  "owner": "X5",
+  "signature": "def safe_text(value: object, limit: int=OBSERVE_TEXT_LIMIT) -> str",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/services/onboard_service.py::brief_block": {
+  "owner": "X3",
+  "signature": "def brief_block() -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/onboard_service.py::brief_ready": {
+  "owner": "X3",
+  "signature": "def brief_ready(brief: dict | None=None) -> bool",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/onboard_service.py::get_brief": {
+  "owner": "X3",
+  "signature": "def get_brief() -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/onboard_service.py::save_brief": {
+  "owner": "X3",
+  "signature": "def save_brief(patch: dict) -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/pay_service.py::create_order": {
+  "owner": "C",
+  "signature": "async def create_order(*, title: str='', amount: int=0, product_id: str='', qty: int=1, customer: str='', channel: str='دایرکت', thread_id: str='', mobile: str='', lines: list[dict] | None=None) -> dict",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/pay_service.py::ensure_pay_secret": {
+  "owner": "C",
+  "signature": "def ensure_pay_secret() -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/pay_service.py::get_order": {
+  "owner": "C",
+  "signature": "def get_order(order_id: str) -> dict | None",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/pay_service.py::public_order": {
+  "owner": "C",
+  "signature": "def public_order(row: dict) -> dict",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/payment_service.py::PAYMENT_LATER": {
+  "owner": "X5",
+  "signature": "PAYMENT_LATER = 'پرداخت به\\u200cزودی فعال می\\u200cشود'",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/payment_service.py::commission_toman": {
+  "owner": "X5",
+  "signature": "def commission_toman(amount: int, bps: int | None=None) -> int",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/payment_service.py::idpay_request": {
+  "owner": "X5",
+  "signature": "async def idpay_request(*, amount_toman: int, description: str, callback_url: str, order_id: str, api_key: str, sandbox: bool=False, name: str='', phone: str='') -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/payment_service.py::idpay_verify": {
+  "owner": "X5",
+  "signature": "async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: bool=False, amount_toman: int=0) -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/payment_service.py::resolve_sale_gateway": {
+  "owner": "X5",
+  "signature": "def resolve_sale_gateway(row: dict | None=None) -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/payment_service.py::zarinpal_request": {
+  "owner": "X5",
+  "signature": "async def zarinpal_request(*, amount_toman: int, description: str, callback_url: str, mobile: str='', merchant: str='') -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/payment_service.py::zarinpal_verify": {
+  "owner": "X5",
+  "signature": "async def zarinpal_verify(*, amount_toman: int, authority: str, merchant: str='') -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/persian_text.py::guard_output": {
+  "owner": "X1",
+  "signature": "def guard_output(text: str, *, finish: str='', limit: int=800) -> str",
+  "users": [
+   "X2",
+   "Y"
+  ]
+ },
+ "backend/app/services/persian_text.py::sanitize_persian": {
+  "owner": "X1",
+  "signature": "def sanitize_persian(text: str, *, limit: int=80) -> str",
+  "users": [
+   "C",
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/services/pii_mask.py::mask_pii": {
+  "owner": "Y",
+  "signature": "def mask_pii(text: str) -> str",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/pipeline_release.py::BEHAVIOR_VERSION": {
+  "owner": "X5",
+  "signature": "BEHAVIOR_VERSION = '2026.09.16-pipeline'",
+  "users": [
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/pipeline_release.py::hub_release_id": {
+  "owner": "X5",
+  "signature": "def hub_release_id() -> str",
+  "users": [
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/plan_service.py::allow_new_channel": {
+  "owner": "X5",
+  "signature": "def allow_new_channel(already: int) -> str | None",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/plan_service.py::allow_new_site": {
+  "owner": "X5",
+  "signature": "def allow_new_site() -> str | None",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/plan_service.py::current": {
+  "owner": "X5",
+  "signature": "def current() -> dict",
+  "users": [
+   "X3",
+   "Y"
+  ]
+ },
+ "backend/app/services/plan_service.py::current_plan_id": {
+  "owner": "X5",
+  "signature": "def current_plan_id() -> str",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/plan_service.py::record_site": {
+  "owner": "X5",
+  "signature": "def record_site(slug: str) -> None",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/plan_service.py::snapshot": {
+  "owner": "X5",
+  "signature": "def snapshot() -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/product_image_service.py::remove_if_unreferenced": {
+  "owner": "X2",
+  "signature": "def remove_if_unreferenced(name: str) -> bool",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/product_image_service.py::store": {
+  "owner": "X2",
+  "signature": "def store(data: bytes, content_type: str, filename: str) -> str",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/profile_service.py::TONES": {
+  "owner": "X5",
+  "signature": "TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\\u200cتعارف.', 'sampleRepl...",
+  "users": [
+   "X3",
+   "Y"
+  ]
+ },
+ "backend/app/services/profile_service.py::TONES.get": {
+  "owner": "X5",
+  "signature": "TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\\u200cتعارف.', 'sampleRepl...",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/profile_service.py::complete": {
+  "owner": "X5",
+  "signature": "def complete(phone: str, *, firstName: str, lastName: str, brandName: str, brandWork: str, toneId: str, hasLogo: bool) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/profile_service.py::get_profile": {
+  "owner": "X5",
+  "signature": "def get_profile(phone: str) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/profile_service.py::patch_profile": {
+  "owner": "X5",
+  "signature": "def patch_profile(phone: str, patch: dict) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/public_media_service.py::public_url": {
+  "owner": "X3",
+  "signature": "def public_url(*, name: str, ttl: int=3600) -> str",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/router_embed.py::cosine": {
+  "owner": "X1",
+  "signature": "def cosine(left: list[float], right: list[float]) -> float",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/router_service.py::bind_thread_id": {
+  "owner": "X1",
+  "signature": "def bind_thread_id(thread_id: str) -> None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/router_service.py::clear_dead_busy": {
+  "owner": "X1",
+  "signature": "def clear_dead_busy() -> None",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/router_service.py::remember_content": {
+  "owner": "X1",
+  "signature": "def remember_content(extra: dict) -> None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/router_service.py::thread_campaign_id": {
+  "owner": "X1",
+  "signature": "def thread_campaign_id() -> str",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/sales_policy_service.py::public_policy": {
+  "owner": "Y",
+  "signature": "def public_policy() -> dict",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/sales_policy_service.py::save_policy": {
+  "owner": "Y",
+  "signature": "def save_policy(patch: dict) -> dict",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/sendbox_service.py::send_message": {
+  "owner": "X3",
+  "signature": "async def send_message(*, account_id: str, recipient_id: str, text: str, media_url: str='', media_kind: str='') -> None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/settings_service.py::allows_training": {
+  "owner": "X5",
+  "signature": "def allows_training() -> bool",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/settings_service.py::get_settings": {
+  "owner": "X5",
+  "signature": "def get_settings() -> dict",
+  "users": [
+   "C",
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/settings_service.py::save_settings": {
+  "owner": "X5",
+  "signature": "def save_settings(patch: dict, *, hub_admin: bool=False) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/shop_edit_service.py::apply_live_edit": {
+  "owner": "X4",
+  "signature": "async def apply_live_edit(shop: dict, prompt: str, view_path: str, view_target: str='', classified: dict | None=None) -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_edit_service.py::build_dir_for": {
+  "owner": "X4",
+  "signature": "def build_dir_for(shop: dict) -> Path | None",
+  "users": [
+   "C",
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_edit_service.py::has_runtime_overlay": {
+  "owner": "X4",
+  "signature": "def has_runtime_overlay(root: Path | None) -> bool",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_edit_service.py::publish_shop_runtime": {
+  "owner": "X4",
+  "signature": "def publish_shop_runtime(shop: dict, root: Path, rels: list[str]) -> None",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_edit_service.py::safe_view_path": {
+  "owner": "X4",
+  "signature": "def safe_view_path(raw: str) -> str",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_edit_service.py::safe_view_target": {
+  "owner": "X4",
+  "signature": "def safe_view_target(raw: str) -> str",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_edit_service.py::write_catalog_json": {
+  "owner": "X4",
+  "signature": "def write_catalog_json(root: Path, products: list[dict]) -> Path",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_intent_service.py::CLARIFY_PAGE": {
+  "owner": "X4",
+  "signature": "CLARIFY_PAGE = 'کدام صفحه را بسازم: درباره ما، تماس، داستان برند، یا پرسش\\u200cهای متداول؟'",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_intent_service.py::catalog_add": {
+  "owner": "X4",
+  "signature": "def catalog_add(text: str) -> dict | None",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_intent_service.py::classify_actions": {
+  "owner": "X4",
+  "signature": "def classify_actions(prompt: str, view_target: str='', view_path: str='') -> list[dict]",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_intent_service.py::page_kind_from_text": {
+  "owner": "X4",
+  "signature": "def page_kind_from_text(text: str) -> str",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_service.py::PROTECTED_SHOP_SLUGS": {
+  "owner": "X4",
+  "signature": "PROTECTED_SHOP_SLUGS = frozenset({'joahr-froshi', 'cahrm-srai-pars'})",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_service.py::bump_pending": {
+  "owner": "X4",
+  "signature": "def bump_pending(shop: dict) -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_service.py::bump_pending_build": {
+  "owner": "X4",
+  "signature": "def bump_pending_build() -> None",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_service.py::catalog_add_reply": {
+  "owner": "X4",
+  "signature": "def catalog_add_reply(text: str) -> str | None",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_service.py::chat": {
+  "owner": "X4",
+  "signature": "async def chat(text: str, media: dict | None=None, view_path: str='', view_target: str='') -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_service.py::current_shop": {
+  "owner": "X4",
+  "signature": "def current_shop() -> dict",
+  "users": [
+   "C",
+   "X1",
+   "Y"
+  ]
+ },
+ "backend/app/services/shop_service.py::explicit_build": {
+  "owner": "X4",
+  "signature": "def explicit_build(text: str) -> bool",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_service.py::explicit_rebuild": {
+  "owner": "X4",
+  "signature": "def explicit_rebuild(text: str) -> bool",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_service.py::factory_category_slug": {
+  "owner": "X4",
+  "signature": "def factory_category_slug(category_fa: str) -> str",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_service.py::factory_item_sub": {
+  "owner": "X4",
+  "signature": "def factory_item_sub(title: str, category_fa: str) -> tuple[str, str]",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_service.py::live_url": {
+  "owner": "X4",
+  "signature": "def live_url(shop: dict) -> str",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/shop_service.py::rebuild_from_channel_catalog": {
+  "owner": "X4",
+  "signature": "def rebuild_from_channel_catalog() -> dict | None",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/shop_service.py::reset_for_brand": {
+  "owner": "X4",
+  "signature": "def reset_for_brand(*, name: str, tagline: str) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/shop_service.py::shop_is_live": {
+  "owner": "X4",
+  "signature": "def shop_is_live(shop: dict) -> bool",
+  "users": [
+   "C",
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_service.py::snapshot": {
+  "owner": "X4",
+  "signature": "def snapshot() -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/sms_service.py::PROVIDERS": {
+  "owner": "X3",
+  "signature": "PROVIDERS = ({'id': 'kavenegar', 'label': 'کاوه نگار', 'docs': 'https://kavenegar.com/rest.html', 'help': 'از پنل کاوه\\u200cنگار کلید و نام الگوی پیامک را بر...",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/sms_service.py::public_catalog": {
+  "owner": "X3",
+  "signature": "def public_catalog() -> list[dict]",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/sms_service.py::resolve_sms": {
+  "owner": "X3",
+  "signature": "def resolve_sms(overlay: dict | None=None) -> dict[str, str]",
+  "users": [
+   "C",
+   "X5"
+  ]
+ },
+ "backend/app/services/sms_service.py::send_otp": {
+  "owner": "X3",
+  "signature": "async def send_otp(*, provider: str, api_key: str, template_id: str, token_name: str, phone: str, code: str) -> None",
+  "users": [
+   "C",
+   "X5"
+  ]
+ },
+ "backend/app/services/storefront_service.py::add_product": {
+  "owner": "C",
+  "signature": "def add_product(*, title: str, price: int, stock: int, sku: str, image: str='', images: list | None=None, source: str='', sourceHandle: str='', description: str='', category: str='', subcategory: str='', colors: list | None=None, sizes: str='', priceNote: str='', discount: int=0) -> dict",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/storefront_service.py::clear_scanned_catalog": {
+  "owner": "C",
+  "signature": "def clear_scanned_catalog() -> None",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/storefront_service.py::count_scanned_handle": {
+  "owner": "C",
+  "signature": "def count_scanned_handle(source_handles: list[str]) -> int",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/storefront_service.py::list_products": {
+  "owner": "C",
+  "signature": "def list_products() -> dict",
+  "users": [
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/storefront_service.py::list_sales": {
+  "owner": "C",
+  "signature": "def list_sales() -> dict",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/storefront_service.py::price_label": {
+  "owner": "C",
+  "signature": "def price_label(price: int, note: str='') -> str",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/storefront_service.py::referenced_image_names": {
+  "owner": "C",
+  "signature": "def referenced_image_names() -> set[str]",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/storefront_service.py::remove_product_by_title": {
+  "owner": "C",
+  "signature": "def remove_product_by_title(title: str) -> dict",
+  "users": [
+   "X1",
+   "X4"
+  ]
+ },
+ "backend/app/services/storefront_service.py::remove_scanned_handle": {
+  "owner": "C",
+  "signature": "def remove_scanned_handle(source_handle: str) -> None",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/storefront_service.py::retitle_scanned_from_captions": {
+  "owner": "C",
+  "signature": "def retitle_scanned_from_captions() -> int",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/storefront_service.py::upsert_scanned_product": {
+  "owner": "C",
+  "signature": "def upsert_scanned_product(*, title: str, price: int, description: str, sku: str, image: str, source: str, sourceHandle: str, category: str='', colors: list | None=None, sizes: str='', priceNote: str='', sourcePostId: str='', sourceCaption: str='', extractor: str='', confidence: float=0.0, priceStatus: str='', priceUnit: str='toman', stableKey: str='', stock: int | None=None) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/studio_chat_service.py::begin_placeholder": {
+  "owner": "X2",
+  "signature": "def begin_placeholder() -> str",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/studio_chat_service.py::chat": {
+  "owner": "X2",
+  "signature": "async def chat(text: str, campaigns: CampaignService, media: dict | None=None, into_id: str='') -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/studio_chat_service.py::messages_by_id": {
+  "owner": "X2",
+  "signature": "def messages_by_id(ids: set[str]) -> dict[str, dict]",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/studio_chat_service.py::snapshot": {
+  "owner": "X2",
+  "signature": "def snapshot() -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/studio_compose_service.py::expire_stale": {
+  "owner": "X2",
+  "signature": "def expire_stale() -> None",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/studio_publish_service.py::publish": {
+  "owner": "X2",
+  "signature": "async def publish(*, platform: str, caption: str, media_name: str, media_kind: str, message_id: str='', campaign_id: str='', force: bool=False, recipient_id: str='') -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/support_service.py::create_ticket": {
+  "owner": "C",
+  "signature": "def create_ticket(*, subject: str, text: str, phone: str='', order_no: str='', image_name: str='', kind: str='storefront') -> dict",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/support_service.py::list_all_tickets_for_hub_admin": {
+  "owner": "C",
+  "signature": "def list_all_tickets_for_hub_admin() -> list[dict]",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/support_service.py::list_tickets": {
+  "owner": "C",
+  "signature": "def list_tickets(*, kind: str='') -> list[dict]",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/support_service.py::reply_hub_ticket": {
+  "owner": "C",
+  "signature": "def reply_hub_ticket(ticket_id: str, *, text: str, status: str='') -> dict",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/telegram_alert_service.py::seller_ticket_alert": {
+  "owner": "X3",
+  "signature": "async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str) -> None",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/telegram_service.py::pull_updates": {
+  "owner": "X3",
+  "signature": "async def pull_updates(*, token: str, handle: str='') -> dict",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/telegram_service.py::send_photo": {
+  "owner": "X3",
+  "signature": "async def send_photo(*, token: str, chat_id: str, path, caption: str='') -> None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/telegram_service.py::send_video": {
+  "owner": "X3",
+  "signature": "async def send_video(*, token: str, chat_id: str, path, caption: str='') -> None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/tenant_index_service.py::load": {
+  "owner": "X5",
+  "signature": "def load() -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/tenant_index_service.py::rebuild": {
+  "owner": "X5",
+  "signature": "def rebuild(all_rows: list[tuple[str, dict]]) -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/tenant_index_service.py::slug_owner": {
+  "owner": "X5",
+  "signature": "def slug_owner(index: dict, slug: str) -> str | None",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/tenant_lock.py::tenant_file_lock": {
+  "owner": "X5",
+  "signature": "def tenant_file_lock(name: str='shop') -> Iterator[None]",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/training_log.py::log_example": {
+  "owner": "Y",
+  "signature": "def log_example(**kwargs: Any) -> str",
+  "users": [
+   "X1",
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/services/training_log.py::log_label": {
+  "owner": "Y",
+  "signature": "def log_label(example_id: str, labels: dict, *, tenant: str='') -> str",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/turn_parse.py::parse_turn": {
+  "owner": "X1",
+  "signature": "def parse_turn(text: str) -> Turn",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/voice_service.py::apply_tone": {
+  "owner": "Y",
+  "signature": "def apply_tone(tone_id: str) -> dict",
+  "users": [
+   "X1",
+   "X3"
+  ]
+ },
+ "backend/app/services/voice_service.py::get_voice": {
+  "owner": "Y",
+  "signature": "def get_voice() -> dict",
+  "users": [
+   "X3",
+   "X5"
+  ]
+ },
+ "backend/app/services/voice_service.py::learn": {
+  "owner": "Y",
+  "signature": "async def learn(*, platform: str, handle: str, samples: str) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/voice_service.py::merge_summary": {
+  "owner": "Y",
+  "signature": "def merge_summary(summary: str) -> dict",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/wallet_service.py::consume_sms": {
+  "owner": "X5",
+  "signature": "def consume_sms() -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/wallet_service.py::credit_sale": {
+  "owner": "X5",
+  "signature": "def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner: str) -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/wallet_service.py::get": {
+  "owner": "X5",
+  "signature": "def get() -> dict",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/wallet_service.py::refund_sms": {
+  "owner": "X5",
+  "signature": "def refund_sms(charged: int=0) -> dict",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/whatsapp_service.py::send_media": {
+  "owner": "X3",
+  "signature": "async def send_media(*, token: str, phone_number_id: str, to: str, path, caption: str='') -> None",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/state_store.py::brand_dir": {
+  "owner": "X5",
+  "signature": "def brand_dir() -> Path",
+  "users": [
+   "X2",
+   "X3"
+  ]
+ },
+ "backend/app/state_store.py::current_tenant": {
+  "owner": "X5",
+  "signature": "def current_tenant() -> str",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/state_store.py::iter_tenants": {
+  "owner": "X5",
+  "signature": "def iter_tenants() -> list[str]",
+  "users": [
+   "C",
+   "X1",
+   "X3",
+   "X4"
+  ]
+ },
+ "backend/app/state_store.py::read_json": {
+  "owner": "X5",
+  "signature": "def read_json(name: str, default: Any, *, shared: bool=False) -> Any",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/state_store.py::shared_lock": {
+  "owner": "X5",
+  "signature": "def shared_lock() -> Iterator[None]",
+  "users": [
+   "C",
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/state_store.py::tenant_dir": {
+  "owner": "X5",
+  "signature": "def tenant_dir() -> Path",
+  "users": [
+   "X1",
+   "X3",
+   "X4"
+  ]
+ },
+ "backend/app/state_store.py::tenant_scope": {
+  "owner": "X5",
+  "signature": "def tenant_scope(phone: str) -> Iterator[None]",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4"
+  ]
+ },
+ "backend/app/state_store.py::update_json": {
+  "owner": "X5",
+  "signature": "def update_json(name: str, mutate, default: Any, *, lock: str) -> Any",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/state_store.py::write_json": {
+  "owner": "X5",
+  "signature": "def write_json(name: str, payload: Any, *, shared: bool=False) -> None",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "Y"
+  ]
+ },
+ "frontend/components/app-shell.tsx::AppShell": {
+  "owner": "U",
+  "signature": "export function AppShell(",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/components/auth-image.tsx::AuthImage": {
+  "owner": "U",
+  "signature": "export function AuthImage(",
+  "users": [
+   "C",
+   "X2"
+  ]
+ },
+ "frontend/components/auth-media.tsx::AuthMedia": {
+  "owner": "U",
+  "signature": "export function AuthMedia(",
+  "users": [
+   "X2"
+  ]
+ },
+ "frontend/components/channel-alert.tsx::ChannelAlert": {
+  "owner": "X3",
+  "signature": "export function ChannelAlert({ inset = true }: { inset?: boolean })",
+  "users": [
+   "X1",
+   "Y"
+  ]
+ },
+ "frontend/components/chat-thread.tsx::ChatMsg": {
+  "owner": "X1",
+  "signature": "export type ChatMsg =",
+  "users": [
+   "Y"
+  ]
+ },
+ "frontend/components/chat-thread.tsx::ChatThread": {
+  "owner": "X1",
+  "signature": "export function ChatThread(",
+  "users": [
+   "Y"
+  ]
+ },
+ "frontend/components/domain-menu.tsx::DomainMenu": {
+  "owner": "C",
+  "signature": "export function DomainMenu(",
+  "users": [
+   "X4"
+  ]
+ },
+ "frontend/components/domain-menu.tsx::ShopState": {
+  "owner": "C",
+  "signature": "export type ShopState =",
+  "users": [
+   "X4"
+  ]
+ },
+ "frontend/components/domain-menu.tsx::shopHostLabel": {
+  "owner": "C",
+  "signature": "export function shopHostLabel(url: string)",
+  "users": [
+   "X4"
+  ]
+ },
+ "frontend/components/domain-menu.tsx::shopPublicUrl": {
+  "owner": "C",
+  "signature": "export function shopPublicUrl(shop: ShopState | null, fallback = \"\")",
+  "users": [
+   "X4"
+  ]
+ },
+ "frontend/components/empty-state.tsx::EmptyState": {
+  "owner": "U",
+  "signature": "export function EmptyState(",
+  "users": [
+   "C",
+   "X2",
+   "X3",
+   "X4",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/components/field.tsx::Field": {
+  "owner": "U",
+  "signature": "export function Field({ label, children }: { label: string; children: React.ReactNode })",
+  "users": [
+   "C",
+   "X2",
+   "X3",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/components/getting-started.tsx::GettingStarted": {
+  "owner": "U",
+  "signature": "export function GettingStarted()",
+  "users": [
+   "X1"
+  ]
+ },
+ "frontend/components/login-coder-scene.tsx::LoginCoderScene": {
+  "owner": "U",
+  "signature": "export function LoginCoderScene()",
+  "users": [
+   "X3",
+   "X5"
+  ]
+ },
+ "frontend/components/onboard-gate.tsx::OnboardGate": {
+  "owner": "X3",
+  "signature": "export function OnboardGate({ children }: { children: React.ReactNode })",
+  "users": [
+   "U"
+  ]
+ },
+ "frontend/components/sales-policy-form.tsx::SalesPolicyForm": {
+  "owner": "Y",
+  "signature": "export function SalesPolicyForm()",
+  "users": [
+   "X5"
+  ]
+ },
+ "frontend/components/shop-settings-form.tsx::ShopSettingsForm": {
+  "owner": "C",
+  "signature": "export function ShopSettingsForm()",
+  "users": [
+   "X5"
+  ]
+ },
+ "frontend/components/sozan-mark.tsx::SozanMark": {
+  "owner": "U",
+  "signature": "export function SozanMark({ className, glow = true }: { className?: string; glow?: boolean })",
+  "users": [
+   "C",
+   "X1",
+   "X3",
+   "X5"
+  ]
+ },
+ "frontend/components/studio-publish.tsx::PublishPayload": {
+  "owner": "X2",
+  "signature": "export type PublishPayload =",
+  "users": [
+   "X1"
+  ]
+ },
+ "frontend/components/studio-publish.tsx::PublishTarget": {
+  "owner": "X2",
+  "signature": "export type PublishTarget =",
+  "users": [
+   "X1"
+  ]
+ },
+ "frontend/components/studio-publish.tsx::StudioAttachment": {
+  "owner": "X2",
+  "signature": "export type StudioAttachment = { kind: string; name: string; source?: string };",
+  "users": [
+   "X1"
+  ]
+ },
+ "frontend/components/studio-publish.tsx::StudioCaptions": {
+  "owner": "X2",
+  "signature": "export type StudioCaptions = { instagram?: string; telegram?: string; whatsapp?: string };",
+  "users": [
+   "X1"
+  ]
+ },
+ "frontend/components/studio-publish.tsx::StudioPublishCard": {
+  "owner": "X2",
+  "signature": "export function StudioPublishCard(",
+  "users": [
+   "X1"
+  ]
+ },
+ "frontend/components/theme-toggle.tsx::ThemeToggle": {
+  "owner": "U",
+  "signature": "export function ThemeToggle({ compact = false, className }: { compact?: boolean; className?: string })",
+  "users": [
+   "X5"
+  ]
+ },
+ "frontend/components/training-choice.tsx::TrainingChoice": {
+  "owner": "Y",
+  "signature": "export function TrainingChoice()",
+  "users": [
+   "X5"
+  ]
+ },
+ "frontend/components/ui/button.tsx::Button": {
+  "owner": "U",
+  "signature": "export function Button(",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/components/ui/card.tsx::Card": {
+  "owner": "U",
+  "signature": "export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>)",
+  "users": [
+   "C",
+   "X2",
+   "X3",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/components/ui/input.tsx::Input": {
+  "owner": "U",
+  "signature": "export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)",
+  "users": [
+   "C",
+   "X2",
+   "X3",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/components/ui/select.tsx::Select": {
+  "owner": "U",
+  "signature": "export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)",
+  "users": [
+   "C",
+   "X3",
+   "Y"
+  ]
+ },
+ "frontend/components/ui/textarea.tsx::Textarea": {
+  "owner": "U",
+  "signature": "export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>)",
+  "users": [
+   "C",
+   "X2",
+   "X3"
+  ]
+ },
+ "frontend/lib/api.ts::ApiError": {
+  "owner": "U",
+  "signature": "export class ApiError extends Error",
+  "users": [
+   "X3",
+   "X5"
+  ]
+ },
+ "frontend/lib/api.ts::Brand": {
+  "owner": "U",
+  "signature": "export type Brand =",
+  "users": [
+   "X2"
+  ]
+ },
+ "frontend/lib/api.ts::Campaign": {
+  "owner": "U",
+  "signature": "export type Campaign =",
+  "users": [
+   "X2"
+  ]
+ },
+ "frontend/lib/api.ts::api": {
+  "owner": "U",
+  "signature": "export async function api<T>(path: string, init: RequestInit = {}): Promise<T>",
+  "users": [
+   "C",
+   "X1",
+   "X2",
+   "X3",
+   "X4",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/lib/api.ts::catalogImageUrl": {
+  "owner": "U",
+  "signature": "export function catalogImageUrl(name: string): string",
+  "users": [
+   "C"
+  ]
+ },
+ "frontend/lib/api.ts::chatMediaUrl": {
+  "owner": "U",
+  "signature": "export function chatMediaUrl(name: string): string",
+  "users": [
+   "X1"
+  ]
+ },
+ "frontend/lib/api.ts::clearToken": {
+  "owner": "U",
+  "signature": "export function clearToken()",
+  "users": [
+   "X5"
+  ]
+ },
+ "frontend/lib/api.ts::fileUrl": {
+  "owner": "U",
+  "signature": "export function fileUrl(campaignId: string, relPath: string): string",
+  "users": [
+   "C"
+  ]
+ },
+ "frontend/lib/api.ts::getApiBase": {
+  "owner": "U",
+  "signature": "export function getApiBase(): string",
+  "users": [
+   "C",
+   "X2"
+  ]
+ },
+ "frontend/lib/api.ts::getOnboarded": {
+  "owner": "U",
+  "signature": "export function getOnboarded(): boolean",
+  "users": [
+   "X3"
+  ]
+ },
+ "frontend/lib/api.ts::getToken": {
+  "owner": "U",
+  "signature": "export function getToken(): string | null",
+  "users": [
+   "X1",
+   "X2",
+   "X3"
+  ]
+ },
+ "frontend/lib/api.ts::setOnboarded": {
+  "owner": "U",
+  "signature": "export function setOnboarded(onboarded: boolean)",
+  "users": [
+   "X3",
+   "X5"
+  ]
+ },
+ "frontend/lib/api.ts::setToken": {
+  "owner": "U",
+  "signature": "export function setToken(token: string)",
+  "users": [
+   "X5"
+  ]
+ },
+ "frontend/lib/digits.ts::formatWhen": {
+  "owner": "U",
+  "signature": "export function formatWhen(at: number): string",
+  "users": [
+   "X1",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/lib/digits.ts::money": {
+  "owner": "U",
+  "signature": "export function money(amount: number): string",
+  "users": [
+   "C",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/lib/digits.ts::parseNonNegativeInt": {
+  "owner": "U",
+  "signature": "export function parseNonNegativeInt(raw: string): number | null",
+  "users": [
+   "C",
+   "X5",
+   "Y"
+  ]
+ },
+ "frontend/lib/digits.ts::priceText": {
+  "owner": "U",
+  "signature": "export function priceText(price: number, label?: string): string",
+  "users": [
+   "C"
+  ]
+ },
+ "frontend/lib/digits.ts::toLatinDigits": {
+  "owner": "U",
+  "signature": "export function toLatinDigits(raw: string): string",
+  "users": [
+   "X5"
+  ]
+ },
+ "frontend/lib/idempotency.ts::emptyIdempotencySlot": {
+  "owner": "U",
+  "signature": "export function emptyIdempotencySlot(): IdempotencySlot",
+  "users": [
+   "X1",
+   "X4",
+   "Y"
+  ]
+ },
+ "frontend/lib/idempotency.ts::finishIdempotencyKey": {
+  "owner": "U",
+  "signature": "export function finishIdempotencyKey(slot: IdempotencySlot, err?: unknown): void",
+  "users": [
+   "X1",
+   "X4",
+   "Y"
+  ]
+ },
+ "frontend/lib/idempotency.ts::takeIdempotencyKey": {
+  "owner": "U",
+  "signature": "export function takeIdempotencyKey(slot: IdempotencySlot, stamp: string): string",
+  "users": [
+   "X1",
+   "X4",
+   "Y"
+  ]
+ },
+ "frontend/lib/site-host.ts::isPanelHost": {
+  "owner": "C",
+  "signature": "export function isPanelHost(hostHeader: string | null): boolean",
+  "users": [
+   "U"
+  ]
+ },
+ "frontend/lib/site-host.ts::panelOriginFromHost": {
+  "owner": "C",
+  "signature": "export function panelOriginFromHost(hostHeader: string | null): string",
+  "users": [
+   "U"
+  ]
+ },
+ "frontend/lib/use-ai-budget.ts::useAiBudget": {
+  "owner": "X5",
+  "signature": "export function useAiBudget(): AiBudget | null",
+  "users": [
+   "U"
+  ]
+ },
+ "frontend/lib/use-plan.ts::usePlan": {
+  "owner": "X5",
+  "signature": "export function usePlan(): PlanInfo | null",
+  "users": [
+   "U"
+  ]
+ },
+ "frontend/lib/utils.ts::cn": {
+  "owner": "U",
+  "signature": "export function cn(...inputs: ClassValue[])",
+  "users": [
+   "X1",
+   "X4",
+   "Y"
+  ]
+ }
+}

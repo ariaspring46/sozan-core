@@ -27,8 +27,8 @@
   "roles": [
     {
       "id": "X1",
-      "title": "روتر، چت پنل و پوستهٔ پنل",
-      "summary": "مغز چت پنل (انتخاب ابزار، کارت تأیید، قفل نوبت)، صفحهٔ چت، و قاب مشترک پنل (app-shell، lib، ui، تم) که همهٔ صفحه‌ها رویش می‌نشینند.",
+      "title": "روتر و چت پنل",
+      "summary": "مغز چت پنل (انتخاب ابزار، کارت تأیید، قفل نوبت) و صفحهٔ چت.",
       "report": "talk-x1.md",
       "core": [
         "backend/app/services/router_service.py",
@@ -48,62 +48,29 @@
         "backend/app/data/**",
         "backend/scripts/refresh_router_intents.py",
         "frontend/app/chat/**",
-        "frontend/app/layout.tsx",
-        "frontend/app/globals.css",
         "frontend/components/chat-thread.tsx",
         "frontend/components/chat-attach.tsx",
         "frontend/components/typing-hints.tsx",
-        "frontend/components/app-shell.tsx",
-        "frontend/components/panel-home.tsx",
-        "frontend/components/getting-started.tsx",
-        "frontend/components/empty-state.tsx",
-        "frontend/components/field.tsx",
-        "frontend/components/theme-toggle.tsx",
-        "frontend/components/drop-stale-workers.tsx",
-        "frontend/components/ui/**",
-        "frontend/lib/api.ts",
-        "frontend/lib/idempotency.ts",
-        "frontend/lib/theme.ts",
-        "frontend/lib/utils.ts",
-        "frontend/lib/digits.ts",
-        "frontend/lib/use-app-viewport.ts",
-        "frontend/package.json",
-        "frontend/next.config.ts",
-        "frontend/next-env.d.ts",
-        "frontend/tsconfig.json",
-        "frontend/tailwind.config.js",
-        "frontend/postcss.config.js",
-        "frontend/public/**",
         "tools/qa50_battery.json",
         "tools/qa50_battery.py",
         "tools/qa_battery.py",
         "tools/agentic_probes/p_router.py",
-        "tools/agentic_probes/p_router_lock.py",
-        "frontend/app/icon.png",
-        "frontend/app/apple-icon.png",
-        "frontend/package-lock.json"
+        "tools/agentic_probes/p_router_lock.py"
       ],
       "rare": [
         "backend/app/data/**",
         "backend/scripts/refresh_router_intents.py",
-        "frontend/public/**",
-        "frontend/package.json",
-        "frontend/next.config.ts",
-        "frontend/next-env.d.ts",
-        "frontend/tsconfig.json",
-        "frontend/tailwind.config.js",
-        "frontend/postcss.config.js",
         "tools/qa50_battery.json",
         "tools/qa_battery.py",
         "tools/agentic_probes/p_router.py",
         "tools/agentic_probes/p_router_lock.py"
       ],
-      "title_en": "Router, panel chat and panel shell",
+      "title_en": "Router and panel chat",
       "branch": "x1/<issue>-<slug>",
       "plan": [
         "owner-plan.md"
       ],
-      "mission": "Own the panel chat brain: one model call per turn picks a tool name; code extracts arguments; every write tool goes through a confirm card. Own the shared panel frame (app-shell, lib/api.ts, ui/, theme, Next config) that every page sits on.",
+      "mission": "Own the panel chat brain: one model call per turn picks a tool name; code extracts arguments; every write tool goes through a confirm card; the per-thread turn lock; and the chat page that shows it.",
       "frontend": true,
       "gates": [
         "qa50 router battery 50/50 on two consecutive runs on the hub's parallel instance whenever router_service.py, turn_parse.py, router_embed.py, backend/app/data/router_*.json or the LLM env changes. You cannot run it (it needs the hub); ask X5 in talk-x5.md and wait for the result before asking for merge."
@@ -111,9 +78,7 @@
       "rules": [
         "The model only picks a tool NAME. Prices, text and targets come from the user's sentence via code. Never add free-form string arguments that the model fills.",
         "Every tool in WRITE_TOOLS must create a confirm card; it runs only on a matching, unexpired confirmId.",
-        "router_intent_vectors.json is generated: change router_intents.json and run backend/scripts/refresh_router_intents.py (needs the bge-m3 embed service). Never hand-edit or read the vectors file.",
-        "frontend/lib/api.ts, components/ui/*, app-shell.tsx are used by every page: keep exported names and props backward compatible; a breaking change needs a note to every role that imports it (see 'Your contract').",
-        "Panel copy is Persian, right-to-left, Persian digits where the page already uses them."
+        "router_intent_vectors.json is generated: change router_intents.json and run backend/scripts/refresh_router_intents.py (needs the bge-m3 embed service). Never hand-edit or read the vectors file."
       ]
     },
     {
@@ -155,21 +120,10 @@
         "frontend/app/studio/**",
         "frontend/app/campaigns/**",
         "frontend/app/brand/**",
-        "frontend/app/page.tsx",
-        "frontend/app/about/**",
-        "frontend/app/contact/**",
-        "frontend/app/terms/**",
-        "frontend/app/refund/**",
         "frontend/components/studio-publish.tsx",
         "frontend/components/studio-library.tsx",
         "frontend/components/studio-nav.tsx",
         "frontend/components/brand-identity.tsx",
-        "frontend/components/brand-logo.tsx",
-        "frontend/components/sozan-mark.tsx",
-        "frontend/components/landing-page.tsx",
-        "frontend/components/landing-slogan-rotator.tsx",
-        "frontend/components/legal-page.tsx",
-        "frontend/lib/public-plans.ts",
         "promo-engine/**",
         "brand/**",
         "campaigns/**",
@@ -183,14 +137,6 @@
         "promo-engine/**",
         "brand/**",
         "campaigns/**",
-        "frontend/app/page.tsx",
-        "frontend/app/about/**",
-        "frontend/app/contact/**",
-        "frontend/app/terms/**",
-        "frontend/app/refund/**",
-        "frontend/components/landing-page.tsx",
-        "frontend/components/landing-slogan-rotator.tsx",
-        "frontend/components/legal-page.tsx",
         "backend/scripts/compose_campaign.py",
         "backend/scripts/compose_logo_motion.py",
         "backend/app/services/logo_motion_service.py",
@@ -207,7 +153,7 @@
       "plan": [
         "owner-plan.md"
       ],
-      "mission": "Own content creation: studio chat (captions, posts, stories), still/scene image generation with the vision guard, cutout, compose to video, campaigns, publishing to channels, brand identity, the public landing/legal pages and the promo-engine.",
+      "mission": "Own content creation: studio chat (captions, posts, stories), still/scene image generation with the vision guard, cutout, compose to video, campaigns, publishing through the channel layer, brand identity and the promo-engine.",
       "frontend": true,
       "gates": [
         "qa_image_battery (tools/qa_image_battery.py) green when image_provider_service.py, cloud_cutout_service.py or compose_pipeline.py changes. It spends real cloud money: ask the owner in talk-x2.md to run it; never run it yourself."
@@ -404,9 +350,6 @@
         "frontend/app/more/settings/**",
         "frontend/app/more/wallet/**",
         "frontend/app/more/docs/**",
-        "frontend/components/login-coder-scene.tsx",
-        "frontend/components/auth-image.tsx",
-        "frontend/components/auth-media.tsx",
         "frontend/lib/use-plan.ts",
         "frontend/lib/use-ai-budget.ts",
         "frontend/lib/seller-guides.ts",
@@ -418,10 +361,10 @@
         "scripts/**",
         "tools/lab_session.py",
         "tools/remove_test_tenant.py",
-        "tools/agent_context/**",
         "tools/agentic_probes/run_all.sh",
         "tools/agentic_probes/p_outbox_chain.py",
-        "tools/agentic_probes/p_outbox_chain_loop.py"
+        "tools/agentic_probes/p_outbox_chain_loop.py",
+        "tools/agent_context/build.py"
       ],
       "rare": [
         "deploy/**",
@@ -434,15 +377,12 @@
         "backend/app/hub_admin.py",
         "frontend/lib/seller-guides.ts",
         "frontend/app/more/docs/**",
-        "frontend/components/login-coder-scene.tsx",
-        "frontend/components/auth-image.tsx",
-        "frontend/components/auth-media.tsx",
         "tools/lab_session.py",
         "tools/remove_test_tenant.py",
-        "tools/agent_context/**",
         "tools/agentic_probes/run_all.sh",
         "tools/agentic_probes/p_outbox_chain.py",
-        "tools/agentic_probes/p_outbox_chain_loop.py"
+        "tools/agentic_probes/p_outbox_chain_loop.py",
+        "tools/agent_context/build.py"
       ],
       "external": [
         "Only deployer: `flock /home/ubuntu/.sozan-deploy.lock` with `deploy/deploy-api.sh` / `deploy/deploy-panel.sh`.",
@@ -663,6 +603,106 @@
       ]
     },
     {
+      "id": "U",
+      "title": "UI/UX: سیستم طراحی و پلتفرم فرانت",
+      "title_en": "UI/UX: design system and frontend platform",
+      "summary": "زبان بصری پنل و لندینگ: توکن‌های رنگ و تایپوگرافی، کامپوننت‌های پایه، قاب پنل، تم، راست‌به‌چپ و موبایل، لایهٔ fetch فرانت، پیکربندی Next، و صفحه‌های عمومی.",
+      "mission": "Own how Sozan looks and feels everywhere: design tokens (colours, type, spacing), shared UI components, the panel frame (app-shell, panel home, getting started), light/dark theme, RTL and Persian typography, mobile-first layout (390px) and accessibility, the frontend data layer (lib/api.ts, idempotency), Next/Tailwind/TypeScript config and dependencies, the public landing and legal pages, and the UI audit. Feature roles own their pages; you own the rules and building blocks they use.",
+      "report": "talk-u.md",
+      "branch": "u/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "frontend": true,
+      "core": [
+        "frontend/app/globals.css",
+        "frontend/tailwind.config.js",
+        "frontend/components/app-shell.tsx",
+        "frontend/lib/api.ts",
+        "frontend/components/ui/button.tsx"
+      ],
+      "owns": [
+        "frontend/app/layout.tsx",
+        "frontend/app/globals.css",
+        "frontend/components/app-shell.tsx",
+        "frontend/components/panel-home.tsx",
+        "frontend/components/getting-started.tsx",
+        "frontend/components/empty-state.tsx",
+        "frontend/components/field.tsx",
+        "frontend/components/theme-toggle.tsx",
+        "frontend/components/drop-stale-workers.tsx",
+        "frontend/components/ui/**",
+        "frontend/lib/api.ts",
+        "frontend/lib/idempotency.ts",
+        "frontend/lib/theme.ts",
+        "frontend/lib/utils.ts",
+        "frontend/lib/digits.ts",
+        "frontend/lib/use-app-viewport.ts",
+        "frontend/package.json",
+        "frontend/next.config.ts",
+        "frontend/next-env.d.ts",
+        "frontend/tsconfig.json",
+        "frontend/tailwind.config.js",
+        "frontend/postcss.config.js",
+        "frontend/public/**",
+        "frontend/app/icon.png",
+        "frontend/app/apple-icon.png",
+        "frontend/package-lock.json",
+        "frontend/app/page.tsx",
+        "frontend/app/about/**",
+        "frontend/app/contact/**",
+        "frontend/app/terms/**",
+        "frontend/app/refund/**",
+        "frontend/components/landing-page.tsx",
+        "frontend/components/landing-slogan-rotator.tsx",
+        "frontend/components/legal-page.tsx",
+        "frontend/components/brand-logo.tsx",
+        "frontend/components/sozan-mark.tsx",
+        "frontend/lib/public-plans.ts",
+        "frontend/components/login-coder-scene.tsx",
+        "frontend/components/auth-image.tsx",
+        "frontend/components/auth-media.tsx",
+        "docs/ui-ux-audit.md",
+        "docs/ui-audit-live.md",
+        "tools/ui_check.py"
+      ],
+      "rare": [
+        "frontend/public/**",
+        "frontend/app/icon.png",
+        "frontend/app/apple-icon.png",
+        "frontend/package-lock.json",
+        "frontend/next-env.d.ts",
+        "frontend/postcss.config.js",
+        "frontend/components/login-coder-scene.tsx",
+        "frontend/components/auth-image.tsx",
+        "frontend/components/auth-media.tsx",
+        "frontend/app/about/**",
+        "frontend/app/contact/**",
+        "frontend/app/terms/**",
+        "frontend/app/refund/**",
+        "frontend/components/legal-page.tsx",
+        "frontend/components/landing-slogan-rotator.tsx",
+        "docs/ui-ux-audit.md",
+        "docs/ui-audit-live.md"
+      ],
+      "gates": [
+        "`python3 tools/ui_check.py` prints 0 problems and `npm run build` passes.",
+        "Any visual change: screenshots at 390px and 1440px, light and dark, of every page whose look changed, attached to the PR (built-in Chromium + Playwright). No horizontal scroll at 390px."
+      ],
+      "rules": [
+        "Design tokens live only in app/globals.css (CSS variables) and tailwind.config.js. No hex colours elsewhere (ui_check U5); add a token instead.",
+        "Shared components (components/ui/*, app-shell, empty-state, field) stay backward compatible: new props optional, no renamed exports. A breaking change needs an ack from every role listed in 'Your contract'.",
+        "Every page is RTL (`<html lang=\"fa\" dir=\"rtl\">`), Persian copy, Persian digits for numbers shown to sellers, and works at 390px wide without horizontal scroll.",
+        "Accessibility floor: every <img> has alt, icon-only buttons have aria-label, focus is visible, text contrast >= 4.5:1, tap targets >= 40px.",
+        "lib/api.ts is the only place that knows the API host and auth header; pages call api()/getApiBase(), never a hard-coded host (ui_check U6).",
+        "Dependencies: you alone change frontend/package.json and the lockfile; keep the lockfile's registry as is (the hub builds through it).",
+        "You do not change a feature page's behaviour or data flow; for a visual fix inside another role's page, send the exact class/markup change to that role."
+      ],
+      "external": [
+        "UI rules you publish apply to every frontend role: they appear in each frontend harness under 'UI rules'. Changing them = edit roles.json (owner) and regenerate."
+      ]
+    },
+    {
       "id": "OWNER",
       "title": "مالک و برنامه‌ریز (برنامه‌نویس نیست)",
       "summary": "پلن‌ها، قواعد تیم، سندهای مرجع و ابزار ویرایشگر. برنامه‌نویس‌ها فقط می‌خوانند، آن هم وقتی پلنشان ارجاع داده.",
@@ -685,7 +725,8 @@
         ".zcode/**",
         ".cursor/**",
         "AGENTS.md",
-        "CLAUDE.md"
+        "CLAUDE.md",
+        "tools/agent_context/roles.json"
       ],
       "rare": [],
       "title_en": "Owner and planner (not a programmer)",
@@ -699,5 +740,311 @@
   ],
   "not_unit_tests": [
     "voice-gateway/loopback_test.py"
+  ],
+  "ui_rules": [
+    "Use design tokens and components/ui/*; no new hex colours or one-off button styles (tools/ui_check.py).",
+    "RTL and Persian: Persian copy, Persian digits for numbers sellers see, no left-aligned layouts.",
+    "Mobile first: the page works at 390px with no horizontal scroll; check 1440px too.",
+    "Every async view has loading, empty and error states (use components/empty-state.tsx).",
+    "Accessibility: <img alt>, aria-label on icon-only buttons, rel=\"noreferrer\" on target=_blank, visible focus.",
+    "Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host."
+  ],
+  "shared_files": [
+    [
+      "CHANGELOG.md",
+      "everyone",
+      "Append one bullet for your change under today's dated heading (`head -20` to see it). Never edit other bullets."
+    ],
+    [
+      "docs/agents/**",
+      "generated",
+      "Never hand-edit. Run `python3 tools/agent_context/build.py` and commit the result in the same PR when you change a cross-role import, contract or route."
+    ],
+    [
+      "docs/agents/contracts.json",
+      "generated",
+      "Snapshot of every cross-role signature. CI fails if code and snapshot differ: regenerate, and the reviewer sees the contract change in the diff."
+    ],
+    [
+      "tools/agent_context/roles.json",
+      "OWNER",
+      "Boundaries. Ask the owner to move a file between roles."
+    ],
+    [
+      "talk-*.md, *-talk.md",
+      "each role",
+      "Your own file: append only. Another role's file: append a `## FROM → TO:` request only."
+    ],
+    [
+      "backend/requirements.txt",
+      "X5",
+      "New Python dependency: request from X5 with the reason and pinned version."
+    ],
+    [
+      "frontend/package.json, package-lock.json",
+      "U",
+      "New npm dependency: request from U."
+    ],
+    [
+      "backend/app/config.py, .env.example",
+      "X5",
+      "New setting/env var: request from X5 with name, default and who reads it. Never put a value in git."
+    ],
+    [
+      ".github/workflows/**",
+      "X5",
+      "CI changes: request from X5."
+    ],
+    [
+      "STATE_DIR/tenants/<phone>/*.json (runtime)",
+      "see table",
+      "A file with more than one writer role must be written with `state_store.update_json(name, mutate, default, lock=...)` or inside `tenant_file_lock(...)`. `build.py --check` fails otherwise."
+    ]
+  ],
+  "flows": [
+    {
+      "id": "F1",
+      "title": "Customer DM → automatic reply",
+      "steps": [
+        [
+          "X3",
+          "channel webhook/poll → inbox_service.handle_inbound"
+        ],
+        [
+          "Y",
+          "maybe_auto_reply → inbox_agent_service.answer (tools, guards)"
+        ],
+        [
+          "C",
+          "payment_link → pay_service.create_order"
+        ],
+        [
+          "X3",
+          "reply delivered by the channel adapter"
+        ]
+      ],
+      "tests": [
+        "app.services.inbox_service_test",
+        "app.services.inbox_agent_service_test",
+        "app.services.telegram_inbox_test",
+        "app.services.sendbox_service_test",
+        "app.services.channel_poll_service_test",
+        "app.api.inbox_dry_test",
+        "app.services.customer_memory_service_test"
+      ]
+    },
+    {
+      "id": "F2",
+      "title": "Seller panel chat → tool",
+      "steps": [
+        [
+          "U",
+          "chat frame, api()"
+        ],
+        [
+          "X1",
+          "router turn: tool choice, confirm card, lock"
+        ],
+        [
+          "X4/X2/X5/Y",
+          "the tool runs: edit_shop, studio_chat, settings, auto-reply"
+        ]
+      ],
+      "tests": [
+        "app.services.router_service_test",
+        "app.api.router_chat_test",
+        "app.services.turn_parse_test",
+        "app.services.router_embed_test"
+      ]
+    },
+    {
+      "id": "F3",
+      "title": "Onboarding → first storefront",
+      "steps": [
+        [
+          "X3",
+          "onboard_service.complete → channel_scan_service.start_scan"
+        ],
+        [
+          "C",
+          "catalog (storefront_service) and DNS (arvan_dns_service)"
+        ],
+        [
+          "X4",
+          "shop_service.start_build → factory"
+        ],
+        [
+          "C",
+          "factory build and live storefront"
+        ]
+      ],
+      "tests": [
+        "app.services.onboard_service_test",
+        "app.services.channel_scan_service_test",
+        "app.services.storefront_service_test",
+        "app.services.shop_service_test",
+        "app.services.shop_pipeline_e2e_test",
+        "app.services.arvan_dns_service_test",
+        "app.services.catalog_sync_service_test"
+      ]
+    },
+    {
+      "id": "F4",
+      "title": "Live storefront edit",
+      "steps": [
+        [
+          "X1",
+          "router routes the sentence to edit_shop"
+        ],
+        [
+          "X4",
+          "apply_live_edit: patch → publish → verify → rollback"
+        ],
+        [
+          "C",
+          "catalog sync to the live storefront"
+        ]
+      ],
+      "tests": [
+        "app.services.shop_edit_service_test",
+        "app.services.shop_edit_verify_test",
+        "app.services.shop_intent_service_test",
+        "app.services.catalog_sync_service_test",
+        "app.services.agentic_regressions_test"
+      ]
+    },
+    {
+      "id": "F5",
+      "title": "Studio post → publish",
+      "steps": [
+        [
+          "X2",
+          "studio_chat → image_provider (budget-gated) → compose"
+        ],
+        [
+          "X3",
+          "channel adapters deliver"
+        ]
+      ],
+      "tests": [
+        "app.services.studio_chat_service_test",
+        "app.services.studio_compose_service_test",
+        "app.services.studio_publish_service_test",
+        "app.services.image_provider_service_test",
+        "app.services.compose_pipeline_test",
+        "app.api.studio_test"
+      ]
+    },
+    {
+      "id": "F6",
+      "title": "Storefront customer purchase",
+      "steps": [
+        [
+          "C",
+          "/p/ checkout → gateway → mark paid → receipt"
+        ],
+        [
+          "C",
+          "stock and catalog sync"
+        ],
+        [
+          "X3",
+          "customer OTP by SMS"
+        ]
+      ],
+      "tests": [
+        "app.services.pay_service_test",
+        "app.api.pay_status_rate_test",
+        "app.services.shop_otp_service_test",
+        "app.services.storefront_service_test"
+      ]
+    },
+    {
+      "id": "F7",
+      "title": "Seller login, plan and subscription payment",
+      "steps": [
+        [
+          "X5",
+          "auth_service OTP"
+        ],
+        [
+          "X3",
+          "SMS delivery"
+        ],
+        [
+          "X5",
+          "plan, billing, payment, wallet"
+        ]
+      ],
+      "tests": [
+        "app.services.auth_service_test",
+        "app.services.melipayamak_otp_service_test",
+        "app.services.sms_service_test",
+        "app.services.plan_service_test",
+        "app.services.billing_service_test",
+        "app.services.wallet_pay_test"
+      ]
+    },
+    {
+      "id": "F8",
+      "title": "Phone sales call",
+      "steps": [
+        [
+          "Z",
+          "SIP call → sales state machine → LLM/TTS"
+        ],
+        [
+          "X5",
+          "GET /billing/plans and /health for prices"
+        ]
+      ],
+      "tests": [],
+      "commands": [
+        "cd voice-gateway && python3 -m unittest test_voice 2>&1 | tail -5"
+      ]
+    },
+    {
+      "id": "F9",
+      "title": "Shared core: tenant state, LLM, budget, events",
+      "steps": [
+        [
+          "X5",
+          "state_store, tenant_lock, llm, ai_budget, observe_client"
+        ],
+        [
+          "X1/X2/X3/X4/Y/C",
+          "call state_store, llm, observe_client, ai_budget through their public API"
+        ]
+      ],
+      "tests": [
+        "app.services.state_store_test",
+        "app.services.tenant_lock_test",
+        "app.services.llm_test",
+        "app.services.llm_routing_service_test",
+        "app.services.ai_budget_service_test",
+        "app.services.observe_client_test",
+        "app.services.pipeline_release_test",
+        "app.services.agentic_regressions_test"
+      ]
+    },
+    {
+      "id": "F10",
+      "title": "Panel UI",
+      "steps": [
+        [
+          "U",
+          "tokens, components, shell, api.ts"
+        ],
+        [
+          "all frontend roles",
+          "their pages"
+        ]
+      ],
+      "tests": [],
+      "commands": [
+        "python3 tools/ui_check.py",
+        "cd frontend && npm run build 2>&1 | tail -15"
+      ]
+    }
   ]
 }

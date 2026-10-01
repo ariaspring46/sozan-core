@@ -174,14 +174,16 @@ def save_settings(patch: dict, *, hub_admin: bool = False) -> dict:
         write_json("settings.json", studio, shared=True)
     write_json("integrations.json", integrations)
     if "storeName" in patch or "storeTagline" in patch:
-        shop = read_json("shop.json", {})
-        if not isinstance(shop, dict):
-            shop = {}
-        if "storeName" in patch and patch["storeName"] is not None:
-            shop["brand"] = str(patch["storeName"]).strip()
-        if "storeTagline" in patch and patch["storeTagline"] is not None:
-            shop["tagline"] = str(patch["storeTagline"]).strip()
-        write_json("shop.json", shop)
+        from app.state_store import update_json
+
+        def _brand(shop: dict) -> None:
+            if "storeName" in patch and patch["storeName"] is not None:
+                shop["brand"] = str(patch["storeName"]).strip()
+            if "storeTagline" in patch and patch["storeTagline"] is not None:
+                shop["tagline"] = str(patch["storeTagline"]).strip()
+
+        # shop.json is also written by the build (X4) and the pay secret (C): locked update.
+        update_json("shop.json", _brand, {}, lock="shop")
     if "helpImprove" in patch and patch["helpImprove"] is not None:
         save_training_choice(bool(patch["helpImprove"]))
     return public_settings()

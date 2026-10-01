@@ -181,3 +181,24 @@ def write_json(name: str, payload: Any, *, shared: bool = False) -> None:
             _write_atomic(path, payload)
         return
     _write_atomic(path, payload)
+
+
+def update_json(name: str, mutate, default: Any, *, lock: str) -> Any:
+    """Read-modify-write one tenant file under its tenant_file_lock.
+
+    Use this for any file more than one role writes (shop.json): a plain
+    read_json + write_json loses whatever another writer saved in between.
+    `mutate` changes the value in place or returns a replacement.
+    """
+    from app.services.tenant_lock import tenant_file_lock
+
+    with tenant_file_lock(lock):
+        value = read_json(name, default)
+        if not isinstance(value, type(default)):
+            value = default
+        result = mutate(value)
+        if result is not None:
+            value = result
+        write_json(name, value)
+        return value
+

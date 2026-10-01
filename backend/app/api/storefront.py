@@ -165,7 +165,7 @@ async def catalog_media(name: str, _user=Depends(require_permission("campaigns:r
     safe = Path(name).name
     if safe != name:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "نام نامعتبر است")
-    from app.services.channel_scan_service import _scan_dir, _unattributed_dir
+    from app.services.channel_scan_service import scan_dir as _scan_dir, unattributed_dir as _unattributed_dir
 
     for root in (_scan_dir().resolve(), _unattributed_dir().resolve()):
         path = (root / safe).resolve()

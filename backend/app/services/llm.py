@@ -1108,3 +1108,16 @@ async def complete_tools(
         )
     except Exception:
         raise last_exc or RuntimeError("llm")
+
+# ---- Public API for other roles (docs/agents). Wrappers call the private names at call time, so tests that patch those still work.
+
+def budget_capped(surface: str) -> str | None:
+    return _budget_capped(surface)
+
+
+def emit_usage(*, surface: str, model: str, payload: dict, latency_ms: float = 0) -> dict:
+    return _emit_usage(surface=surface, model=model, payload=payload, latency_ms=latency_ms)
+
+
+def auth_scheme(value: object) -> str:
+    return _auth_scheme(value)
