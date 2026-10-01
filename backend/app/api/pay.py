@@ -43,6 +43,14 @@ class TicketIn(BaseModel):
     text: str = Field(min_length=2, max_length=2000)
 
 
+@router.get("/p/catalog-ids")
+async def catalog_ids(slug: str = Query(default=""), secret: str = Query(default="")):
+    try:
+        return pay_service.catalog_ids(slug=slug, secret=secret)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
 @router.get("/p/shop-config")
 async def shop_config(slug: str = Query(default=""), secret: str = Query(default="")):
     try:

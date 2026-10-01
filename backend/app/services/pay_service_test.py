@@ -113,6 +113,15 @@ class ShopPayB1Tests(unittest.TestCase):
                 approved = pay_service.review_receipt(order_no=order["id"], approve=True, note="")
                 self.assertEqual(approved["status"], "paid")
 
+    def test_catalog_ids_maps_and_checks_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+                write_json("shop.json", {"slug": SLUG, "paySecret": SECRET})
+                storefront_service.add_product(title="انگشتر", price=5000, stock=2, sku="ring-1")
+                out = pay_service.catalog_ids(slug=SLUG, secret=SECRET)
+                mapping = out["map"]
+                self.assertTrue(any(k.startswith(SLUG + "-") for k in mapping))
+
     def test_receipt_reject_keeps_order_reachable(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope(PHONE):

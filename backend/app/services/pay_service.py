@@ -537,6 +537,23 @@ async def shop_checkout(
         return {**order, "url": order["startPayUrl"] or order["payUrl"], "orderId": order["id"]}
 
 
+def catalog_ids(*, slug: str, secret: str) -> dict:
+    """نگاشت شناسهٔ ویترین (اسلاگ‌دار) → شناسهٔ واقعی کالای تنانت."""
+    tenant = verify_pay_secret(slug, secret)
+    mapping: dict = {}
+    with tenant_scope(tenant):
+        from app.services import storefront_service
+
+        for row in (storefront_service.list_products().get("products") or []):
+            pid = str(row.get("id") or "")
+            if not pid:
+                continue
+            # هم شکل slug-دار (از بذر قالب: azmaish-panl-01) و هم خود pid
+            mapping[f"{slug}-{pid[:2]}"] = pid
+            mapping[pid] = pid
+    return {"map": mapping, "slug": slug}
+
+
 def shop_config(*, slug: str, secret: str) -> dict:
     tenant = verify_pay_secret(slug, secret)
     with tenant_scope(tenant):
