@@ -187,8 +187,8 @@ export default function ShopPage() {
   return (
     <AppShell
       header={
-        <div className="flex items-center justify-between gap-3">
-          <div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
             <p className="flex items-center gap-2 text-sm text-muted">
               فروشگاه
               {building ? <span className="sozan-breathe h-1.5 w-1.5 rounded-full bg-signal" /> : null}

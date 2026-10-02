@@ -132,7 +132,7 @@ export default function WalletPage() {
       header={
         <div>
           <p className="text-sm text-muted">
-            <Link href="/more" className="text-warm">
+            <Link href="/more" className="tap text-warm">
               بیشتر
             </Link>
           </p>
@@ -141,27 +141,27 @@ export default function WalletPage() {
       }
     >
       <div className="h-full space-y-4 overflow-y-auto p-4">
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
-        {notice ? <p className="text-sm text-signal">{notice}</p> : null}
+        {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
+        {notice ? <p className="text-sm text-signal" role="status">{notice}</p> : null}
         {wallet ? (
           <>
             <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <p className="text-xs text-muted">قابل‌برداشت</p>
-                <p className="mt-1 text-lg font-bold">{money(wallet.available)} تومان</p>
-              </Card>
-              <Card>
-                <p className="text-xs text-muted">در انتظار برداشت</p>
-                <p className="mt-1 text-lg font-bold">{money(wallet.pendingWithdraw)} تومان</p>
-              </Card>
-              <Card>
-                <p className="text-xs text-muted">فروش آنلاین</p>
-                <p className="mt-1 font-bold">{money(wallet.lifetimeSales)} تومان</p>
-              </Card>
-              <Card>
-                <p className="text-xs text-muted">کمیسیون سوزان</p>
-                <p className="mt-1 font-bold">{money(wallet.lifetimeCommission)} تومان</p>
-              </Card>
+              {[
+                { label: "قابل‌برداشت", value: wallet.available, big: true },
+                { label: "در انتظار برداشت", value: wallet.pendingWithdraw, big: true },
+                { label: "فروش آنلاین", value: wallet.lifetimeSales, big: false },
+                { label: "کمیسیون سوزان", value: wallet.lifetimeCommission, big: false },
+              ].map((item) => (
+                <Card key={item.label} className="min-w-0 p-3">
+                  <p className="text-xs text-muted">{item.label}</p>
+                  <p
+                    className={`mt-1 whitespace-nowrap font-bold ${item.big ? "text-[clamp(0.9rem,4.6vw,1.125rem)]" : "text-[clamp(0.85rem,4vw,1rem)]"}`}
+                  >
+                    {money(item.value)}
+                  </p>
+                  <p className="text-xs text-muted">تومان</p>
+                </Card>
+              ))}
             </div>
             <Card>
               <p className="text-sm leading-7 text-muted">
@@ -201,7 +201,7 @@ export default function WalletPage() {
                       <li key={row.id} className="rounded-xl bg-canvas p-3">
                         <p className="text-sm">{row.phone}</p>
                         <p className="font-medium">{money(row.amount)} تومان</p>
-                        <p dir="ltr" className="text-xs text-muted">{row.iban}</p>
+                        <p dir="ltr" className="wrap-any text-start text-sm text-muted">{row.iban}</p>
                         <div className="mt-2 flex gap-2">
                           <Button disabled={busy} onClick={() => void decide(row.id, true)}>
                             تأیید
@@ -226,10 +226,10 @@ export default function WalletPage() {
                     <li key={row.id} className="flex items-start justify-between gap-3 text-sm">
                       <div>
                         <p>{KIND[row.kind] || row.kind}</p>
-                        {row.note ? <p className="text-xs text-muted">{row.note}</p> : null}
+                        {row.note ? <p className="wrap-any text-xs text-muted">{row.note}</p> : null}
                         {row.at ? <p className="text-xs text-muted">{formatWhen(row.at)}</p> : null}
                       </div>
-                      <p className={row.amount < 0 ? "text-danger" : "text-signal"}>{money(row.amount)}</p>
+                      <p className={`shrink-0 whitespace-nowrap font-medium ${row.amount < 0 ? "text-danger" : "text-signal"}`}>{money(row.amount)}</p>
                     </li>
                   ))}
                 </ul>
@@ -244,7 +244,7 @@ export default function WalletPage() {
                       <p>
                         {money(row.amount)} تومان · {STATUS[row.status] || row.status}
                       </p>
-                      <p className="text-xs text-muted">{row.iban}</p>
+                      <p dir="ltr" className="wrap-any text-start text-sm text-muted">{row.iban}</p>
                     </li>
                   ))}
                 </ul>

@@ -230,7 +230,7 @@ export default function ChatPage() {
           {threads.length ? (
             <select
               id="sozan-thread"
-              className="min-w-0 max-w-[8rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink sm:max-w-[14rem]"
+              className="min-h-11 min-w-0 max-w-[9rem] rounded-xl border border-line bg-canvas px-2 text-sm text-ink sm:max-w-[14rem]"
               value={threadId}
               onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
             >
@@ -243,7 +243,7 @@ export default function ChatPage() {
           ) : null}
           <button
             type="button"
-            className="shrink-0 rounded-xl border border-line px-2 py-1 text-xs text-warm"
+            className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-line px-3 text-sm text-warm"
             onClick={() => void startThread().catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
           >
             گفتگوی تازه

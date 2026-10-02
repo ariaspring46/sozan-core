@@ -149,7 +149,7 @@ export function BrandIdentitySection() {
             bust={bust}
             className="h-16 w-auto max-w-56 object-contain"
           />
-          <label className="cursor-pointer text-sm text-warm">
+          <label className="inline-flex min-h-11 cursor-pointer items-center text-sm text-warm">
             بارگذاری لوگو
             <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={onFile("logo")} />
           </label>
@@ -173,7 +173,7 @@ export function BrandIdentitySection() {
         <Button disabled={busy} onClick={() => void save()}>
           ذخیره هویت
         </Button>
-        <Button className="bg-surface" disabled={busy} onClick={() => void makeMotion()}>
+        <Button variant="ghost" disabled={busy} onClick={() => void makeMotion()}>
           بساز لوگو موشن
         </Button>
         {saved ? <p className="text-sm text-signal">ذخیره شد</p> : null}

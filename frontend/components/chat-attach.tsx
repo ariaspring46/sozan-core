@@ -42,7 +42,7 @@ export function ChatAttach({ kind, name }: { kind: string; name: string }) {
 
   if (failed) {
     return (
-      <button type="button" className="mt-2 text-xs text-danger" onClick={() => setTick((n) => n + 1)}>
+      <button type="button" className="mt-2 inline-flex min-h-11 items-center text-sm text-danger" onClick={() => setTick((n) => n + 1)}>
         بارگذاری نشد · تلاش دوباره
       </button>
     );

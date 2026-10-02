@@ -55,6 +55,7 @@ function tagLabel(tag: string) {
 /** متن‌های سرور را برای فروشنده روان کن (اصطلاح «بیلد» در پنل نیست). */
 export function friendlyReply(text: string) {
   return String(text || "")
+    .replace(/\s*https?:\/\/(?:localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?\S*/g, "")
     .replace(/وقتی آماده بودی بیلد بزن\.?/g, "هر وقت آماده بودی «انتشار تغییرات» را بزن.")
     .replace(/بیلد/g, "انتشار");
 }
@@ -162,10 +163,10 @@ export function ShopEditor({
     <div className="flex min-h-0 flex-col gap-2 lg:gap-3">
       {pending > 0 ? (
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2">
-          <p className="min-w-0 text-xs leading-5 text-ink">
+          <p className="min-w-0 text-sm leading-6 text-ink">
             <span className="font-bold">{pending.toLocaleString("fa-IR")} تغییر</span> در پیش‌نمایش است و هنوز روی سایت نرفته.
           </p>
-          <Button type="button" className="h-9 min-h-9 shrink-0 px-3 text-xs" disabled={buildBusy} onClick={onPublish}>
+          <Button type="button" className="shrink-0 px-3 text-sm" disabled={buildBusy} onClick={onPublish}>
             انتشار تغییرات
           </Button>
         </div>
@@ -177,7 +178,7 @@ export function ShopEditor({
             <p className="text-xs text-muted">
               انتخاب‌شده: <span className="font-bold text-warm">{tagLabel(selection.tag)}</span>
             </p>
-            <button type="button" aria-label="لغو انتخاب" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-paper" onClick={onClearSelection}>
+            <button type="button" aria-label="لغو انتخاب" className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-paper" onClick={onClearSelection}>
               <X size={16} />
             </button>
           </div>
@@ -207,14 +208,14 @@ export function ShopEditor({
                 className="w-full resize-none rounded-xl border border-field bg-paper px-3 py-2 text-[16px] leading-7 text-ink outline-none focus:border-accent"
               />
               <div className="flex gap-2">
-                <Button type="submit" className="h-10 min-h-10 flex-1 text-sm" disabled={!canRewrite || locked}>
+                <Button type="submit" className="flex-1 text-sm" disabled={!canRewrite || locked}>
                   ثبت متن
                 </Button>
                 <button
                   type="button"
                   disabled={locked}
                   onClick={() => void run("این متن را حذف کن", { target })}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm text-danger disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line px-3 text-sm text-danger disabled:opacity-50"
                 >
                   <Trash2 size={15} />
                   حذف
@@ -229,7 +230,7 @@ export function ShopEditor({
         </p>
       )}
 
-      <div role="toolbar" aria-label="ابزارهای ویرایش" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 lg:flex-wrap lg:overflow-visible">
+      <div role="toolbar" aria-label="ابزارهای ویرایش" className="-mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 pb-0.5 [mask-image:linear-gradient(to_right,transparent,black_28px)] lg:flex-wrap lg:overflow-visible lg:[mask-image:none]">
         {tools.map((item) => {
           const Icon = item.icon;
           const active = tool === item.id;
@@ -241,7 +242,7 @@ export function ShopEditor({
               aria-pressed={["colors", "name", "cta", "pages", "history"].includes(item.id) ? active : undefined}
               onClick={() => onTool(item.id)}
               className={cn(
-                "inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs disabled:opacity-50",
+                "tap inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] disabled:opacity-50",
                 active ? "border-accent bg-accent/15 font-bold text-warm" : "border-line bg-canvas text-ink hover:border-accent/50",
                 item.id === "history" && "lg:hidden",
               )}
@@ -265,9 +266,9 @@ export function ShopEditor({
                 title={swatch.name}
                 aria-label={`رنگ ${swatch.name}`}
                 onClick={() => void run(`رنگ اصلی را ${swatch.name} کن`)}
-                className="flex flex-col items-center gap-1 text-[10px] text-muted disabled:opacity-50"
+                className="flex min-h-11 flex-col items-center gap-1 text-xs text-muted disabled:opacity-50"
               >
-                <span className="h-8 w-8 rounded-full border border-line shadow-card" style={{ background: swatch.hex }} />
+                <span className="h-9 w-9 rounded-full border border-line shadow-card" style={{ background: swatch.hex }} />
                 {swatch.name}
               </button>
             ))}
@@ -296,7 +297,7 @@ export function ShopEditor({
             onChange={(event) => setNameText(event.target.value)}
             className="min-w-0 flex-1 rounded-xl border border-field bg-paper px-3 text-[16px] text-ink outline-none focus:border-accent"
           />
-          <Button type="submit" className="h-10 min-h-10 shrink-0 px-4 text-sm" disabled={locked || !cleanQuote(nameText) || cleanQuote(nameText) === brand}>
+          <Button type="submit" className="shrink-0 px-4 text-sm" disabled={locked || !cleanQuote(nameText) || cleanQuote(nameText) === brand}>
             ثبت
           </Button>
         </form>
@@ -326,7 +327,7 @@ export function ShopEditor({
               onChange={(event) => setCtaText(event.target.value)}
               className="min-w-0 flex-1 rounded-xl border border-field bg-paper px-3 text-[16px] text-ink outline-none focus:border-accent"
             />
-            <Button type="submit" className="h-10 min-h-10 shrink-0 px-4 text-sm" disabled={locked || !cleanQuote(ctaText)}>
+            <Button type="submit" className="shrink-0 px-4 text-sm" disabled={locked || !cleanQuote(ctaText)}>
               ثبت
             </Button>
           </div>
@@ -343,7 +344,7 @@ export function ShopEditor({
                 type="button"
                 disabled={locked}
                 onClick={() => void run(`صفحهٔ ${label} بساز`)}
-                className="min-h-9 rounded-xl border border-line bg-paper px-3 text-sm text-ink hover:border-accent/50 disabled:opacity-50"
+                className="min-h-11 rounded-xl border border-line bg-paper px-3 text-sm text-ink hover:border-accent/50 disabled:opacity-50"
               >
                 {label}
               </button>
@@ -354,7 +355,7 @@ export function ShopEditor({
 
       <form onSubmit={(event) => void submitDraft(event)} className="flex items-center gap-2 rounded-2xl border border-field bg-canvas p-1.5 ps-3 focus-within:border-accent">
         {target ? (
-          <span className="max-w-[35%] shrink-0 truncate rounded-lg bg-accent/10 px-2 py-1 text-[11px] text-warm" title={target}>
+          <span className="max-w-[35%] shrink-0 truncate rounded-lg bg-accent/10 px-2 py-1 text-xs text-warm" title={target}>
             «{target}»
           </span>
         ) : null}
@@ -368,14 +369,14 @@ export function ShopEditor({
           disabled={locked}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={target ? "بگو با این چه کنم…" : "بگو چه چیزی در سایت عوض شود…"}
-          className="min-h-10 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-muted"
+          className="min-h-11 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-muted"
         />
-        <Button type="submit" aria-label="بفرست" className="h-10 min-h-10 w-10 shrink-0 p-0" disabled={locked || !draft.trim()}>
+        <Button type="submit" aria-label="بفرست" className="h-11 w-11 shrink-0 p-0" disabled={locked || !draft.trim()}>
           <SendHorizontal size={17} className="-scale-x-100" />
         </Button>
       </form>
 
-      <p className="min-h-5 px-1 text-xs leading-6" role="status" aria-live="polite">
+      <p className="min-h-5 px-1 text-sm leading-6" role="status" aria-live="polite">
         {busy ? (
           <span className="text-warm">در حال اعمال…</span>
         ) : buildBusy ? (
@@ -396,7 +397,7 @@ export function ShopEditor({
               <li
                 key={row.id}
                 className={cn(
-                  "rounded-xl px-3 py-2 text-xs leading-6",
+                  "rounded-xl px-3 py-2 text-sm leading-6",
                   row.role === "user" ? "ms-6 bg-accent/10 text-ink" : "me-6 bg-paper text-ink",
                 )}
               >

@@ -158,7 +158,7 @@ function PlanCard({
       <a
         href={start}
         className={`mt-auto inline-flex h-12 items-center justify-center rounded-full px-6 text-sm ${
-          featured ? "bg-accent text-onAccent hover:bg-warm" : "border border-line/80 text-ink hover:border-warm/60"
+          featured ? "bg-accentStrong text-onAccent hover:bg-accent" : "border border-line/80 text-ink hover:border-warm/60"
         }`}
       >
         {plan.checkout === "free" ? "رایگان شروع کن" : `انتخاب ${plan.label}`}
@@ -171,7 +171,7 @@ function PlanCard({
       }`}
     >
       {featured ? (
-        <span className="absolute -top-3 end-6 rounded-full bg-accent px-3 py-1 text-[11px] text-onAccent">پیشنهاد سوزان</span>
+        <span className="absolute -top-3 end-6 rounded-full bg-accentStrong px-3 py-1 text-[11px] text-onAccent">پیشنهاد سوزان</span>
       ) : null}
       <h3 className="landing-display text-2xl">{plan.label}</h3>
       <div className="mt-4">
@@ -206,7 +206,7 @@ function ShopMock() {
       <div className="pt-4">
         <div className="landing-tile flex h-16 items-center justify-between rounded-lg px-4">
           <p className="text-xs font-medium text-ink/90">کالکشن پاییز رسید</p>
-          <span className="rounded-full bg-accent px-3 py-1 text-[10px] text-onAccent">دیدن کالاها</span>
+          <span className="rounded-full bg-accentStrong px-3 py-1 text-[10px] text-onAccent">دیدن کالاها</span>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {["پیراهن مردانه", "کیف چرمی", "کلاه بافت", "شال پشمی"].map((name) => (
@@ -253,7 +253,7 @@ function StudioMock() {
           ))}
         </div>
         <div className="mt-4 flex justify-end">
-          <span className="rounded-full bg-accent px-4 py-1.5 text-[11px] text-onAccent">پست را بفرست</span>
+          <span className="rounded-full bg-accentStrong px-4 py-1.5 text-[11px] text-onAccent">پست را بفرست</span>
         </div>
       </div>
     </div>
@@ -311,7 +311,9 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
   const start = panelOrigin ? `${panelOrigin.replace(/\/$/, "")}/login` : "/login";
 
   return (
-    <div className="sozan-landing min-h-screen overflow-x-hidden bg-canvas text-ink">
+    <div className="sozan-landing min-h-dvh overflow-x-hidden bg-canvas text-ink">
+      <link rel="preload" href="/fonts/estedad-arabic.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      <link rel="preload" href="/fonts/estedad-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:end-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-accent focus:px-4 focus:py-2 focus:text-onAccent"
@@ -320,7 +322,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
       </a>
       <header className="landing-nav sticky top-0 z-40 border-b border-line/40 bg-canvas/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:h-[4.25rem] sm:px-8">
-          <a href="#main" className="flex items-center gap-3">
+          <a href="#main" className="flex min-h-11 items-center gap-3">
             <SozanMark className="h-9 w-9" glow={false} />
             <span className="text-sm font-medium text-warm">سوزان</span>
           </a>
@@ -341,7 +343,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
               <summary className="cursor-pointer list-none marker:content-none hover:text-ink">شرکت</summary>
               <div className="absolute end-0 top-8 z-50 w-56 rounded-2xl border border-line/70 bg-paper/95 p-3 text-sm shadow-card">
                 {LEGAL.map((item) => (
-                  <a key={item.href} className="block py-2 text-ink/80 hover:text-ink" href={item.href}>
+                  <a key={item.href} className="flex min-h-11 items-center text-ink/85 hover:text-ink" href={item.href}>
                     {item.label}
                   </a>
                 ))}
@@ -350,24 +352,24 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
           </nav>
           <div className="flex items-center gap-3">
             <details className="landing-nav-menu relative md:hidden">
-              <summary className="inline-flex h-10 cursor-pointer list-none items-center rounded-full border border-line/80 bg-paper/60 px-4 text-sm text-ink marker:content-none">
+              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full border border-line/80 bg-paper/60 px-5 text-sm text-ink marker:content-none">
                 بخش‌ها
               </summary>
-              <div className="absolute end-0 top-11 z-50 w-44 rounded-2xl border border-line/70 bg-paper/95 p-3 text-sm shadow-card">
-                <a className="block py-2 text-ink/80 hover:text-ink" href="#capabilities">
+              <div className="absolute end-0 top-12 z-50 w-52 rounded-2xl border border-line/70 bg-paper/95 p-3 text-sm shadow-card">
+                <a className="flex min-h-11 items-center text-ink/85 hover:text-ink" href="#capabilities">
                   امکانات
                 </a>
-                <a className="block py-2 text-ink/80 hover:text-ink" href="#how">
+                <a className="flex min-h-11 items-center text-ink/85 hover:text-ink" href="#how">
                   نحوهٔ کار
                 </a>
-                <a className="block py-2 text-ink/80 hover:text-ink" href="#channels">
+                <a className="flex min-h-11 items-center text-ink/85 hover:text-ink" href="#channels">
                   کانال‌ها
                 </a>
-                <a className="block py-2 text-ink/80 hover:text-ink" href="#plans">
+                <a className="flex min-h-11 items-center text-ink/85 hover:text-ink" href="#plans">
                   پلن‌ها
                 </a>
                 {LEGAL.map((item) => (
-                  <a key={item.href} className="block py-2 text-ink/80 hover:text-ink" href={item.href}>
+                  <a key={item.href} className="flex min-h-11 items-center text-ink/85 hover:text-ink" href={item.href}>
                     {item.label}
                   </a>
                 ))}
@@ -375,7 +377,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             </details>
             <a
               href={start}
-              className="inline-flex h-10 items-center rounded-full border border-line/80 bg-paper/60 px-4 text-sm text-ink hover:border-warm/50 hover:text-warm"
+              className="inline-flex min-h-11 items-center rounded-full border border-line/80 bg-paper/60 px-5 text-sm text-ink hover:border-warm/50 hover:text-warm"
             >
               ورود
             </a>
@@ -398,15 +400,15 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
               <div className="landing-fade landing-fade-cta mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
                 <a
                   href={start}
-                  className="inline-flex h-12 items-center justify-center rounded-full bg-accent px-8 text-sm text-onAccent hover:bg-warm"
+                  className="inline-flex h-12 items-center justify-center rounded-full bg-accentStrong px-8 text-sm text-onAccent hover:bg-accent"
                 >
                   رایگان شروع کن
                 </a>
-                <a href="#capabilities" className="text-sm text-ink/85 transition-colors hover:text-ink">
+                <a href="#capabilities" className="inline-flex min-h-11 items-center text-sm text-ink/85 transition-colors hover:text-ink">
                   دیدن همهٔ امکانات
                 </a>
               </div>
-              <ul className="landing-fade landing-fade-cta mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-ink/55">
+              <ul className="landing-fade landing-fade-cta mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-ink/70">
                 <li className="flex items-center gap-2">
                   <span className="h-1 w-1 rounded-full bg-warm/80" />
                   اتصال از مسیر رسمی
@@ -529,7 +531,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
                 <p className="landing-lede mt-3 text-sm leading-7">{item.body}</p>
                 <ul className="mt-auto flex flex-wrap gap-2 pt-6">
                   {item.tags.map((tag) => (
-                    <li key={tag} className="rounded-full border border-line/50 bg-canvas/60 px-3 py-1 text-[11px] text-ink/65">
+                    <li key={tag} className="rounded-full border border-line/50 bg-canvas/60 px-3 py-1 text-xs text-ink/75">
                       {tag}
                     </li>
                   ))}
@@ -575,7 +577,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             </div>
             <a
               href={start}
-              className="inline-flex h-12 items-center justify-center rounded-full bg-accent px-8 text-sm text-onAccent hover:bg-warm"
+              className="inline-flex h-12 items-center justify-center rounded-full bg-accentStrong px-8 text-sm text-onAccent hover:bg-accent"
             >
               ساخت حساب رایگان
             </a>
@@ -681,7 +683,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             </div>
             <a
               href={start}
-              className="inline-flex h-12 items-center justify-center rounded-full bg-accent px-8 text-sm text-onAccent hover:bg-warm"
+              className="inline-flex h-12 items-center justify-center rounded-full bg-accentStrong px-8 text-sm text-onAccent hover:bg-accent"
             >
               رایگان شروع کن
             </a>
@@ -709,11 +711,11 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
           </nav>
           <div className="flex items-center gap-4">
             <div dangerouslySetInnerHTML={{ __html: ENAMAD_SEAL }} />
-            <span className="text-[11px] leading-5 text-ink/45">دارای نماد<br />اعتماد الکترونیکی</span>
+            <span className="text-xs leading-5 text-ink/60">دارای نماد<br />اعتماد الکترونیکی</span>
           </div>
         </div>
         <div className="border-t border-line/30">
-          <p className="mx-auto max-w-6xl px-5 py-4 text-center text-[11px] leading-6 text-ink/55 sm:px-8">
+          <p className="mx-auto max-w-6xl px-5 py-4 text-center text-xs leading-6 text-ink/65 sm:px-8">
             ساخته شده توسط شرکت گهر شبکه کارمانیا
           </p>
         </div>

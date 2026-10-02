@@ -894,6 +894,21 @@ def _factory_status(shop: dict) -> dict:
     )
 
 
+_INTERNAL_URL = re.compile(
+    r"^(?:https?://)?(?:localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?(?:/|$)",
+    re.IGNORECASE,
+)
+
+
+def _seller_url(url: str) -> str:
+    """نشانی داخلی (IP، لوکال‌هاست، پورت) هرگز به فروشنده نشان داده نمی‌شود؛ جایش نشانی عمومی می‌آید."""
+    raw = (url or "").strip()
+    if raw and not _INTERNAL_URL.match(raw):
+        return raw
+    host = str(_shop().get("publicHost") or "").strip()
+    return f"https://{host}" if host else ""
+
+
 def _persian_build_text(build: dict) -> str:
     status = str(build.get("status") or "")
     if status in BUILD_BUSY:
@@ -902,7 +917,7 @@ def _persian_build_text(build: dict) -> str:
     if status == "ready":
         if _missing_sellable_price(_shop()):
             return LIVE_OPENING_INCOMPLETE
-        url = str(build.get("url") or "").strip()
+        url = _seller_url(str(build.get("url") or ""))
         live = "سایت زنده است." if build.get("urlOk") or url else "ساخت تمام شد."
         return f"{live} {url}".strip()
     if status == "failed":

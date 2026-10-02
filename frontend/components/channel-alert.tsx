@@ -42,7 +42,7 @@ export function ChannelAlert({ inset = true }: { inset?: boolean }) {
         <bdi dir="ltr">{handle}</bdi> قطع است؛ پیام تازهٔ مشتری نمی‌رسد و پاسخ خودکار کار نمی‌کند.
         {broken.length > 1 ? ` (${broken.length.toLocaleString("fa-IR")} کانال)` : ""}
       </p>
-      <Link href="/more/channels" className="shrink-0 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-onAccent">
+      <Link href="/more/channels" className="shrink-0 rounded-xl bg-accentStrong px-3 py-2 text-sm font-bold text-onAccent">
         اتصال دوباره
       </Link>
     </div>

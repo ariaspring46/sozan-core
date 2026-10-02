@@ -167,7 +167,7 @@ export default function LoginPage() {
   const hintText = phoneHint(phone);
 
   return (
-    <main className="sozan-lamp relative flex min-h-screen items-end justify-center overflow-hidden sm:items-center">
+    <main className="sozan-lamp relative flex min-h-dvh items-end justify-center overflow-hidden sm:items-center">
       <LoginCoderScene />
       <div className="pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative z-10 mx-auto w-full max-w-md px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-40 sm:mt-24 sm:px-6 sm:pb-6 sm:pt-8">
@@ -175,8 +175,8 @@ export default function LoginPage() {
           <div className="flex items-center gap-3">
             <SozanMark className="h-20 w-20" />
             <div className="space-y-2">
-              <p className="text-[11px] tracking-[0.28em] text-warm">سوزان</p>
-              <h1 className="text-2xl font-bold tracking-tight">ورود</h1>
+              <p className="text-xs text-warm">سوزان</p>
+              <h1 className="text-2xl font-bold">ورود</h1>
             </div>
           </div>
           <p className="text-sm leading-7 text-muted">فروشگاه را در چت می‌سازی. شماره‌ات را وارد کن تا کد پیامک بیاید.</p>

@@ -11,7 +11,7 @@ export default function InventoryPage() {
       header={
         <div>
           <p className="text-sm text-muted">
-            <Link href="/more" className="text-warm">
+            <Link href="/more" className="tap text-warm">
               بیشتر
             </Link>
           </p>

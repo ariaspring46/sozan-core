@@ -101,7 +101,7 @@ function VoteButtons({ trainId }: { trainId: string }) {
         aria-label="پاسخ خوب بود"
         disabled={voted !== ""}
         onClick={() => void vote(true)}
-        className={cn("min-h-9 rounded-lg px-2 text-sm", voted === "up" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas")}
+        className={cn("inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-base", voted === "up" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas")}
       >
         👍
       </button>
@@ -110,7 +110,7 @@ function VoteButtons({ trainId }: { trainId: string }) {
         aria-label="پاسخ خوب نبود"
         disabled={voted !== ""}
         onClick={() => void vote(false)}
-        className={cn("min-h-9 rounded-lg px-2 text-sm", voted === "down" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas")}
+        className={cn("inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-base", voted === "down" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas")}
       >
         👎
       </button>
@@ -286,7 +286,7 @@ export function ChatThread({
         <div className="space-y-3 px-4 py-5">
           {messages.length === 0 && !pendingText ? (
             welcome || welcomeLines ? (
-              <div className="flex min-h-[min(60vh,28rem)] flex-col items-center justify-center gap-6 pt-6">
+              <div className="flex min-h-[min(60dvh,28rem)] flex-col items-center justify-center gap-6 pt-6">
                 <div className="space-y-1 text-center text-sm leading-7 text-muted">
                   {(welcomeLines || SHOP_WELCOME).map((line) => (
                     <p key={line}>{line}</p>
@@ -320,7 +320,7 @@ export function ChatThread({
                 msg.kind === "build"
                   ? "ms-auto rounded-2xl border border-line/70 bg-canvas text-warm"
                   : msg.role === "user"
-                    ? "ms-0 rounded-2xl bg-accent text-onAccent"
+                    ? "ms-0 rounded-2xl bg-accentStrong text-onAccent"
                     : "ms-auto rounded-2xl border border-line/60 bg-paper text-ink";
               const width = assistantPersona && wide ? "min-w-0 flex-1" : wide ? "w-full max-w-[85%]" : "w-fit max-w-[85%]";
               const bubble = (
@@ -333,15 +333,15 @@ export function ChatThread({
                     : cn(width, tone),
                 )}
               >
-                {assistantPersona ? <p className="mb-1 text-[11px] text-warm">{persona}</p> : null}
+                {assistantPersona ? <p className="mb-1 text-xs text-warm">{persona}</p> : null}
                 {msg.platformLabel || msg.platform || msg.sender ? (
-                  <p className="mb-1 text-[11px] text-warm">
+                  <p className="mb-1 text-xs text-warm">
                     {[msg.platformLabel || msg.platform, msg.sender].filter(Boolean).join(" · ")}
                   </p>
                 ) : null}
-                {msg.text ? <p className="whitespace-pre-wrap">{sanitizeShopText(msg.text, sanitize)}</p> : null}
+                {msg.text ? <p className="wrap-any whitespace-pre-wrap">{sanitizeShopText(msg.text, sanitize)}</p> : null}
                 {msg.captions && !onPublish ? (
-                  <div className="mt-2 space-y-1 text-[11px] leading-6 text-muted">
+                  <div className="wrap-any mt-2 space-y-1 text-xs leading-6 text-muted">
                     {msg.captions.instagram ? <p className="whitespace-pre-wrap">اینستاگرام: {msg.captions.instagram}</p> : null}
                     {msg.captions.telegram ? <p className="whitespace-pre-wrap">تلگرام: {msg.captions.telegram}</p> : null}
                     {msg.captions.whatsapp ? <p className="whitespace-pre-wrap">واتساپ: {msg.captions.whatsapp}</p> : null}
@@ -376,7 +376,7 @@ export function ChatThread({
                       <button
                         key={option}
                         type="button"
-                        className="rounded-full border border-warm/40 bg-paper px-3 py-1 text-xs text-ink disabled:opacity-50"
+                        className="min-h-11 rounded-full border border-warm/40 bg-paper px-4 text-sm text-ink disabled:opacity-50"
                         disabled={busy}
                         onClick={() => void onSend({ text: option })}
                       >
@@ -387,7 +387,7 @@ export function ChatThread({
                 ) : null}
                 {msg.role === "assistant" && msg.trainId ? <VoteButtons trainId={msg.trainId} /> : null}
                 {showTime && msg.at ? (
-                  <p className="mt-1 text-[11px] opacity-70">
+                  <p className="mt-1 text-xs opacity-80">
                     {formatWhen(msg.at)}
                     {msg.status === "sending"
                       ? " · در حال ارسال…"
@@ -398,7 +398,7 @@ export function ChatThread({
                 ) : null}
                 {msg.kind === "draft" ? (
                   <div className="mt-2">
-                    <p className="text-[11px] text-warm">پیش‌نویس هوش مصنوعی — هنوز ارسال نشده</p>
+                    <p className="text-xs text-warm">پیش‌نویس هوش مصنوعی — هنوز ارسال نشده</p>
                     {onApproveDraft ? (
                       <div className="mt-1 flex gap-2">
                         <Button
@@ -428,7 +428,7 @@ export function ChatThread({
                 ) : null}
                 {msg.kind === "failed" || msg.status === "failed" ? (
                   <div className="mt-2">
-                    <p className="text-[11px] text-danger" role="alert">
+                    <p className="text-xs text-danger" role="alert">
                       {msg.error || "ارسال نشد"}
                     </p>
                     <div className="mt-1 flex gap-2">
@@ -459,7 +459,7 @@ export function ChatThread({
                 {msg.compose?.status === "running" ? <ComposeWait compose={msg.compose} /> : null}
                 {msg.compose?.status === "failed" ? (
                   <div className="mt-2">
-                    <p className="text-[11px] text-danger" role="alert">{msg.compose.error || "ساخت تصویر نشد"}</p>
+                    <p className="text-xs text-danger" role="alert">{msg.compose.error || "ساخت تصویر نشد"}</p>
                     {onRegenerate ? (
                       <Button
                         type="button"
@@ -506,7 +506,7 @@ export function ChatThread({
                   />
                 ) : null}
                 {msg.campaignId ? (
-                  <Link className="mt-1 block text-warm" href={`/campaigns/${msg.campaignId}`}>
+                  <Link className="mt-1 inline-flex min-h-11 items-center text-warm" href={`/campaigns/${msg.campaignId}`}>
                     باز کردن کمپین
                   </Link>
                 ) : null}
@@ -522,24 +522,24 @@ export function ChatThread({
             })
           )}
           {pendingText ? (
-            <article className="ms-0 max-w-[85%] rounded-2xl bg-accent px-3.5 py-2.5 text-sm leading-7 text-onAccent opacity-80">
-              <p className="whitespace-pre-wrap">{pendingText}</p>
+            <article className="ms-0 max-w-[85%] rounded-2xl bg-accentStrong px-3.5 py-2.5 text-sm leading-7 text-onAccent opacity-80">
+              <p className="wrap-any whitespace-pre-wrap">{pendingText}</p>
             </article>
           ) : null}
-          {busy ? future ? <WaitSignal label={waitLine} /> : <p className="text-center text-xs text-muted">در حال نوشتن…</p> : null}
+          {busy ? future ? <WaitSignal label={waitLine} /> : <p className="text-center text-sm text-muted" role="status">در حال نوشتن…</p> : null}
         </div>
       </div>
       <form className="shrink-0 space-y-2 border-t border-line/70 bg-canvas px-3 pb-2 pt-2" onSubmit={(event) => void submit(event)}>
         {file ? (
-          <div className="flex items-center justify-between gap-2 rounded-2xl border border-line/70 bg-paper px-3 py-2 text-xs text-muted">
+          <div className="flex items-center justify-between gap-2 rounded-2xl border border-line/70 bg-paper px-3 text-sm text-muted">
             <span className="truncate">{file.type.startsWith("image/") ? "تصویر" : file.type.startsWith("video/") ? "ویدیو" : "صدا"} · {file.name}</span>
-            <button type="button" className="text-warm" onClick={() => setFile(null)}>
+            <button type="button" className="inline-flex min-h-11 shrink-0 items-center px-2 text-warm" onClick={() => setFile(null)}>
               حذف
             </button>
           </div>
         ) : null}
-        {recording ? <p className="text-xs text-warm">در حال ضبط صدا…</p> : null}
-        {micError ? <p className="text-xs text-danger">{micError}</p> : null}
+        {recording ? <p className="text-sm text-warm" role="status">در حال ضبط صدا…</p> : null}
+        {micError ? <p className="text-sm text-danger" role="alert">{micError}</p> : null}
         {aspects?.length ? (
           <div className="flex items-center gap-2 px-1" role="group" aria-label="نسبت تصویر">
             {aspects.map((row) => {
@@ -550,7 +550,7 @@ export function ChatThread({
                   type="button"
                   onClick={() => setAspect((value) => (value === row.id ? "" : row.id))}
                   className={cn(
-                    "min-h-9 rounded-xl px-3 text-xs font-medium",
+                    "tap min-h-9 rounded-xl px-3 text-[13px] font-medium",
                     on ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted",
                   )}
                 >
@@ -612,7 +612,7 @@ export function ChatThread({
               }
             }}
           />
-          <Button type="submit" className="h-auto shrink-0 whitespace-nowrap rounded-xl px-3 py-2" disabled={!canSend}>
+          <Button type="submit" className="shrink-0 whitespace-nowrap rounded-xl px-4" disabled={!canSend}>
             بفرست
           </Button>
         </div>

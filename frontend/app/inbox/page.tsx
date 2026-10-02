@@ -187,7 +187,7 @@ export default function InboxPage() {
         <section aria-label="پاسخ به دایرکت" className="space-y-2 rounded-2xl border border-line/70 bg-paper p-3">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold">پاسخ سوزان به دایرکت</h2>
-            {planLabel ? <span className="text-[11px] text-muted">پلن {planLabel}</span> : null}
+            {planLabel ? <span className="shrink-0 text-xs text-muted">پلن {planLabel}</span> : null}
           </div>
           <div className="flex gap-1 rounded-xl bg-canvas p-1" role="radiogroup" aria-label="حالت پاسخ">
             {MODES.map((mode) => {
@@ -203,7 +203,7 @@ export default function InboxPage() {
                   title={locked ? `در پلن ${mode.id === "send" ? "پرو مکس" : "پرو"}` : undefined}
                   onClick={() => void setMode(mode.id)}
                   className={cn(
-                    "min-h-10 flex-1 rounded-lg px-2 text-xs",
+                    "min-h-11 flex-1 rounded-lg px-1 text-[13px]",
                     active ? "bg-accentStrong font-bold text-onAccent" : "text-muted",
                     locked && "opacity-40",
                   )}
@@ -214,7 +214,7 @@ export default function InboxPage() {
               );
             })}
           </div>
-          <p className="text-xs leading-6 text-muted">
+          <p className="text-sm leading-6 text-muted">
             {autoReply === "send"
               ? "سوزان خودش جواب مشتری را می‌فرستد."
               : autoReply === "draft"
@@ -252,33 +252,39 @@ export default function InboxPage() {
           aria-label="جستجوی گفتگو"
           onChange={(event) => setQ(event.target.value)}
         />
-        <div className="flex flex-wrap gap-1">
-          {FILTERS.map((item) => (
-            <button
-              key={item.id || "all"}
-              type="button"
-              onClick={() => setFilter(item.id)}
-              className={cn(
-                "min-h-9 rounded-full px-3 text-xs",
-                filter === item.id ? "bg-accentStrong text-onAccent" : "border border-line/70 text-muted",
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-          {PLATFORMS.map((item) => (
-            <button
-              key={item.id || "plat"}
-              type="button"
-              onClick={() => setPlatform(item.id)}
-              className={cn(
-                "min-h-9 rounded-full px-3 text-xs",
-                platform === item.id ? "bg-accentStrong text-onAccent" : "border border-line/70 text-muted",
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className="space-y-2">
+          <div role="group" aria-label="وضعیت گفتگو" className="flex flex-wrap gap-2">
+            {FILTERS.map((item) => (
+              <button
+                key={item.id || "all"}
+                type="button"
+                aria-pressed={filter === item.id}
+                onClick={() => setFilter(item.id)}
+                className={cn(
+                  "tap min-h-9 rounded-full px-4 text-[13px]",
+                  filter === item.id ? "bg-accentStrong text-onAccent" : "border border-line/70 bg-canvas text-muted",
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div role="group" aria-label="کانال" className="flex flex-wrap gap-2">
+            {PLATFORMS.map((item) => (
+              <button
+                key={item.id || "plat"}
+                type="button"
+                aria-pressed={platform === item.id}
+                onClick={() => setPlatform(item.id)}
+                className={cn(
+                  "tap min-h-9 rounded-full px-4 text-[13px]",
+                  platform === item.id ? "border border-accentStrong bg-accent/15 font-bold text-warm" : "border border-dashed border-line bg-canvas text-muted",
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
         {error ? (
           <p className="text-sm text-danger" role="alert">
@@ -314,28 +320,28 @@ export default function InboxPage() {
                   <Card className="hover:border-accent">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-xs text-warm">{thread.platformLabel}</p>
-                      <p className="text-[11px] text-muted">{formatWhen(thread.updatedAt || 0)}</p>
+                      <p className="shrink-0 text-xs text-muted">{formatWhen(thread.updatedAt || 0)}</p>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
-                      <p className="font-medium">{thread.sender}</p>
+                      <p className="min-w-0 truncate font-medium" dir="auto">{thread.sender}</p>
                       {thread.unread ? (
-                        <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accentStrong px-1.5 text-[11px] text-onAccent">
+                        <span className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-accentStrong px-1.5 text-xs text-onAccent">
                           {Number(thread.unread).toLocaleString("fa-IR")}
                         </span>
                       ) : null}
                       {thread.handoffReason ? (
-                        <span className="text-[11px] text-warm">منتظر شما</span>
+                        <span className="shrink-0 text-xs text-warm">منتظر شما</span>
                       ) : thread.paused ? (
-                        <span className="text-[11px] text-warm">پاسخ خودکار متوقف</span>
+                        <span className="shrink-0 text-xs text-warm">پاسخ خودکار متوقف</span>
                       ) : null}
                     </div>
-                    <p className="truncate text-sm text-muted">{preview(thread)}</p>
+                    <p className="truncate text-sm text-muted" dir="auto">{preview(thread)}</p>
                     {thread.lastRole === "draft" ? (
-                      <p className="text-[11px] text-warm">پیش‌نویس هوش مصنوعی</p>
+                      <p className="text-xs text-warm">پیش‌نویس هوش مصنوعی</p>
                     ) : thread.lastRole === "failed" ? (
-                      <p className="text-[11px] text-danger">ارسال نشد</p>
+                      <p className="text-xs text-danger">ارسال نشد</p>
                     ) : thread.pending ? (
-                      <p className="text-[11px] text-warm">پیش‌نویس یا ارسال ناموفق</p>
+                      <p className="text-xs text-warm">پیش‌نویس یا ارسال ناموفق</p>
                     ) : null}
                   </Card>
                 </Link>

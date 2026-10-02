@@ -50,7 +50,7 @@ function unreadLabel(count: number) {
 
 function Badge({ count }: { count: number }) {
   return (
-    <span className="absolute -end-2.5 -top-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-accentStrong px-1 text-[10px] font-bold leading-[18px] text-onAccent">
+    <span className="absolute -end-3 -top-2 inline-flex min-w-[20px] items-center justify-center rounded-full bg-accentStrong px-1 text-[11px] font-bold leading-5 text-onAccent">
       {unreadLabel(count)}
     </span>
   );
@@ -194,7 +194,7 @@ export function AppShell({
                 aria-current={active ? "page" : undefined}
                 aria-label={label(tab)}
                 className={cn(
-                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px]",
+                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-xs",
                   active ? "font-bold text-warm" : "text-muted",
                 )}
               >

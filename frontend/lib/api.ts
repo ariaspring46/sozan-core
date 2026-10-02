@@ -10,6 +10,13 @@ export function getApiBase(): string {
   return process.env.NEXT_PUBLIC_API_URL || LOCAL_API;
 }
 
+/** سیگنال قطع‌شونده برای درخواست‌هایی که نباید روی شبکهٔ کند همیشه منتظر بمانند (مثل بررسی ورود). */
+export function timeoutSignal(ms: number): AbortSignal {
+  const controller = new AbortController();
+  window.setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("sozan_token");

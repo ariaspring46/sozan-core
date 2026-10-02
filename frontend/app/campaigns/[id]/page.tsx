@@ -13,6 +13,23 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+const CHANNEL_FA: Record<string, string> = {
+  instagram: "اینستاگرام",
+  telegram: "تلگرام",
+  whatsapp: "واتساپ",
+  bale: "بله",
+  rubika: "روبیکا",
+};
+const FORMAT_FA: Record<string, string> = {
+  post: "پست",
+  story: "استوری",
+  reel: "ریلز",
+  reels: "ریلز",
+  captions: "کپشن",
+  poster: "پوستر",
+  video: "ویدیو",
+};
+
 export default function CampaignDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -136,7 +153,7 @@ export default function CampaignDetailPage() {
     >
     <main className="h-full space-y-4 overflow-y-auto p-4">
       <StudioNav current="campaigns" />
-      <Link className="text-sm text-warm" href="/campaigns">
+      <Link className="inline-flex min-h-11 items-center text-sm text-warm" href="/campaigns">
         بازگشت به کمپین‌ها
       </Link>
       <div className="grid gap-4">
@@ -168,21 +185,21 @@ export default function CampaignDetailPage() {
           ذخیره متن
         </Button>
         <Button disabled={busy} onClick={() => void compose()}>
-          بساز ویدیو
+          ساخت ویدیو
         </Button>
-        <Button className="bg-surface" disabled={busy} onClick={() => void download()}>
-          دانلود پک
+        <Button variant="ghost" disabled={busy} onClick={() => void download()}>
+          دانلود فایل‌ها
         </Button>
       </div>
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
       <section className="grid gap-4 md:grid-cols-2">
         {overlays.map((asset) => (
           <Card key={asset.id}>
             <p className="mb-2 text-sm text-muted">
-              {asset.channel} — {asset.format}
+              {CHANNEL_FA[asset.channel] || asset.channel} — {FORMAT_FA[asset.format] || asset.format}
             </p>
             {asset.format === "captions" ? (
-              <p className="whitespace-pre-wrap text-sm">{ig || tg || wa}</p>
+              <p className="wrap-any whitespace-pre-wrap text-sm leading-7">{ig || tg || wa}</p>
             ) : (
               <AuthMedia
                 campaignId={campaign.id}

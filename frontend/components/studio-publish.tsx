@@ -204,13 +204,13 @@ export function StudioPublishCard({
 
   return (
     <div className="mt-3 space-y-3 rounded-2xl border border-line/70 bg-canvas/70 p-3">
-      <p className="text-xs text-warm">ارسال به شبکه‌های ثبت‌شده</p>
+      <p className="text-sm font-medium text-warm">ارسال به شبکه‌های ثبت‌شده</p>
       {onRegenerate ? (
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="ghost"
-            className="h-auto shrink-0 whitespace-nowrap py-2 text-xs"
+            className="shrink-0 whitespace-nowrap text-sm"
             disabled={Boolean(busy)}
             onClick={() => void regen("caption")}
           >
@@ -219,7 +219,7 @@ export function StudioPublishCard({
           <Button
             type="button"
             variant="ghost"
-            className="h-auto shrink-0 whitespace-nowrap py-2 text-xs"
+            className="shrink-0 whitespace-nowrap text-sm"
             disabled={Boolean(busy)}
             onClick={() => void regen("image")}
           >
@@ -239,7 +239,7 @@ export function StudioPublishCard({
           <Button
             type="button"
             variant="ghost"
-            className="h-auto shrink-0 whitespace-nowrap py-2 text-xs"
+            className="shrink-0 whitespace-nowrap text-sm"
             disabled={Boolean(busy)}
             onClick={() => fileRef.current?.click()}
           >
@@ -254,20 +254,21 @@ export function StudioPublishCard({
         const sent = Boolean(sentAt[channel.platform] || published?.[channel.platform]);
         return (
           <div key={channel.platform} className="space-y-2">
-            <label className="block text-[11px] text-muted">{channel.label}</label>
+            <label className="block text-sm text-muted" htmlFor={`caption-${channel.platform}`}>{`کپشن ${channel.label}`}</label>
             <textarea
-              className="min-h-16 w-full rounded-xl border border-line/80 bg-paper px-2.5 py-2 text-xs leading-6 outline-none"
+              id={`caption-${channel.platform}`}
+              className="wrap-any min-h-24 w-full rounded-xl border border-field bg-paper px-3 py-2 text-sm leading-7 outline-none focus:border-accent"
               value={drafts[key] || ""}
               maxLength={channel.limit}
               onChange={(event) => setDrafts({ ...drafts, [key]: event.target.value })}
             />
             {attachments.length > 1 ? (
-              <div className="flex gap-2 text-[11px]">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="رسانهٔ ارسال">
                 {attachments.map((item) => (
                   <button
                     key={item.name}
                     type="button"
-                    className={selected === item.name ? "text-warm" : "text-muted"}
+                    className={`tap rounded-full border px-4 py-1.5 text-[13px] ${selected === item.name ? "border-accent bg-accent/15 font-bold text-warm" : "border-line text-muted"}`}
                     aria-pressed={selected === item.name}
                     onClick={() => setMediaByChannel({ ...mediaByChannel, [channel.platform]: item.name })}
                   >
@@ -278,35 +279,36 @@ export function StudioPublishCard({
             ) : null}
             {channel.platform === "instagram" && target?.ready ? (
               <div className="space-y-2 rounded-xl border border-line/70 bg-paper/70 p-2">
-                <label className="block text-[11px] text-muted">مخاطب دایرکت</label>
+                <label className="block text-sm text-muted" htmlFor="audience-search">مخاطب دایرکت</label>
                 <input
-                  className="w-full rounded-lg border border-line/80 bg-canvas px-2.5 py-1.5 text-xs outline-none"
+                  id="audience-search"
+                  className="min-h-11 w-full rounded-lg border border-field bg-canvas px-3 text-[16px] outline-none focus:border-accent"
                   value={audienceQ}
                   onChange={(event) => setAudienceQ(event.target.value)}
                   placeholder="جستجو در اخیر و پیش‌نویس"
                 />
                 {picked ? (
-                  <p className="text-[11px] text-signal">
+                  <p className="text-sm text-signal">
                     انتخاب‌شده: {picked.sender}
                     {picked.pending ? " · پیش‌نویس" : ""}
                   </p>
                 ) : (
-                  <p className="text-[11px] text-muted">از اخیر یک نفر را انتخاب کن؛ بدون مخاطب ارسال نمی‌شود.</p>
+                  <p className="text-sm text-muted">از اخیر یک نفر را انتخاب کن؛ بدون مخاطب ارسال نمی‌شود.</p>
                 )}
-                <div className="max-h-28 space-y-1 overflow-y-auto">
+                <div className="max-h-48 space-y-1 overflow-y-auto overscroll-contain">
                   {audience.length === 0 ? (
-                    <p className="text-[11px] text-muted">در صندوق مخاطب اینستاگرام نیست. اول دایرکت مشتری را همگام کن.</p>
+                    <p className="text-sm text-muted">در صندوق مخاطب اینستاگرام نیست. اول پیام‌های تازه را در صندوق بگیر.</p>
                   ) : (
                     audience.map((row) => (
                       <button
                         key={row.id}
                         type="button"
-                        className={`block w-full rounded-lg px-2 py-1.5 text-right text-[11px] ${
+                        className={`block min-h-11 w-full rounded-lg px-3 py-1.5 text-start text-xs ${
                           picked?.recipientId === row.recipientId ? "bg-signal/15 text-warm" : "text-muted hover:bg-canvas"
                         }`}
                         onClick={() => setPicked(row)}
                       >
-                        <span className="font-medium text-ink">{row.sender}</span>
+                        <span className="wrap-any text-sm font-medium text-ink">{row.sender}</span>
                         {row.pending ? <span className="ms-1 text-warm">پیش‌نویس</span> : null}
                         {row.lastText ? <span className="mt-0.5 block truncate">{row.lastText}</span> : null}
                       </button>
@@ -320,8 +322,8 @@ export function StudioPublishCard({
               variant={sent ? "primary" : "ghost"}
               className={
                 sent
-                  ? "h-auto w-full whitespace-nowrap py-2 text-xs bg-signal text-onAccent hover:bg-signal"
-                  : "h-auto w-full whitespace-nowrap py-2 text-xs"
+                  ? "wrap-any w-full text-sm bg-signal text-onAccent hover:bg-signal"
+                  : "wrap-any w-full text-sm"
               }
               disabled={Boolean(busy) || !target?.ready || (channel.platform === "instagram" && !picked?.recipientId)}
               onClick={() => void send(channel.platform, confirmFor === channel.platform)}
@@ -340,15 +342,15 @@ export function StudioPublishCard({
                           : "ارسال دایرکت"
                         : `ارسال به ${channel.label}`}
             </Button>
-            {!target ? <p className="text-[11px] text-muted">حساب {channel.label} وصل نیست.</p> : null}
-            {target && !target.ready ? <p className="text-[11px] text-warm">{target.hint}</p> : null}
+            {!target ? <p className="text-sm text-muted">حساب {channel.label} وصل نیست.</p> : null}
+            {target && !target.ready ? <p className="text-sm text-warm">{target.hint}</p> : null}
           </div>
         );
       })}
-      {savedHint ? <p className="text-[11px] text-muted">ذخیره شد</p> : null}
-      {notice ? <p className="text-[11px] text-signal">{notice}</p> : null}
-      {error ? <p className="text-[11px] text-danger" role="alert">{error}</p> : null}
-      <Link className="block text-[11px] text-warm" href="/more/channels">
+      {savedHint ? <p className="text-sm text-muted" role="status">ذخیره شد</p> : null}
+      {notice ? <p className="text-sm text-signal" role="status">{notice}</p> : null}
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
+      <Link className="inline-flex min-h-11 items-center text-sm text-warm" href="/more/channels">
         تنظیم حساب کانال‌ها
       </Link>
     </div>

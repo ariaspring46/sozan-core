@@ -125,7 +125,7 @@ export function StudioLibrary() {
           title="هنوز رسانه‌ای ساخته نشده"
           detail="از چت بگو چه پست یا ویدیویی می‌خواهی. ساخته‌شده‌ها همین‌جا می‌مانند."
           action={
-            <Link href="/chat" className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent">
+            <Link href="/chat" className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm text-onAccent">
               رفتن به چت
             </Link>
           }

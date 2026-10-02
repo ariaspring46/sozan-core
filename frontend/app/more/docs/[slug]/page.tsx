@@ -16,7 +16,7 @@ export default async function MoreDocsArticlePage({ params }: { params: Promise<
       header={
         <div>
           <p className="text-sm text-muted">
-            <Link href="/more/docs" className="text-warm">
+            <Link href="/more/docs" className="tap text-warm">
               اسناد آموزشی
             </Link>
           </p>
@@ -30,7 +30,7 @@ export default async function MoreDocsArticlePage({ params }: { params: Promise<
             {section.heading ? <h2 className="mb-2 font-bold">{section.heading}</h2> : null}
             <div className="space-y-3">
               {section.paragraphs.map((paragraph, line) => (
-                <p key={line} className="text-sm leading-7 text-ink">
+                <p key={line} className="wrap-any text-[15px] leading-8 text-ink">
                   {paragraph}
                 </p>
               ))}

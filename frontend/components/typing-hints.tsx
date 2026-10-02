@@ -73,7 +73,7 @@ export function TypingHints({ hints, onPick }: { hints: string[]; onPick?: (text
     <div className="flex min-h-[5.5rem] flex-col items-center justify-center px-2 text-center">
       <button
         type="button"
-        className="max-w-md text-lg font-medium leading-9 text-ink/70 outline-none transition-colors hover:text-ink focus-visible:text-ink sm:text-xl"
+        className="wrap-any min-h-11 max-w-md text-lg font-medium leading-9 text-ink/75 outline-none transition-colors hover:text-ink focus-visible:text-ink sm:text-xl"
         aria-label={`نمونه: ${text}. برای نوشتنش در کادر بزن`}
         onClick={() => onPick?.(text)}
         disabled={phase === "gap"}
@@ -103,7 +103,7 @@ export function TypingHints({ hints, onPick }: { hints: string[]; onPick?: (text
           <span aria-hidden>&nbsp;</span>
         )}
       </button>
-      <p className="mt-1 text-[11px] text-muted">مثلاً این را بنویس — یا روی جمله بزن</p>
+      <p className="mt-1 text-xs text-muted">مثلاً این را بنویس — یا روی جمله بزن</p>
     </div>
   );
 }

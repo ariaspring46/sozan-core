@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/empty-state";
 import { api, fileUrl } from "@/lib/api";
 
@@ -141,7 +143,7 @@ export default function SupportPage() {
       header={
         <div>
           <p className="text-sm text-muted">
-            <Link href="/more" className="text-warm">
+            <Link href="/more" className="tap text-warm">
               بیشتر
             </Link>
           </p>
@@ -164,13 +166,16 @@ export default function SupportPage() {
             <ul className="mt-3 space-y-3">
               {receipts.map((row) => (
                 <li key={row.id} className="rounded-xl border border-line bg-canvas p-3">
-                  <p className="text-sm">
-                    سفارش <bdo dir="ltr">{row.id}</bdo> · {row.title} ·{" "}
-                    {Number(row.amount || 0).toLocaleString("fa-IR")} تومان · {row.customer}
+                  <p className="wrap-any text-sm font-medium">
+                    {row.title || "سفارش"} · {Number(row.amount || 0).toLocaleString("fa-IR")} تومان
+                  </p>
+                  <p className="wrap-any mt-0.5 text-xs text-muted">
+                    سفارش <bdi dir="ltr">{row.id}</bdi>
+                    {row.customer ? ` · ${row.customer}` : ""}
                   </p>
                   {row.receipt ? (
                     <a
-                      className="mt-1 block text-xs text-warm underline"
+                      className="mt-1 inline-flex min-h-11 items-center text-sm text-warm underline"
                       href={fileUrl("", `media/${row.receipt}`)}
                       target="_blank"
                       rel="noreferrer"
@@ -180,9 +185,10 @@ export default function SupportPage() {
                   ) : (
                     <p className="mt-1 text-xs text-muted">بدون عکس</p>
                   )}
-                  <input
-                    className="mt-2 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+                  <Input
+                    className="mt-2"
                     placeholder="یادداشت برای خریدار (اختیاری)"
+                    aria-label="یادداشت برای خریدار"
                     value={reply[`r-${row.id}`] || ""}
                     onChange={(e) => setReply((rows) => ({ ...rows, [`r-${row.id}`]: e.target.value }))}
                   />
@@ -198,7 +204,7 @@ export default function SupportPage() {
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-xs text-muted">رسیدی در انتظار نیست.</p>
+            <p className="mt-2 text-sm text-muted">رسیدی در انتظار نیست.</p>
           )}
         </section>
 
@@ -207,15 +213,16 @@ export default function SupportPage() {
             تیکت به پشتیبانی سوزان
           </h2>
           <div className="mt-3 space-y-2">
-            <input
-              className="w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm"
+            <Input
               placeholder="موضوع"
+              aria-label="موضوع تیکت"
               value={ticketSubject}
               onChange={(e) => setTicketSubject(e.target.value)}
             />
-            <textarea
-              className="min-h-24 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm"
+            <Textarea
+              className="min-h-24"
               placeholder="مشکل یا پرسش‌ات را بنویس"
+              aria-label="متن تیکت"
               value={ticketText}
               onChange={(e) => setTicketText(e.target.value)}
             />
@@ -233,7 +240,7 @@ export default function SupportPage() {
                   </p>
                   <p className="mt-1 whitespace-pre-line leading-6">{row.text}</p>
                   {(row.replies || []).map((rep, idx) => (
-                    <p key={idx} className="mt-2 rounded-lg bg-paper p-2 text-xs leading-6">
+                    <p key={idx} className="wrap-any mt-2 rounded-lg bg-paper p-2 text-sm leading-7">
                       پاسخ پشتیبانی: {rep.text}
                     </p>
                   ))}
@@ -255,18 +262,19 @@ export default function SupportPage() {
                     {row.subject}{" "}
                     <span className="text-xs font-normal text-muted">
                       · {STATUS_LABEL[row.status] || row.status} · {faTime(row.at)}
-                      {row.orderNo ? ` · سفارش ${row.orderNo}` : ""}
+                      {row.orderNo ? <> · سفارش <bdi dir="ltr">{row.orderNo}</bdi></> : null}
                     </span>
                   </p>
                   <p className="mt-1 whitespace-pre-line text-sm leading-7">{row.text}</p>
                   {(row.replies || []).map((rep, idx) => (
-                    <p key={idx} className="mt-2 rounded-lg bg-paper p-2 text-xs leading-6">
+                    <p key={idx} className="wrap-any mt-2 rounded-lg bg-paper p-2 text-sm leading-7">
                       پاسخ شما: {rep.text}
                     </p>
                   ))}
-                  <input
-                    className="mt-2 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+                  <Input
+                    className="mt-2"
                     placeholder="پاسخ به مشتری"
+                    aria-label="پاسخ به مشتری"
                     value={reply[row.id] || ""}
                     onChange={(e) => setReply((rows) => ({ ...rows, [row.id]: e.target.value }))}
                   />
@@ -308,9 +316,10 @@ export default function SupportPage() {
                       </p>
                     ))}
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <input
-                        className="min-w-40 flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+                      <Input
+                        className="min-w-40 flex-1"
                         placeholder="پاسخ پشتیبانی سوزان"
+                        aria-label="پاسخ پشتیبانی سوزان"
                         value={reply[`h-${row.id}`] || ""}
                         onChange={(e) => setReply((rows) => ({ ...rows, [`h-${row.id}`]: e.target.value }))}
                       />

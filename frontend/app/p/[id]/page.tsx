@@ -52,12 +52,12 @@ export default function PublicPayPage() {
   const ok = status === "paid" || status === "ok";
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
+    <main className="flex min-h-dvh items-center justify-center bg-canvas p-6">
       <Card className="w-full max-w-md space-y-4">
         <div className="flex items-center gap-3">
           <SozanMark className="h-14 w-14" />
           <div>
-            <p className="text-[11px] tracking-[0.28em] text-warm">سوزان</p>
+            <p className="text-xs text-warm">سوزان</p>
             <h1 className="text-xl font-bold">{LABEL[status] || "رسید پرداخت"}</h1>
           </div>
         </div>

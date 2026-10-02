@@ -4,10 +4,11 @@ export function SozanMark({ className, glow = true }: { className?: string; glow
   return (
     <span className={cn("inline-flex shrink-0", className)}>
       <img
-        src="/sozan-mark.png?v=copper-1"
+        src="/sozan-mark-256.webp?v=copper-1"
         alt="سوزان"
         width={112}
         height={112}
+        decoding="async"
         className={cn(
           "h-full w-full object-contain",
           glow && "drop-shadow-[0_0_18px_rgb(196_92_38_/_45%)]",
