@@ -162,6 +162,8 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 )
                 with (
                     patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
+                    patch.object(shop_service, "_read_job_file", return_value={"buildDir": raw}),
+                    patch("app.services.shop_edit_service.build_dir_for", return_value=Path(raw)),
                     patch.object(
                         shop_service,
                         "_run_factory",
@@ -188,6 +190,42 @@ class LiveShopChatRouteTests(unittest.TestCase):
                     out = shop_service.start_build(prompt="x", rebuild=True)
                 blocked.assert_not_called()
                 self.assertFalse(out["ok"])
+
+    def test_full_rebuild_phrases_cover_natural_persian(self) -> None:
+        for text in ("از نو بساز", "از دیزاینش خوشم نمیاد میخوام از نو ساخته شه", "ازنو درستش کن", "از اول بسازش", "بساز از صفر"):
+            self.assertTrue(shop_service._wants_full_rebuild(text), text)
+        for text in ("دوباره بساز", "رنگ را آبی کن", "قیمت را عوض کن"):
+            self.assertFalse(shop_service._wants_full_rebuild(text), text)
+
+    def test_rebuild_with_missing_job_falls_back_to_fresh_build(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="کیف", price=850000, stock=1, sku="k", category="کیف")
+                shop_service._save_shop(
+                    {**shop_service._shop(), "slug": "demo-shop", "status": "failed", "port": 12410, "jobId": "gone"}
+                )
+                with (
+                    patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
+                    patch.object(shop_service, "_read_job_file", return_value=None),
+                    patch.object(
+                        shop_service,
+                        "_run_factory",
+                        return_value={"ok": True, "jobId": "j9", "status": "running", "slug": "demo-shop"},
+                    ) as factory,
+                    patch.object(shop_service, "_factory_prompt", return_value="p"),
+                    patch.object(shop_service, "_publish_dns", side_effect=lambda shop: shop),
+                    patch.object(shop_service, "_emit_build"),
+                    patch("app.services.shop_service.get_settings", return_value={"storeName": "دمو"}),
+                    patch("app.services.shop_service.record_site"),
+                ):
+                    out = shop_service.start_build(prompt="دوباره بساز", rebuild=True)
+                spawn.assert_not_called()
+                factory.assert_called_once()
+                self.assertTrue(out["ok"])
+                self.assertTrue(out["freshBuild"])
+                self.assertEqual(shop_service._shop()["error"], "")
 
     def test_from_page_uses_catalog_instead_of_edit(self) -> None:
         with _live_shop_chat() as (edit, answer):

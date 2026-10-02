@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="سوزان">
+  <defs>
+    <mask id="moon">
+      <rect width="240" height="240" fill="#fff"/>
+      <circle cx="140" cy="108" r="72" fill="#000"/>
+    </mask>
+  </defs>
+  <circle cx="108" cy="124" r="88" fill="#C45C26" mask="url(#moon)"/>
+  <g fill="#E8A87C">
+    <circle cx="156" cy="118" r="22"/>
+  </g>
+  <g stroke="#E8A87C" stroke-width="8" stroke-linecap="round">
+    <path d="M156 76V84"/><path d="M156 152V160"/><path d="M114 118H122"/><path d="M190 118H198"/>
+    <path d="M126 88L132 94"/><path d="M180 142L186 148"/><path d="M186 88L180 94"/><path d="M132 142L126 148"/>
+  </g>
+</svg>

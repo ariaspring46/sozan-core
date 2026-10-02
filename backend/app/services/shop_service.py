@@ -71,6 +71,8 @@ BUILD_BUSY = frozenset({"running", "queued"})
 JOB_STALE_SECONDS = 30 * 60
 EXPLICIT_BUILD = ("بیلد کن", "دوباره بیلد", "دوباره بساز", "rebuild", "فروشگاه را بساز")
 FULL_REBUILD = ("از نو بساز", "فروشگاه را از نو بساز", "قالب را از نو")
+# «از نو ساخته شه»، «ازنو درستش کن»، «از اول بساز»: هر قالبی که «از نو/از اول/از صفر» و فعل ساخت کنار هم دارد.
+FULL_REBUILD_RE = re.compile(r"(?:از\s*نو|ازنو|از\s*اول|از\s*صفر).{0,25}?(?:بساز|ساخت|ساخته|بسازی|بسازید|درست|طراحی)|(?:بساز|ساخت|ساخته|درست|طراحی).{0,12}?(?:از\s*نو|ازنو|از\s*اول|از\s*صفر)")
 BUILD_WORD = re.compile(r"(?:^|[\s،,])بساز(?:ش|ید)?(?:$|[\s،.])")
 PROGRESS_HINT = ("مرحله", "وضعیت ساخت", "وضعیت بیلد", "چقدر مانده", "در چه مرحله", "پیشرفت", "دوباره ببین", "چه خبر از ساخت", "چه خبر از بیلد")
 SKINS = ("atelier", "street", "boutique")
@@ -1343,19 +1345,19 @@ def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) 
         _emit_build(result, shop, rebuild=rebuild)
         return result
     full_rebuild = _wants_full_rebuild(prompt)
+    fresh_build = False
     if shop.get("slug") and rebuild and (revise_only is True or (revise_only is None and not full_rebuild)):
         from app.services import shop_edit_service
 
         job_id = str(shop.get("jobId") or "")
-        if not job_id:
-            result = {"ok": False, "error": "بیلد قبلی پیدا نشد. اگر لازم است بگو از نو بساز."}
+        # بیلد قبلی (فایل job یا پوشهٔ ساخت) از بین رفته: بازسازی ممکن نیست، به‌جای خطا از نو ساخته می‌شود.
+        if job_id and _read_job_file(job_id) and shop_edit_service.build_dir_for(shop) is not None:
+            shop_edit_service.spawn_rebuild(job_id, shop)
+            shop = _shop()
+            result = {"ok": True, "jobId": job_id, "status": "running", "slug": shop.get("slug")}
             _emit_build(result, shop, rebuild=rebuild)
             return result
-        shop_edit_service.spawn_rebuild(job_id, shop)
-        shop = _shop()
-        result = {"ok": True, "jobId": job_id, "status": "running", "slug": shop.get("slug")}
-        _emit_build(result, shop, rebuild=rebuild)
-        return result
+        fresh_build = True
     if not rebuild and not shop.get("slug"):
         blocked = allow_new_site()
         if blocked:
@@ -1390,6 +1392,8 @@ def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) 
         if shop.get("port"):
             args.extend(["--port", str(int(shop["port"]))])
     result = _run_factory(args)
+    if fresh_build:
+        result["freshBuild"] = True
     if result.get("queued") and result.get("activeJobId"):
         shop["jobId"] = str(result.get("activeJobId") or shop.get("jobId") or "")
         _mark_build_started(shop)
@@ -1435,7 +1439,8 @@ def _wants_progress(text: str) -> bool:
 
 
 def _wants_full_rebuild(text: str) -> bool:
-    return any(token in (text or "") for token in FULL_REBUILD)
+    value = text or ""
+    return any(token in value for token in FULL_REBUILD) or bool(FULL_REBUILD_RE.search(value))
 
 
 def _explicit_rebuild(text: str) -> bool:
@@ -1860,7 +1865,9 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
             revise_only=(False if _wants_full_rebuild(raw) else True) if live else None,
         )
         shop = _refresh_job(_shop())
-        if result.get("ok"):
+        if result.get("ok") and result.get("freshBuild"):
+            reply = "نسخهٔ قبلی سایت پیدا نشد؛ فروشگاه را از نو می‌سازم. مرحله‌ها را همین‌جا می‌بینی."
+        elif result.get("ok"):
             reply = "ساخت فروشگاه شروع شد. مرحله‌ها را همین‌جا می‌بینی."
         elif result.get("queued"):
             reply = "ساخت قبلی هنوز تمام نشده. مرحله‌ها را همین‌جا می‌بینی."
