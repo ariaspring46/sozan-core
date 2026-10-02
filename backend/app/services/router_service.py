@@ -1176,7 +1176,7 @@ _STATUS_FA = {
     "ready": "آماده",
     "running": "در حال ساخت",
     "queued": "در صف",
-    "failed": "ناتمام",
+    "failed": "ناموفق",
     "idle": "بیکار",
     "done": "تمام",
     "free": "رایگان",
@@ -1207,11 +1207,14 @@ def _domain_ok(shop: dict) -> bool:
 def _format_status(data: dict) -> str:
     chans = data.get("channels") or []
     chan = "، ".join(f"{c.get('platform')} {'وصل' if c.get('connected') else 'قطع'}" for c in chans) if chans else "—"
-    return (
+    text = (
         f"فروشگاه {_fa_status(data.get('shopStatus'))} · اسکن {_fa_status(data.get('scanStatus'))} · "
         f"بیلد {_fa_status(data.get('buildStatus'))} · دامنه {'درست' if data.get('cnameOk') else 'ناقص'} · "
         f"پلن {_fa_status(data.get('plan'))} · کیف {data.get('walletAvailable') or 0} · کانال {chan}"
     )
+    if "failed" in (str(data.get("shopStatus") or ""), str(data.get("buildStatus") or "")):
+        text += "\nساخت فروشگاه کامل نشد. بگو «فروشگاه را از نو بساز» تا دوباره بسازم."
+    return text
 
 
 async def _inbox_payload() -> dict:
@@ -1744,7 +1747,12 @@ async def _execute(
         result = {"text": "", "tool_calls": [{"name": choice["tool"], "arguments": {}}], "usage": {}}
     else:
         try:
-            result = await completer(history, TOOLS)
+            try:
+                result = await completer(history, TOOLS)
+            except Exception:
+                # قطعی کوتاه مدل یا شبکه: یک بار بی‌صدا دوباره می‌پرسیم.
+                await asyncio.sleep(1.0)
+                result = await completer(history, TOOLS)
         except Exception:
             _trace(path="model")
             _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")

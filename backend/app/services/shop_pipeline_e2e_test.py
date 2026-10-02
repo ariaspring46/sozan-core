@@ -52,6 +52,8 @@ class ShopPipelineScenarioTests(unittest.TestCase):
                 )
                 with (
                     patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
+                    patch.object(shop_service, "_read_job_file", return_value={"buildDir": raw}),
+                    patch("app.services.shop_edit_service.build_dir_for", return_value=Path(raw)),
                     patch.object(shop_service, "_emit_build"),
                 ):
                     shop_service.start_build(prompt="x", rebuild=True)
