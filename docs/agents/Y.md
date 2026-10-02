@@ -174,7 +174,7 @@ def cosine(left: list[float], right: list[float]) -> float  # changed 2026-09-22
 **`frontend/components/chat-thread.tsx`** — owner X1
 ```
 export type ChatMsg =  # changed 2026-09-29
-export function ChatThread(  # changed 2026-09-28
+export function ChatThread(  # changed 2026-10-02
 ```
 **`backend/app/services/channel_outbound_service.py`** — owner X3
 ```

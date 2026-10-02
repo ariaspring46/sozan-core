@@ -51,6 +51,7 @@ export function sanitizeShopText(text: string, enabled?: boolean) {
   return text;
 }
 
+const STUDIO_WORDS = /پست|استوری|ریلز|ریل|عکس|تصویر|کمپین|بنر|کپشن/;
 const WAIT_LINES = ["دارم فکر می‌کنم…", "یک لحظه…", "جواب را می‌چینم…"];
 
 function composeWaitLabel(compose: NonNullable<ChatMsg["compose"]>, now: number): string {
@@ -72,7 +73,7 @@ function ComposeWait({ compose }: { compose: NonNullable<ChatMsg["compose"]> }) 
 
 function WaitSignal({ label }: { label: string }) {
   return (
-    <div className="ms-auto flex max-w-[85%] items-center gap-3 rounded-2xl border border-line/70 bg-paper px-4 py-2.5">
+    <div role="status" className="ms-auto flex max-w-[85%] items-center gap-3 rounded-2xl border border-line/70 bg-paper px-4 py-2.5">
       <span className="flex items-center gap-1">
         <span className="sozan-dot h-1.5 w-1.5 rounded-full bg-signal" />
         <span className="sozan-dot h-1.5 w-1.5 rounded-full bg-signal" />
@@ -81,6 +82,25 @@ function WaitSignal({ label }: { label: string }) {
       <p className="text-xs text-warm">{label}</p>
     </div>
   );
+}
+
+/** هر چه انتظار طولانی‌تر شود متن صادقانه‌تر می‌شود؛ کاربر نباید فکر کند برنامه قفل کرده. */
+function BusyHint({ future, waitLine }: { future: boolean; waitLine: string }) {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = window.setInterval(() => setSecs(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const label =
+    secs >= 25
+      ? "کند شده؛ هنوز منتظر جواب هستم…"
+      : secs >= 8
+        ? "کمی طول می‌کشد؛ هنوز دارم کار می‌کنم…"
+        : future
+          ? waitLine
+          : "در حال نوشتن…";
+  return <WaitSignal label={label} />;
 }
 
 function VoteButtons({ trainId }: { trainId: string }) {
@@ -144,6 +164,8 @@ export function ChatThread({
   onCancel,
   persona = "",
   aspects,
+  loading = false,
+  banner,
 }: {
   messages: ChatMsg[];
   busy: boolean;
@@ -172,6 +194,10 @@ export function ChatThread({
   showTime?: boolean;
   /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */
   aspects?: readonly { id: string; label: string; word: string }[];
+  /** تا تاریخچه نرسیده، صفحهٔ خوشامد نشان داده نمی‌شود (سوسوی «سلام، من سوزانم» در بازدید دوباره). */
+  loading?: boolean;
+  /** خطا یا اعلان؛ بالای کادر نوشتن می‌نشیند تا کنار جایی باشد که کاربر دست دارد. */
+  banner?: ReactNode;
 }) {
   const [draft, setDraft] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -186,6 +212,13 @@ export function ChatThread({
   const chunksRef = useRef<Blob[]>([]);
   const future = tone === "future";
   const canSend = Boolean((draft.trim() || (allowMedia && file)) && !busy);
+
+  const fitDraft = () => {
+    const el = draftRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 112)}px`;
+  };
 
   const stickToEnd = () => {
     if (!stickRef.current) return;
@@ -202,6 +235,10 @@ export function ChatThread({
     vv?.addEventListener("resize", stickToEnd);
     return () => vv?.removeEventListener("resize", stickToEnd);
   }, []);
+
+  useEffect(() => {
+    fitDraft();
+  }, [draft]);
 
   useEffect(() => {
     if (!busy || !future) return;
@@ -261,14 +298,19 @@ export function ChatThread({
     const chosen = (aspects || []).find((row) => row.id === aspect);
     if (chosen && chosen.word && !text.includes(chosen.word)) text = `${text} (${chosen.word})`.trim();
     const attached = file || undefined;
+    const keepKeyboard = document.activeElement === draftRef.current;
+    stickRef.current = true;
+    // مثل هر چت دیگر: کادر همان لحظه خالی می‌شود و متن در حباب «در حال ارسال» دیده می‌شود.
+    setDraft("");
+    setFile(null);
     try {
       await onSend({ text, file: attached });
-      setDraft("");
-      setFile(null);
     } catch {
-      setDraft(text);
-      setFile(attached || null);
+      // ارسال نشد: متن برمی‌گردد (اگر در این فاصله چیز تازه‌ای نوشته، متن قبلی بالای آن می‌نشیند).
+      setDraft((current) => (current.trim() ? `${text}\n${current}` : text));
+      setFile((current) => current || attached || null);
     }
+    if (keepKeyboard) window.requestAnimationFrame(() => draftRef.current?.focus());
   }
 
   return (
@@ -283,8 +325,14 @@ export function ChatThread({
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
         }}
       >
-        <div className="space-y-3 px-4 py-5">
-          {messages.length === 0 && !pendingText ? (
+        <div className="space-y-3 px-4 py-5" role="log" aria-live="polite" aria-relevant="additions text" aria-label="گفتگو">
+          {loading && messages.length === 0 ? (
+            <div className="space-y-3 pt-4" aria-hidden="true">
+              <div className="h-12 w-3/5 animate-pulse rounded-2xl bg-line/40" />
+              <div className="ms-auto h-16 w-4/5 animate-pulse rounded-2xl bg-line/30" />
+              <div className="h-10 w-2/5 animate-pulse rounded-2xl bg-line/40" />
+            </div>
+          ) : messages.length === 0 && !pendingText ? (
             welcome || welcomeLines ? (
               <div className="flex min-h-[min(60dvh,28rem)] flex-col items-center justify-center gap-6 pt-6">
                 <div className="space-y-1 text-center text-sm leading-7 text-muted">
@@ -348,27 +396,20 @@ export function ChatThread({
                   </div>
                 ) : null}
                 {msg.kind === "confirm" && msg.confirmId && onConfirm ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      className="h-auto py-1 text-xs"
-                      disabled={busy || confirmId !== msg.confirmId}
-                      onClick={() => onConfirm(msg.confirmId || "")}
-                    >
-                      تأیید
-                    </Button>
-                    {onCancel ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="h-auto py-1 text-xs"
-                        disabled={busy || confirmId !== msg.confirmId}
-                        onClick={() => onCancel(msg.confirmId || "")}
-                      >
-                        انصراف
+                  msg.confirmId === confirmId ? (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button type="button" disabled={busy} onClick={() => onConfirm(msg.confirmId || "")}>
+                        تأیید
                       </Button>
-                    ) : null}
-                  </div>
+                      {onCancel ? (
+                        <Button type="button" variant="ghost" disabled={busy} onClick={() => onCancel(msg.confirmId || "")}>
+                          انصراف
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-muted">این کارت بسته شد.</p>
+                  )
                 ) : null}
                 {msg.kind === "ask" && msg.options?.length ? (
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -526,10 +567,11 @@ export function ChatThread({
               <p className="wrap-any whitespace-pre-wrap">{pendingText}</p>
             </article>
           ) : null}
-          {busy ? future ? <WaitSignal label={waitLine} /> : <p className="text-center text-sm text-muted" role="status">در حال نوشتن…</p> : null}
+          {busy ? <BusyHint future={future} waitLine={waitLine} /> : null}
         </div>
       </div>
       <form className="shrink-0 space-y-2 border-t border-line/70 bg-canvas px-3 pb-2 pt-2" onSubmit={(event) => void submit(event)}>
+        {banner}
         {file ? (
           <div className="flex items-center justify-between gap-2 rounded-2xl border border-line/70 bg-paper px-3 text-sm text-muted">
             <span className="truncate">{file.type.startsWith("image/") ? "تصویر" : file.type.startsWith("video/") ? "ویدیو" : "صدا"} · {file.name}</span>
@@ -540,7 +582,7 @@ export function ChatThread({
         ) : null}
         {recording ? <p className="text-sm text-warm" role="status">در حال ضبط صدا…</p> : null}
         {micError ? <p className="text-sm text-danger" role="alert">{micError}</p> : null}
-        {aspects?.length ? (
+        {aspects?.length && STUDIO_WORDS.test(draft) ? (
           <div className="flex items-center gap-2 px-1" role="group" aria-label="نسبت تصویر">
             {aspects.map((row) => {
               const on = aspect === row.id || (!aspect && row.id === "post");
@@ -548,6 +590,7 @@ export function ChatThread({
                 <button
                   key={row.id}
                   type="button"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => setAspect((value) => (value === row.id ? "" : row.id))}
                   className={cn(
                     "tap min-h-9 rounded-xl px-3 text-[13px] font-medium",
@@ -578,6 +621,7 @@ export function ChatThread({
                 className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted"
                 aria-label="پیوست تصویر یا ویدیو"
                 disabled={busy}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => fileRef.current?.click()}
               >
                 <Paperclip size={18} />
@@ -590,6 +634,7 @@ export function ChatThread({
                 )}
                 aria-label={recording ? "پایان ضبط" : "ضبط صدا"}
                 disabled={busy}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => void toggleVoice()}
               >
                 {recording ? <Square size={16} /> : <Mic size={18} />}
@@ -601,18 +646,24 @@ export function ChatThread({
             className="max-h-28 min-h-11 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 outline-none"
             rows={1}
             value={draft}
-            disabled={busy}
+            enterKeyHint="send"
             placeholder={placeholder}
             aria-label={placeholder}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
+              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+              // روی گوشی Enter خط تازه است و دکمهٔ «بفرست» می‌فرستد؛ روی کامپیوتر Enter می‌فرستد.
+              if (window.matchMedia("(pointer: coarse)").matches) return;
+              event.preventDefault();
+              if (canSend) event.currentTarget.form?.requestSubmit();
             }}
           />
-          <Button type="submit" className="shrink-0 whitespace-nowrap rounded-xl px-4" disabled={!canSend}>
+          <Button
+            type="submit"
+            className="shrink-0 whitespace-nowrap rounded-xl px-4"
+            disabled={!canSend}
+            onMouseDown={(event) => event.preventDefault()}
+          >
             بفرست
           </Button>
         </div>

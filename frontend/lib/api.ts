@@ -66,6 +66,26 @@ export class ApiError extends Error {
   }
 }
 
+const PERSIAN_LETTER = /[\u0600-\u06FF]/;
+
+/** متن فارسی برای خطای HTTP؛ بدنهٔ انگلیسی سرور یا پراکسی («Bad Gateway») به فروشنده نمی‌رسد. */
+export function statusMessage(status: number): string {
+  if (status === 401) return "نشست تمام شد؛ دوباره وارد شو.";
+  if (status === 403) return "اجازهٔ این کار را نداری.";
+  if (status === 404) return "پیدا نشد.";
+  if (status === 408 || status === 504) return "جواب دیر رسید. دوباره امتحان کن.";
+  if (status === 413) return "حجم فایل یا متن بیش از حد است.";
+  if (status === 429) return "درخواست‌ها زیاد است؛ چند لحظه صبر کن.";
+  if (status >= 500) return "سرور الان جواب نمی‌دهد. چند لحظه بعد دوباره امتحان کن.";
+  return "خطایی پیش آمد. دوباره امتحان کن.";
+}
+
+/** قطع اینترنت یا زمان‌بر شدن درخواست: status صفر یعنی معلوم نیست سرور درخواست را گرفته یا نه. */
+function networkError(err: unknown): ApiError {
+  const slow = err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError");
+  return new ApiError(slow ? "جواب دیر رسید. دوباره امتحان کن." : "اینترنت قطع یا ضعیف است. دوباره امتحان کن.", 0);
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   const token = getToken();
@@ -73,20 +93,25 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(`${getApiBase()}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${getApiBase()}${path}`, { ...init, headers });
+  } catch (err) {
+    throw networkError(err);
+  }
   if (res.status === 401) {
     clearToken();
     if (typeof window !== "undefined") window.location.href = "/login";
   }
   if (!res.ok) {
-    let detail = "خطا";
+    let detail = "";
     try {
       const data = await res.json();
-      detail = formatApiDetail(data.detail) || detail;
+      detail = formatApiDetail(data.detail);
     } catch {
-      detail = res.statusText;
+      detail = "";
     }
-    throw new ApiError(typeof detail === "string" ? detail : "خطا", res.status);
+    throw new ApiError(PERSIAN_LETTER.test(detail) ? detail : statusMessage(res.status), res.status);
   }
   const ctype = res.headers.get("content-type") || "";
   if (ctype.includes("application/json")) return res.json() as Promise<T>;

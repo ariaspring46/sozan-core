@@ -72,7 +72,7 @@ Done when: every P0/P1 is fixed or has an acknowledged request in its owner's re
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.0k tokens. Your core files total 11.4k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.0k tokens. Your core files total 11.9k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -84,8 +84,8 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 11.4k | the files most tasks touch; read the relevant one first |
-| active | 39.0k | yours to edit; read only what the task needs |
+| core | 11.9k | the files most tasks touch; read the relevant one first |
+| active | 39.5k | yours to edit; read only what the task needs |
 | rare | 29.8k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
@@ -94,7 +94,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/app/globals.css` (5.6k)
 - `frontend/tailwind.config.js` (0.4k)
 - `frontend/components/app-shell.tsx` (3.1k)
-- `frontend/lib/api.ts` (1.4k)
+- `frontend/lib/api.ts` (1.9k)
 - `frontend/components/ui/button.tsx` (0.2k)
 - `frontend/lib/use-app-viewport.ts` (0.7k)
 
@@ -105,7 +105,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/app/`: `globals.css` (5.6k), `page.tsx` (0.5k), `layout.tsx` (0.4k)
 - `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (3.1k), `getting-started.tsx` (2.3k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
 - `frontend/components/ui/`: `button.tsx` (0.2k), `textarea.tsx` (0.1k), `select.tsx` (0.1k), `input.tsx` (0.1k), `card.tsx` (0.1k)
-- `frontend/lib/`: `api.ts` (1.4k), `theme.ts` (0.7k), `use-app-viewport.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.3k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
+- `frontend/lib/`: `api.ts` (1.9k), `theme.ts` (0.7k), `use-app-viewport.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.4k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
 - `tools/`: `ui_check.py` (1.4k)
 
 **Rare (yours; only when the task names it):**
@@ -201,7 +201,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `frontend/components/ui/input.tsx`: `Input` (changed 2026-09-18) ← C, X2, X3, X5, Y
 - `frontend/components/ui/select.tsx`: `Select` (changed 2026-09-18) ← C, X3, Y
 - `frontend/components/ui/textarea.tsx`: `Textarea` (changed 2026-09-18) ← C, X2, X3
-- `frontend/lib/api.ts`: `ApiError` (changed 2026-09-21) ← X3, X5; `Brand` (changed 2026-09-18) ← X2; `Campaign` (changed 2026-09-18) ← X2; `api` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-18) ← C; `chatMediaUrl` (changed 2026-09-18) ← X1; `clearToken` (changed 2026-09-18) ← X5; `fileUrl` (changed 2026-09-18) ← C; `getApiBase` (changed 2026-09-18) ← C, X2; `getOnboarded` (changed 2026-09-18) ← X3; `getToken` (changed 2026-09-18) ← X1, X2, X3; `setOnboarded` (changed 2026-09-18) ← X3, X5; `setToken` (changed 2026-09-18) ← X5; `timeoutSignal` (changed 2026-10-02) ← X3
+- `frontend/lib/api.ts`: `ApiError` (changed 2026-09-21) ← X3, X5; `Brand` (changed 2026-09-18) ← X2; `Campaign` (changed 2026-09-18) ← X2; `api` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-18) ← C; `chatMediaUrl` (changed 2026-09-18) ← X1; `clearToken` (changed 2026-09-18) ← X5; `fileUrl` (changed 2026-09-18) ← C; `getApiBase` (changed 2026-09-18) ← C, X2; `getOnboarded` (changed 2026-09-18) ← X3; `getToken` (changed 2026-09-18) ← X1, X2, X3; `setOnboarded` (changed 2026-09-18) ← X3, X5; `setToken` (changed 2026-09-18) ← X5; `timeoutSignal` (changed 2026-10-02) ← X1, X3
 - `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← X1, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← X5
 - `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-20) ← X1, X4, Y; `finishIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y; `takeIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y
 - `frontend/lib/utils.ts`: `cn` (changed 2026-09-18) ← X1, X2, X4, Y
