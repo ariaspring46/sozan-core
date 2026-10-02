@@ -414,6 +414,36 @@ def _shop_row() -> dict:
     return shop if isinstance(shop, dict) else {}
 
 
+_PRONOUN_WORDS = frozenset(
+    {"ش", "اش", "اون", "اونو", "همون", "همین", "همان", "این", "اینو", "آن", "چی", "چیه", "چنده", "چقدره", "چقدر", "است",
+     "هست", "بگو", "رو", "را", "قیمت", "موجودی", "چند", "چقد", "چیست", "هم"}
+)
+
+
+def _product_ref_name() -> str:
+    tid = str(_THREAD.get() or "").strip()
+    return f"router-last-product-{tid}.json" if tid else "router-last-product.json"
+
+
+def _remember_product(title: str) -> None:
+    if str(title or "").strip():
+        write_json(_product_ref_name(), {"title": str(title).strip(), "at": int(time.time())})
+
+
+def _pronoun_only(rest: str) -> bool:
+    """«موجودیش چی؟» / «قیمت همون؟»: nothing left of the question but a pointer to the product just discussed."""
+    words = [word for word in re.split(r"[\s؟?،.!]+", rest or "") if word]
+    return bool(words) and all(word in _PRONOUN_WORDS for word in words)
+
+
+def _last_product(rows: list) -> dict | None:
+    ref = read_json(_product_ref_name(), {})
+    title = str(ref.get("title") or "") if isinstance(ref, dict) else ""
+    if not title or time.time() - float(ref.get("at") or 0) > 6 * 3600:
+        return None
+    return next((row for row in rows if str(row.get("title") or "") == title), None)
+
+
 def _fact_reply(spoken: str) -> str:
     from app.services.turn_parse import parse_turn
 
@@ -477,14 +507,20 @@ def _fact_reply(spoken: str) -> str:
         hit = max(titled, key=lambda row: len(str(row.get("title") or ""))) if titled else None
         if hit is None:
             ask = text.replace("موجودی", "").replace("؟", "").replace("?", "").strip()
-            matches = [row for row in rows if len(ask) >= 2 and ask in str(row.get("title") or "")]
+            if _pronoun_only(ask):
+                hit = _last_product(rows)
+                if hit is None:
+                    return "کدام کالا را می‌گویی؟ نامش را بگو."
+            matches = [row for row in rows if hit is None and len(ask) >= 2 and ask in str(row.get("title") or "")]
             if len(matches) > 1:
                 return "چند مورد داری: " + "، ".join(
                     f"«{row.get('title')}» {router_text.fa_digits(int(row.get('stock') or 0))}" for row in matches[:3]
                 ) + ". کدام را می‌خواهی؟"
-            hit = matches[0] if matches else None
+            if hit is None:
+                hit = matches[0] if matches else None
         if hit is None:
             return "این کالا را در کاتالوگ پیدا نکردم."
+        _remember_product(str(hit.get("title") or ""))
         count = int(hit.get("stock") or 0)
         return f"موجودی «{hit.get('title')}» {router_text.fa_digits(count)} است." + (" (تمام شده)" if count == 0 else "")
     if topic == "shop_name":
@@ -509,6 +545,12 @@ def _fact_reply(spoken: str) -> str:
         for drop in ("قیمت", "چنده", "چقدر است", "چقدر", "؟", "?"):
             needle = needle.replace(drop, "")
         needle = needle.strip()
+        if _pronoun_only(needle):
+            hit = _last_product(list_products().get("products") or [])
+            if hit is None:
+                return "کدام کالا را می‌گویی؟ نامش را بگو."
+            _remember_product(str(hit.get("title") or ""))
+            return f"قیمت «{hit.get('title')}» {router_text.fa_money(hit.get('price'))} تومان است."
         if len(needle) >= 2:
             rows = list_products().get("products") or []
             titled = [row for row in rows if str(row.get("title") or "") and str(row.get("title")) in text]
@@ -522,6 +564,7 @@ def _fact_reply(spoken: str) -> str:
                 hit = matches[0] if matches else None
             if hit is None:
                 return "این کالا را در کاتالوگ پیدا نکردم."
+            _remember_product(str(hit.get("title") or ""))
             return f"قیمت «{hit.get('title')}» {router_text.fa_money(hit.get('price'))} تومان است."
         return ""
     if topic == "site_up":

@@ -91,6 +91,26 @@ class RouterChatBehaviorTests(unittest.TestCase):
         out = self.turn("اون کالا را موجود کن")
         self.assertIn("انبار", out["messages"][-1]["text"])
 
+    def test_pronoun_follow_up_uses_the_product_just_discussed(self) -> None:
+        with tenant_scope(PHONE):
+            write_json("products.json", [{"title": "انگشتر نقره", "price": 2500000, "stock": 3}, {"title": "کیف چرمی", "price": 900000, "stock": 0}])
+        first = self.turn("قیمت انگشتر نقره چنده؟")
+        self.assertIn("«انگشتر نقره»", first["messages"][-1]["text"])
+        stock = self.turn("موجودیش چی؟")
+        self.assertIn("«انگشتر نقره» ۳", stock["messages"][-1]["text"])
+        price = self.turn("قیمت همون؟")
+        self.assertIn("۲٬۵۰۰٬۰۰۰", price["messages"][-1]["text"])
+        other = self.turn("موجودی کیف چرمی")
+        self.assertIn("«کیف چرمی» ۰", other["messages"][-1]["text"])
+        again = self.turn("قیمتش چنده")
+        self.assertIn("«کیف چرمی»", again["messages"][-1]["text"])
+
+    def test_pronoun_without_a_product_asks_which(self) -> None:
+        with tenant_scope(PHONE):
+            write_json("products.json", [{"title": "انگشتر نقره", "price": 2500000, "stock": 3}])
+        out = self.turn("موجودیش چی؟")
+        self.assertIn("کدام کالا", out["messages"][-1]["text"])
+
     def test_status_is_plain_persian_without_internal_words(self) -> None:
         with patch(
             "app.services.shop_service.snapshot",
