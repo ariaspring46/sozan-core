@@ -3291,6 +3291,14 @@
    "X5"
   ]
  },
+ "frontend/lib/api.ts::timeoutSignal": {
+  "owner": "U",
+  "signature": "export function timeoutSignal(ms: number): AbortSignal",
+  "since": "2026-10-02",
+  "users": [
+   "X3"
+  ]
+ },
  "frontend/lib/digits.ts::formatWhen": {
   "owner": "U",
   "signature": "export function formatWhen(at: number): string",
@@ -3405,6 +3413,7 @@
   "since": "2026-09-18",
   "users": [
    "X1",
+   "X2",
    "X4",
    "Y"
   ]

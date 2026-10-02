@@ -57,7 +57,7 @@ export function SalesPolicyForm() {
   return (
     <section id="shipping" aria-label="ارسال و مرجوعی" className="rounded-2xl bg-canvas p-4 shadow-card">
       <h2 className="text-base font-bold">ارسال و مرجوعی</h2>
-      <p className="mt-1 text-sm text-muted">فیلد خالی یعنی هنوز ثبت نشده و دایرکت همان موضوع را به شما می‌سپارد.</p>
+      <p className="mt-1 text-sm text-muted">فیلد خالی یعنی هنوز ثبت نشده و دایرکت همان موضوع را به خودت می‌سپارد.</p>
       <div className="mt-3 space-y-3">
         {NUMBER_FIELDS.map((field) => (
           <label key={field.key} className="block text-sm">

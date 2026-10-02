@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { api } from "@/lib/api";
 
@@ -179,9 +180,9 @@ export default function AdminPage() {
 
         {tab === "users" ? (
           <>
-            <input
-              className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+            <Input
               placeholder="جستجو: شماره یا پلن"
+              aria-label="جستجوی کاربر"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

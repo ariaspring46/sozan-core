@@ -340,7 +340,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
               پلن‌ها
             </a>
             <details className="relative">
-              <summary className="cursor-pointer list-none marker:content-none hover:text-ink">شرکت</summary>
+              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center marker:content-none hover:text-ink">شرکت</summary>
               <div className="absolute end-0 top-8 z-50 w-56 rounded-2xl border border-line/70 bg-paper/95 p-3 text-sm shadow-card">
                 {LEGAL.map((item) => (
                   <a key={item.href} className="flex min-h-11 items-center text-ink/85 hover:text-ink" href={item.href}>
@@ -450,7 +450,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
                     <img src="/sozan-mark.png?v=copper-1" alt="" className="h-9 w-9" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-ink">سوزان</p>
-                      <p className="text-xs text-ink/50">همین حالا در چت بساز</p>
+                      <p className="text-xs text-ink/70">همین حالا در چت بساز</p>
                     </div>
                     <span className="sozan-breathe h-1.5 w-1.5 rounded-full bg-accent" />
                   </div>
@@ -665,7 +665,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
           <div className="mt-10 grid gap-x-12 md:grid-cols-2">
             {FAQS.map((item) => (
               <details key={item.q} className="group border-t border-line/40 py-5">
-                <summary className="cursor-pointer list-none text-base text-ink/85 transition-colors group-open:text-ink hover:text-ink">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center text-base text-ink/85 transition-colors group-open:text-ink hover:text-ink">
                   {item.q}
                 </summary>
                 <p className="landing-lede mt-3 text-sm leading-7">{item.a}</p>
@@ -698,16 +698,16 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
               <SozanMark className="h-8 w-8" glow={false} />
               <p className="text-sm font-medium text-warm">سوزان</p>
             </div>
-            <p className="mt-3 max-w-sm text-xs leading-6 text-ink/50">فروشگاه، محتوا، گفتگو و پرداخت برای فروشندهٔ ایرانی.</p>
+            <p className="mt-3 max-w-sm text-sm leading-6 text-ink/70">فروشگاه، محتوا، گفتگو و پرداخت برای فروشندهٔ ایرانی.</p>
           </div>
-          <nav className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-ink/65">
-            <a href="#capabilities" className="hover:text-warm">امکانات</a>
-            <a href="#channels" className="hover:text-warm">کانال‌ها</a>
-            <a href="#plans" className="hover:text-warm">پلن‌ها</a>
+          <nav aria-label="پیوندهای پایین صفحه" className="flex flex-wrap gap-x-5 text-sm text-ink/75">
+            <a href="#capabilities" className="inline-flex min-h-11 items-center hover:text-warm">امکانات</a>
+            <a href="#channels" className="inline-flex min-h-11 items-center hover:text-warm">کانال‌ها</a>
+            <a href="#plans" className="inline-flex min-h-11 items-center hover:text-warm">پلن‌ها</a>
             {LEGAL.map((item) => (
-              <a key={item.href} href={item.href} className="hover:text-warm">{item.label}</a>
+              <a key={item.href} href={item.href} className="inline-flex min-h-11 items-center hover:text-warm">{item.label}</a>
             ))}
-            <a href={panelOrigin || "https://app.sozan-core.ir"} className="hover:text-warm">ورود به پنل</a>
+            <a href={panelOrigin || "https://app.sozan-core.ir"} className="inline-flex min-h-11 items-center hover:text-warm">ورود به پنل</a>
           </nav>
           <div className="flex items-center gap-4">
             <div dangerouslySetInnerHTML={{ __html: ENAMAD_SEAL }} />

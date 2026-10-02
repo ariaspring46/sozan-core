@@ -125,7 +125,7 @@ export function BrandIdentitySection() {
 
   return (
     <Card className="space-y-4">
-      <div className="flex flex-wrap items-start gap-6">
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
         <div className="flex flex-col items-center gap-2">
           {hasCharacter ? (
             <AuthImage
@@ -137,7 +137,7 @@ export function BrandIdentitySection() {
           ) : (
             <div className="h-40 w-32 rounded-xl bg-paper" />
           )}
-          <label className="cursor-pointer text-sm text-warm">
+          <label className="inline-flex min-h-11 cursor-pointer items-center text-sm text-warm">
             بارگذاری کاراکتر
             <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={onFile("character")} />
           </label>
@@ -154,14 +154,14 @@ export function BrandIdentitySection() {
             <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={onFile("logo")} />
           </label>
         </div>
-        <div className="min-w-0 flex-1 space-y-3">
+        <div className="w-full min-w-0 space-y-3 sm:w-auto sm:min-w-[14rem] sm:flex-1">
           <h2 className="text-lg font-bold">هویت سوزان</h2>
           <Field label="نام">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
         </div>
       </div>
-      <Field label="توضیح کامل — کار‌ها و کاراکتر">
+      <Field label="توضیح کامل: کارها و کاراکتر">
         <Textarea
           className="min-h-64"
           value={description}

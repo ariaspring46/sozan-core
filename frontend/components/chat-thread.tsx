@@ -387,7 +387,7 @@ export function ChatThread({
                 ) : null}
                 {msg.role === "assistant" && msg.trainId ? <VoteButtons trainId={msg.trainId} /> : null}
                 {showTime && msg.at ? (
-                  <p className="mt-1 text-xs opacity-80">
+                  <p className={cn("mt-1 text-xs", msg.role !== "user" && "opacity-80")}>
                     {formatWhen(msg.at)}
                     {msg.status === "sending"
                       ? " · در حال ارسال…"

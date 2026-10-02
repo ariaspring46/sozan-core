@@ -3,57 +3,57 @@
  "owned_source_max": 80000,
  "roles": [
   {
-   "active": 52938,
-   "core": 39293,
-   "core_pct": 87,
+   "active": 53222,
+   "core": 39553,
+   "core_pct": 88,
    "id": "X1",
    "loose_contracts": 2,
    "manifest": 8925,
    "rare": 8819,
-   "tests": 26340
+   "tests": 26661
   },
   {
-   "active": 76005,
-   "core": 39779,
-   "core_pct": 88,
+   "active": 76805,
+   "core": 40060,
+   "core_pct": 89,
    "id": "X2",
    "loose_contracts": 6,
-   "manifest": 9870,
-   "rare": 45152,
-   "tests": 30370
+   "manifest": 9906,
+   "rare": 53628,
+   "tests": 31121
   },
   {
-   "active": 72457,
+   "active": 72949,
    "core": 15497,
    "core_pct": 34,
    "id": "X3",
    "loose_contracts": 19,
-   "manifest": 10262,
+   "manifest": 10286,
    "rare": 1208,
    "tests": 33819
   },
   {
-   "active": 73581,
+   "active": 74387,
    "core": 29023,
    "core_pct": 64,
    "id": "X4",
    "loose_contracts": 12,
    "manifest": 8916,
    "rare": 2323,
-   "tests": 26367
+   "tests": 27682
   },
   {
-   "active": 76201,
-   "core": 21155,
-   "core_pct": 47,
+   "active": 76789,
+   "core": 21408,
+   "core_pct": 48,
    "id": "X5",
    "loose_contracts": 27,
    "manifest": 11972,
-   "rare": 18591,
-   "tests": 47892
+   "rare": 19126,
+   "tests": 48735
   },
   {
-   "active": 64931,
+   "active": 65425,
    "core": 32543,
    "core_pct": 72,
    "id": "Y",
@@ -73,27 +73,27 @@
    "tests": 14831
   },
   {
-   "active": 56269,
+   "active": 56937,
    "core": 19799,
    "core_pct": 44,
    "id": "C",
    "loose_contracts": 14,
-   "manifest": 10505,
-   "rare": 0,
+   "manifest": 10622,
+   "rare": 11609,
    "tests": 16166
   },
   {
-   "active": 37712,
-   "core": 10399,
-   "core_pct": 23,
+   "active": 38921,
+   "core": 11355,
+   "core_pct": 25,
    "id": "U",
    "loose_contracts": 0,
-   "manifest": 8953,
-   "rare": 15872,
+   "manifest": 9008,
+   "rare": 20065,
    "tests": 0
   },
   {
-   "active": 208644,
+   "active": 208982,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",

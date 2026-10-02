@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "سوزان",
-  description: "فروشگاه در چت، استودیوی محتوا، تنظیمات سوزان",
+  description: "سوزان: ساخت فروشگاه، نوشتن پست و جواب دادن به مشتری، فقط با چت.",
 };
 
 export const viewport: Viewport = {

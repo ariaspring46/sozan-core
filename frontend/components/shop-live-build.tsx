@@ -405,7 +405,7 @@ function ShopLivePreview({
           </span>
         ) : (
           <span className="ms-auto px-2 py-1 text-xs text-muted">
-            {mode === "design" ? "روی المان بزن" : "در حال مرور"}
+            {mode === "design" ? "روی هر بخش سایت بزن" : "در حال مرور"}
           </span>
         )}
       </div>
@@ -510,7 +510,7 @@ function ShopPipeline({
   onRetry?: () => void;
 }) {
   const pipeline = build.pipeline || [];
-  const title = live ? build.stepLabel || "کارخانه در حال ساخت سایت است…" : "ساخت کامل نشد";
+  const title = live ? build.stepLabel || "سوزان در حال ساخت سایت است…" : "ساخت کامل نشد";
   return (
     <section
       className={cn(

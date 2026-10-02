@@ -97,8 +97,6 @@ export function DomainMenu({
   const live = shopPublicUrl(shop);
   const running = shop?.status === "running" || shop?.status === "queued";
   const hostLabel = Boolean(live) && !running && shop?.status !== "failed";
-  // نشانی سوزان بدون پسوند کوتاه نشان داده می‌شود؛ دامنهٔ شخصی کامل.
-  const shortLabel = hostLabel ? label.replace(/\.sozan-core\.ir$/i, "") : label;
   const label = running
     ? "در حال ساخت…"
     : shop?.status === "failed"
@@ -106,6 +104,8 @@ export function DomainMenu({
       : live
         ? shopHostLabel(live)
         : "بعد از ساخت سایت";
+  // نشانی سوزان بدون پسوند کوتاه نشان داده می‌شود؛ دامنهٔ شخصی کامل.
+  const shortLabel = hostLabel ? label.replace(/\.sozan-core\.ir$/i, "") : label;
 
   useEffect(() => {
     setMounted(true);
@@ -160,7 +160,7 @@ export function DomainMenu({
           {live
             ? "فروشگاه روی دامنهٔ سوزان زنده است. دامنهٔ شخصی را وقتی بگذار که در پنل دامنه‌ات یک رکورد CNAME به نشانی زیر ساخته باشی."
             : running
-              ? "کارخانه در حال ساخت است. پیشرفت را در چت می‌بینی."
+              ? "سوزان در حال ساخت سایت است. پیشرفت را در چت می‌بینی."
               : "اول در چت سبک و رنگ را بگو، بعد بگو بساز. دامنه بعد از آماده شدن سایت است."}
         </p>
         {live ? (

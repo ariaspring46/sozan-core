@@ -138,7 +138,7 @@ export default function OnboardPage() {
   async function finish(event?: FormEvent) {
     event?.preventDefault();
     if (!brandReady) {
-      setError("نام برند و کاری که انجام می‌دهید لازم است.");
+      setError("نام برند و کاری که می‌کنی لازم است.");
       setStep(2);
       return;
     }
@@ -278,7 +278,7 @@ export default function OnboardPage() {
             onSubmit={(event) => {
               event.preventDefault();
               if (!brandReady) {
-                setError("نام برند و کاری که انجام می‌دهید لازم است.");
+                setError("نام برند و کاری که می‌کنی لازم است.");
                 return;
               }
               setError("");
@@ -291,7 +291,7 @@ export default function OnboardPage() {
             <Field label="نام برند">
               <Input value={brandName} onChange={(event) => setBrandName(event.target.value)} />
             </Field>
-            <Field label="چه کاری انجام می‌دهید">
+            <Field label="چه کاری می‌کنی؟">
               <Textarea
                 className="min-h-24"
                 value={brandWork}

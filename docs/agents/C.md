@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.5k tokens. Your core files total 19.8k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.6k tokens. Your core files total 19.8k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -67,8 +67,8 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 19.8k | the files most tasks touch; read the relevant one first |
-| active | 56.3k | yours to edit; read only what the task needs |
-| rare | 0.0k | yours; read only when the task names it |
+| active | 56.9k | yours to edit; read only what the task needs |
+| rare | 11.6k | yours; read only when the task names it |
 | tests | 16.2k | read only the test of the module you change |
 
 **Core:**
@@ -83,10 +83,16 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `backend/app/api/`: `pay.py` (3.7k), `storefront.py` (2.9k)
 - `backend/app/services/`: `pay_service.py` (7.7k), `storefront_service.py` (5.5k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `shop_otp_service.py` (1.8k), `support_service.py` (1.6k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
-- `frontend/app/more/support/`: `page.tsx` (4.2k)
+- `frontend/app/more/support/`: `page.tsx` (4.3k)
 - `frontend/app/p/[id]/`: `page.tsx` (0.8k)
-- `frontend/components/`: `shop-settings-form.tsx` (8.6k), `product-editor.tsx` (5.1k), `inventory-catalog.tsx` (4.2k), `domain-menu.tsx` (3.4k)
+- `frontend/components/`: `shop-settings-form.tsx` (8.7k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.3k), `domain-menu.tsx` (3.7k)
 - `frontend/lib/`: `site-host.ts` (0.1k)
+
+**Rare (yours; only when the task names it):**
+
+- `docs/storefront/`: `after-c-test-1440.png` (0.0k), `after-c-test-390.png` (0.0k), `before-azmaish-1440.png` (0.0k), `before-azmaish-390.png` (0.0k)
+- `tools/monitor/`: `install.sh` (0.4k), `sozan_monitor.py` (7.1k), `status-nginx.conf` (0.3k)
+- `tools/storefront/`: `scan_storefront.py` (3.4k), `shop-closed.html` (0.3k)
 
 **Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
 

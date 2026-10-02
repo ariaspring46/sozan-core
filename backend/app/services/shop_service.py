@@ -79,7 +79,7 @@ SKINS = ("atelier", "street", "boutique")
 STEP_FA = {
     "archetype": "در حال فهمیدن نوع فروشگاه…",
     "DESIGN_27B": "در حال طراحی ظاهر و چیدن کالاها…",
-    "DESIGN_CLOUD": "در حال طراحی ابری ظاهر و کالاها…",
+    "DESIGN_CLOUD": "در حال طراحی ظاهر و چیدن کالاها…",
     "DESIGN_SKIPPED": "قالب آماده بود؛ در حال کپی…",
     "COMFY": "در حال ساخت تصویرها…",
     "COPY_TEMPLATE": "در حال ساخت صفحات سایت…",
@@ -90,7 +90,7 @@ STEP_FA = {
 STEP_DONE_FA = {
     "archetype": "فهم نوع فروشگاه",
     "DESIGN_27B": "طراحی ظاهر",
-    "DESIGN_CLOUD": "طراحی ابری",
+    "DESIGN_CLOUD": "طراحی ظاهر",
     "DESIGN_SKIPPED": "کپی قالب",
     "COMFY": "ساخت تصویرها",
     "COPY_TEMPLATE": "ساخت صفحات",
@@ -560,7 +560,7 @@ def _factory_env() -> dict[str, str]:
 def _run_factory(args: list[str]) -> dict:
     script = settings.factory_script
     if not script.is_file():
-        return {"ok": False, "error": "اسکریپت کارخانه پیدا نشد"}
+        return {"ok": False, "error": "سرویس ساخت سایت الان در دسترس نیست؛ چند دقیقه بعد دوباره امتحان کن."}
     try:
         # کارخانه httpx می‌خواهد؛ پایتون venv هاب آن را دارد، system python نه.
         proc = subprocess.run(
@@ -572,7 +572,7 @@ def _run_factory(args: list[str]) -> dict:
             env=_factory_env(),
         )
     except subprocess.TimeoutExpired:
-        return {"ok": False, "error": "کارخانه دیر جواب داد؛ دوباره تلاش کن."}
+        return {"ok": False, "error": "ساخت سایت دیر جواب داد؛ دوباره تلاش کن."}
     text = (proc.stdout or "").strip().splitlines()
     payload = {}
     if text:
@@ -587,10 +587,10 @@ def _run_factory(args: list[str]) -> dict:
         elif not payload.get("error"):
             payload["error"] = err
     elif not payload:
-        payload = {"ok": False, "error": "خروجی کارخانه نامعتبر است"}
+        payload = {"ok": False, "error": "پاسخ سرویس ساخت سایت درست نبود؛ دوباره امتحان کن."}
     if isinstance(payload, dict) and payload.get("error"):
         payload["error"] = _operator_error(str(payload["error"])) or SAFE_BUILD
-    return payload if isinstance(payload, dict) else {"ok": False, "error": "خروجی کارخانه نامعتبر است"}
+    return payload if isinstance(payload, dict) else {"ok": False, "error": "پاسخ سرویس ساخت سایت درست نبود؛ دوباره امتحان کن."}
 
 
 def _fastpath_root() -> Path:
@@ -712,7 +712,7 @@ def _operator_error(raw: str) -> str:
     if not text:
         return ""
     if "FileNotFoundError" in text or "job not found" in text or "load_job" in text:
-        return "شناسه این بیلد در کارخانه پیدا نشد."
+        return "نسخهٔ قبلی سایت پیدا نشد؛ بگو «فروشگاه را از نو بساز»."
     if "Traceback" in text or ".py\", line" in text or '.py", line' in text:
         return SAFE_BUILD
     if "price_missing" in text or "بدون قیمت تومان" in text or "قیمت کالاها ثبت نشده" in text:
@@ -724,7 +724,7 @@ def _operator_error(raw: str) -> str:
     if "readiness failed: image" in text:
         return "عکس کالاها کم بود؛ عکس بگذار یا بدون عکس بساز."
     if "gpu_busy" in text or "extra GPU1 LLMs still loaded" in text or "could not acquire RESOURCE_LOCK" in text:
-        return "پردازندهٔ کارخانه مشغول چت بود؛ چند لحظه بعد دوباره بساز."
+        return "سوزان الان مشغول است؛ چند لحظه بعد دوباره بساز."
     if "header search" in text or "data-sozan-search" in text:
         return "قالب جستجو در سربرگ نداشت."
     if "gateway_down" in text:
@@ -734,7 +734,7 @@ def _operator_error(raw: str) -> str:
     if "npm ERR" in text or "npm ci failed" in text or "npm install failed" in text:
         return "نصب بسته‌های فروشگاه شکست خورد."
     if "build incomplete" in text or "URL not serving" in text:
-        return "سایت روشن نشد؛ کارخانه در npm یا داکر ماند."
+        return "سایت روشن نشد؛ ساخت وسط کار متوقف شد. دوباره امتحان کن."
     line = text.splitlines()[-1].strip()
     if len(line) > 180 or line.startswith("File "):
         return SAFE_BUILD
@@ -912,7 +912,7 @@ def _seller_url(url: str) -> str:
 def _persian_build_text(build: dict) -> str:
     status = str(build.get("status") or "")
     if status in BUILD_BUSY:
-        label = str(build.get("stepLabel") or "") or "کارخانه در حال ساخت سایت است…"
+        label = str(build.get("stepLabel") or "") or "سوزان در حال ساخت سایت است…"
         return f"در حال ساخت فروشگاه. {label}"
     if status == "ready":
         if _missing_sellable_price(_shop()):
@@ -921,7 +921,7 @@ def _persian_build_text(build: dict) -> str:
         live = "سایت زنده است." if build.get("urlOk") or url else "ساخت تمام شد."
         return f"{live} {url}".strip()
     if status == "failed":
-        hint = _operator_error(str(build.get("error") or "")) or "کارخانه ساخت را تمام نکرد."
+        hint = _operator_error(str(build.get("error") or "")) or "ساخت سایت کامل نشد."
         done = STEP_DONE_FA.get(str(build.get("step") or ""), "")
         prefix = f"تا {done} رفت و کامل نشد." if done else "ساخت کامل نشد."
         return f"{prefix} {hint} اگر خواستی بگو دوباره بساز."

@@ -43,6 +43,24 @@ function tabActive(pathname: string, href: string, mobile: boolean) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** عنوان تب مرورگر برای هر بخش؛ در فهرست تب‌های گوشی معلوم باشد کدام صفحه است. */
+const PAGE_TITLES: readonly [string, string][] = [
+  ["/chat", "چت"],
+  ["/shop", "فروشگاه"],
+  ["/studio", "استودیو"],
+  ["/campaigns", "کمپین‌ها"],
+  ["/inbox", "صندوق"],
+  ["/sales", "فروش"],
+  ["/brand", "هویت و لوگو"],
+  ["/more/inventory", "انبار"],
+  ["/more/channels", "کانال‌ها"],
+  ["/more/wallet", "کیف پول"],
+  ["/more/settings", "پرداخت و پیامک"],
+  ["/more/support", "پشتیبانی"],
+  ["/more/docs", "اسناد آموزشی"],
+  ["/more", "بیشتر"],
+];
+
 function unreadLabel(count: number) {
   if (count > 9) return "۹+";
   return count.toLocaleString("fa-IR");
@@ -69,6 +87,11 @@ export function AppShell({
   const [typing, setTyping] = useState(false);
   const plan = usePlan();
   const aiBudget = useAiBudget();
+
+  useEffect(() => {
+    const hit = PAGE_TITLES.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+    document.title = hit ? `${hit[1]} · سوزان` : "سوزان";
+  }, [pathname]);
 
   // رنگ نوار مرورگر را با تم انتخابی هم‌راستا کن (اسکریپت head ممکن است قبل از متاها اجرا شده باشد).
   useEffect(() => {
