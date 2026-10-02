@@ -1,0 +1,106 @@
+{
+ "core_max": 45000,
+ "owned_source_max": 80000,
+ "roles": [
+  {
+   "active": 52938,
+   "core": 39293,
+   "core_pct": 87,
+   "id": "X1",
+   "loose_contracts": 2,
+   "manifest": 8925,
+   "rare": 8819,
+   "tests": 26340
+  },
+  {
+   "active": 76005,
+   "core": 39779,
+   "core_pct": 88,
+   "id": "X2",
+   "loose_contracts": 6,
+   "manifest": 9870,
+   "rare": 45152,
+   "tests": 30370
+  },
+  {
+   "active": 72457,
+   "core": 15497,
+   "core_pct": 34,
+   "id": "X3",
+   "loose_contracts": 19,
+   "manifest": 10262,
+   "rare": 1208,
+   "tests": 33819
+  },
+  {
+   "active": 73581,
+   "core": 29023,
+   "core_pct": 64,
+   "id": "X4",
+   "loose_contracts": 12,
+   "manifest": 8916,
+   "rare": 2323,
+   "tests": 26367
+  },
+  {
+   "active": 76201,
+   "core": 21155,
+   "core_pct": 47,
+   "id": "X5",
+   "loose_contracts": 27,
+   "manifest": 11972,
+   "rare": 18591,
+   "tests": 47892
+  },
+  {
+   "active": 64931,
+   "core": 32543,
+   "core_pct": 72,
+   "id": "Y",
+   "loose_contracts": 12,
+   "manifest": 9639,
+   "rare": 19762,
+   "tests": 35711
+  },
+  {
+   "active": 79109,
+   "core": 33408,
+   "core_pct": 74,
+   "id": "Z",
+   "loose_contracts": 0,
+   "manifest": 4947,
+   "rare": 29390,
+   "tests": 14831
+  },
+  {
+   "active": 56269,
+   "core": 19799,
+   "core_pct": 44,
+   "id": "C",
+   "loose_contracts": 14,
+   "manifest": 10505,
+   "rare": 0,
+   "tests": 16166
+  },
+  {
+   "active": 37712,
+   "core": 10399,
+   "core_pct": 23,
+   "id": "U",
+   "loose_contracts": 0,
+   "manifest": 8953,
+   "rare": 15872,
+   "tests": 0
+  },
+  {
+   "active": 208644,
+   "core": 0,
+   "core_pct": 0,
+   "id": "OWNER",
+   "loose_contracts": 0,
+   "manifest": 3446,
+   "rare": 0,
+   "tests": 0
+  }
+ ]
+}
