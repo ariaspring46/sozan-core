@@ -86,7 +86,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 |---|---|---|
 | core | 10.4k | the files most tasks touch; read the relevant one first |
 | active | 37.7k | yours to edit; read only what the task needs |
-| rare | 15.9k | yours; read only when the task names it |
+| rare | 18.5k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
 **Core:**
@@ -120,6 +120,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/components/`: `auth-image.tsx` (0.3k), `auth-media.tsx` (0.5k), `landing-slogan-rotator.tsx` (0.4k), `legal-page.tsx` (0.7k), `login-coder-scene.tsx` (1.1k)
 - `frontend/public/`: `2326207.txt` (0.0k), `sozan-mark-legacy.png` (0.0k), `sozan-mark.png` (0.0k), `sozan-preview-beacon.js` (2.9k)
 - `frontend/public/fonts/`: `OFL.txt` (1.4k), `estedad-arabic.woff2` (0.0k), `estedad-latin.woff2` (0.0k)
+- `tools/`: `ui_live_audit.mjs` (2.6k)
 
 **Yours but never read** (generated or huge; change only through its script): `docs/ui-audit-live/00-login-390-light.png` (0.0k), `docs/ui-audit-live/act-chat-steps-390.png` (0.0k), `docs/ui-audit-live/act-settings-plan-390.png` (0.0k), `docs/ui-audit-live/act-settings-saved-390.png` (0.0k), `docs/ui-audit-live/campaigns-1440-dark.png` (0.0k), `docs/ui-audit-live/campaigns-1440-light.png` (0.0k), `docs/ui-audit-live/campaigns-390-dark.png` (0.0k), `docs/ui-audit-live/campaigns-390-light.png` (0.0k), `docs/ui-audit-live/channels-1440-dark.png` (0.0k), `docs/ui-audit-live/channels-1440-light.png` (0.0k), `docs/ui-audit-live/channels-390-dark.png` (0.0k), `docs/ui-audit-live/channels-390-light.png` (0.0k), `docs/ui-audit-live/chat-1440-dark.png` (0.0k), `docs/ui-audit-live/chat-1440-light.png` (0.0k), `docs/ui-audit-live/chat-390-dark.png` (0.0k), `docs/ui-audit-live/chat-390-light.png` (0.0k), `docs/ui-audit-live/findings.json` (35.4k), `docs/ui-audit-live/inbox-1440-dark.png` (0.0k), `docs/ui-audit-live/inbox-1440-light.png` (0.0k), `docs/ui-audit-live/inbox-390-dark.png` (0.0k), `docs/ui-audit-live/inbox-390-light.png` (0.0k), `docs/ui-audit-live/inventory-1440-dark.png` (0.0k), `docs/ui-audit-live/inventory-1440-light.png` (0.0k), `docs/ui-audit-live/inventory-390-dark.png` (0.0k), `docs/ui-audit-live/inventory-390-light.png` (0.0k), `docs/ui-audit-live/more-1440-dark.png` (0.0k), `docs/ui-audit-live/more-1440-light.png` (0.0k), `docs/ui-audit-live/more-390-dark.png` (0.0k), `docs/ui-audit-live/more-390-light.png` (0.0k), `docs/ui-audit-live/onboard-1440-dark.png` (0.0k), `docs/ui-audit-live/onboard-1440-light.png` (0.0k), `docs/ui-audit-live/onboard-390-dark.png` (0.0k), `docs/ui-audit-live/onboard-390-light.png` (0.0k), `docs/ui-audit-live/onboard-result.txt` (0.1k), `docs/ui-audit-live/sales-1440-dark.png` (0.0k), `docs/ui-audit-live/sales-1440-light.png` (0.0k), `docs/ui-audit-live/sales-390-dark.png` (0.0k), `docs/ui-audit-live/sales-390-light.png` (0.0k), `docs/ui-audit-live/settings-1440-dark.png` (0.0k), `docs/ui-audit-live/settings-1440-light.png` (0.0k), `docs/ui-audit-live/settings-390-dark.png` (0.0k), `docs/ui-audit-live/settings-390-light.png` (0.0k), `docs/ui-audit-live/shop-1440-dark.png` (0.0k), `docs/ui-audit-live/shop-1440-light.png` (0.0k), `docs/ui-audit-live/shop-390-dark.png` (0.0k), `docs/ui-audit-live/shop-390-light.png` (0.0k), `docs/ui-audit-live/studio-1440-dark.png` (0.0k), `docs/ui-audit-live/studio-1440-light.png` (0.0k), `docs/ui-audit-live/studio-390-dark.png` (0.0k), `docs/ui-audit-live/studio-390-light.png` (0.0k), `docs/ui-audit-live/wallet-1440-dark.png` (0.0k), `docs/ui-audit-live/wallet-1440-light.png` (0.0k), `docs/ui-audit-live/wallet-390-dark.png` (0.0k), `docs/ui-audit-live/wallet-390-light.png` (0.0k), `frontend/package-lock.json` (22.7k)
 
@@ -285,7 +286,7 @@ The system works only if every step of every flow keeps its promise. When your c
 - X4/X2/X5/Y: the tool runs: edit_shop, studio_chat, settings, auto-reply
 ```bash
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
-  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_embed_test 2>&1 | tail -3
+  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.services.router_embed_test 2>&1 | tail -3
 ```
 
 **F10 — Panel UI**

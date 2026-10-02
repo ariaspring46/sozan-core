@@ -10,9 +10,10 @@ from contextvars import ContextVar
 from pathlib import Path
 from uuid import uuid4
 
-from app.services import router_embed
+from app.services import router_embed, router_text
 from app.services.observe_client import emit_later
-from app.services.persian_text import guard_output
+from app.services.persian_text import REFUSAL_GENERIC, guard_output
+from app.services.pii_mask import mask_pii
 from app.services.tenant_lock import tenant_file_lock
 from app.state_store import current_tenant, read_json, write_json
 
@@ -58,6 +59,11 @@ TRACE_MAX_BYTES = 2_000_000
 CARD_TTL = 86400  # ۲۴ ساعت — ثانیه نبود (ریویو Z)
 CARD_EXPIRED = "کارت قبلی منقضی شد؛ دوباره بگو."
 STILL_WRITING = "هنوز جواب قبلی را می‌نویسم."
+BUDGET_CAPPED = (
+    "سهم هوش مصنوعی امروزت تمام شد. فردا دوباره کار می‌کند یا می‌توانی پلن را ارتقا بدهی؛ "
+    "تا آن موقع کارهای ساده مثل وضعیت و دامنه جواب می‌دهند."
+)
+CLARIFY_FALLBACK = "دقیق‌تر بگو چه کاری انجام دهم: فروشگاه، پست یا صندوق."
 _AUTO_MODES = {"", "draft", "send"}
 _STUDIO_FIELDS = ("campaignId", "captions", "attachments", "compose", "mediaKind", "mediaName", "published")
 _TOOL_RANK = {
@@ -118,7 +124,7 @@ def _flush_trace(out: dict) -> None:
         handle.write(json.dumps(safe, ensure_ascii=False) + "\n")
 _PERSIAN = re.compile(r"[\u0600-\u06FF]")
 _UNSAFE_ERROR = re.compile(r"[/\\]|traceback|\.py\b|https?://|exception", re.I)
-HOLD_PENDING = "اول کارت باز را تأیید یا انصراف بده."
+HOLD_PENDING = "اول دکمهٔ «تأیید» یا «انصراف» کارت بالا را بزن؛ نوشتن «بله» کافی نیست."
 
 TOOLS = [
     {
@@ -319,8 +325,12 @@ def new_thread() -> dict:
     with tenant_file_lock("router"):
         index = _ensure_index_locked()
         threads = [item for item in (index.get("threads") or []) if isinstance(item, dict) and item.get("id")]
-        if len(threads) >= MAX_THREADS:
-            raise ValueError("ظرفیت گفتگو پر است. یکی را ببند یا از همان‌ها ادامه بده.")
+        while len(threads) >= MAX_THREADS:
+            oldest = threads.pop()
+            from app.state_store import tenant_dir
+
+            for name in (_msg_name(str(oldest.get("id"))), _pend_name(str(oldest.get("id")))):
+                (tenant_dir() / name).unlink(missing_ok=True)
         tid = uuid4().hex[:12]
         threads.insert(0, {"id": tid, "title": "گفتگوی تازه", "at": int(time.time())})
         index["threads"] = threads
@@ -433,14 +443,14 @@ def _fact_reply(spoken: str) -> str:
         from app.services.wallet_service import get as wallet_get
 
         amount = int((wallet_get() or {}).get("available") or 0)
-        return f"موجودی کیف {amount} تومان است."
+        return f"موجودی کیف پول {router_text.fa_money(amount)} تومان است."
     if topic == "plan":
         from app.services.plan_service import snapshot as plan_snapshot
 
         plan = _fa_status((plan_snapshot() or {}).get("plan") or "")
         row = _usage_row()
         left = max(0, DAILY_TURNS - int(row.get("turns") or 0))
-        return f"پلن {plan} است. از سقف چت امروز {left} نوبت مانده."
+        return f"پلن {plan} است. از سقف چت امروز {router_text.fa_digits(left)} نوبت مانده."
     if topic == "channel_status":
         from app.services.channel_service import list_accounts
 
@@ -458,7 +468,7 @@ def _fact_reply(spoken: str) -> str:
         from app.services.storefront_service import list_products
 
         count = len(list_products().get("products") or [])
-        return f"{count} کالا در کاتالوگ است."
+        return f"{router_text.fa_digits(count)} کالا در کاتالوگ است."
     if topic == "stock":
         from app.services.storefront_service import list_products
 
@@ -467,10 +477,16 @@ def _fact_reply(spoken: str) -> str:
         hit = max(titled, key=lambda row: len(str(row.get("title") or ""))) if titled else None
         if hit is None:
             ask = text.replace("موجودی", "").replace("؟", "").replace("?", "").strip()
-            hit = next((row for row in rows if len(ask) >= 2 and ask in str(row.get("title") or "")), None)
+            matches = [row for row in rows if len(ask) >= 2 and ask in str(row.get("title") or "")]
+            if len(matches) > 1:
+                return "چند مورد داری: " + "، ".join(
+                    f"«{row.get('title')}» {router_text.fa_digits(int(row.get('stock') or 0))}" for row in matches[:3]
+                ) + ". کدام را می‌خواهی؟"
+            hit = matches[0] if matches else None
         if hit is None:
             return "این کالا را در کاتالوگ پیدا نکردم."
-        return f"موجودی «{hit.get('title')}» {int(hit.get('stock') or 0)} است."
+        count = int(hit.get("stock") or 0)
+        return f"موجودی «{hit.get('title')}» {router_text.fa_digits(count)} است." + (" (تمام شده)" if count == 0 else "")
     if topic == "shop_name":
         brand = str(_shop_row().get("brand") or "").strip()
         return f"اسم فروشگاه {brand} است." if brand else "اسم فروشگاه ثبت نشده."
@@ -498,10 +514,15 @@ def _fact_reply(spoken: str) -> str:
             titled = [row for row in rows if str(row.get("title") or "") and str(row.get("title")) in text]
             hit = max(titled, key=lambda row: len(str(row.get("title") or ""))) if titled else None
             if hit is None:
-                hit = next((row for row in rows if needle in str(row.get("title") or "")), None)
+                matches = [row for row in rows if needle in str(row.get("title") or "")]
+                if len(matches) > 1:
+                    return "چند مورد داری: " + "، ".join(
+                        f"«{row.get('title')}» {router_text.fa_money(row.get('price'))} تومان" for row in matches[:3]
+                    ) + ". کدام را می‌خواهی؟"
+                hit = matches[0] if matches else None
             if hit is None:
                 return "این کالا را در کاتالوگ پیدا نکردم."
-            return f"قیمت «{hit.get('title')}» {int(hit.get('price') or 0)} تومان است."
+            return f"قیمت «{hit.get('title')}» {router_text.fa_money(hit.get('price'))} تومان است."
         return ""
     if topic == "site_up":
         return f"بله. فروشگاه روی {host} باز است." if host else "هنوز ویترینی ساخته نشده."
@@ -515,10 +536,40 @@ def _shop_public() -> str:
     return str(shop.get("url") or shop.get("publicHost") or shop.get("domain") or "").strip()
 
 
+_FRESH_COMMAND = re.compile(r"بساز|بگو|حذف|اضافه|عوض|تغییر|بفرست|منتشر|نشان|نشون|مخفی|پنهان|وضعیت|چنده|چقدر|چیه|چیست|\?|؟|کن\b")
+
+
+def _merge_followup(spoken: str) -> str:
+    """A short answer to Sozan's own question («درباره ما» after «کدام صفحه؟») continues that request."""
+    rows = [row for row in _messages()[:-1] if isinstance(row, dict)]
+    if len(rows) < 2:
+        return spoken
+    asked, before = rows[-1], rows[-2]
+    if asked.get("role") != "assistant" or asked.get("kind") != "ask" or before.get("role") != "user":
+        return spoken
+    if len(spoken.split()) > 5 or _FRESH_COMMAND.search(spoken):
+        return spoken
+    base = router_text.squeeze(str(before.get("text") or ""))
+    return f"{base}. {spoken}"[:800] if base else spoken
+
+
+def _clarify_extra(text: str) -> dict:
+    """A question the gate asks is shown as a question (with chips when the answers are known)."""
+    from app.services.shop_intent_service import CLARIFY_PAGE, PAGE_LABELS
+
+    if text == CLARIFY_PAGE:
+        return {"kind": "ask", "options": list(PAGE_LABELS.values())}
+    if text in {"کدام کالا حذف شود؟", "نام کالا چیست؟", "متن هدر چه باشد؟", _registry_text("continue_ask")}:
+        return {"kind": "ask"}
+    return {}
+
+
 def _chooser_history(spoken: str) -> list[dict]:
+    """System line and this turn only: earlier prose made the model answer in prose instead of calling a tool.
+    A short answer to Sozan's own question is joined to the question's request by _merge_followup."""
     return [
         {"role": "system", "content": _system_prompt()},
-        {"role": "user", "content": spoken[:800]},
+        {"role": "user", "content": router_text.mask_payment(spoken)[:800]},
     ]
 
 
@@ -558,9 +609,8 @@ def _continue_reply(spoken: str) -> str:
     pending = _pending()
     if _card_open(pending):
         return str(pending.get("summary") or "همان کارت باز است.")
-    prior = _last_content_line()
-    if prior:
-        return prior
+    if _last_content_line():
+        return f"آخرین پست «{_content_label()}» است. بگو چه چیزش عوض شود یا کجا منتشر شود."
     return _registry_text("continue_ask")
 
 
@@ -590,6 +640,14 @@ def _studio_without_post(spoken: str) -> str:
 
 
 def _direct_reply(spoken: str) -> str:
+    from app.services.turn_parse import parse_turn as _parse
+
+    if router_text.has_payment_number(spoken):
+        return router_text.SENSITIVE_REPLY
+    if _parse(spoken).topic not in {"secret", "shaba", "other_shop"}:
+        quick = router_text.social_reply(spoken) or router_text.redirect_reply(spoken)
+        if quick:
+            return quick
     fact = _fact_reply(spoken)
     if fact:
         return fact
@@ -700,6 +758,23 @@ def _remember_content(extra: dict) -> None:
     )
 
 
+def _content_label(campaign_id: str = "") -> str:
+    """What the seller calls this post: the start of its caption, never its id."""
+    from app.services.studio_chat_service import snapshot as studio_snapshot
+
+    wanted = str(campaign_id or "").strip()
+    for item in reversed(studio_snapshot().get("messages") or []):
+        if not isinstance(item, dict) or item.get("role") == "user":
+            continue
+        cid = str(item.get("campaignId") or "").strip()
+        if not cid or (wanted and cid != wanted):
+            continue
+        captions = item.get("captions") if isinstance(item.get("captions"), dict) else {}
+        label = _data_line(str(captions.get("instagram") or captions.get("telegram") or item.get("text") or ""), 36)
+        return label or "پست قبلی"
+    return "پست قبلی"
+
+
 def _last_content_line() -> str:
     campaign = thread_campaign_id()
     if campaign:
@@ -723,8 +798,15 @@ def _wants_studio(spoken: str) -> bool:
     return turn.act == "studio"
 
 
+_HOSTILE = re.compile(r"ignore|system prompt|پرامپت|دستورالعمل|jailbreak|\bdan\b|فراموش کن|secret|token|api[_-]?key", re.I)
+
+
 def _polish_model_text(spoken: str, reply: str, finish: str) -> str:
-    return _guard_reply(spoken, guard_output(reply, finish=finish))
+    out = guard_output(reply, finish=finish)
+    if out == REFUSAL_GENERIC and not (_HOSTILE.search(spoken or "") or _NEVER_RE.search(spoken or "")):
+        # مدل انگلیسی رد کرده ولی خواستهٔ فروشنده بی‌خطر است: جملهٔ «جواب نمی‌دهم» گمراه‌کننده است، سؤال روشن بهتر است.
+        return CLARIFY_FALLBACK
+    return _guard_reply(spoken, out)
 
 
 def _system_prompt() -> str:
@@ -828,7 +910,7 @@ def _append_user(spoken: str, media: dict | None) -> None:
     if isinstance(media, dict) and media.get("kind") and media.get("name"):
         extra["mediaKind"] = media.get("kind")
         extra["mediaName"] = media.get("name")
-    _append("user", spoken or _attachment_label(media), **extra)
+    _append("user", router_text.mask_payment(spoken) or _attachment_label(media), **extra)
 
 
 _TONE_FA = {"warm": "گرم", "formal": "رسمی", "street": "جوان و خیابانی", "luxury": "لوکس"}
@@ -896,6 +978,9 @@ def _route_shop(name: str, spoken: str, view_path: str, view_target: str) -> tup
         return name, "این پیام ویرایش فروشگاه نیست."
     parsed = catalog_add(spoken)
     if parsed is not None:
+        bad_price = router_text.price_problem(spoken, int(parsed.get("price") or 0))
+        if bad_price:
+            return "add_product", bad_price
         if int(parsed.get("price") or 0) > 0:
             return "add_product", ""
         return "add_product", "قیمت تومان را هم بگو تا در کاتالوگ بنویسم."
@@ -1056,15 +1141,29 @@ def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = ""
         tone = _TONE_FA.get(str(args.get("toneId") or ""), "؟")
         return f"لحن دایرکت بشود {tone}؟"
     if name == "add_product":
-        mut = _mutation(_shop_actions(spoken, view_path, view_target))
-        if mut and str(mut.get("type") or "") == "add_product":
-            return f"«{mut.get('title')}» با قیمت {mut.get('price')} تومان به کاتالوگ اضافه شود؟"
+        added = next(
+            (item for item in _shop_actions(spoken, view_path, view_target) if str(item.get("type") or "") == "add_product"),
+            None,
+        )
+        if added:
+            return f"«{added.get('title')}» با قیمت {router_text.fa_money(added.get('price'))} تومان به کاتالوگ اضافه شود؟"
         return "این کالا به کاتالوگ اضافه شود؟"
     if name == "edit_shop":
         mut = _mutation(_shop_actions(spoken, view_path, view_target))
         kind = str((mut or {}).get("type") or "")
         if kind == "set_colors":
-            return "رنگ فروشگاه عوض شود؟"
+            from app.services.shop_edit_service import NAMED_COLORS
+
+            color = next((word for word in NAMED_COLORS if word in spoken), "")
+            part = "پس‌زمینهٔ" if ("پس‌زمینه" in spoken or "پس زمینه" in spoken) else "رنگ"
+            where = "" if part == "پس‌زمینهٔ" else " فروشگاه"
+            return f"{part}{where} «{color}» شود؟" if color else "رنگ فروشگاه عوض شود؟"
+        if kind == "create_page":
+            from app.services.shop_intent_service import PAGE_LABELS, page_kind_from_text
+
+            label = PAGE_LABELS.get(page_kind_from_text(spoken), "")
+            if label:
+                return f"صفحهٔ «{label}» به سایت اضافه شود؟"
         if kind == "hide_prices":
             return "قیمت روی سایت پنهان شود؟"
         if kind == "show_prices":
@@ -1079,18 +1178,35 @@ def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = ""
 
         cid = str(args.get("campaignId") or "").strip()
         if cid and parse_turn(spoken).revise:
-            return f"کپشن پست {cid} عوض شود؟"
-        return "این پست ساخته شود؟"
+            return f"کپشن پست «{_content_label(cid)}» عوض شود؟"
+        turn = parse_turn(spoken)
+        if any(word in spoken for word in ("ویدیو", "ریلز", "ریل")):
+            kind = "ویدیو"
+        elif "استوری" in spoken:
+            kind = "استوری"
+        elif "کپشن" in spoken or "بنویس" in spoken:
+            kind = "کپشن"
+        elif ("عکس" in spoken or "تصویر" in spoken) and "پست" not in spoken:
+            kind = "عکس"
+        else:
+            kind = "پست"
+        platform = {"instagram": "اینستاگرام", "telegram": "تلگرام", "whatsapp": "واتساپ"}.get(turn.platform, "")
+        subject = turn.subject if len(turn.subject) >= 2 and not re.search(r"بنویس|نساز|بساز|بگو|ویدیو|ریلز|استوری|پست|عکس|تصویر|کپشن|\d", turn.subject) else ""
+        return " ".join(part for part in (kind, platform) if part) + (f" برای «{subject}»" if subject else "") + " ساخته شود؟"
     if name == "publish_post":
         platform = str(args.get("platform") or "")
         who = str(args.get("recipientName") or "").strip()
         cid = str(args.get("campaignId") or "").strip()
         if platform == "instagram" and who:
             return f"این پیام برای {who} در دایرکت اینستاگرام فرستاده شود؟"
+        post = _latest_post(spoken, campaign_id=cid) or {}
+        captions = post.get("captions") if isinstance(post.get("captions"), dict) else {}
+        preview = _data_line(str(captions.get(platform) or captions.get("instagram") or post.get("text") or ""), 80)
+        tail = f"\n«{preview}»" if preview else ""
         if platform == "instagram":
-            return f"پست {cid} در اینستاگرام منتشر شود؟" if cid else "این پست در اینستاگرام منتشر شود؟"
+            return f"این پست در اینستاگرام منتشر شود؟{tail}"
         label = _PUBLISH_FA.get(platform, "کانال")
-        return f"این پست در {label} فرستاده شود؟"
+        return f"این پست در {label} فرستاده شود؟{tail}"
     if name == "shop_chat":
         return "فروشگاه از نو ساخته شود؟"
     return "این تغییر اعمال شود؟"
@@ -1204,16 +1320,36 @@ def _domain_ok(shop: dict) -> bool:
     return not domain or domain == host
 
 
+_CHANNEL_FA = {"instagram": "اینستاگرام", "telegram": "تلگرام", "rubika": "روبیکا", "whatsapp": "واتساپ"}
+
+
 def _format_status(data: dict) -> str:
     chans = data.get("channels") or []
-    chan = "، ".join(f"{c.get('platform')} {'وصل' if c.get('connected') else 'قطع'}" for c in chans) if chans else "—"
-    text = (
-        f"فروشگاه {_fa_status(data.get('shopStatus'))} · اسکن {_fa_status(data.get('scanStatus'))} · "
-        f"بیلد {_fa_status(data.get('buildStatus'))} · دامنه {'درست' if data.get('cnameOk') else 'ناقص'} · "
-        f"پلن {_fa_status(data.get('plan'))} · کیف {data.get('walletAvailable') or 0} · کانال {chan}"
+    chan = "، ".join(
+        f"{_CHANNEL_FA.get(str(c.get('platform')), c.get('platform'))} {'وصل است' if c.get('connected') else 'وصل نیست'}"
+        for c in chans
     )
-    if "failed" in (str(data.get("shopStatus") or ""), str(data.get("buildStatus") or "")):
-        text += "\nساخت فروشگاه کامل نشد. بگو «فروشگاه را از نو بساز» تا دوباره بسازم."
+    state = str(data.get("shopStatus") or "")
+    build = str(data.get("buildStatus") or "")
+    host = _shop_public()
+    if "failed" in (state, build):
+        shop_line = "ساخت فروشگاه کامل نشد."
+    elif state in {"running", "queued"} or build in {"running", "queued"}:
+        shop_line = "فروشگاه در حال ساخت است."
+    elif state == "ready":
+        shop_line = f"فروشگاه آماده است: {host}" if host else "فروشگاه آماده است."
+    else:
+        shop_line = "فروشگاه هنوز ساخته نشده."
+    lines = [
+        shop_line,
+        f"دامنه: {'وصل است' if data.get('cnameOk') else 'هنوز وصل نشده'}",
+        f"پلن: {_fa_status(data.get('plan'))}",
+        f"موجودی کیف پول: {router_text.fa_money(data.get('walletAvailable') or 0)} تومان",
+        f"کانال‌ها: {chan or 'هنوز وصل نشده'}",
+    ]
+    text = "\n".join(lines)
+    if "failed" in (state, build):
+        text += "\nبگو «فروشگاه را از نو بساز» تا دوباره بسازم."
     return text
 
 
@@ -1232,7 +1368,10 @@ async def _inbox_payload() -> dict:
 
 def _format_inbox(data: dict) -> str:
     mode = {"": "خاموش", "draft": "پیش‌نویس", "send": "ارسال"}.get(str(data.get("autoReply") or ""), "خاموش")
-    return f"خوانده‌نشده: {data.get('unread') or 0} · پاسخ خودکار: {mode} · گفتگوها: {data.get('threadCount') or 0}"
+    return (
+        f"خوانده‌نشده: {router_text.fa_digits(data.get('unread') or 0)} · پاسخ خودکار: {mode} · "
+        f"گفتگوها: {router_text.fa_digits(data.get('threadCount') or 0)}"
+    )
 
 
 def _last_assistant(out: dict) -> dict:
@@ -1575,6 +1714,9 @@ def route_tool(spoken: str, view_path: str = "", view_target: str = "") -> str:
         return "add_product"
     if kinds & {"create_page", "set_colors", "show_prices", "hide_prices", "remove_product"}:
         return "edit_shop"
+    turn = parse_turn(spoken)
+    if turn.topic == "status" and not turn.write:
+        return "inbox_status" if any(word in spoken for word in ("صندوق", "دایرکت", "پیام", "اینباکس")) else "status"
     if _wants_advice(spoken):
         return "shop_chat"
     if _wants_studio(spoken):
@@ -1670,8 +1812,9 @@ async def _execute(
     view_target: str = "",
     embed=None,
 ) -> dict:
-    spoken = (text or "").strip()
-    _TURN_TRACE.set({"text": spoken[:400], "path": "", "tool": "", "arguments": {}})
+    original = (text or "").strip()
+    spoken = router_text.squeeze(original)
+    _TURN_TRACE.set({"text": mask_pii(spoken)[:400], "path": "", "tool": "", "arguments": {}})
     pending = _pending()
     if cancel_id and pending.get("id") == cancel_id:
         tool = str(pending.get("tool") or "")
@@ -1712,18 +1855,20 @@ async def _execute(
     pending_open = _card_open(pending)
     if pending.get("id") and not pending_open:
         _clear_pending()
-        _append_user(spoken, media if isinstance(media, dict) else None)
+        _append_user(original, media if isinstance(media, dict) else None)
         _append("assistant", CARD_EXPIRED)
         return snapshot()
     if _over_daily_cap(_usage_row()):
-        _append_user(spoken, media if isinstance(media, dict) else None)
+        _append_user(original, media if isinstance(media, dict) else None)
         _append("assistant", "برای امروز کافی است؛ فردا دوباره از چت استفاده کن.")
         return snapshot()
-    _append_user(spoken, media if isinstance(media, dict) else None)
+    _append_user(original, media if isinstance(media, dict) else None)
+    spoken = _merge_followup(spoken)
     choice = decide(spoken, view_path, view_target)
     if choice["kind"] == "direct":
         _trace(path="gate")
-        _append("assistant", str(choice.get("text") or ""))
+        direct_text = str(choice.get("text") or "")
+        _append("assistant", direct_text, **_clarify_extra(direct_text))
         return snapshot()
     if pending_open and not any(mark in spoken for mark in ("وضعیت", "صندوق", "خوانده")):
         _append("assistant", HOLD_PENDING)
@@ -1749,12 +1894,18 @@ async def _execute(
         try:
             try:
                 result = await completer(history, TOOLS)
-            except Exception:
+            except Exception as first:
+                if getattr(first, "budget_capped", False):
+                    raise
                 # قطعی کوتاه مدل یا شبکه: یک بار بی‌صدا دوباره می‌پرسیم.
                 await asyncio.sleep(1.0)
                 result = await completer(history, TOOLS)
-        except Exception:
+        except Exception as exc:
             _trace(path="model")
+            if getattr(exc, "budget_capped", False):
+                _append("assistant", BUDGET_CAPPED)
+                _emit("router-budget-capped", {"reason": str(exc)[:40]}, status="error")
+                return snapshot()
             _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
             _emit("router-llm-fail", {"error": "unreachable"}, status="error")
             return snapshot()

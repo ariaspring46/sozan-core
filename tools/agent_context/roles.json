@@ -43,6 +43,9 @@
       "owns": [
         "backend/app/services/router_service.py",
         "backend/app/services/router_embed.py",
+        "backend/app/services/router_text.py",
+        "backend/app/services/router_text_test.py",
+        "backend/app/services/router_chat_behavior_test.py",
         "backend/app/services/turn_parse.py",
         "backend/app/services/fallback_tally.py",
         "backend/app/services/persian_text.py",
@@ -56,6 +59,8 @@
         "frontend/components/typing-hints.tsx",
         "tools/qa50_battery.json",
         "tools/qa50_battery.py",
+        "tools/chat_scenarios.json",
+        "tools/chat_scenarios.py",
         "tools/qa_battery.py",
         "tools/agentic_probes/p_router.py",
         "tools/agentic_probes/p_router_lock.py",
@@ -901,6 +906,8 @@
         "app.services.router_service_test",
         "app.api.router_chat_test",
         "app.services.turn_parse_test",
+        "app.services.router_text_test",
+        "app.services.router_chat_behavior_test",
         "app.services.router_embed_test"
       ]
     },

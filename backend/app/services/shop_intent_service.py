@@ -23,10 +23,13 @@ PAGE_HINTS = (
     ("contact", ("تماس با ما", "تماس", "ارتباط", "contact")),
     ("story", ("داستان برند", "قصه ما", "داستان", "قصه", "story")),
 )
-SHOW_PRICE_RE = re.compile(r"قیمت(?:‌?ها)?\s*(?:را\s*)?(?:نشان|بذار|بگذار|بزن)|با\s*قیمت")
+SHOW_PRICE_RE = re.compile(r"قیمت(?:‌?ها|ا)?\s*(?:را\s*|رو\s*)?(?:نشان|نشون|نمایش|بذار|بگذار|بزن)|با\s*قیمت")
+_HIDE_WORDS = r"(?:مخفی|پنهان|پنهون|قایم|نمایش\s*نده|نشان\s*نده|نشون\s*نده)"
 HIDE_PRICE_RE = re.compile(
-    r"قیمت\s*نزن|بدون قیمت|قیمت\s*نذار|قیمت\s*نگذار|پنهان.{0,12}قیمت|قیمت.{0,12}پنهان|مخفی.{0,16}قیمت|قیمت.{0,16}مخفی"
+    r"قیمت\s*نزن|بدون قیمت|قیمت\s*نذار|قیمت\s*نگذار|" + _HIDE_WORDS + r".{0,16}قیمت|قیمت.{0,16}" + _HIDE_WORDS
 )
+PUT_ON_SITE_RE = re.compile(r"(?:بذار|بگذار|بزار)(?:\s*(?:تو|توی|در|به))?\s*(?:سایت|ویترین|فروشگاه|کاتالوگ)")
+COLOR_CUE_RE = re.compile(r"رنگ|\bتم\b|پس.?زمینه|اکسنت|تاکید|دکمه|هدر|نوار|سبک|حس|سایت را|فروشگاه را|ویترین را")
 FROM_PAGE = ("از پیج", "از داخل پیج", "از کانال", "از اینستا")
 CREATE_PAGE_RE = re.compile(r"صفحه.{0,24}(?:بساز|درست کن|اضافه)|(?:بساز|درست کن).{0,24}صفحه")
 ADD_PRODUCT_RE = re.compile(
@@ -97,6 +100,8 @@ def _price_toman(text: str) -> int:
 _TITLE_DROP = frozenset(
     {"یک", "یه", "را", "کالا", "محصول", "اضافه", "کن", "کنید", "بگذار", "بذار", "عنوان", "تومان", "تومن", "هزار", "میلیون"}
 )
+_TITLE_DROP_MORE = frozenset({"میلیون", "هزار", "و", "تو", "توی", "سایت", "ویترین", "فروشگاه", "کاتالوگ", "بزار"})
+_COUNT_WORDS = frozenset({"دو", "سه", "چهار", "پنج", "شش", "هفت", "هشت", "نه", "ده", "یک", "یه"})
 _TITLE_PUNCT = " ،.,:;؛!؟«»\"'`"
 
 
@@ -118,7 +123,15 @@ def _product_title(text: str) -> str:
         if bare == "با" and nxt == "عنوان":
             index += 2
             continue
-        if not bare or bare in _TITLE_DROP or re.fullmatch(r"[\d۰-۹]+", bare):
+        if (
+            not bare
+            or bare in _TITLE_DROP
+            or bare in _TITLE_DROP_MORE
+            or re.fullmatch(r"[\d۰-۹]+(?:[./٫][\d۰-۹]+)?", bare)
+            or re.fullmatch(r"[\d۰-۹]*[\u0600-\u06FF]*(?:تومانی|تومنی|هزاری)", bare)
+            or (bare in _COUNT_WORDS and nxt == "تا")
+            or (bare == "تا" and index > 0 and _bare_token(tokens[index - 1]) in _COUNT_WORDS)
+        ):
             index += 1
             continue
         kept.append(bare)
@@ -131,6 +144,8 @@ def _is_product_add(text: str) -> bool:
     if CREATE_PAGE_RE.search(blob):
         return False
     if ADD_PRODUCT_RE.search(blob):
+        return True
+    if PUT_ON_SITE_RE.search(blob) and (_price_toman(blob) > 0 or any(word in blob for word in GOODS_WORDS)):
         return True
     if not ADD_VERB_RE.search(blob):
         return False
@@ -148,6 +163,11 @@ def catalog_add(text: str) -> dict | None:
     return {"title": title, "price": _price_toman(text)}
 
 
+def _loose(value: str) -> str:
+    """Same name, different typing: half-space, spaces, Arabic ي/ك."""
+    return (value or "").replace("\u200c", "").replace(" ", "").translate(str.maketrans({"ك": "ک", "ي": "ی"}))
+
+
 def _catalog_title_in(text: str) -> str:
     from app.services.storefront_service import list_products
 
@@ -158,8 +178,9 @@ def _catalog_title_in(text: str) -> str:
         title = str(row.get("title") or "").strip()
         if len(title) >= 2:
             titles.append(title)
+    loose_text = _loose(text)
     for title in sorted(titles, key=len, reverse=True):
-        if title in text:
+        if title in text or _loose(title) in loose_text:
             return title
     return ""
 
@@ -269,7 +290,7 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
     if wipe_all:
         pass
     elif REMOVE_PRODUCT_RE.search(text):
-        title = _quoted(text) or target
+        title = _quoted(text) or target or _catalog_title_in(text)
         if title:
             actions.append({"type": "remove_product", "title": title})
         elif catalog_add(text) is None:
@@ -288,6 +309,9 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
         elif "نام" in text or "عنوان" in text:
             actions.append({"type": "ask_clarify", "reply": "متن هدر چه باشد؟"})
     colors = named_color_updates(text)
+    if colors and not COLOR_CUE_RE.search(text) and len(text.split()) > 3:
+        # «کیف مشکی را بذار تو سایت» نام رنگِ کالاست، نه دستور عوض‌کردن رنگ فروشگاه
+        colors = {}
     if colors:
         actions.append({"type": "set_colors", "colors": colors})
     if _wants_hero(text, colors):
