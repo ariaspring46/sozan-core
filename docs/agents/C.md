@@ -67,7 +67,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 19.8k | the files most tasks touch; read the relevant one first |
-| active | 56.9k | yours to edit; read only what the task needs |
+| active | 57.0k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
 | tests | 16.2k | read only the test of the module you change |
 

@@ -36,6 +36,14 @@ function applyCatalog(
   else if (sync?.error) setHint(sync.error);
 }
 
+const SOURCE_FA: Record<string, string> = {
+  instagram: "اینستاگرام",
+  telegram: "تلگرام",
+  whatsapp: "واتساپ",
+  manual: "ثبت دستی",
+  scan: "خواندن صفحه",
+};
+
 export function InventoryCatalog() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -261,7 +269,7 @@ export function InventoryCatalog() {
                       )}
                       {product.source ? (
                         <p className="text-xs text-warm">
-                          از {product.source === "instagram" ? "اینستاگرام" : product.source} {product.sourceHandle || ""}
+                          از {SOURCE_FA[product.source] || product.source} {product.sourceHandle || ""}
                         </p>
                       ) : null}
                       <div className="mt-2 flex items-center justify-between gap-3" onClick={(event) => event.stopPropagation()}>

@@ -151,7 +151,7 @@ function PlanCard({
   const paymentLater = plan.checkout === "open" && !paymentReady;
   const action =
     plan.checkout === "soon" || paymentLater ? (
-      <span className="mt-auto inline-flex h-12 items-center justify-center rounded-full border border-line/80 px-4 text-center text-sm text-ink/50">
+      <span className="mt-auto inline-flex h-12 items-center justify-center rounded-full border border-line/80 px-4 text-center text-sm text-ink/65">
         {paymentLater ? "پرداخت به‌زودی فعال می‌شود" : "به‌زودی"}
       </span>
     ) : (
@@ -171,11 +171,11 @@ function PlanCard({
       }`}
     >
       {featured ? (
-        <span className="absolute -top-3 end-6 rounded-full bg-accentStrong px-3 py-1 text-[11px] text-onAccent">پیشنهاد سوزان</span>
+        <span className="absolute -top-3 end-6 rounded-full bg-accentStrong px-3 py-1 text-xs text-onAccent">پیشنهاد سوزان</span>
       ) : null}
       <h3 className="landing-display text-2xl">{plan.label}</h3>
       <div className="mt-4">
-        {discounted ? <p className="text-sm text-ink/40 line-through">{money(plan.listPrice)} تومان</p> : null}
+        {discounted ? <p className="text-sm text-ink/60 line-through">{money(plan.listPrice)} تومان</p> : null}
         <p className="landing-display text-2xl">{plan.price > 0 ? `${money(plan.price)} تومان` : "رایگان"}</p>
         {plan.discountPercent ? <p className="mt-1 text-xs text-warm">٪{money(plan.discountPercent)} تخفیف</p> : null}
         <p className="mt-1 text-xs text-warm">{plan.price > 0 ? "ماهانه" : "بدون پرداخت"}</p>
@@ -526,7 +526,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
           <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {CAPABILITIES.map((item) => (
               <article key={item.n} className="landing-feature-card flex min-h-72 flex-col rounded-3xl border border-line/50 bg-paper/35 p-6">
-                <p className="landing-display text-sm text-accent/80">{item.n}</p>
+                <p className="landing-display text-sm text-warm">{item.n}</p>
                 <h3 className="landing-display mt-5 text-xl leading-8">{item.title}</h3>
                 <p className="landing-lede mt-3 text-sm leading-7">{item.body}</p>
                 <ul className="mt-auto flex flex-wrap gap-2 pt-6">
@@ -552,7 +552,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
               <article key={item.id} id={item.id} className="grid items-center gap-10 border-t border-line/40 pt-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
                 <div className={i % 2 === 1 ? "lg:order-2" : ""}>
                   <p className="landing-kicker font-medium text-warm">
-                    <span className="landing-display me-3 text-base text-accent/80">{item.n}</span>
+                    <span className="landing-display me-3 text-base text-warm">{item.n}</span>
                     {item.kicker}
                   </p>
                   <h2 className="landing-display mt-3 text-[clamp(1.8rem,4vw,3.1rem)] leading-snug">
@@ -591,7 +591,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             <ol className="mt-10 grid gap-10 sm:grid-cols-3">
               {STEPS.map((step) => (
                 <li key={step.n} className="border-t border-line/50 pt-6">
-                  <p className="landing-display text-2xl text-accent/80">{step.n}</p>
+                  <p className="landing-display text-2xl text-warm">{step.n}</p>
                   <h3 className="mt-3 text-lg">{step.title}</h3>
                   <p className="landing-lede mt-3 text-sm leading-7">{step.body}</p>
                 </li>
@@ -701,13 +701,13 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
             <p className="mt-3 max-w-sm text-sm leading-6 text-ink/70">فروشگاه، محتوا، گفتگو و پرداخت برای فروشندهٔ ایرانی.</p>
           </div>
           <nav aria-label="پیوندهای پایین صفحه" className="flex flex-wrap gap-x-5 text-sm text-ink/75">
-            <a href="#capabilities" className="inline-flex min-h-11 items-center hover:text-warm">امکانات</a>
-            <a href="#channels" className="inline-flex min-h-11 items-center hover:text-warm">کانال‌ها</a>
-            <a href="#plans" className="inline-flex min-h-11 items-center hover:text-warm">پلن‌ها</a>
+            <a href="#capabilities" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-warm">امکانات</a>
+            <a href="#channels" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-warm">کانال‌ها</a>
+            <a href="#plans" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-warm">پلن‌ها</a>
             {LEGAL.map((item) => (
-              <a key={item.href} href={item.href} className="inline-flex min-h-11 items-center hover:text-warm">{item.label}</a>
+              <a key={item.href} href={item.href} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-warm">{item.label}</a>
             ))}
-            <a href={panelOrigin || "https://app.sozan-core.ir"} className="inline-flex min-h-11 items-center hover:text-warm">ورود به پنل</a>
+            <a href={panelOrigin || "https://app.sozan-core.ir"} className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-warm">ورود به پنل</a>
           </nav>
           <div className="flex items-center gap-4">
             <div dangerouslySetInnerHTML={{ __html: ENAMAD_SEAL }} />

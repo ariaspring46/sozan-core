@@ -230,7 +230,7 @@ export function ShopEditor({
         </p>
       )}
 
-      <div role="toolbar" aria-label="ابزارهای ویرایش" className="-mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 pb-0.5 [mask-image:linear-gradient(to_right,transparent,black_28px)] lg:flex-wrap lg:overflow-visible lg:[mask-image:none]">
+      <div role="toolbar" aria-label="ابزارهای ویرایش" className="-mx-1 -my-1 flex snap-x gap-1.5 overflow-x-auto px-1 py-1.5 [mask-image:linear-gradient(to_right,transparent,black_28px)] lg:flex-wrap lg:overflow-visible lg:[mask-image:none]">
         {tools.map((item) => {
           const Icon = item.icon;
           const active = tool === item.id;

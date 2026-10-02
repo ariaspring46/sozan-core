@@ -85,8 +85,8 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 11.4k | the files most tasks touch; read the relevant one first |
-| active | 38.9k | yours to edit; read only what the task needs |
-| rare | 20.1k | yours; read only when the task names it |
+| active | 39.0k | yours to edit; read only what the task needs |
+| rare | 29.8k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
 **Core:**
@@ -110,17 +110,17 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Rare (yours; only when the task names it):**
 
-- `docs/`: `ui-audit-live.md` (1.2k), `ui-ux-audit.md` (6.4k)
+- `docs/`: `ui-audit-live.md` (2.2k), `ui-ux-audit.md` (6.4k)
 - `frontend/`: `next-env.d.ts` (0.1k), `postcss.config.js` (0.0k)
 - `frontend/app/`: `apple-icon.png` (0.0k), `icon.png` (0.0k)
 - `frontend/app/about/`: `page.tsx` (0.2k)
 - `frontend/app/contact/`: `page.tsx` (0.2k)
 - `frontend/app/refund/`: `page.tsx` (0.2k)
 - `frontend/app/terms/`: `page.tsx` (0.4k)
-- `frontend/components/`: `auth-image.tsx` (0.3k), `auth-media.tsx` (0.6k), `landing-slogan-rotator.tsx` (0.4k), `legal-page.tsx` (0.8k), `login-coder-scene.tsx` (1.1k)
+- `frontend/components/`: `auth-image.tsx` (0.5k), `auth-media.tsx` (0.6k), `landing-slogan-rotator.tsx` (0.4k), `legal-page.tsx` (0.8k), `login-coder-scene.tsx` (1.1k)
 - `frontend/public/`: `2326207.txt` (0.0k), `sozan-mark-256.webp` (0.0k), `sozan-mark-legacy.png` (0.0k), `sozan-mark.png` (0.0k), `sozan-preview-beacon.js` (2.9k)
 - `frontend/public/fonts/`: `OFL-vazirmatn.txt` (1.4k), `OFL.txt` (1.4k), `estedad-arabic.woff2` (0.0k), `estedad-latin.woff2` (0.0k), `vazirmatn-var.woff2` (0.0k)
-- `tools/`: `ui_live_audit.mjs` (2.6k)
+- `tools/`: `ui_live_audit.mjs` (2.6k), `ui_mobile_audit.mjs` (8.5k)
 
 **Yours but never read** (generated or huge; change only through its script): `docs/ui-audit-live/00-login-390-light.png` (0.0k), `docs/ui-audit-live/act-chat-steps-390.png` (0.0k), `docs/ui-audit-live/act-settings-plan-390.png` (0.0k), `docs/ui-audit-live/act-settings-saved-390.png` (0.0k), `docs/ui-audit-live/campaigns-1440-dark.png` (0.0k), `docs/ui-audit-live/campaigns-1440-light.png` (0.0k), `docs/ui-audit-live/campaigns-390-dark.png` (0.0k), `docs/ui-audit-live/campaigns-390-light.png` (0.0k), `docs/ui-audit-live/channels-1440-dark.png` (0.0k), `docs/ui-audit-live/channels-1440-light.png` (0.0k), `docs/ui-audit-live/channels-390-dark.png` (0.0k), `docs/ui-audit-live/channels-390-light.png` (0.0k), `docs/ui-audit-live/chat-1440-dark.png` (0.0k), `docs/ui-audit-live/chat-1440-light.png` (0.0k), `docs/ui-audit-live/chat-390-dark.png` (0.0k), `docs/ui-audit-live/chat-390-light.png` (0.0k), `docs/ui-audit-live/findings.json` (35.4k), `docs/ui-audit-live/inbox-1440-dark.png` (0.0k), `docs/ui-audit-live/inbox-1440-light.png` (0.0k), `docs/ui-audit-live/inbox-390-dark.png` (0.0k), `docs/ui-audit-live/inbox-390-light.png` (0.0k), `docs/ui-audit-live/inventory-1440-dark.png` (0.0k), `docs/ui-audit-live/inventory-1440-light.png` (0.0k), `docs/ui-audit-live/inventory-390-dark.png` (0.0k), `docs/ui-audit-live/inventory-390-light.png` (0.0k), `docs/ui-audit-live/more-1440-dark.png` (0.0k), `docs/ui-audit-live/more-1440-light.png` (0.0k), `docs/ui-audit-live/more-390-dark.png` (0.0k), `docs/ui-audit-live/more-390-light.png` (0.0k), `docs/ui-audit-live/onboard-1440-dark.png` (0.0k), `docs/ui-audit-live/onboard-1440-light.png` (0.0k), `docs/ui-audit-live/onboard-390-dark.png` (0.0k), `docs/ui-audit-live/onboard-390-light.png` (0.0k), `docs/ui-audit-live/onboard-result.txt` (0.1k), `docs/ui-audit-live/sales-1440-dark.png` (0.0k), `docs/ui-audit-live/sales-1440-light.png` (0.0k), `docs/ui-audit-live/sales-390-dark.png` (0.0k), `docs/ui-audit-live/sales-390-light.png` (0.0k), `docs/ui-audit-live/settings-1440-dark.png` (0.0k), `docs/ui-audit-live/settings-1440-light.png` (0.0k), `docs/ui-audit-live/settings-390-dark.png` (0.0k), `docs/ui-audit-live/settings-390-light.png` (0.0k), `docs/ui-audit-live/shop-1440-dark.png` (0.0k), `docs/ui-audit-live/shop-1440-light.png` (0.0k), `docs/ui-audit-live/shop-390-dark.png` (0.0k), `docs/ui-audit-live/shop-390-light.png` (0.0k), `docs/ui-audit-live/studio-1440-dark.png` (0.0k), `docs/ui-audit-live/studio-1440-light.png` (0.0k), `docs/ui-audit-live/studio-390-dark.png` (0.0k), `docs/ui-audit-live/studio-390-light.png` (0.0k), `docs/ui-audit-live/wallet-1440-dark.png` (0.0k), `docs/ui-audit-live/wallet-1440-light.png` (0.0k), `docs/ui-audit-live/wallet-390-dark.png` (0.0k), `docs/ui-audit-live/wallet-390-light.png` (0.0k), `frontend/package-lock.json` (22.7k)
 

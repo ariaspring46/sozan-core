@@ -392,7 +392,7 @@ function ShopLivePreview({
             type="button"
             onClick={() => go(page.path)}
             className={cn(
-              "tap rounded-lg px-3 py-1.5 text-[13px]",
+              "tap rounded-lg px-3 py-2 text-[13px]",
               (page.path === "/" ? path === "/" : path.startsWith(page.path)) ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas",
             )}
           >

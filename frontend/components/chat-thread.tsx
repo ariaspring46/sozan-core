@@ -335,7 +335,7 @@ export function ChatThread({
               >
                 {assistantPersona ? <p className="mb-1 text-xs text-warm">{persona}</p> : null}
                 {msg.platformLabel || msg.platform || msg.sender ? (
-                  <p className="mb-1 text-xs text-warm">
+                  <p className={cn("mb-1 text-xs", msg.role === "user" ? "text-onAccent" : "text-warm")}>
                     {[msg.platformLabel || msg.platform, msg.sender].filter(Boolean).join(" · ")}
                   </p>
                 ) : null}
