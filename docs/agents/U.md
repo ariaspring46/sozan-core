@@ -56,12 +56,12 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~6.0k tokens. Your core files total 9.7k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~6.3k tokens. Your core files total 9.7k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
 - Do not re-read a file you just edited; do not read a file to 'understand the project'.
-- Never read: `.zcode/**`, `.cursor/**`, `backend/app/data/router_intent_vectors.json`, `voice-gateway/sales-train.jsonl`, `voice-gateway/sales-holdout.jsonl`, `frontend/package-lock.json`, `frontend/tsconfig.tsbuildinfo`, `docs/ui-audit-live/**`, `docs/festival/**`, `docs/*.patch`, `talk.md`, `sales-agent-talk.md`, `voice-agent-talk.md`, `storefront-talk.md`, `CHANGELOG.md`. Report files: only `tail -n 60`, only append.
+- Never read: `.zcode/**`, `.cursor/**`, `.agents/**`, `.y-tmp/**`, `.impeccable/**`, `backend/app/data/router_intent_vectors.json`, `voice-gateway/sales-train.jsonl`, `voice-gateway/sales-holdout.jsonl`, `frontend/package-lock.json`, `frontend/tsconfig.tsbuildinfo`, `docs/ui-audit-live/**`, `docs/festival/**`, `docs/*.patch`, `talk.md`, `sales-agent-talk.md`, `voice-agent-talk.md`, `storefront-talk.md`, `CHANGELOG.md`. Report files: only `tail -n 60`, only append.
 - If the conversation is getting long, finish the current step, commit, append a short report, and continue in a new session from §3.
 
 ## 6. Your files
@@ -69,7 +69,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 9.7k | the files most tasks touch; read the relevant one first |
-| active | 33.6k | yours to edit; read only what the task needs |
+| active | 36.8k | yours to edit; read only what the task needs |
 | rare | 15.9k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
@@ -83,7 +83,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Active (you may edit):**
 
-- `./`: `talk-u.md` (1.7k)
+- `./`: `talk-u.md` (4.9k)
 - `frontend/`: `tailwind.config.js` (0.4k), `package.json` (0.2k), `tsconfig.json` (0.2k), `next.config.ts` (0.0k)
 - `frontend/app/`: `globals.css` (5.1k), `page.tsx` (0.5k), `layout.tsx` (0.5k)
 - `frontend/components/`: `landing-page.tsx` (12.4k), `app-shell.tsx` (2.8k), `getting-started.tsx` (2.2k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
@@ -112,20 +112,20 @@ Every other file in the repo belongs to another role (see `docs/agents/README.md
 
 **`frontend/lib/site-host.ts`** — owner C
 ```
-export function isPanelHost(hostHeader: string | null): boolean
-export function panelOriginFromHost(hostHeader: string | null): string
+export function isPanelHost(hostHeader: string | null): boolean  # changed 2026-09-18
+export function panelOriginFromHost(hostHeader: string | null): string  # changed 2026-09-18
 ```
 **`frontend/components/onboard-gate.tsx`** — owner X3
 ```
-export function OnboardGate({ children }: { children: React.ReactNode })
+export function OnboardGate({ children }: { children: React.ReactNode })  # changed 2026-09-27
 ```
 **`frontend/lib/use-ai-budget.ts`** — owner X5
 ```
-export function useAiBudget(): AiBudget | null
+export function useAiBudget(): AiBudget | null  # changed 2026-09-28
 ```
 **`frontend/lib/use-plan.ts`** — owner X5
 ```
-export function usePlan(): PlanInfo | null
+export function usePlan(): PlanInfo | null  # changed 2026-09-27
 ```
 
 **Backend endpoints your pages call** (ask the owner for the response shape; do not read the file):
@@ -148,24 +148,24 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 
 ## 10. Your contract (others call these; change only after their ack)
 
-- `frontend/components/app-shell.tsx`: `AppShell` ← C, X1, X2, X3, X4, X5, Y
-- `frontend/components/auth-image.tsx`: `AuthImage` ← C, X2
-- `frontend/components/auth-media.tsx`: `AuthMedia` ← X2
-- `frontend/components/empty-state.tsx`: `EmptyState` ← C, X2, X3, X4, X5, Y
-- `frontend/components/field.tsx`: `Field` ← C, X2, X3, X5, Y
-- `frontend/components/getting-started.tsx`: `GettingStarted` ← X1
-- `frontend/components/login-coder-scene.tsx`: `LoginCoderScene` ← X3, X5
-- `frontend/components/sozan-mark.tsx`: `SozanMark` ← C, X1, X3, X5
-- `frontend/components/theme-toggle.tsx`: `ThemeToggle` ← X5
-- `frontend/components/ui/button.tsx`: `Button` ← C, X1, X2, X3, X4, X5, Y
-- `frontend/components/ui/card.tsx`: `Card` ← C, X2, X3, X5, Y
-- `frontend/components/ui/input.tsx`: `Input` ← C, X2, X3, X5, Y
-- `frontend/components/ui/select.tsx`: `Select` ← C, X3, Y
-- `frontend/components/ui/textarea.tsx`: `Textarea` ← C, X2, X3
-- `frontend/lib/api.ts`: `ApiError` ← X3, X5; `Brand` ← X2; `Campaign` ← X2; `api` ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` ← C; `chatMediaUrl` ← X1; `clearToken` ← X5; `fileUrl` ← C; `getApiBase` ← C, X2; `getOnboarded` ← X3; `getToken` ← X1, X2, X3; `setOnboarded` ← X3, X5; `setToken` ← X5
-- `frontend/lib/digits.ts`: `formatWhen` ← X1, X5, Y; `money` ← C, X5, Y; `parseNonNegativeInt` ← C, X5, Y; `priceText` ← C; `toLatinDigits` ← X5
-- `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` ← X1, X4, Y; `finishIdempotencyKey` ← X1, X4, Y; `takeIdempotencyKey` ← X1, X4, Y
-- `frontend/lib/utils.ts`: `cn` ← X1, X4, Y
+- `frontend/components/app-shell.tsx`: `AppShell` (changed 2026-09-28) ← C, X1, X2, X3, X4, X5, Y
+- `frontend/components/auth-image.tsx`: `AuthImage` (changed 2026-09-18) ← C, X2
+- `frontend/components/auth-media.tsx`: `AuthMedia` (changed 2026-09-18) ← X2
+- `frontend/components/empty-state.tsx`: `EmptyState` (changed 2026-09-18) ← C, X2, X3, X4, X5, Y
+- `frontend/components/field.tsx`: `Field` (changed 2026-09-18) ← C, X2, X3, X5, Y
+- `frontend/components/getting-started.tsx`: `GettingStarted` (changed 2026-09-27) ← X1
+- `frontend/components/login-coder-scene.tsx`: `LoginCoderScene` (changed 2026-09-27) ← X3, X5
+- `frontend/components/sozan-mark.tsx`: `SozanMark` (changed 2026-09-18) ← C, X1, X3, X5
+- `frontend/components/theme-toggle.tsx`: `ThemeToggle` (changed 2026-09-27) ← X5
+- `frontend/components/ui/button.tsx`: `Button` (changed 2026-09-28) ← C, X1, X2, X3, X4, X5, Y
+- `frontend/components/ui/card.tsx`: `Card` (changed 2026-09-18) ← C, X2, X3, X5, Y
+- `frontend/components/ui/input.tsx`: `Input` (changed 2026-09-27) ← C, X2, X3, X5, Y
+- `frontend/components/ui/select.tsx`: `Select` (changed 2026-09-27) ← C, X3, Y
+- `frontend/components/ui/textarea.tsx`: `Textarea` (changed 2026-09-27) ← C, X2, X3
+- `frontend/lib/api.ts`: `ApiError` (changed 2026-09-24) ← X3, X5; `Brand` (changed 2026-09-24) ← X2; `Campaign` (changed 2026-09-24) ← X2; `api` (changed 2026-09-24) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-24) ← C; `chatMediaUrl` (changed 2026-09-24) ← X1; `clearToken` (changed 2026-09-24) ← X5; `fileUrl` (changed 2026-09-24) ← C; `getApiBase` (changed 2026-09-24) ← C, X2; `getOnboarded` (changed 2026-09-24) ← X3; `getToken` (changed 2026-09-24) ← X1, X2, X3; `setOnboarded` (changed 2026-09-24) ← X3, X5; `setToken` (changed 2026-09-24) ← X5
+- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← X1, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← X5
+- `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-21) ← X1, X4, Y; `finishIdempotencyKey` (changed 2026-09-21) ← X1, X4, Y; `takeIdempotencyKey` (changed 2026-09-21) ← X1, X4, Y
+- `frontend/lib/utils.ts`: `cn` (changed 2026-09-18) ← X1, X4, Y
 
 ## 11. Verify (exact commands)
 

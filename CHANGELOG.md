@@ -13,6 +13,8 @@
 - سقف ۶۰ درخواست در دقیقه برای `/p/{id}/status` و `/p/{id}` واقعاً پیاده شد (قبلی فقط تست بی‌اثر بود)
 - برداشت‌ها: ترتیب زمانی حفظ می‌شود (قبلاً pending به ابتدای فهرست می‌رفت و از «۲۰ تای آخر» کیف بیرون می‌افتاد)
 - توکن وب‌هوک Sendbox: دورهٔ چرخش با `SENDBOX_WEBHOOK_LEGACY_UNTIL`
+- ابزار تیم: `build.py` حالا (الف) برای هر قرارداد تاریخ آخرین تغییر (`since`) در `contracts.json` و کنار امضاها در §7/§10 می‌نویسد، (ب) وقتی قرارداد عوض شود، نقش‌های مصرف‌کننده و فایل گزارششان را با خط «اعلام قرارداد» نام می‌برد (در `--check` هم به‌عنوان problem)، (ج) `docs/agents/budget.json` می‌سازد و درصد مصرف هسته از سقف و هشدار «نزدیک سقف» (≥۸۵٪) را چاپ می‌کند. پنج skill پروژه هم در `.agents/skills/` اضافه شد (contract-change, session-boot, state-lock, verify-and-pr, frontend) و `.agents/**` به مالکیت OWNER و never_read رفت
+- اصلاح بدهی مالکیت: `shop_paysecret_race_test.py` → X4، `.y-tmp/**` → Y (+never_read)، `.impeccable/**` و `.zcodeignore` → OWNER (+never_read)؛ `backend/talk-x2.md` که محتوایش کپی تکراریِ ورودیِ هم‌نام در `talk-x2.md` بود، حذف و مالکیتش برداشته شد
 - nginx: لاگ دسترسی بدون query (`log_format sozan_noargs`)
 
 ## 2026-10-01 — بستن ایرادهای بازبینی کامل مخزن

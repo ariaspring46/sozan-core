@@ -3,6 +3,9 @@
 
 Reads tools/agent_context/roles.json and the git file list, then:
   * gives every tracked file exactly one owner (longest pattern wins; foo_test.py follows foo.py),
+  * stamps every contract in contracts.json with the last-change date of its file (`since`),
+  * on a changed contract, names the consumer roles (and their report files) that must be told,
+  * writes docs/agents/budget.json and reports each role's core usage against the cap.
   * estimates tokens per file and per role (conservative: Persian counts heavier than ASCII),
   * finds what each role calls in other roles' files (Python imports, TS imports, API paths)
     and writes those signatures into the role's manifest, so the agent never opens those files,
@@ -21,6 +24,7 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
+from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -37,6 +41,13 @@ TEXT_EXT = {
 def git_files() -> list[str]:
     out = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout
     return [line for line in out.splitlines() if line and (ROOT / line).is_file()]
+
+
+@lru_cache(maxsize=None)
+def last_commit_date(path: str) -> str:
+    """Date (YYYY-MM-DD) of the last commit that touched the file; '' if untracked."""
+    out = subprocess.run(["git", "log", "-1", "--format=%as", "--", path], cwd=ROOT, capture_output=True, text=True)
+    return out.stdout.strip()
 
 
 def is_text(path: str) -> bool:
@@ -333,8 +344,22 @@ def contract_snapshot(needed_by: dict, owner: dict[str, str]) -> dict[str, dict]
             if name == "*":
                 continue
             sig = signature(path, name) if path.endswith(".py") else ts_signature(path, name)
-            snap[key] = {"owner": rid, "users": sorted(needed_by[rid][key]), "signature": sig.split("  # ")[0]}
+            snap[key] = {"owner": rid, "users": sorted(needed_by[rid][key]), "signature": sig.split("  # ")[0], "since": last_commit_date(path)}
     return snap
+
+
+def contract_alerts(old: dict, new: dict, roles: list[dict]) -> list[str]:
+    """For every changed contract, the consumer roles (old and new users) that must be told, with their report file."""
+    reports = {r["id"]: r.get("report", "") for r in roles}
+    out = []
+    for key in sorted(set(old) | set(new)):
+        if old.get(key, {}).get("signature") == new.get(key, {}).get("signature"):
+            continue
+        users = sorted(set(old.get(key, {}).get("users", [])) | set(new.get(key, {}).get("users", [])))
+        who = ", ".join(f"{u} ({reports[u]})" for u in users if reports.get(u))
+        if who:
+            out.append(f"اعلام قرارداد: {key} عوض شد؛ در گزارش این نقش‌ها خبرش بده: {who}")
+    return out
 
 
 # ---------- build ----------
@@ -399,12 +424,15 @@ def build(check_only: bool) -> int:
     state = state_files(owner)
     problems += lock_problems(state)
     snap = contract_snapshot(needed_by, owner)
+    old = json.loads(CONTRACTS_FILE.read_text(encoding="utf-8")) if CONTRACTS_FILE.is_file() else {}
     if check_only:
-        old = json.loads(CONTRACTS_FILE.read_text(encoding="utf-8")) if CONTRACTS_FILE.is_file() else {}
         changed = sorted(k for k in set(old) | set(snap) if old.get(k, {}).get("signature") != snap.get(k, {}).get("signature"))
         for key in changed[:20]:
             problems.append(f"قرارداد عوض شد (build.py را اجرا و docs/agents را commit کن): {key}")
-    CTX = {"config": config, "state": state, "owner": owner, "roles": roles}
+        for line in contract_alerts(old, snap, roles)[:20]:
+            problems.append(line)
+    CTX = {"config": config, "state": state, "owner": owner, "roles": roles,
+           "sig_dates": {k: v.get("since", "") for k, v in snap.items()}}
 
     report_rows = []
     for role in roles:
@@ -442,11 +470,34 @@ def build(check_only: bool) -> int:
     if not check_only:
         (OUT_DIR / "README.md").write_text(index_doc(report_rows, roles, budget, never), encoding="utf-8")
         CONTRACTS_FILE.write_text(json.dumps(snap, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        (OUT_DIR / "budget.json").write_text(json.dumps({
+            "core_max": budget["core_max"],
+            "owned_source_max": budget["owned_source_max"],
+            "roles": [
+                {
+                    "id": r["id"],
+                    "core": r["core"],
+                    "core_pct": round(100 * r["core"] / budget["core_max"]) if budget["core_max"] else 0,
+                    "active": r["src"],
+                    "rare": r.get("rare", 0),
+                    "tests": r["tests"],
+                    "manifest": r["iface"],
+                }
+                for r in report_rows
+            ],
+        }, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        for line in contract_alerts(old, snap, roles):
+            print(line, file=sys.stderr)
 
     for line in problems:
         print(line, file=sys.stderr)
+    core_max = budget["core_max"]
     for row in report_rows:
-        print(f"{row['id']:>5}  هسته {row['core']:>6}  فعال {row['src']:>6}  کم‌کاربرد {row.get('rare', 0):>6}  تست {row['tests']:>6}  نخوان {row['skipped']:>7}  مانیفست {row['iface']:>5}")
+        pct = round(100 * row["core"] / core_max) if core_max else 0
+        print(f"{row['id']:>5}  هسته {row['core']:>6} ({pct:>2}% از {core_max})  فعال {row['src']:>6}  کم‌کاربرد {row.get('rare', 0):>6}  تست {row['tests']:>6}  نخوان {row['skipped']:>7}  مانیفست {row['iface']:>5}")
+    for row in report_rows:
+        if row["id"] != "OWNER" and core_max and row["core"] >= 0.85 * core_max:
+            print(f"نزدیک سقف: {row['id']} هسته {row['core']} توکن از سقف {core_max} ({round(100 * row['core'] / core_max)}%)", file=sys.stderr)
     return 1 if problems else 0
 
 
@@ -628,7 +679,9 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
             continue
         L.append("```")
         for name in names:
-            L.append(signature(dep, name) if dep.endswith(".py") else ts_signature(dep, name))
+            sig = signature(dep, name) if dep.endswith(".py") else ts_signature(dep, name)
+            since = CTX.get("sig_dates", {}).get(f"{dep}::{name}", "")
+            L.append(f"{sig}  # changed {since}" if since else sig)
         L.append("```")
     if endpoints:
         L += ["", "**Backend endpoints your pages call** (ask the owner for the response shape; do not read the file):", ""]
@@ -650,7 +703,9 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
     for key, users in needed_by.items():
         path, name = key.split("::", 1)
         if name != "*":
-            contract[path].append(f"`{name}` ← {', '.join(sorted(users))}")
+            since = CTX.get("sig_dates", {}).get(key, "")
+            label = f"`{name}` (changed {since})" if since else f"`{name}`"
+            contract[path].append(f"{label} ← {', '.join(sorted(users))}")
     if not contract:
         L.append("No other role calls your code directly.")
     for path in sorted(contract):
