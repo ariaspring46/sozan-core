@@ -49,7 +49,7 @@ export function AuthMedia({
 
   if (failed) {
     return (
-      <button type="button" className="text-xs text-danger" onClick={() => setTick((n) => n + 1)}>
+      <button type="button" className="inline-flex min-h-11 items-center text-sm text-danger" onClick={() => setTick((n) => n + 1)}>
         بارگذاری نشد · تلاش دوباره
       </button>
     );
@@ -58,5 +58,5 @@ export function AuthMedia({
   if (kind === "video" || relPath.endsWith(".mp4")) {
     return <video className="w-full rounded-lg" src={url} controls playsInline />;
   }
-  return <img className="w-full rounded-lg" src={url} alt={alt} />;
+  return <img className="h-auto w-full rounded-lg" src={url} alt={alt} />;
 }

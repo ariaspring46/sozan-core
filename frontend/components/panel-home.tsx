@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, api, getOnboarded, getToken } from "@/lib/api";
+import { ApiError, api, getOnboarded, getToken, timeoutSignal } from "@/lib/api";
 
 export function PanelHome() {
   const router = useRouter();
@@ -17,7 +17,7 @@ export function PanelHome() {
       router.replace("/chat");
       return;
     }
-    void api<{ onboarded?: boolean }>("/auth/me")
+    void api<{ onboarded?: boolean }>("/auth/me", { signal: timeoutSignal(15000) })
       .then((data) => router.replace(data.onboarded ? "/chat" : "/onboard"))
       .catch((err) => {
         if (err instanceof ApiError && err.status === 401) router.replace("/login");
@@ -25,13 +25,13 @@ export function PanelHome() {
       });
   }, [router, retry]);
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-canvas px-6 text-center">
       {offline ? (
         <>
           <p className="text-sm text-ink">اتصال به سوزان برقرار نشد.</p>
           <button
             type="button"
-            className="min-h-11 rounded-xl bg-accent px-4 text-sm font-bold text-onAccent"
+            className="min-h-11 rounded-xl bg-accentStrong px-4 text-sm font-bold text-onAccent"
             onClick={() => {
               setOffline(false);
               setRetry((value) => value + 1);

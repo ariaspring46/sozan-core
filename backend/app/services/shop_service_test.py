@@ -227,6 +227,22 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 self.assertTrue(out["freshBuild"])
                 self.assertEqual(shop_service._shop()["error"], "")
 
+    def test_build_text_never_shows_internal_url(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                shop_service._save_shop({**shop_service._shop(), "slug": "demo-shop", "publicHost": "demo-shop.sozan-core.ir"})
+                with patch.object(shop_service, "_missing_sellable_price", return_value=False):
+                    local = shop_service._persian_build_text({"status": "ready", "url": "http://127.0.0.1:12410", "urlOk": True})
+                    ip = shop_service._persian_build_text({"status": "ready", "url": "http://10.0.0.5:3010/", "urlOk": True})
+                    public = shop_service._persian_build_text({"status": "ready", "url": "https://shop.example.com", "urlOk": True})
+                self.assertEqual(local, "سایت زنده است. https://demo-shop.sozan-core.ir")
+                self.assertNotIn("10.0.0.5", ip)
+                self.assertEqual(public, "سایت زنده است. https://shop.example.com")
+                shop_service._save_shop({**shop_service._shop(), "publicHost": ""})
+                with patch.object(shop_service, "_missing_sellable_price", return_value=False):
+                    bare = shop_service._persian_build_text({"status": "ready", "url": "http://127.0.0.1:12410", "urlOk": True})
+                self.assertEqual(bare, "سایت زنده است.")
+
     def test_from_page_uses_catalog_instead_of_edit(self) -> None:
         with _live_shop_chat() as (edit, answer):
             edit.return_value = {

@@ -689,6 +689,8 @@
         "tools/ui_check.py",
         "talk-u.md",
         "tools/ui_live_audit.mjs",
+        "tools/ui_chat_probe.mjs",
+        "tools/ui_mobile_audit.mjs",
         "docs/ui-audit-live/**"
       ],
       "rare": [
@@ -709,7 +711,8 @@
         "frontend/components/landing-slogan-rotator.tsx",
         "docs/ui-ux-audit.md",
         "docs/ui-audit-live.md",
-        "tools/ui_live_audit.mjs"
+        "tools/ui_live_audit.mjs",
+        "tools/ui_mobile_audit.mjs"
       ],
       "gates": [
         "`python3 tools/ui_check.py` prints 0 problems and `npm run build` passes.",

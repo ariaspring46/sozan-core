@@ -111,7 +111,7 @@ function ShopLiveReady({ href }: { href: string }) {
         <span className="absolute inset-0 rounded-full border border-accent/30" />
         <span className="absolute inset-4 rounded-full bg-accent/25" />
       </div>
-      <p className="text-[11px] tracking-[0.22em] text-warm">آنلاین</p>
+      <p className="text-xs text-warm">آنلاین</p>
       <p className="mt-1 text-base font-bold">فروشگاه زنده است</p>
       {host ? (
         <p className="mt-1 truncate text-xs text-muted" dir="ltr">
@@ -152,11 +152,13 @@ function IconBtn({
   active,
   onClick,
   children,
+  className,
 }: {
   label: string;
   active?: boolean;
   onClick: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <button
@@ -165,8 +167,9 @@ function IconBtn({
       title={label}
       onClick={onClick}
       className={cn(
-        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-warm",
+        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warm sm:h-9 sm:w-9",
         active ? "bg-accent/15" : "hover:bg-canvas",
+        className,
       )}
     >
       {children}
@@ -298,9 +301,9 @@ function ShopLivePreview({
   }, [applyPatch, href]);
 
   const bar = (
-    <div className="flex items-center gap-1 border-b border-line/70 px-2 py-1.5">
-      <p className="min-w-0 flex-1 truncate px-1 text-[11px] tracking-[0.14em] text-warm" dir="ltr">
-        {host}
+    <div className="flex items-center gap-1 border-b border-line/70 px-2 py-1">
+      <p className="min-w-0 flex-1 truncate px-1 text-xs text-warm" dir="ltr">
+        <span className="hidden sm:inline">{host}</span>
         {path}
       </p>
       {open ? (
@@ -309,7 +312,7 @@ function ShopLivePreview({
             type="button"
             onClick={() => setMode((value) => (value === "design" ? "browse" : "design"))}
             className={cn(
-              "shrink-0 rounded-lg px-2 py-1 text-xs",
+              "inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm sm:min-h-9",
               mode === "design" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas",
             )}
           >
@@ -321,21 +324,27 @@ function ShopLivePreview({
               onClick={() => onBuild()}
               disabled={buildBusy || (overlay && !failed) || (pendingBuild < 1 && !failed)}
               className={cn(
-                "shrink-0 whitespace-nowrap rounded-lg px-2 py-1 text-xs",
-                (pendingBuild > 0 || failed) && !(overlay && !failed) ? "bg-accent text-onAccent" : "text-muted",
+                "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 text-sm sm:min-h-9",
+                (pendingBuild > 0 || failed) && !(overlay && !failed) ? "bg-accentStrong text-onAccent" : "text-muted",
               )}
             >
-              {failed ? "ساخت دوباره" : "انتشار تغییرات"}
+              {failed ? "ساخت دوباره" : (
+                <>
+                  <span className="sm:hidden">انتشار</span>
+                  <span className="hidden sm:inline">انتشار تغییرات</span>
+                </>
+              )}
               {pendingBuild > 0 ? ` (${pendingBuild.toLocaleString("fa-IR")})` : ""}
             </button>
           ) : null}
-          <IconBtn label={phone ? "نمایش دسکتاپ" : "نمایش موبایل"} active={phone} onClick={() => setPhone((value) => !value)}>
+          <IconBtn label={phone ? "نمایش دسکتاپ" : "نمایش موبایل"} active={phone} onClick={() => setPhone((value) => !value)} className="hidden sm:inline-flex">
             {phone ? <Smartphone size={14} /> : <Monitor size={14} />}
           </IconBtn>
           <IconBtn label="تازه‌کردن" onClick={() => setReload((value) => value + 1)}>
             <RefreshCw size={14} />
           </IconBtn>
           <IconBtn
+            className="hidden sm:inline-flex"
             label="کپی نشانی عمومی"
             onClick={() => {
               void navigator.clipboard?.writeText(href.replace(/\/$/, "") + (path.split("?")[0] || "/"));
@@ -349,9 +358,9 @@ function ShopLivePreview({
             rel="noreferrer"
             aria-label="باز کردن ویترین در تب جدید"
             title="باز کردن ویترین در تب جدید"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-warm hover:bg-canvas"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warm hover:bg-canvas sm:h-9 sm:w-9"
           >
-            <ExternalLink size={14} />
+            <ExternalLink size={16} />
           </a>
           <IconBtn label="بستن پیش‌نمایش" onClick={() => setPreviewOpen(false)}>
             <X size={14} />
@@ -361,7 +370,7 @@ function ShopLivePreview({
         <button
           type="button"
           onClick={() => setPreviewOpen(true)}
-          className="shrink-0 rounded-lg px-2 py-1 text-xs text-warm hover:bg-canvas"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm text-warm hover:bg-canvas"
         >
           باز کردن
         </button>
@@ -383,7 +392,7 @@ function ShopLivePreview({
             type="button"
             onClick={() => go(page.path)}
             className={cn(
-              "rounded-lg px-2 py-1 text-xs",
+              "tap rounded-lg px-3 py-2 text-[13px]",
               (page.path === "/" ? path === "/" : path.startsWith(page.path)) ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas",
             )}
           >
@@ -391,12 +400,12 @@ function ShopLivePreview({
           </button>
         ))}
         {pick ? (
-          <span className="ms-auto max-w-[45%] truncate rounded-lg bg-accent/10 px-2 py-1 text-[11px] text-warm">
+          <span className="ms-auto max-w-[45%] truncate rounded-lg bg-accent/10 px-2 py-1 text-xs text-warm">
             {pick}
           </span>
         ) : (
-          <span className="ms-auto px-2 py-1 text-[11px] text-muted">
-            {mode === "design" ? "روی المان بزن" : "در حال مرور"}
+          <span className="ms-auto px-2 py-1 text-xs text-muted">
+            {mode === "design" ? "روی هر بخش سایت بزن" : "در حال مرور"}
           </span>
         )}
       </div>
@@ -443,20 +452,20 @@ function ShopLivePreview({
         {frameStale && !frameLoaded && !overlay ? (
           <div className="absolute inset-x-3 top-3 rounded-2xl border border-danger/30 bg-paper/95 px-3 py-2 shadow-card">
             <p className="text-sm text-danger">پیش‌نمایش بار نشد — تازه کن</p>
-            <button type="button" className="mt-1 text-sm text-warm underline" onClick={() => setReload((value) => value + 1)}>
+            <button type="button" className="inline-flex min-h-11 items-center text-sm text-warm underline" onClick={() => setReload((value) => value + 1)}>
               تازه کن
             </button>
           </div>
         ) : null}
         {overlay ? (
           <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-accent/25 bg-paper/95 px-3 py-2 shadow-card">
-            <p className="text-[11px] tracking-[0.18em] text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
+            <p className="text-xs text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
             <p className={cn("mt-0.5 text-sm", failed ? "text-danger" : "text-ink")}>{title}</p>
             <p className={cn("text-xs", failed ? "text-danger" : "text-muted")}>
               {live ? `زمان ساخت ${clock(seconds)}` : failed ? "ساخت کامل نشد." : ""}
             </p>
             {failed && onRetry ? (
-              <button type="button" className="mt-2 text-sm text-warm underline" onClick={onRetry}>
+              <button type="button" className="mt-1 inline-flex min-h-11 items-center text-sm text-warm underline" onClick={onRetry}>
                 دوباره بساز
               </button>
             ) : null}
@@ -501,7 +510,7 @@ function ShopPipeline({
   onRetry?: () => void;
 }) {
   const pipeline = build.pipeline || [];
-  const title = live ? build.stepLabel || "کارخانه در حال ساخت سایت است…" : "ساخت کامل نشد";
+  const title = live ? build.stepLabel || "سوزان در حال ساخت سایت است…" : "ساخت کامل نشد";
   return (
     <section
       className={cn(
@@ -520,13 +529,13 @@ function ShopPipeline({
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] tracking-[0.22em] text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
+          <p className="text-xs text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
           <p className="mt-1 text-sm font-medium leading-6 text-ink">{title}</p>
           <p className={cn("mt-0.5 text-xs", failed ? "text-danger" : "text-muted")}>
             {live ? `زمان ساخت ${clock(seconds)}` : "ساخت کامل نشد."}
           </p>
           {failed && onRetry ? (
-            <button type="button" className="mt-2 text-sm text-warm underline" onClick={onRetry}>
+            <button type="button" className="mt-1 inline-flex min-h-11 items-center text-sm text-warm underline" onClick={onRetry}>
               دوباره بساز
             </button>
           ) : null}

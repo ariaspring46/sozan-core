@@ -178,7 +178,7 @@ export function ShopSettingsForm() {
                   {payMeta.docs ? (
                     <>
                       {" "}
-                      <a className="text-warm" href={payMeta.docs} target="_blank" rel="noreferrer">
+                      <a className="tap text-warm" href={payMeta.docs} target="_blank" rel="noreferrer">
                         اسناد
                       </a>
                     </>
@@ -187,7 +187,7 @@ export function ShopSettingsForm() {
               ) : null}
               <p className="text-xs leading-6 text-muted">
                 مرچنت شخصی زرین‌پال یا آیدی‌پی کمیسیون ندارد. اگر نباشد، لینک پرداخت و فروشگاه روی درگاه سوزان می‌رود و ۲٪ کم می‌شود. پول قابل‌برداشت در{" "}
-                <a className="text-warm" href="/more/wallet">
+                <a className="tap text-warm" href="/more/wallet">
                   کیف پول
                 </a>{" "}
                 است.
@@ -205,7 +205,7 @@ export function ShopSettingsForm() {
                 {form.paymentGateway === "zarinpal"
                   ? form.paymentMerchantId || form.paymentMerchantFromHub
                     ? form.paymentMerchantFromHub
-                      ? "مرچنت زرین‌پال هاب سوزان برای اشتراک آماده است."
+                      ? "پرداخت اشتراک با درگاه خود سوزان آماده است."
                       : "مرچنت‌آیدی زرین‌پال آماده ذخیره است."
                     : "مرچنت‌آیدی ۳۶ کاراکتری زرین‌پال را بگذار."
                   : form.paymentGateway === "idpay"
@@ -301,7 +301,7 @@ export function ShopSettingsForm() {
                       {smsMeta.docs ? (
                         <>
                           {" "}
-                          <a className="text-warm" href={smsMeta.docs} target="_blank" rel="noreferrer">
+                          <a className="tap text-warm" href={smsMeta.docs} target="_blank" rel="noreferrer">
                             اسناد
                           </a>
                         </>
@@ -315,7 +315,7 @@ export function ShopSettingsForm() {
                       autoComplete="off"
                       placeholder={
                         form.smsFromHub
-                          ? "کلید هاب فعال است؛ برای عوض کردن کلید فروشگاه را بزن"
+                          ? "کلید سوزان فعال است؛ برای استفاده از کلید خودت اینجا بنویس"
                           : form.smsApiKeySet
                             ? "کلید ذخیره شده؛ برای عوض کردن کلید جدید بزن"
                             : "کلید را اینجا بگذار"
@@ -359,12 +359,12 @@ export function ShopSettingsForm() {
           ) : null}
           {form?.subscription ? (
             <details ref={subRef} id="plans" className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-              <summary className="cursor-pointer font-bold">
+              <summary className="flex min-h-11 cursor-pointer items-center font-bold">
                 اشتراک {form.subscription.label}
               </summary>
               <div className="mt-3 space-y-3">
               <p className="text-sm text-muted">
-                وب‌سایت {form.subscription.sitesUsed} از {form.subscription.sitesLimit || "∞"}
+                وب‌سایت {Number(form.subscription.sitesUsed || 0).toLocaleString("fa-IR")} از {form.subscription.sitesLimit ? Number(form.subscription.sitesLimit).toLocaleString("fa-IR") : "نامحدود"}
               </p>
               {form.voice?.summary ? (
                 <p className="text-sm leading-7">لحن یادگرفته: {form.voice.tone}. {form.voice.summary}</p>
@@ -383,7 +383,7 @@ export function ShopSettingsForm() {
                       <button
                         key={plan.id}
                         type="button"
-                        className={`w-full rounded-xl border p-3 text-right ${
+                        className={`min-h-11 w-full rounded-xl border p-3 text-start ${
                           selected ? "border-accent bg-paper" : "border-line bg-surface"
                         }`}
                         disabled={busy}
@@ -396,7 +396,7 @@ export function ShopSettingsForm() {
                       >
                         <p className="font-medium">
                           {plan.label}
-                          {active ? <span className="mr-2 text-xs text-warm">فعال</span> : null}
+                          {active ? <span className="ms-2 text-xs text-warm">فعال</span> : null}
                         </p>
                         <p className="text-xs text-muted">
                           {plan.sites === 1 ? "یک وب‌سایت" : plan.sites === 0 ? "وب‌سایت نامحدود" : `تا ${plan.sites} وب‌سایت`}

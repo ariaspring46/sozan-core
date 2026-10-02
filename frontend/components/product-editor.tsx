@@ -304,34 +304,41 @@ export function ProductEditor({
               <p className="mb-2 text-sm">عکس‌ها</p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {images.map((name, index) => (
-                  <div key={name} className="relative w-24 shrink-0">
-                    <AuthImage src={catalogImageUrl(name)} alt="" className="h-24 w-24 rounded-xl object-cover" />
-                    {index === 0 ? (
-                      <span className="absolute inset-x-1 top-1 rounded-full bg-accent/90 px-2 py-0.5 text-center text-[10px] text-onAccent">
-                        اصلی
-                      </span>
-                    ) : (
+                  <div key={name} className="w-24 shrink-0 space-y-1">
+                    <div className="relative">
+                      <AuthImage src={catalogImageUrl(name)} alt="" className="h-24 w-24 rounded-xl object-cover" />
+                      {index === 0 ? (
+                        <span className="absolute inset-x-1 top-1 rounded-full bg-accentStrong/95 px-2 py-0.5 text-center text-xs text-onAccent">
+                          عکس اصلی
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex gap-1">
+                      {index !== 0 ? (
+                        <button
+                          type="button"
+                          aria-label="این عکس، عکس اصلی شود"
+                          className="min-h-11 flex-1 rounded-lg border border-line bg-canvas text-xs text-ink"
+                          onClick={() => setImages([name, ...images.filter((item) => item !== name)])}
+                        >
+                          اصلی
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        className="absolute inset-x-1 top-1 rounded-full bg-paper/90 px-2 py-0.5 text-[10px]"
-                        onClick={() => setImages([name, ...images.filter((item) => item !== name)])}
+                        aria-label="حذف این عکس"
+                        className="min-h-11 flex-1 rounded-lg border border-line bg-canvas text-xs text-danger"
+                        onClick={() => setImages(images.filter((item) => item !== name))}
                       >
-                        اصلی کن
+                        حذف
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="absolute inset-x-1 bottom-1 rounded-full bg-paper/90 px-2 py-0.5 text-[10px] text-danger"
-                      onClick={() => setImages(images.filter((item) => item !== name))}
-                    >
-                      حذف
-                    </button>
+                    </div>
                   </div>
                 ))}
                 {images.length < 5 ? (
                   <button
                     type="button"
-                    className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-dashed border-line text-sm text-muted"
+                    className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-dashed border-line px-2 text-center text-sm text-muted"
                     disabled={uploading}
                     onClick={() => fileRef.current?.click()}
                   >
@@ -417,7 +424,7 @@ export function ProductEditor({
                   <button
                     key={item}
                     type="button"
-                    className="rounded-full border border-line px-2 py-1 text-xs"
+                    className="min-h-11 rounded-full border border-line px-3 text-sm"
                     onClick={() => setColors(colors.filter((color) => color !== item))}
                   >
                     {item} ×
@@ -441,7 +448,7 @@ export function ProductEditor({
               <Input value={sizes} onChange={(event) => setSizes(event.target.value)} />
             </Field>
           </div>
-          <div className="flex flex-wrap gap-2 border-t border-line p-4">
+          <div className="flex flex-wrap gap-2 border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <Button type="submit" disabled={busy || uploading || !dirty || !valid}>
               ذخیره
             </Button>

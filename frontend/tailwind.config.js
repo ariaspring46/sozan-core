@@ -20,7 +20,7 @@ module.exports = {
         danger: "rgb(var(--c-danger) / <alpha-value>)",
       },
       fontFamily: {
-        vazir: ["Vazirmatn", "sans-serif"],
+        vazir: ["Vazirmatn", "Tahoma", "sans-serif"],
         sozan: ["Estedad", "Tahoma", "sans-serif"],
       },
       boxShadow: {

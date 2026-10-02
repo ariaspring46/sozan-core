@@ -14,10 +14,10 @@ export function TrainingChoice() {
 
   return (
     <section aria-label="کمک به بهتر شدن سوزان" className="rounded-2xl bg-canvas p-4 shadow-card">
-      <label className="flex items-start gap-3 text-sm">
+      <label className="flex min-h-11 items-start gap-3 text-sm">
         <input
           type="checkbox"
-          className="mt-1"
+          className="mt-1 h-5 w-5 shrink-0 accent-accent"
           checked={on}
           onChange={(event) => {
             const next = event.target.checked;

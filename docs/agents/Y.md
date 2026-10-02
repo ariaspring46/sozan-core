@@ -67,7 +67,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 32.5k | the files most tasks touch; read the relevant one first |
-| active | 64.9k | yours to edit; read only what the task needs |
+| active | 65.4k | yours to edit; read only what the task needs |
 | rare | 19.8k | yours; read only when the task names it |
 | tests | 35.7k | read only the test of the module you change |
 
@@ -81,9 +81,9 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 - `backend/app/api/`: `inbox.py` (1.6k)
 - `backend/app/services/`: `inbox_agent_service.py` (16.5k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (2.8k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (0.5k), `pii_mask.py` (0.5k)
-- `frontend/app/inbox/`: `page.tsx` (4.3k)
-- `frontend/app/inbox/[id]/`: `page.tsx` (2.1k)
-- `frontend/app/sales/`: `page.tsx` (3.1k)
+- `frontend/app/inbox/`: `page.tsx` (4.4k)
+- `frontend/app/inbox/[id]/`: `page.tsx` (2.3k)
+- `frontend/app/sales/`: `page.tsx` (3.2k)
 - `frontend/components/`: `sales-policy-form.tsx` (1.3k), `training-choice.tsx` (0.5k)
 - `tools/`: `sales100_battery.py` (7.8k), `train_nightly.py` (3.4k)
 
@@ -174,7 +174,7 @@ def cosine(left: list[float], right: list[float]) -> float  # changed 2026-09-22
 **`frontend/components/chat-thread.tsx`** — owner X1
 ```
 export type ChatMsg =  # changed 2026-09-29
-export function ChatThread(  # changed 2026-09-28
+export function ChatThread(  # changed 2026-10-02
 ```
 **`backend/app/services/channel_outbound_service.py`** — owner X3
 ```

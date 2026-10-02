@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
 import { api } from "@/lib/api";
 
@@ -126,6 +128,31 @@ export default function AdminPage() {
 
   const filtered = users.filter((u) => !search || u.phone.includes(search) || u.plan.includes(search));
 
+  if (/فقط برای مدیر/.test(error)) {
+    return (
+      <AppShell
+        header={
+          <div>
+            <p className="text-sm text-muted">مدیریت سوزان</p>
+            <h1 className="text-lg font-bold">پیشخوان مدیر</h1>
+          </div>
+        }
+      >
+        <div className="h-full overflow-y-auto p-4">
+          <EmptyState
+            title="این بخش فقط برای مدیر سوزان است"
+            detail="با حساب فروشنده به این صفحه دسترسی نداری."
+            action={
+              <Link href="/chat" className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm text-onAccent">
+                رفتن به چت
+              </Link>
+            }
+          />
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell
       header={
@@ -144,7 +171,7 @@ export default function AdminPage() {
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`min-h-9 rounded-xl px-3 text-sm ${tab === t ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted"}`}
+              className={`min-h-11 rounded-xl px-4 text-sm ${tab === t ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted"}`}
             >
               {t === "users" ? "کاربران" : t === "payments" ? "پرداخت‌ها" : "اقدامات"}
             </button>
@@ -153,9 +180,9 @@ export default function AdminPage() {
 
         {tab === "users" ? (
           <>
-            <input
-              className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm"
+            <Input
               placeholder="جستجو: شماره یا پلن"
+              aria-label="جستجوی کاربر"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -163,10 +190,10 @@ export default function AdminPage() {
               <ul className="space-y-2">
                 {filtered.map((u) => (
                   <li key={u.phone} className="rounded-xl border border-line bg-canvas p-3">
-                    <button type="button" className="w-full text-right" onClick={() => void openDetail(u.phone)}>
+                    <button type="button" className="min-h-11 w-full text-start" onClick={() => void openDetail(u.phone)}>
                       <p className="text-sm font-bold">
                         <bdo dir="ltr">{u.phone}</bdo>
-                        <span className={`mr-2 text-xs ${u.status === "active" ? "text-signal" : "text-danger"}`}>
+                        <span className={`ms-2 text-xs ${u.status === "active" ? "text-signal" : "text-danger"}`}>
                           · {STATUS_LABEL[u.status] || u.status}
                         </span>
                       </p>

@@ -37,7 +37,8 @@ export function ThemeToggle({ compact = false, className }: { compact?: boolean;
               saveTheme(option.id);
             }}
             className={cn(
-              "flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-xs",
+              "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2",
+              compact ? "min-h-9 text-xs" : "min-h-11 text-sm",
               active ? "bg-canvas font-bold text-ink shadow-card" : "text-muted hover:text-ink",
             )}
           >

@@ -138,7 +138,7 @@ export default function OnboardPage() {
   async function finish(event?: FormEvent) {
     event?.preventDefault();
     if (!brandReady) {
-      setError("نام برند و کاری که انجام می‌دهید لازم است.");
+      setError("نام برند و کاری که می‌کنی لازم است.");
       setStep(2);
       return;
     }
@@ -167,19 +167,19 @@ export default function OnboardPage() {
   }
 
   return (
-    <main className="sozan-lamp relative flex min-h-screen items-end justify-center overflow-hidden sm:items-center">
+    <main className="sozan-lamp relative flex min-h-dvh items-end justify-center overflow-hidden sm:items-center">
       <LoginCoderScene />
       <div className="relative z-10 mx-auto w-full max-w-md px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-40 sm:mt-24 sm:px-6 sm:pb-6 sm:pt-8">
       <Card className="w-full space-y-4 bg-surface/95 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <SozanMark className="h-16 w-16 shrink-0" />
           <div>
-            <p className="text-[11px] tracking-[0.22em] text-warm">سوزان</p>
-            <p className="text-sm text-muted">ساخت حساب · مرحله {step + 1} از ۴</p>
+            <p className="text-xs text-warm">سوزان</p>
+            <p className="text-sm text-muted">ساخت حساب · مرحله {(step + 1).toLocaleString("fa-IR")} از {STEPS.length.toLocaleString("fa-IR")}</p>
           </div>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">{STEPS[step]}</h1>
-        <div className="flex gap-1">
+        <h1 className="text-2xl font-bold">{STEPS[step]}</h1>
+        <div className="flex gap-1" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label="مرحلهٔ ثبت‌نام">
           {STEPS.map((label, index) => (
             <span
               key={label}
@@ -187,7 +187,7 @@ export default function OnboardPage() {
             />
           ))}
         </div>
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
+        {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
 
         {step === 0 ? (
           <form
@@ -206,7 +206,7 @@ export default function OnboardPage() {
             <Field label="نام خانوادگی">
               <Input value={lastName} onChange={(event) => setLastName(event.target.value)} />
             </Field>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant="ghost" onClick={() => setStep(1)}>
                 رد کردن
               </Button>
@@ -229,11 +229,11 @@ export default function OnboardPage() {
             </p>
             <div className="space-y-2">
               {CATALOG.map((item) => (
-                <label key={item.id} className="flex items-center gap-2 text-sm">
+                <label key={item.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line bg-canvas px-3 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/10">
                   <input
                     type="radio"
                     name="catalogPlatform"
-                    className="h-4 w-4 accent-accent"
+                    className="h-5 w-5 shrink-0 accent-accent"
                     checked={catalogPlatform === item.id}
                     onChange={() => {
                       setCatalogPlatform(item.id);
@@ -252,7 +252,7 @@ export default function OnboardPage() {
                 onChange={(event) => setCatalogHandle(event.target.value)}
               />
             </Field>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant="ghost" onClick={() => setStep(0)}>
                 قبلی
               </Button>
@@ -278,7 +278,7 @@ export default function OnboardPage() {
             onSubmit={(event) => {
               event.preventDefault();
               if (!brandReady) {
-                setError("نام برند و کاری که انجام می‌دهید لازم است.");
+                setError("نام برند و کاری که می‌کنی لازم است.");
                 return;
               }
               setError("");
@@ -291,7 +291,7 @@ export default function OnboardPage() {
             <Field label="نام برند">
               <Input value={brandName} onChange={(event) => setBrandName(event.target.value)} />
             </Field>
-            <Field label="چه کاری انجام می‌دهید">
+            <Field label="چه کاری می‌کنی؟">
               <Textarea
                 className="min-h-24"
                 value={brandWork}
@@ -305,7 +305,7 @@ export default function OnboardPage() {
                 onChange={(event) => setLogo(event.target.files?.[0] || null)}
               />
             </Field>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant="ghost" onClick={() => setStep(1)}>
                 قبلی
               </Button>
@@ -321,11 +321,11 @@ export default function OnboardPage() {
             <p className="text-sm text-muted">لحن پیام به مشتری. اختیاری است.</p>
             <div className="space-y-2">
               {tones.map((item) => (
-                <label key={item.id} className="flex items-center gap-2 text-sm">
+                <label key={item.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-line bg-canvas px-3 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/10">
                   <input
                     type="radio"
                     name="tone"
-                    className="h-4 w-4 accent-accent"
+                    className="h-5 w-5 shrink-0 accent-accent"
                     checked={toneId === item.id}
                     onChange={() => setToneId(item.id)}
                   />
@@ -333,7 +333,7 @@ export default function OnboardPage() {
                 </label>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="button" variant="ghost" onClick={() => setStep(2)}>
                 قبلی
               </Button>

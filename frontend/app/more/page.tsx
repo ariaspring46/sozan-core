@@ -33,7 +33,7 @@ export default function MorePage() {
         {plan ? (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-canvas p-4 shadow-card">
             <div>
-              <p className="text-xs text-muted">پلن فعلی</p>
+              <p className="text-[13px] text-muted">پلن فعلی</p>
               <p className="text-lg font-bold">{plan.label}</p>
             </div>
             <Link
@@ -48,13 +48,13 @@ export default function MorePage() {
           {HUB.map((item) => (
             <Link key={item.href} href={item.href} className="rounded-2xl bg-canvas p-4 shadow-card">
               <p className="font-bold">{item.title}</p>
-              <p className="mt-1 text-xs leading-6 text-muted">{item.hint}</p>
+              <p className="mt-1 text-[13px] leading-6 text-muted">{item.hint}</p>
             </Link>
           ))}
         </div>
         <section aria-labelledby="theme-title" className="rounded-2xl bg-canvas p-4 shadow-card">
           <p id="theme-title" className="font-bold">ظاهر پنل</p>
-          <p className="mt-1 text-xs leading-6 text-muted">«خودکار» همان روشن یا تیرهٔ گوشی/سیستم را دنبال می‌کند.</p>
+          <p className="mt-1 text-[13px] leading-6 text-muted">«خودکار» همان روشن یا تیرهٔ گوشی/سیستم را دنبال می‌کند.</p>
           <ThemeToggle className="mt-3" />
         </section>
         <Button

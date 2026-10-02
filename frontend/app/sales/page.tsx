@@ -118,16 +118,16 @@ export default function SalesPage() {
   return (
     <AppShell
       header={
-        <div className="flex items-center justify-between gap-3">
-          <div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
             <p className="text-sm text-muted">فروش</p>
             <h1 className="text-lg font-bold">فروش و سفارش‌ها</h1>
           </div>
-          <div className="flex gap-3 text-sm">
-            <Link href="/more/wallet" className="text-warm">
+          <div className="flex shrink-0 gap-1 text-sm">
+            <Link href="/more/wallet" className="inline-flex min-h-11 items-center rounded-xl px-3 text-warm hover:bg-canvas">
               کیف پول
             </Link>
-            <Link href="/more/inventory" className="text-warm">
+            <Link href="/more/inventory" className="inline-flex min-h-11 items-center rounded-xl px-3 text-warm hover:bg-canvas">
               انبار
             </Link>
           </div>
@@ -143,10 +143,10 @@ export default function SalesPage() {
 
         <section aria-label="خلاصهٔ فروش" className="grid grid-cols-3 gap-2">
           {stats.map((item) => (
-            <div key={item.label} className="rounded-2xl bg-canvas p-3 shadow-card">
+            <div key={item.label} className="min-w-0 rounded-2xl bg-canvas p-3 shadow-card">
               <p className="text-xs text-muted">{item.label}</p>
-              <p className="mt-1 text-base font-bold text-ink">{loading ? "…" : money(item.value)}</p>
-              <p className="text-[11px] text-muted">تومان</p>
+              <p className="mt-1 whitespace-nowrap text-[clamp(0.8125rem,3.7vw,1rem)] font-bold text-ink">{loading ? "…" : money(item.value)}</p>
+              <p className="text-xs text-muted">تومان</p>
             </div>
           ))}
         </section>
@@ -155,9 +155,9 @@ export default function SalesPage() {
           <Card>
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-bold">منتظر پرداخت</h2>
-              <span className="rounded-full bg-paper px-2 py-0.5 text-xs text-warm">{pending.length.toLocaleString("fa-IR")} سفارش</span>
+              <span className="shrink-0 rounded-full bg-paper px-2.5 py-0.5 text-xs text-warm">{pending.length.toLocaleString("fa-IR")} سفارش</span>
             </div>
-            <p className="mt-1 text-xs leading-6 text-muted">لینک پرداخت ساخته شده ولی هنوز پرداخت نشده.</p>
+            <p className="mt-1 text-sm leading-6 text-muted">لینک پرداخت ساخته شده ولی هنوز پرداخت نشده.</p>
             <ul className="mt-2 divide-y divide-line">
               {pending.slice(0, 5).map((row) => (
                 <li key={row.id} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -179,7 +179,7 @@ export default function SalesPage() {
         {formOpen ? (
           <Card>
             <form className="space-y-3" onSubmit={(event) => void addSale(event)}>
-              <p className="text-xs leading-6 text-muted">فروشی که بیرون از درگاه سوزان گرفته‌ای (کارت‌به‌کارت، حضوری…). وارد کیف پول نمی‌شود.</p>
+              <p className="text-sm leading-6 text-muted">فروشی که بیرون از درگاه سوزان گرفته‌ای (کارت‌به‌کارت، حضوری…). وارد کیف پول نمی‌شود.</p>
               <Field label="چه فروختی؟">
                 <Input value={title} placeholder="مثلاً انگشتر نقره" onChange={(event) => setTitle(event.target.value)} />
               </Field>
@@ -227,13 +227,13 @@ export default function SalesPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{sale.title}</p>
-                      <p className="mt-0.5 text-xs text-muted">
+                      <p className="wrap-any mt-0.5 text-xs leading-5 text-muted">
                         {sale.channel}
                         {sale.customer ? ` · ${sale.customer}` : ""}
                         {sale.at ? ` · ${formatWhen(sale.at)}` : ""}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-bold">{money(sale.amount)} تومان</p>
+                    <p className="shrink-0 whitespace-nowrap text-sm font-bold">{money(sale.amount)} تومان</p>
                   </div>
                 </Card>
               </li>

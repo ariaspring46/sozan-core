@@ -43,6 +43,24 @@ function tabActive(pathname: string, href: string, mobile: boolean) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** عنوان تب مرورگر برای هر بخش؛ در فهرست تب‌های گوشی معلوم باشد کدام صفحه است. */
+const PAGE_TITLES: readonly [string, string][] = [
+  ["/chat", "چت"],
+  ["/shop", "فروشگاه"],
+  ["/studio", "استودیو"],
+  ["/campaigns", "کمپین‌ها"],
+  ["/inbox", "صندوق"],
+  ["/sales", "فروش"],
+  ["/brand", "هویت و لوگو"],
+  ["/more/inventory", "انبار"],
+  ["/more/channels", "کانال‌ها"],
+  ["/more/wallet", "کیف پول"],
+  ["/more/settings", "پرداخت و پیامک"],
+  ["/more/support", "پشتیبانی"],
+  ["/more/docs", "اسناد آموزشی"],
+  ["/more", "بیشتر"],
+];
+
 function unreadLabel(count: number) {
   if (count > 9) return "۹+";
   return count.toLocaleString("fa-IR");
@@ -50,7 +68,7 @@ function unreadLabel(count: number) {
 
 function Badge({ count }: { count: number }) {
   return (
-    <span className="absolute -end-2.5 -top-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-accentStrong px-1 text-[10px] font-bold leading-[18px] text-onAccent">
+    <span className="absolute -end-3 -top-2 inline-flex min-w-[20px] items-center justify-center rounded-full bg-accentStrong px-1 text-[11px] font-bold leading-5 text-onAccent">
       {unreadLabel(count)}
     </span>
   );
@@ -69,6 +87,11 @@ export function AppShell({
   const [typing, setTyping] = useState(false);
   const plan = usePlan();
   const aiBudget = useAiBudget();
+
+  useEffect(() => {
+    const hit = PAGE_TITLES.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+    document.title = hit ? `${hit[1]} · سوزان` : "سوزان";
+  }, [pathname]);
 
   // رنگ نوار مرورگر را با تم انتخابی هم‌راستا کن (اسکریپت head ممکن است قبل از متاها اجرا شده باشد).
   useEffect(() => {
@@ -194,7 +217,7 @@ export function AppShell({
                 aria-current={active ? "page" : undefined}
                 aria-label={label(tab)}
                 className={cn(
-                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[11px]",
+                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-xs",
                   active ? "font-bold text-warm" : "text-muted",
                 )}
               >

@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ChannelAlert } from "@/components/channel-alert";
 import { GettingStarted } from "@/components/getting-started";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
 import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
-import { api } from "@/lib/api";
+import { api, timeoutSignal } from "@/lib/api";
 import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
 
 type ThreadRow = { id: string; title: string; at?: number };
@@ -49,12 +50,16 @@ const STUDIO_ASPECTS = [
   { id: "story", label: "استوری/ریلز", word: "استوری" },
 ] as const;
 
+/** کمی بیشتر از بدترین زمان سرور (دو مدل پشت‌سرهم)؛ بعد از آن پیام خطا می‌آید و متن برمی‌گردد. */
+const CHAT_TIMEOUT_MS = 100_000;
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [pendingConfirm, setPendingConfirm] = useState<ChatPayload["pendingConfirm"]>(null);
   const [brand, setBrand] = useState("");
   const [threadId, setThreadId] = useState("");
   const [threads, setThreads] = useState<ThreadRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
@@ -86,7 +91,9 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : "خطا"));
+    void load()
+      .catch((err) => setError(err instanceof Error ? err.message : "خطا"))
+      .finally(() => setLoaded(true));
     void api<{ targets?: PublishTarget[] }>("/studio")
       .then((data) => setPublishTargets(data.targets || []))
       .catch(() => setPublishTargets([]));
@@ -102,7 +109,8 @@ export default function ChatPage() {
     return () => window.clearInterval(timer);
   }, [messages, load]);
 
-  async function send(text: string, file?: File, confirmId?: string, cancelId?: string) {
+  /** true = جواب رسید (یا گفتگو عوض شد)؛ false = ارسال نشد و متن باید به کادر برگردد. */
+  async function send(text: string, file?: File, confirmId?: string, cancelId?: string): Promise<boolean> {
     const seen = ++epoch.current;
     busyRef.current = true;
     setBusy(true);
@@ -125,6 +133,7 @@ export default function ChatPage() {
           method: "POST",
           headers: { "Idempotency-Key": key },
           body,
+          signal: timeoutSignal(CHAT_TIMEOUT_MS),
         });
       } else {
         data = await api<ChatPayload>("/chat", {
@@ -136,6 +145,7 @@ export default function ChatPage() {
             cancelId: cancelId || "",
             threadId: current,
           }),
+          signal: timeoutSignal(CHAT_TIMEOUT_MS),
         });
       }
       finishIdempotencyKey(chatKey.current);
@@ -143,15 +153,18 @@ export default function ChatPage() {
         apply(data);
         if (data.notice) setNotice(data.notice);
       }
+      return true;
     } catch (err) {
-      if (seen !== epoch.current) return;
+      if (seen !== epoch.current) return true;
       finishIdempotencyKey(chatKey.current, err);
       setError(err instanceof Error ? err.message : "خطا");
+      return false;
     } finally {
-      if (seen !== epoch.current) return;
-      busyRef.current = false;
-      setPending("");
-      setBusy(false);
+      if (seen === epoch.current) {
+        busyRef.current = false;
+        setPending("");
+        setBusy(false);
+      }
     }
   }
 
@@ -230,7 +243,7 @@ export default function ChatPage() {
           {threads.length ? (
             <select
               id="sozan-thread"
-              className="min-w-0 max-w-[8rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink sm:max-w-[14rem]"
+              className="min-h-11 min-w-0 max-w-[9rem] rounded-xl border border-line bg-canvas px-2 text-sm text-ink sm:max-w-[14rem]"
               value={threadId}
               onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
             >
@@ -243,10 +256,12 @@ export default function ChatPage() {
           ) : null}
           <button
             type="button"
-            className="shrink-0 rounded-xl border border-line px-2 py-1 text-xs text-warm"
+            aria-label="گفتگوی تازه"
+            title="گفتگوی تازه"
+            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-line text-warm"
             onClick={() => void startThread().catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
           >
-            گفتگوی تازه
+            <Plus size={20} aria-hidden="true" />
           </button>
         </div>
       }
@@ -254,20 +269,22 @@ export default function ChatPage() {
       <div className="sozan-chat flex h-full flex-col">
         <ChannelAlert />
         <GettingStarted />
-        {error ? (
-          <p className="px-4 pt-3 text-sm text-danger" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {notice ? (
-          <p className="px-4 pt-3 text-sm text-warm" role="status">
-            {notice}
-          </p>
-        ) : null}
         <div className="min-h-0 flex-1">
           <ChatThread
             messages={messages}
             busy={busy}
+            loading={!loaded}
+            banner={
+              error ? (
+                <p className="rounded-xl border border-danger/40 bg-paper px-3 py-2 text-sm text-danger" role="alert">
+                  {error}
+                </p>
+              ) : notice ? (
+                <p className="rounded-xl border border-line bg-paper px-3 py-2 text-sm text-warm" role="status">
+                  {notice}
+                </p>
+              ) : null
+            }
             pendingText={pending}
             welcome
             welcomeLines={welcomeLines(brand)}
@@ -281,7 +298,7 @@ export default function ChatPage() {
             onConfirm={(id) => void send("", undefined, id)}
             onCancel={(id) => void send("", undefined, undefined, id)}
             onSend={async (payload) => {
-              await send(payload.text, payload.file);
+              if (!(await send(payload.text, payload.file))) throw new Error("not-sent");
             }}
             publishTargets={publishTargets}
             onPublish={publishStudio}
