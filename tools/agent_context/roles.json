@@ -684,6 +684,7 @@
         "tools/ui_check.py",
         "talk-u.md",
         "tools/ui_live_audit.mjs",
+        "tools/ui_chat_probe.mjs",
         "tools/ui_mobile_audit.mjs",
         "docs/ui-audit-live/**"
       ],
