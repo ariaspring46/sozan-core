@@ -352,6 +352,28 @@ class RouterServiceTests(unittest.TestCase):
         out = self._turn("سلام", complete)
         self.assertIn("مدل پاسخ نداد", out["messages"][-1]["text"])
 
+    def test_llm_one_blip_is_retried_silently(self) -> None:
+        calls = {"n": 0}
+
+        async def complete(_messages, _tools):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("blip")
+            return {"text": "سلام، چه کمکی از من برمی‌آید؟", "tool_calls": [], "usage": {}}
+
+        with patch("app.services.router_service.asyncio.sleep", new=AsyncMock()):
+            out = self._turn("سلام", complete)
+        self.assertEqual(calls["n"], 2)
+        self.assertNotIn("مدل پاسخ نداد", out["messages"][-1]["text"])
+
+    def test_status_text_says_failed_build_and_how_to_fix(self) -> None:
+        text = router_service._format_status(
+            {"shopStatus": "failed", "scanStatus": "done", "buildStatus": "failed", "cnameOk": True, "plan": "promax"}
+        )
+        self.assertIn("ناموفق", text)
+        self.assertNotIn("ناتمام", text)
+        self.assertIn("از نو بساز", text)
+
     def test_daily_cap_persian(self) -> None:
         async def complete(_messages, _tools):
             raise AssertionError("llm should not run")
