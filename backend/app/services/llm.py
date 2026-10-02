@@ -138,9 +138,23 @@ def _is_arvan_url(url: str) -> bool:
     return host == ARVAN_HOST_SUFFIX or host.endswith(f".{ARVAN_HOST_SUFFIX}")
 
 
+def local_fallback_enabled() -> bool:
+    """LLM_LOCAL_FALLBACK=0 removes the last-resort home-GPU hop: cloud failures end at the Arvan fallback, not a local model."""
+    return (os.environ.get("LLM_LOCAL_FALLBACK") or "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def is_fallback_cloud_host(url: str) -> bool:
+    """The configured fallback endpoint (Arvan AI behind our own domain) is reachable from Iran; no foreign proxy."""
+    host = _host_of(url)
+    configured = os.environ.get("CLOUD_LLM_FALLBACK_URL", "").strip() or _str_setting(
+        getattr(settings, "cloud_llm_fallback_url", "")
+    )
+    return bool(host) and host == _host_of(configured)
+
+
 def _proxy_for_url(url: str) -> str | None:
     host = _host_of(url)
-    if _is_arvan_url(url):
+    if _is_arvan_url(url) or is_fallback_cloud_host(url):
         return None
     # OpenRouter در صورت نیاز پروکسی اختصاصی خودش را دارد (مثلاً برای مسیر فیلترینگ).
     if host == "openrouter.ai" or host.endswith(".openrouter.ai"):
@@ -758,11 +772,11 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
             (route, PRIMARY_CLOUD_TIMEOUT, 1),
             (fallback, FALLBACK_CLOUD_TIMEOUT, 2),
         ]
-        allow_local = surface in CLOUD_PRIMARY_SURFACES
+        allow_local = surface in CLOUD_PRIMARY_SURFACES and local_fallback_enabled()
     else:
         primary_timeout = CLOUD_PRIMARY_TIMEOUT if surface in CLOUD_PRIMARY_SURFACES else 120
         hops = [(route, primary_timeout, 2)]
-        allow_local = surface in CLOUD_PRIMARY_SURFACES and surface != "router"
+        allow_local = surface in CLOUD_PRIMARY_SURFACES and surface != "router" and local_fallback_enabled()
     last_exc: Exception | None = None
     for index, (hop, timeout, attempts) in enumerate(hops):
         final_hop = index == len(hops) - 1 and not allow_local
@@ -1065,10 +1079,10 @@ async def complete_tools(
     later = FALLBACK_CLOUD_TIMEOUT if timeout is None else timeout
     if chained:
         hops: list[tuple[dict, float]] = [(route, PRIMARY_CLOUD_TIMEOUT), (fallback, later)]
-        allow_local = True
+        allow_local = local_fallback_enabled()
     else:
         hops = [(route, CLOUD_PRIMARY_TIMEOUT if timeout is None else timeout)]
-        allow_local = surface != "router"
+        allow_local = surface != "router" and local_fallback_enabled()
     last_exc: Exception | None = None
     for index, (hop, hop_timeout) in enumerate(hops):
         try:

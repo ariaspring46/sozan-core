@@ -1154,6 +1154,10 @@ def _proxy_for(url: str) -> str | None:
         return (os.environ.get("OPENROUTER_PROXY") or "").strip() or None
     if host.endswith("arvancloudai.ir"):
         return None
+    fallback_host = _host(os.environ.get("CLOUD_LLM_FALLBACK_URL") or os.environ.get("IMAGE_FALLBACK_URL") or "")
+    if host and host == fallback_host:
+        # آروان از ایران مستقیم در دسترس است؛ پراکسی خارجی فقط کندش می‌کند.
+        return None
     raw = (os.environ.get("CLOUD_LLM_PROXY") or os.environ.get("CHANNEL_PROXY") or "").strip()
     return raw or None
 

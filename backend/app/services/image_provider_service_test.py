@@ -150,6 +150,13 @@ class ImageCutoverTests(unittest.TestCase):
                 "socks5://127.0.0.1:9",
             )
         self.assertIsNone(image_provider_service._proxy_for("https://ai.arvancloudai.ir/v1"))
+        with patch.dict(
+            "os.environ",
+            {"CLOUD_LLM_FALLBACK_URL": "https://ai.sozan-core.ir/v1", "CHANNEL_PROXY": "socks5h://127.0.0.1:9"},
+            clear=False,
+        ):
+            self.assertIsNone(image_provider_service._proxy_for("https://ai.sozan-core.ir/v1"))
+            self.assertEqual(image_provider_service._proxy_for("https://other.example/v1"), "socks5h://127.0.0.1:9")
         self.assertEqual(result["cost"], 0.014)
         self.assertEqual(result["provider"], "Together")
         self.assertNotIn("or-test-key", seen["url"])
