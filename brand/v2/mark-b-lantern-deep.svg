@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="سوزان">
+  <g fill="none" stroke="#A24517" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M98 40C98 14 142 14 142 40"/>
+    <path d="M92 70C76 96 66 118 66 146C66 176 90 196 120 196C150 196 174 176 174 146C174 118 164 96 148 70"/>
+  </g>
+  <g fill="#A24517" stroke="#A24517" stroke-width="9" stroke-linejoin="round">
+    <path d="M98 44H142L152 66H88Z"/>
+    <path d="M90 198H150L156 214H84Z"/>
+  </g>
+  <path fill="#C45C26" d="M120 112C126 128 146 138 146 160C146 176 134 186 120 186C106 186 94 176 94 162C94 150 102 144 106 136C109 143 113 147 117 148C120 136 116 124 120 112Z"/>
+</svg>
