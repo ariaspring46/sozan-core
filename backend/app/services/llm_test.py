@@ -966,5 +966,57 @@ class InboxHopTests(unittest.TestCase):
         )
 
 
+class ArvanOnlyFallbackTests(unittest.TestCase):
+    CLOUD = {"kind": "cloud", "url": "https://openrouter.ai/api/v1", "model": "deepseek/deepseek-v4.1-flash", "token": "x", "source": "override"}
+    ARVAN = {"kind": "cloud", "url": "https://ai.sozan-core.ir/v1", "model": "GPT-OSS-120B", "token": "y", "source": "fallback"}
+    LOCAL = {"kind": "local", "url": "http://127.0.0.1:9292/v1", "model": "qwen3.8-27b", "token": "", "source": "default"}
+
+    def _run(self, env: dict, *, surface: str = "studio") -> tuple[object, list[str]]:
+        calls: list[str] = []
+
+        async def fake(route, **_kw):
+            calls.append(str(route.get("model")))
+            if route.get("kind") == "local":
+                return "محلی"
+            raise RuntimeError("cloud down")
+
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch("app.services.llm.route_for_surface", return_value=self.CLOUD),
+            patch("app.services.llm._fallback_cloud_route", return_value=self.ARVAN),
+            patch("app.services.llm._local_default_route", return_value=self.LOCAL),
+            patch("app.services.llm._budget_capped", return_value=None),
+            patch("app.services.llm._complete_with_route", side_effect=fake),
+        ):
+            try:
+                out: object = asyncio.run(
+                    _chat_completion(messages=[{"role": "user", "content": "x"}], temperature=0.2, max_tokens=50, surface=surface)
+                )
+            except Exception as exc:
+                out = exc
+        return out, calls
+
+    def test_default_still_ends_on_local(self) -> None:
+        out, calls = self._run({"LLM_LOCAL_FALLBACK": "1"})
+        self.assertEqual(out, "محلی")
+        self.assertEqual(calls, ["deepseek/deepseek-v4.1-flash", "GPT-OSS-120B", "qwen3.8-27b"])
+
+    def test_local_off_ends_at_arvan(self) -> None:
+        out, calls = self._run({"LLM_LOCAL_FALLBACK": "0"})
+        self.assertIsInstance(out, Exception)
+        self.assertEqual(calls, ["deepseek/deepseek-v4.1-flash", "GPT-OSS-120B"])
+
+    def test_arvan_fallback_host_skips_foreign_proxy(self) -> None:
+        from app.config import settings
+        from app.services.llm import _proxy_for_url, local_fallback_enabled
+
+        with patch.dict(os.environ, {"CLOUD_LLM_FALLBACK_URL": "https://ai.sozan-core.ir/v1", "LLM_LOCAL_FALLBACK": "0"}), patch.object(
+            settings, "channel_proxy", "socks5h://127.0.0.1:10888"
+        ):
+            self.assertIsNone(_proxy_for_url("https://ai.sozan-core.ir/v1"))
+            self.assertEqual(_proxy_for_url("https://other.example/v1"), "socks5h://127.0.0.1:10888")
+            self.assertFalse(local_fallback_enabled())
+
+
 if __name__ == "__main__":
     unittest.main()
