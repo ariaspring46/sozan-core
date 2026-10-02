@@ -54,12 +54,12 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.0k tokens. Your core files total 19.8k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.4k tokens. Your core files total 19.8k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
 - Do not re-read a file you just edited; do not read a file to 'understand the project'.
-- Never read: `.zcode/**`, `.cursor/**`, `backend/app/data/router_intent_vectors.json`, `voice-gateway/sales-train.jsonl`, `voice-gateway/sales-holdout.jsonl`, `frontend/package-lock.json`, `frontend/tsconfig.tsbuildinfo`, `docs/ui-audit-live/**`, `docs/festival/**`, `docs/*.patch`, `talk.md`, `sales-agent-talk.md`, `voice-agent-talk.md`, `storefront-talk.md`, `CHANGELOG.md`. Report files: only `tail -n 60`, only append.
+- Never read: `.zcode/**`, `.cursor/**`, `.agents/**`, `.y-tmp/**`, `.impeccable/**`, `backend/app/data/router_intent_vectors.json`, `voice-gateway/sales-train.jsonl`, `voice-gateway/sales-holdout.jsonl`, `frontend/package-lock.json`, `frontend/tsconfig.tsbuildinfo`, `docs/ui-audit-live/**`, `docs/festival/**`, `docs/*.patch`, `talk.md`, `sales-agent-talk.md`, `voice-agent-talk.md`, `storefront-talk.md`, `CHANGELOG.md`. Report files: only `tail -n 60`, only append.
 - If the conversation is getting long, finish the current step, commit, append a short report, and continue in a new session from §3.
 
 ## 6. Your files
@@ -90,7 +90,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
 
-**Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (27.6k)
+**Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (33.2k)
 
 Every other file in the repo belongs to another role (see `docs/agents/README.md`).
 
@@ -98,196 +98,214 @@ Every other file in the repo belongs to another role (see `docs/agents/README.md
 
 **`frontend/components/app-shell.tsx`** — owner U
 ```
-export function AppShell(
+export function AppShell(  # changed 2026-09-18
 ```
 **`frontend/components/auth-image.tsx`** — owner U
 ```
-export function AuthImage(
+export function AuthImage(  # changed 2026-09-18
 ```
 **`frontend/components/empty-state.tsx`** — owner U
 ```
-export function EmptyState(
+export function EmptyState(  # changed 2026-09-18
 ```
 **`frontend/components/field.tsx`** — owner U
 ```
-export function Field({ label, children }: { label: string; children: React.ReactNode })
+export function Field({ label, children }: { label: string; children: React.ReactNode })  # changed 2026-09-18
 ```
 **`frontend/components/sozan-mark.tsx`** — owner U
 ```
-export function SozanMark({ className, glow = true }: { className?: string; glow?: boolean })
+export function SozanMark({ className, glow = true }: { className?: string; glow?: boolean })  # changed 2026-09-18
 ```
 **`frontend/components/ui/button.tsx`** — owner U
 ```
-export function Button(
+export function Button(  # changed 2026-09-18
 ```
 **`frontend/components/ui/card.tsx`** — owner U
 ```
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>)
+export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>)  # changed 2026-09-18
 ```
 **`frontend/components/ui/input.tsx`** — owner U
 ```
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)
+export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)  # changed 2026-09-18
 ```
 **`frontend/components/ui/select.tsx`** — owner U
 ```
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)
+export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)  # changed 2026-09-18
 ```
 **`frontend/components/ui/textarea.tsx`** — owner U
 ```
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>)
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>)  # changed 2026-09-18
 ```
 **`frontend/lib/api.ts`** — owner U
 ```
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T>
-export function catalogImageUrl(name: string): string
-export function fileUrl(campaignId: string, relPath: string): string
-export function getApiBase(): string
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T>  # changed 2026-09-18
+export function catalogImageUrl(name: string): string  # changed 2026-09-18
+export function fileUrl(campaignId: string, relPath: string): string  # changed 2026-09-18
+export function getApiBase(): string  # changed 2026-09-18
 ```
 **`frontend/lib/digits.ts`** — owner U
 ```
-export function money(amount: number): string
-export function parseNonNegativeInt(raw: string): number | null
-export function priceText(price: number, label?: string): string
+export function money(amount: number): string  # changed 2026-09-18
+export function parseNonNegativeInt(raw: string): number | null  # changed 2026-09-18
+export function priceText(price: number, label?: string): string  # changed 2026-09-18
 ```
 **`backend/app/services/persian_text.py`** — owner X1
 ```
-def sanitize_persian(text: str, *, limit: int=80) -> str
+def sanitize_persian(text: str, *, limit: int=80) -> str  # changed 2026-09-24
 ```
 **`backend/app/services/product_image_service.py`** — owner X2
 ```
-def remove_if_unreferenced(name: str) -> bool
-def store(data: bytes, content_type: str, filename: str) -> str
+def remove_if_unreferenced(name: str) -> bool  # changed 2026-09-18
+def store(data: bytes, content_type: str, filename: str) -> str  # changed 2026-09-18
 ```
 **`backend/app/services/channel_scan_service.py`** — owner X3
 ```
-def looks_like_product_title(title: str) -> bool
-def product_title_from_caption(caption: str, brand: str='') -> str | None
-def scan_dir() -> Path
-def unattributed_dir() -> Path
+def looks_like_product_title(title: str) -> bool  # changed 2026-10-01
+def product_title_from_caption(caption: str, brand: str='') -> str | None  # changed 2026-09-18
+def scan_dir() -> Path  # changed 2026-10-01
+def unattributed_dir() -> Path  # changed 2026-10-01
 ```
 **`backend/app/services/chat_media_service.py`** — owner X3
 ```
-def save(filename: str, data: bytes, content_type: str, *, sweep: bool=True) -> dict
+def save(filename: str, data: bytes, content_type: str, *, sweep: bool=True) -> dict  # changed 2026-09-25
 ```
 **`backend/app/services/sms_service.py`** — owner X3
 ```
-def resolve_sms(overlay: dict | None=None) -> dict[str, str]
-async def send_otp(*, provider: str, api_key: str, template_id: str, token_name: str, phone: str, code: str) -> None
+def resolve_sms(overlay: dict | None=None) -> dict[str, str]  # changed 2026-09-18
+async def send_otp(*, provider: str, api_key: str, template_id: str, token_name: str, phone: str, code: str) -> None  # changed 2026-09-18
 ```
 **`backend/app/services/telegram_alert_service.py`** — owner X3
 ```
-async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str) -> None
+async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str) -> None  # changed 2026-09-29
 ```
 **`backend/app/services/shop_edit_service.py`** — owner X4
 ```
-def build_dir_for(shop: dict) -> Path | None
-def has_runtime_overlay(root: Path | None) -> bool
-def publish_shop_runtime(shop: dict, root: Path, rels: list[str]) -> None
-def write_catalog_json(root: Path, products: list[dict]) -> Path
+def build_dir_for(shop: dict) -> Path | None  # changed 2026-09-18
+def has_runtime_overlay(root: Path | None) -> bool  # changed 2026-09-18
+def publish_shop_runtime(shop: dict, root: Path, rels: list[str]) -> None  # changed 2026-09-18
+def write_catalog_json(root: Path, products: list[dict]) -> Path  # changed 2026-09-18
 ```
 **`backend/app/services/shop_service.py`** — owner X4
 ```
-PROTECTED_SHOP_SLUGS = frozenset({'joahr-froshi', 'cahrm-srai-pars'})
-def bump_pending(shop: dict) -> dict
-def bump_pending_build() -> None
-def current_shop() -> dict
-def factory_category_slug(category_fa: str) -> str
-def factory_item_sub(title: str, category_fa: str) -> tuple[str, str]
-def shop_is_live(shop: dict) -> bool
+PROTECTED_SHOP_SLUGS = frozenset({'joahr-froshi', 'cahrm-srai-pars'})  # changed 2026-09-18
+def bump_pending(shop: dict) -> dict  # changed 2026-10-01
+def bump_pending_build() -> None  # changed 2026-09-19
+def current_shop() -> dict  # changed 2026-10-01
+def factory_category_slug(category_fa: str) -> str  # changed 2026-10-01
+def factory_item_sub(title: str, category_fa: str) -> tuple[str, str]  # changed 2026-10-01
+def shop_is_live(shop: dict) -> bool  # changed 2026-10-01
 ```
 **`backend/app/client_ip.py`** — owner X5
 ```
-def client_ip(request: Request) -> str
+def client_ip(request: Request) -> str  # changed 2026-10-01
 ```
 **`backend/app/config.py`** — owner X5
 ```
-settings = Settings()
-Settings.arvan_api_key: str = ''
-Settings.arvan_origin_ip: str = ''
-Settings.arvan_origin_port: int = 80
-Settings.arvan_zone: str = 'sozan-core.ir'
-Settings.jwt_secret: str = 'change-me-to-a-long-random-secret'
-Settings.otp_dev: bool = False
-Settings.otp_ttl_seconds: int = 300
-Settings.panel_url: str = 'https://app.sozan-core.ir'
-Settings.payment_sign_secret: str = ''
-Settings.public_api_url: str = 'https://api.sozan-core.ir'
-Settings.shop_otp_daily_cap: int = 200
+settings = Settings()  # changed 2026-09-18
+Settings.arvan_api_key: str = ''  # changed 2026-09-18
+Settings.arvan_origin_ip: str = ''  # changed 2026-09-18
+Settings.arvan_origin_port: int = 80  # changed 2026-09-18
+Settings.arvan_zone: str = 'sozan-core.ir'  # changed 2026-09-18
+Settings.jwt_secret: str = 'change-me-to-a-long-random-secret'  # changed 2026-09-18
+Settings.otp_dev: bool = False  # changed 2026-09-18
+Settings.otp_ttl_seconds: int = 300  # changed 2026-09-18
+Settings.panel_url: str = 'https://app.sozan-core.ir'  # changed 2026-09-18
+Settings.payment_sign_secret: str = ''  # changed 2026-09-18
+Settings.public_api_url: str = 'https://api.sozan-core.ir'  # changed 2026-09-18
+Settings.shop_otp_daily_cap: int = 200  # changed 2026-09-18
 ```
 **`backend/app/phone.py`** — owner X5
 ```
-def normalize_digits(raw: str) -> str  # Persian/Arabic-Indic digits to ASCII, other characters untouched.
-def normalize_phone(raw: str) -> str
+def normalize_digits(raw: str) -> str  # Persian/Arabic-Indic digits to ASCII, other characters untouched.  # changed 2026-09-19
+def normalize_phone(raw: str) -> str  # changed 2026-09-18
 ```
 **`backend/app/redis_client.py`** — owner X5
 ```
-redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
-redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
-redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
-redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
-redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
-redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
+redis_client = Redis.from_url(settings.redis_url, decode_responses=True)  # changed 2026-09-18
 ```
 **`backend/app/security.py`** — owner X5
 ```
-def require_permission(code: str)
+def require_permission(code: str)  # changed 2026-09-18
 ```
 **`backend/app/services/auth_service.py`** — owner X5
 ```
-OTP_SEND_LIMIT = 5
-OTP_SEND_WINDOW = 900
-OTP_VERIFY_LIMIT = 5
-OTP_VERIFY_WINDOW = 300
-def otp_test_reveal_allowed(phone: str) -> bool  # کد فقط برای شماره‌های ساختگیِ تست و فقط در پنجرهٔ تست در پاسخ می‌آید.
+OTP_SEND_LIMIT = 5  # changed 2026-09-20
+OTP_SEND_WINDOW = 900  # changed 2026-09-20
+OTP_VERIFY_LIMIT = 5  # changed 2026-09-20
+OTP_VERIFY_WINDOW = 300  # changed 2026-09-20
+def otp_test_reveal_allowed(phone: str) -> bool  # کد فقط برای شماره‌های ساختگیِ تست و فقط در پنجرهٔ تست در پاسخ می‌آید.  # changed 2026-10-01
 ```
 **`backend/app/services/observe_client.py`** — owner X5
 ```
-def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, surface: str='', component: str='', stage: str='', status: str='', conversation_id: str='', turn_id: str='', operation_id: str='', job_id: str='', scan_id: str='', parent_id: str='', event_id: str='', started_at: float | None=None, duration_ms: int | None=None) -> None
+def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, surface: str='', component: str='', stage: str='', status: str='', conversation_id: str='', turn_id: str='', operation_id: str='', job_id: str='', scan_id: str='', parent_id: str='', event_id: str='', started_at: float | None=None, duration_ms: int | None=None) -> None  # changed 2026-09-18
 ```
 **`backend/app/services/payment_service.py`** — owner X5
 ```
-PAYMENT_LATER = 'پرداخت به\u200cزودی فعال می\u200cشود'
-def commission_toman(amount: int, bps: int | None=None) -> int
-async def idpay_request(*, amount_toman: int, description: str, callback_url: str, order_id: str, api_key: str, sandbox: bool=False, name: str='', phone: str='') -> dict
-async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: bool=False, amount_toman: int=0) -> dict
-def resolve_sale_gateway(row: dict | None=None) -> dict
-async def zarinpal_request(*, amount_toman: int, description: str, callback_url: str, mobile: str='', merchant: str='') -> dict
-async def zarinpal_verify(*, amount_toman: int, authority: str, merchant: str='') -> dict
+PAYMENT_LATER = 'پرداخت به\u200cزودی فعال می\u200cشود'  # changed 2026-09-27
+def commission_toman(amount: int, bps: int | None=None) -> int  # changed 2026-09-18
+async def idpay_request(*, amount_toman: int, description: str, callback_url: str, order_id: str, api_key: str, sandbox: bool=False, name: str='', phone: str='') -> dict  # changed 2026-09-18
+async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: bool=False, amount_toman: int=0) -> dict  # changed 2026-09-20
+def resolve_sale_gateway(row: dict | None=None) -> dict  # changed 2026-09-18
+async def zarinpal_request(*, amount_toman: int, description: str, callback_url: str, mobile: str='', merchant: str='') -> dict  # changed 2026-09-18
+async def zarinpal_verify(*, amount_toman: int, authority: str, merchant: str='') -> dict  # changed 2026-09-18
 ```
 **`backend/app/services/settings_service.py`** — owner X5
 ```
-def get_settings() -> dict
+def get_settings() -> dict  # changed 2026-09-18
 ```
 **`backend/app/services/tenant_index_service.py`** — owner X5
 ```
-def lookup(kind: str, key: str, verify: Callable[[str], bool]) -> str | None  # Phone that owns `key`, or None. `verify` checks the tenant's own file.
-def upsert(*, phone: str, slug: str='', order_id: str='', sendbox_id: str='') -> None  # Record a fresh fact. Never raises: the index heals itself on a miss.
+def lookup(kind: str, key: str, verify: Callable[[str], bool]) -> str | None  # Phone that owns `key`, or None. `verify` checks the tenant's own file.  # changed 2026-10-01
+def upsert(*, phone: str, slug: str='', order_id: str='', sendbox_id: str='') -> None  # Record a fresh fact. Never raises: the index heals itself on a miss.  # changed 2026-10-01
 ```
 **`backend/app/services/tenant_lock.py`** — owner X5
 ```
-def tenant_file_lock(name: str='shop') -> Iterator[None]
+def tenant_file_lock(name: str='shop') -> Iterator[None]  # changed 2026-09-18
 ```
 **`backend/app/services/wallet_service.py`** — owner X5
 ```
-def consume_sms() -> dict
-def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner: str) -> dict
-def refund_sms(charged: int=0) -> dict
+def consume_sms() -> dict  # changed 2026-09-18
+def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner: str) -> dict  # changed 2026-09-18
+def refund_sms(charged: int=0) -> dict  # changed 2026-09-20
 ```
 **`backend/app/state_store.py`** — owner X5
 ```
-def current_tenant() -> str
-def iter_tenants() -> list[str]
-def read_json(name: str, default: Any, *, shared: bool=False) -> Any
-def shared_lock() -> Iterator[None]
-def tenant_scope(phone: str) -> Iterator[None]
-def update_json(name: str, mutate, default: Any, *, lock: str) -> Any  # Read-modify-write one tenant file under its tenant_file_lock.
-def write_json(name: str, payload: Any, *, shared: bool=False) -> None
+def current_tenant() -> str  # changed 2026-09-18
+def iter_tenants() -> list[str]  # changed 2026-09-18
+def read_json(name: str, default: Any, *, shared: bool=False) -> Any  # changed 2026-09-18
+def shared_lock() -> Iterator[None]  # changed 2026-09-20
+def tenant_scope(phone: str) -> Iterator[None]  # changed 2026-09-18
+def update_json(name: str, mutate, default: Any, *, lock: str) -> Any  # Read-modify-write one tenant file under its tenant_file_lock.  # changed 2026-10-01
+def write_json(name: str, payload: Any, *, shared: bool=False) -> None  # changed 2026-09-18
 ```
 
-**Backend endpoints your pages call** (ask the owner for the response shape; do not read the file):
+**HTTP routes you call** (contract: method, path, parameters, response):
 
-- `/billing/coupon-preview`, `/billing/subscribe` → `backend/app/api/billing.py` (X5)
-- `/settings`, `/settings/support/hub`, `/settings/support/my-tickets`, `/settings/support/seller-ticket` → `backend/app/api/settings.py` (X5)
+```
+GET /settings  ()  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: response untyped
+GET /settings/support/hub  ()  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: returns keys {tickets}
+GET /settings/support/my-tickets  ()  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: returns keys {tickets}
+PATCH /settings  (body: SettingsIn)  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: SettingsIn {mockSms: bool | None = None; adminPhone: str | None = None; otpTtlSeconds: int | None = None; gatewayPublicUrl: str | None = None; storeName: str | None = None; storeTagline: str | None = None; paymentSandbox: bool | None = None; paymentGateway: str | None = None; paymentMerchantId: str | None = Field(default=None, max_length=80); paymentApiKey: str | None 
+POST /billing/coupon-preview  (body: CouponPreviewIn)  # owner X5, changed 2026-10-02
+    backend/app/api/billing.py: CouponPreviewIn {plan: str = Field(min_length=2, max_length=16); code: str = Field(min_length=1, max_length=40)}; response untyped
+POST /billing/subscribe  (body: SubscribeIn)  # owner X5, changed 2026-10-02
+    backend/app/api/billing.py: SubscribeIn {plan: str = Field(min_length=2, max_length=16); code: str = ''}; response untyped
+POST /settings/support/hub/{ticket_id}/reply  (ticket_id: str, body: dict)  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: response untyped
+POST /settings/support/seller-ticket  (body: SellerTicketIn)  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: SellerTicketIn {subject: str = Field(min_length=2, max_length=120); text: str = Field(min_length=2, max_length=2000)}; response untyped
+```
+
+**Shared runtime state files** (other roles depend on these keys; changing a key is a contract change):
+
+- `channel-scan.json`: writers: X3; readers: C — top-level keys per role: C: {categories}
+- `pay-orders.json`: writers: C; readers: X5
+- `shop.json`: writers: C, X4, X5; readers: X1 — top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, slug, status, url}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}
+- `support-tickets.json`: writers: C; readers: X5
 
 ## 8. Contracts outside imports (HTTP, files, services)
 
@@ -301,16 +319,17 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 
 ## 10. Your contract (others call these; change only after their ack)
 
-- `backend/app/api/pay.py`: `router` ← X5
-- `backend/app/api/storefront.py`: `router` ← X5
-- `backend/app/services/arvan_dns_service.py`: `check_cname` ← X4; `cname_target` ← X4; `edge_dry` ← X4, X5, Y; `ensure_shop_record` ← X4; `hostname` ← X4; `is_zone_host` ← X4; `public_host` ← X4; `start_cname_setup` ← X4; `zone` ← X4
-- `backend/app/services/catalog_sync_service.py`: `sync_live` ← X1, X4
-- `backend/app/services/pay_service.py`: `create_order` ← Y; `ensure_pay_secret` ← X4; `get_order` ← Y; `public_order` ← Y
-- `backend/app/services/storefront_service.py`: `add_product` ← X4; `clear_scanned_catalog` ← X3; `count_scanned_handle` ← X3; `list_products` ← X1, X2, X3, X4, Y; `list_sales` ← X5; `price_label` ← X4; `referenced_image_names` ← X2; `remove_product_by_title` ← X1, X4; `remove_scanned_handle` ← X3; `retitle_scanned_from_captions` ← X5; `upsert_scanned_product` ← X3
-- `backend/app/services/support_service.py`: `create_ticket` ← X5; `list_all_tickets_for_hub_admin` ← X5; `list_tickets` ← X5; `reply_hub_ticket` ← X5
-- `frontend/components/domain-menu.tsx`: `DomainMenu` ← X4; `ShopState` ← X4; `shopHostLabel` ← X4; `shopPublicUrl` ← X4
-- `frontend/components/shop-settings-form.tsx`: `ShopSettingsForm` ← X5
-- `frontend/lib/site-host.ts`: `isPanelHost` ← U; `panelOriginFromHost` ← U
+- `HTTP routes`: `GET /catalog` (changed 2026-10-02) ← U; `GET /sales` (changed 2026-10-02) ← Y; `GET /wallet/orders` (changed 2026-10-02) ← Y; `POST /catalog` (changed 2026-10-02) ← U; `POST /sales` (changed 2026-10-02) ← Y
+- `backend/app/api/pay.py`: `router` (changed 2026-09-18) ← X5
+- `backend/app/api/storefront.py`: `router` (changed 2026-09-18) ← X5
+- `backend/app/services/arvan_dns_service.py`: `check_cname` (changed 2026-09-18) ← X4; `cname_target` (changed 2026-09-18) ← X4; `edge_dry` (changed 2026-09-27) ← X4, X5, Y; `ensure_shop_record` (changed 2026-09-18) ← X4; `hostname` (changed 2026-09-18) ← X4; `is_zone_host` (changed 2026-09-18) ← X4; `public_host` (changed 2026-09-18) ← X4; `start_cname_setup` (changed 2026-09-18) ← X4; `zone` (changed 2026-09-18) ← X4
+- `backend/app/services/catalog_sync_service.py`: `sync_live` (changed 2026-09-18) ← X1, X4
+- `backend/app/services/pay_service.py`: `create_order` (changed 2026-09-19) ← Y; `ensure_pay_secret` (changed 2026-09-18) ← X4; `get_order` (changed 2026-09-18) ← Y; `public_order` (changed 2026-09-18) ← Y
+- `backend/app/services/storefront_service.py`: `add_product` (changed 2026-09-18) ← X4; `clear_scanned_catalog` (changed 2026-09-18) ← X3; `count_scanned_handle` (changed 2026-09-19) ← X3; `list_products` (changed 2026-09-18) ← X1, X2, X3, X4, Y; `list_sales` (changed 2026-09-18) ← X5; `price_label` (changed 2026-09-18) ← X4; `referenced_image_names` (changed 2026-09-18) ← X2; `remove_product_by_title` (changed 2026-09-18) ← X1, X4; `remove_scanned_handle` (changed 2026-09-18) ← X3; `retitle_scanned_from_captions` (changed 2026-09-18) ← X5; `upsert_scanned_product` (changed 2026-09-18) ← X3
+- `backend/app/services/support_service.py`: `create_ticket` (changed 2026-09-29) ← X5; `list_all_tickets_for_hub_admin` (changed 2026-09-29) ← X5; `list_tickets` (changed 2026-09-29) ← X5; `reply_hub_ticket` (changed 2026-10-01) ← X5
+- `frontend/components/domain-menu.tsx`: `DomainMenu` (changed 2026-09-18) ← X4; `ShopState` (changed 2026-09-19) ← X4; `shopHostLabel` (changed 2026-09-18) ← X4; `shopPublicUrl` (changed 2026-09-18) ← X4
+- `frontend/components/shop-settings-form.tsx`: `ShopSettingsForm` (changed 2026-09-18) ← X5
+- `frontend/lib/site-host.ts`: `isPanelHost` (changed 2026-09-18) ← U; `panelOriginFromHost` (changed 2026-09-18) ← U
 
 ## 11. Verify (exact commands)
 

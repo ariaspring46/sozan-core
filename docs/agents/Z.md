@@ -57,12 +57,12 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~4.8k tokens. Your core files total 33.4k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~4.9k tokens. Your core files total 33.4k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
 - Do not re-read a file you just edited; do not read a file to 'understand the project'.
-- Never read: `.zcode/**`, `.cursor/**`, `backend/app/data/router_intent_vectors.json`, `voice-gateway/sales-train.jsonl`, `voice-gateway/sales-holdout.jsonl`, `frontend/package-lock.json`, `frontend/tsconfig.tsbuildinfo`, `docs/ui-audit-live/**`, `docs/festival/**`, `docs/*.patch`, `talk.md`, `sales-agent-talk.md`, `voice-agent-talk.md`, `storefront-talk.md`, `CHANGELOG.md`. Report files: only `tail -n 60`, only append.
+- Never read: `.zcode/**`, `.cursor/**`, `.agents/**`, `.y-tmp/**`, `.impeccable/**`, `backend/app/data/router_intent_vectors.json`, `voice-gateway/sales-train.jsonl`, `voice-gateway/sales-holdout.jsonl`, `frontend/package-lock.json`, `frontend/tsconfig.tsbuildinfo`, `docs/ui-audit-live/**`, `docs/festival/**`, `docs/*.patch`, `talk.md`, `sales-agent-talk.md`, `voice-agent-talk.md`, `storefront-talk.md`, `CHANGELOG.md`. Report files: only `tail -n 60`, only append.
 - If the conversation is getting long, finish the current step, commit, append a short report, and continue in a new session from §3.
 
 ## 6. Your files
@@ -90,13 +90,22 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Tests:** `voice-gateway/test_voice.py`
 
-**Yours but never read** (generated or huge; change only through its script): `voice-agent-talk.md` (51.0k), `voice-gateway/sales-holdout.jsonl` (4.0k), `voice-gateway/sales-train.jsonl` (115.2k)
+**Yours but never read** (generated or huge; change only through its script): `voice-agent-talk.md` (53.0k), `voice-gateway/sales-holdout.jsonl` (4.0k), `voice-gateway/sales-train.jsonl` (115.2k)
 
 Every other file in the repo belongs to another role (see `docs/agents/README.md`).
 
 ## 7. What you use from other roles (do not open their files; signatures are here)
 
 Nothing.
+
+**HTTP routes you call** (contract: method, path, parameters, response):
+
+```
+GET /billing/plans  ()  # owner X5, changed 2026-10-02
+    backend/app/api/billing.py: response untyped
+GET /health  ()  # owner X5, changed 2026-10-02
+    backend/app/main.py: returns keys {edgeDry, ok, paymentReady}
+```
 
 ## 8. Contracts outside imports (HTTP, files, services)
 

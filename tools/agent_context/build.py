@@ -3,6 +3,11 @@
 
 Reads tools/agent_context/roles.json and the git file list, then:
   * gives every tracked file exactly one owner (longest pattern wins; foo_test.py follows foo.py),
+  * snapshots every cross-role contract in contracts.json: Python/TS signatures, the shape behind them
+    (class fields, full TS types), HTTP routes other roles call, and state files shared between roles
+    (contract_shapes.py); `since` is the date the signature or shape last changed (kept when unchanged),
+  * on a changed contract, names the consumer roles (and their report files) that must be told,
+  * writes docs/agents/budget.json and reports each role's core usage against the cap.
   * estimates tokens per file and per role (conservative: Persian counts heavier than ASCII),
   * finds what each role calls in other roles' files (Python imports, TS imports, API paths)
     and writes those signatures into the role's manifest, so the agent never opens those files,
@@ -21,7 +26,12 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
+from datetime import date
+from functools import lru_cache
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import contract_shapes as cs  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 ROLES_FILE = ROOT / "tools" / "agent_context" / "roles.json"
@@ -37,6 +47,13 @@ TEXT_EXT = {
 def git_files() -> list[str]:
     out = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout
     return [line for line in out.splitlines() if line and (ROOT / line).is_file()]
+
+
+@lru_cache(maxsize=None)
+def last_commit_date(path: str) -> str:
+    """Date (YYYY-MM-DD) of the last commit that touched the file; '' if untracked."""
+    out = subprocess.run(["git", "log", "-1", "--format=%as", "--", path], cwd=ROOT, capture_output=True, text=True)
+    return out.stdout.strip()
 
 
 def is_text(path: str) -> bool:
@@ -325,16 +342,125 @@ def lock_problems(table: dict[str, dict]) -> list[str]:
 CONTRACTS_FILE = OUT_DIR / "contracts.json"
 
 
-def contract_snapshot(needed_by: dict, owner: dict[str, str]) -> dict[str, dict]:
+def _since(key: str, entry: dict, old: dict, today: str) -> str:
+    """Date the contract last changed: kept from the old snapshot while signature and shape are the same."""
+    prev = old.get(key)
+    if not prev:
+        return today
+    same = prev.get("signature") == entry["signature"] and (
+        "shape" not in prev or prev.get("shape", "") == entry.get("shape", "")
+    )
+    return prev.get("since") or today if same else today
+
+
+def contract_snapshot(needed_by: dict, owner: dict[str, str], old: dict, http: dict, state: dict) -> dict[str, dict]:
     snap: dict[str, dict] = {}
+    today = date.today().isoformat()
     for rid in sorted(needed_by):
         for key in sorted(needed_by[rid]):
             path, name = key.split("::", 1)
             if name == "*":
                 continue
-            sig = signature(path, name) if path.endswith(".py") else ts_signature(path, name)
-            snap[key] = {"owner": rid, "users": sorted(needed_by[rid][key]), "signature": sig.split("  # ")[0]}
+            if path.endswith(".py"):
+                sig = signature(path, name)
+                shape = cs.py_shape(_defs(path), name)
+            else:
+                sig = ts_signature(path, name)
+                shape = cs.ts_shape((ROOT / path).read_text(encoding="utf-8"), name)
+                if shape == cs.norm(sig):
+                    shape = ""
+            entry = {"owner": rid, "users": sorted(needed_by[rid][key]), "signature": sig.split("  # ")[0]}
+            if shape:
+                entry["shape"] = shape
+            snap[key] = entry
+    for key, entry in http.items():
+        snap[key] = dict(entry)
+    for key, entry in state.items():
+        snap[key] = dict(entry)
+    for key, entry in snap.items():
+        entry["since"] = _since(key, entry, old, today)
     return snap
+
+
+def _changed(old: dict, new: dict, key: str) -> bool:
+    a, b = old.get(key, {}), new.get(key, {})
+    # an old entry without "shape" predates shape tracking: only its signature can be compared
+    return a.get("signature") != b.get("signature") or ("shape" in a and a.get("shape", "") != b.get("shape", ""))
+
+
+def _still_defined(key: str) -> bool:
+    """A contract dropped from the snapshot only because no other role uses it any more is not a breaking change."""
+    path, _, name = key.partition("::")
+    if not name or not (ROOT / path).is_file():
+        return False
+    if path.endswith(".py"):
+        return "not found" not in signature(path, name)
+    return ts_signature(path, name) != name
+
+
+def contract_alerts(old: dict, new: dict, roles: list[dict]) -> list[str]:
+    """For every changed contract, the consumer roles (old and new users) that must be told, with their report file."""
+    reports = {r["id"]: r.get("report", "") for r in roles}
+    out = []
+    for key in sorted(set(old) | set(new)):
+        if key in old and key not in new and _still_defined(key):
+            continue
+        if key in old and key in new and not _changed(old, new, key):
+            continue
+        if key not in old:  # new contract: nobody depended on an old shape
+            continue
+        users = sorted(set(old.get(key, {}).get("users", [])) | set(new.get(key, {}).get("users", [])))
+        who = ", ".join(f"{u} ({reports[u]})" for u in users if reports.get(u))
+        if who:
+            out.append(f"اعلام قرارداد: {key} عوض شد؛ در گزارش این نقش‌ها خبرش بده: {who}")
+    return out
+
+
+def http_contracts(owner: dict[str, str], skip) -> tuple[dict[str, dict], dict[str, dict[str, set[str]]]]:
+    """HTTP routes called across roles → ({"HTTP GET /x": entry}, {caller role: {key: endpoints}})."""
+    routes = cs.backend_routes(ROOT, set(owner))
+    callers = cs.route_callers(ROOT, owner, skip)
+    users: dict[str, set[str]] = defaultdict(set)
+    by_role: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for path, endpoints in callers.items():
+        rid = owner.get(path)
+        for endpoint, truncated in endpoints:
+            for key in cs.match_routes(endpoint, truncated, routes):
+                route_owner = owner.get(routes[key]["file"])
+                if rid and route_owner and rid != route_owner:
+                    name = f"HTTP {key[0]} {key[1]}"
+                    users[name].add(rid)
+                    by_role[rid][name].add(endpoint)
+    out = {}
+    for (method, full), row in routes.items():
+        name = f"HTTP {method} {full}"
+        if name in users:
+            out[name] = {"owner": owner[row["file"]], "users": sorted(users[name]), "signature": row["signature"],
+                         "shape": f"{row['file']}: {row['shape']}"}
+    return out, by_role
+
+
+def state_contracts(state: dict[str, dict], owner: dict[str, str]) -> dict[str, dict]:
+    """Runtime JSON files touched by more than one role, with the top-level keys each role uses (heuristic)."""
+    keys: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for path, rid in owner.items():
+        if path.startswith("backend/") and path.endswith(".py") and not is_test(path) and path not in LOCK_EXEMPT:
+            for name, found in cs.state_keys(ROOT, path).items():
+                keys[name][rid] |= found
+    out = {}
+    for name, row in sorted(state.items()):
+        writers = sorted(row["w"])
+        readers = sorted(row["r"] - set(row["w"]))
+        roles = sorted(set(writers) | set(readers))
+        if len(roles) < 2 or not writers:
+            continue
+        shape = "; ".join(f"{rid}: {{{', '.join(sorted(keys[name][rid]))}}}" for rid in roles if keys[name][rid])
+        entry = {"owner": writers[0], "users": [r for r in roles if r != writers[0]],
+                 "signature": f"state {name}  writers: {', '.join(writers)}; readers: {', '.join(readers) or '-'}"}
+        if shape:
+            entry["shape"] = "top-level keys per role: " + shape
+        out[f"STATE {name}"] = entry
+    return out
 
 
 # ---------- build ----------
@@ -390,6 +516,11 @@ def build(check_only: bool) -> int:
                     endpoints[rid][target].add(endpoint)
         for dep, names in uses.items():
             dep_owner = owner.get(dep)
+            if dep_owner and dep_owner != rid and dep.endswith(".py") and names:
+                try:
+                    names = {cs.canonical_name(_defs(dep), n) for n in names}
+                except SyntaxError:
+                    pass
             if dep_owner and dep_owner != rid:
                 needs[rid][dep].update(names)
                 for name in names or {"*"}:
@@ -398,13 +529,19 @@ def build(check_only: bool) -> int:
     global CTX
     state = state_files(owner)
     problems += lock_problems(state)
-    snap = contract_snapshot(needed_by, owner)
+    old = json.loads(CONTRACTS_FILE.read_text(encoding="utf-8")) if CONTRACTS_FILE.is_file() else {}
+    http, http_by_role = http_contracts(owner, lambda p: is_test(p) or never_read(p, never))
+    snap = contract_snapshot(needed_by, owner, old, http, state_contracts(state, owner))
     if check_only:
-        old = json.loads(CONTRACTS_FILE.read_text(encoding="utf-8")) if CONTRACTS_FILE.is_file() else {}
-        changed = sorted(k for k in set(old) | set(snap) if old.get(k, {}).get("signature") != snap.get(k, {}).get("signature"))
+        changed = sorted(k for k in set(old) | set(snap)
+                         if k not in old or k not in snap or old[k].get("signature") != snap[k].get("signature")
+                         or old[k].get("shape", "") != snap[k].get("shape", ""))
         for key in changed[:20]:
             problems.append(f"قرارداد عوض شد (build.py را اجرا و docs/agents را commit کن): {key}")
-    CTX = {"config": config, "state": state, "owner": owner, "roles": roles}
+        for line in contract_alerts(old, snap, roles)[:20]:
+            problems.append(line)
+    CTX = {"config": config, "state": state, "owner": owner, "roles": roles, "snap": snap, "http_by_role": http_by_role,
+           "sig_dates": {k: v.get("since", "") for k, v in snap.items()}}
 
     report_rows = []
     for role in roles:
@@ -442,11 +579,35 @@ def build(check_only: bool) -> int:
     if not check_only:
         (OUT_DIR / "README.md").write_text(index_doc(report_rows, roles, budget, never), encoding="utf-8")
         CONTRACTS_FILE.write_text(json.dumps(snap, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        (OUT_DIR / "budget.json").write_text(json.dumps({
+            "core_max": budget["core_max"],
+            "owned_source_max": budget["owned_source_max"],
+            "roles": [
+                {
+                    "id": r["id"],
+                    "core": r["core"],
+                    "core_pct": round(100 * r["core"] / budget["core_max"]) if budget["core_max"] else 0,
+                    "active": r["src"],
+                    "rare": r.get("rare", 0),
+                    "tests": r["tests"],
+                    "manifest": r["iface"],
+                    "loose_contracts": sum(1 for v in snap.values() if v["owner"] == r["id"] and cs.is_loose(v["signature"])),
+                }
+                for r in report_rows
+            ],
+        }, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        for line in contract_alerts(old, snap, roles):
+            print(line, file=sys.stderr)
 
     for line in problems:
         print(line, file=sys.stderr)
+    core_max = budget["core_max"]
     for row in report_rows:
-        print(f"{row['id']:>5}  هسته {row['core']:>6}  فعال {row['src']:>6}  کم‌کاربرد {row.get('rare', 0):>6}  تست {row['tests']:>6}  نخوان {row['skipped']:>7}  مانیفست {row['iface']:>5}")
+        pct = round(100 * row["core"] / core_max) if core_max else 0
+        print(f"{row['id']:>5}  هسته {row['core']:>6} ({pct:>2}% از {core_max})  فعال {row['src']:>6}  کم‌کاربرد {row.get('rare', 0):>6}  تست {row['tests']:>6}  نخوان {row['skipped']:>7}  مانیفست {row['iface']:>5}")
+    for row in report_rows:
+        if row["id"] != "OWNER" and core_max and row["core"] >= 0.85 * core_max:
+            print(f"نزدیک سقف: {row['id']} هسته {row['core']} توکن از سقف {core_max} ({round(100 * row['core'] / core_max)}%)", file=sys.stderr)
     return 1 if problems else 0
 
 
@@ -628,12 +789,29 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
             continue
         L.append("```")
         for name in names:
-            L.append(signature(dep, name) if dep.endswith(".py") else ts_signature(dep, name))
+            sig = signature(dep, name) if dep.endswith(".py") else ts_signature(dep, name)
+            since = CTX.get("sig_dates", {}).get(f"{dep}::{name}", "")
+            L.append(f"{sig}  # changed {since}" if since else sig)
         L.append("```")
-    if endpoints:
+    snap = CTX.get("snap", {})
+    calls = sorted(CTX.get("http_by_role", {}).get(rid, {}))
+    if calls:
+        L += ["", "**HTTP routes you call** (contract: method, path, parameters, response):", "", "```"]
+        for key in calls:
+            row = snap.get(key, {})
+            since = row.get("since", "")
+            L.append(f"{row.get('signature', key)}  # owner {row.get('owner', '?')}, changed {since}")
+            if row.get("shape"):
+                L.append(f"    {row['shape'][:400]}")
+        L.append("```")
+    elif endpoints:
         L += ["", "**Backend endpoints your pages call** (ask the owner for the response shape; do not read the file):", ""]
         for target in sorted(endpoints):
             L.append(f"- {', '.join(f'`{e}`' for e in sorted(endpoints[target]))} → `{target}` ({owner[target]})")
+    shared = sorted(k for k, v in snap.items() if k.startswith("STATE ") and rid in [v["owner"], *v["users"]])
+    if shared:
+        L += ["", "**Shared runtime state files** (other roles depend on these keys; changing a key is a contract change):", ""]
+        L += [f"- `{k[6:]}`: {snap[k]['signature'].split('  ', 1)[1]}" + (f" — {snap[k]['shape']}" if snap[k].get("shape") else "") for k in shared]
 
     L += ["", "## 8. Contracts outside imports (HTTP, files, services)", ""]
     L += [f"- {item}" for item in role.get("external", [])] or ["None."]
@@ -650,7 +828,12 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
     for key, users in needed_by.items():
         path, name = key.split("::", 1)
         if name != "*":
-            contract[path].append(f"`{name}` ← {', '.join(sorted(users))}")
+            since = CTX.get("sig_dates", {}).get(key, "")
+            label = f"`{name}` (changed {since})" if since else f"`{name}`"
+            contract[path].append(f"{label} ← {', '.join(sorted(users))}")
+    for key, row in sorted(CTX.get("snap", {}).items()):
+        if row["owner"] == rid and key.startswith("HTTP "):
+            contract["HTTP routes"].append(f"`{key[5:]}` (changed {row.get('since', '')}) ← {', '.join(row['users'])}")
     if not contract:
         L.append("No other role calls your code directly.")
     for path in sorted(contract):

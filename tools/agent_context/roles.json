@@ -10,6 +10,9 @@
   "never_read": [
     ".zcode/**",
     ".cursor/**",
+    ".agents/**",
+    ".y-tmp/**",
+    ".impeccable/**",
     "backend/app/data/router_intent_vectors.json",
     "voice-gateway/sales-train.jsonl",
     "voice-gateway/sales-holdout.jsonl",
@@ -248,6 +251,7 @@
       ],
       "owns": [
         "backend/app/services/shop_service.py",
+        "backend/app/services/shop_paysecret_race_test.py",
         "backend/app/services/shop_edit_service.py",
         "backend/app/services/shop_edit_verify.py",
         "backend/app/services/shop_intent_service.py",
@@ -371,7 +375,6 @@
         "tools/agentic_probes/run_all.sh",
         "tools/agentic_probes/p_outbox_chain.py",
         "tools/agentic_probes/p_outbox_chain_loop.py",
-        "tools/agent_context/build.py",
         "talk-x5.md"
       ],
       "rare": [
@@ -389,8 +392,7 @@
         "tools/remove_test_tenant.py",
         "tools/agentic_probes/run_all.sh",
         "tools/agentic_probes/p_outbox_chain.py",
-        "tools/agentic_probes/p_outbox_chain_loop.py",
-        "tools/agent_context/build.py"
+        "tools/agentic_probes/p_outbox_chain_loop.py"
       ],
       "external": [
         "Only deployer: `flock /home/ubuntu/.sozan-deploy.lock` with `deploy/deploy-api.sh` / `deploy/deploy-panel.sh`.",
@@ -456,7 +458,8 @@
         "tools/agentic_probes/p_dm_paystock.py",
         "tools/agentic_probes/p_f7_memory.py",
         "sales-agent-talk.md",
-        "backend/app/api/inbox_dry_test.py"
+        "backend/app/api/inbox_dry_test.py",
+        ".y-tmp/**"
       ],
       "rare": [
         "tools/sales100_battery.json",
@@ -738,9 +741,14 @@
         ".github/pull_request_template.md",
         ".zcode/**",
         ".cursor/**",
+        ".agents/**",
+        ".impeccable/**",
+        ".zcodeignore",
         "AGENTS.md",
         "CLAUDE.md",
-        "tools/agent_context/roles.json"
+        "tools/agent_context/roles.json",
+        "tools/agent_context/build.py",
+        "tools/agent_context/contract_shapes.py"
       ],
       "rare": [],
       "title_en": "Owner and planner (not a programmer)",

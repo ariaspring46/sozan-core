@@ -1,7 +1,373 @@
 {
+ "HTTP GET /auth/me": {
+  "owner": "X5",
+  "shape": "backend/app/api/auth.py: returns keys {id, isAdmin, onboarded, phone, role}",
+  "signature": "GET /auth/me  ()",
+  "since": "2026-10-02",
+  "users": [
+   "U",
+   "X2",
+   "X3"
+  ]
+ },
+ "HTTP GET /billing/plans": {
+  "owner": "X5",
+  "shape": "backend/app/api/billing.py: response untyped",
+  "signature": "GET /billing/plans  ()",
+  "since": "2026-10-02",
+  "users": [
+   "U",
+   "Z"
+  ]
+ },
+ "HTTP GET /campaigns": {
+  "owner": "X2",
+  "shape": "backend/app/api/campaigns.py: response_model list[CampaignOut]",
+  "signature": "GET /campaigns  () -> list[CampaignOut]",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP GET /catalog": {
+  "owner": "C",
+  "shape": "backend/app/api/storefront.py: response untyped",
+  "signature": "GET /catalog  ()",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP GET /channels": {
+  "owner": "X3",
+  "shape": "backend/app/api/channels.py: returns keys {voice}",
+  "signature": "GET /channels  ()",
+  "since": "2026-10-02",
+  "users": [
+   "U",
+   "Y"
+  ]
+ },
+ "HTTP GET /health": {
+  "owner": "X5",
+  "shape": "backend/app/main.py: returns keys {edgeDry, ok, paymentReady}",
+  "signature": "GET /health  ()",
+  "since": "2026-10-02",
+  "users": [
+   "Z"
+  ]
+ },
+ "HTTP GET /inbox": {
+  "owner": "Y",
+  "shape": "backend/app/api/inbox.py: response untyped",
+  "signature": "GET /inbox  (q: str, platform: str, filter: str)",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP GET /inbox/unread": {
+  "owner": "Y",
+  "shape": "backend/app/api/inbox.py: response untyped",
+  "signature": "GET /inbox/unread  ()",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP GET /inbox/{thread_id}": {
+  "owner": "Y",
+  "shape": "backend/app/api/inbox.py: response untyped",
+  "signature": "GET /inbox/{thread_id}  (thread_id: str)",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP GET /sales": {
+  "owner": "C",
+  "shape": "backend/app/api/storefront.py: response untyped",
+  "signature": "GET /sales  ()",
+  "since": "2026-10-02",
+  "users": [
+   "Y"
+  ]
+ },
+ "HTTP GET /settings": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: response untyped",
+  "signature": "GET /settings  ()",
+  "since": "2026-10-02",
+  "users": [
+   "C",
+   "Y"
+  ]
+ },
+ "HTTP GET /settings/sales-policy": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: response untyped",
+  "signature": "GET /settings/sales-policy  ()",
+  "since": "2026-10-02",
+  "users": [
+   "Y"
+  ]
+ },
+ "HTTP GET /settings/support/hub": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: returns keys {tickets}",
+  "signature": "GET /settings/support/hub  ()",
+  "since": "2026-10-02",
+  "users": [
+   "C"
+  ]
+ },
+ "HTTP GET /settings/support/my-tickets": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: returns keys {tickets}",
+  "signature": "GET /settings/support/my-tickets  ()",
+  "since": "2026-10-02",
+  "users": [
+   "C"
+  ]
+ },
+ "HTTP GET /shop": {
+  "owner": "X4",
+  "shape": "backend/app/api/shop.py: response untyped",
+  "signature": "GET /shop  ()",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP GET /studio": {
+  "owner": "X2",
+  "shape": "backend/app/api/studio.py: returns keys {targets}",
+  "signature": "GET /studio  ()",
+  "since": "2026-10-02",
+  "users": [
+   "X1"
+  ]
+ },
+ "HTTP GET /wallet/orders": {
+  "owner": "C",
+  "shape": "backend/app/api/pay.py: returns keys {orders}",
+  "signature": "GET /wallet/orders  ()",
+  "since": "2026-10-02",
+  "users": [
+   "Y"
+  ]
+ },
+ "HTTP PATCH /inbox/{thread_id}": {
+  "owner": "Y",
+  "shape": "backend/app/api/inbox.py: ThreadPatchIn {paused: bool | None = None}; response untyped",
+  "signature": "PATCH /inbox/{thread_id}  (thread_id: str, body: ThreadPatchIn)",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP PATCH /settings": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: SettingsIn {mockSms: bool | None = None; adminPhone: str | None = None; otpTtlSeconds: int | None = None; gatewayPublicUrl: str | None = None; storeName: str | None = None; storeTagline: str | None = None; paymentSandbox: bool | None = None; paymentGateway: str | None = None; paymentMerchantId: str | None = Field(default=None, max_length=80); paymentApiKey: str | None = Field(default=None, max_length=200); paymentCurrency: str | None = Field(default=None, max_length=8); paymentCallbackUrl: str | None = Field(default=None, max_length=400); smsProvider: str | None = Field(default=None, max_length=32); smsApiKey: str | None = Field(default=None, max_length=200); smsTemplateId: str | None = Field(default=None, max_length=80); smsTokenName: str | None = Field(default=None, max_length=40); plan: str | None = None; helpImprove: bool | None = None}; response untyped",
+  "signature": "PATCH /settings  (body: SettingsIn)",
+  "since": "2026-10-02",
+  "users": [
+   "C",
+   "Y"
+  ]
+ },
+ "HTTP PATCH /studio/caption": {
+  "owner": "X2",
+  "shape": "backend/app/api/studio.py: CaptionIn {messageId: str = Field(min_length=1, max_length=64); captions: dict = Field(default_factory=dict)}; response untyped",
+  "signature": "PATCH /studio/caption  (body: CaptionIn)",
+  "since": "2026-10-02",
+  "users": [
+   "X1"
+  ]
+ },
+ "HTTP POST /billing/coupon-preview": {
+  "owner": "X5",
+  "shape": "backend/app/api/billing.py: CouponPreviewIn {plan: str = Field(min_length=2, max_length=16); code: str = Field(min_length=1, max_length=40)}; response untyped",
+  "signature": "POST /billing/coupon-preview  (body: CouponPreviewIn)",
+  "since": "2026-10-02",
+  "users": [
+   "C"
+  ]
+ },
+ "HTTP POST /billing/subscribe": {
+  "owner": "X5",
+  "shape": "backend/app/api/billing.py: SubscribeIn {plan: str = Field(min_length=2, max_length=16); code: str = ''}; response untyped",
+  "signature": "POST /billing/subscribe  (body: SubscribeIn)",
+  "since": "2026-10-02",
+  "users": [
+   "C"
+  ]
+ },
+ "HTTP POST /campaigns": {
+  "owner": "X2",
+  "shape": "backend/app/api/campaigns.py: CampaignCreateIn {slug: str = Field(min_length=2, max_length=80, pattern='^[a-z0-9-]+$'); pillar: str; title: str; subtitle: str = ''; cta: str = ''; instagram_caption: str = ''; telegram_caption: str = ''; whatsapp_caption: str = ''}; response_model CampaignOut",
+  "signature": "POST /campaigns  (body: CampaignCreateIn) -> CampaignOut",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP POST /catalog": {
+  "owner": "C",
+  "shape": "backend/app/api/storefront.py: ProductIn {title: str = Field(min_length=1, max_length=200); price: int = Field(default=0, ge=0); stock: int = Field(default=0, ge=0); sku: str = Field(default='', max_length=80); description: str = Field(default='', max_length=400); discount: int = Field(default=0, ge=0, le=90); priceNote: str = Field(default='', max_length=40); category: str = Field(default='', max_length=40); subcategory: str = Field(default='', max_length=40); colors: list[str] = Field(default_factory=list); sizes: str = Field(default='', max_length=40); image: str = Field(default='', max_length=200); images: list[str] = Field(default_factory=list); def note_ok(cls, value: str) -> str; def colors_ok(cls, value: list[str]) -> list[str]; def images_ok(cls, value: list[str]) -> list[str]}; response untyped",
+  "signature": "POST /catalog  (body: ProductIn)",
+  "since": "2026-10-02",
+  "users": [
+   "U"
+  ]
+ },
+ "HTTP POST /channels": {
+  "owner": "X3",
+  "shape": "backend/app/api/channels.py: ChannelIn {platform: str = Field(min_length=2, max_length=32); handle: str = Field(default='', max_length=200); secret: str = Field(default='', max_length=2000); credentials: dict[str, str] = Field(default_factory=dict); samples: str = Field(default='', max_length=4000)}; returns keys {account, scan}",
+  "signature": "POST /channels  (body: ChannelIn)",
+  "since": "2026-10-02",
+  "users": [
+   "U",
+   "Y"
+  ]
+ },
+ "HTTP POST /sales": {
+  "owner": "C",
+  "shape": "backend/app/api/storefront.py: SaleIn {title: str = Field(min_length=1, max_length=200); amount: int = Field(ge=0); customer: str = Field(default='', max_length=200); channel: str = Field(default='فروشگاه', max_length=80)}; response untyped",
+  "signature": "POST /sales  (body: SaleIn)",
+  "since": "2026-10-02",
+  "users": [
+   "Y"
+  ]
+ },
+ "HTTP POST /settings/feedback": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: FeedbackIn {trainId: str = Field(min_length=4, max_length=80); good: bool}; returns keys {ok}",
+  "signature": "POST /settings/feedback  (body: FeedbackIn)",
+  "since": "2026-10-02",
+  "users": [
+   "X1"
+  ]
+ },
+ "HTTP POST /settings/support/hub/{ticket_id}/reply": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: response untyped",
+  "signature": "POST /settings/support/hub/{ticket_id}/reply  (ticket_id: str, body: dict)",
+  "since": "2026-10-02",
+  "users": [
+   "C"
+  ]
+ },
+ "HTTP POST /settings/support/seller-ticket": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: SellerTicketIn {subject: str = Field(min_length=2, max_length=120); text: str = Field(min_length=2, max_length=2000)}; response untyped",
+  "signature": "POST /settings/support/seller-ticket  (body: SellerTicketIn)",
+  "since": "2026-10-02",
+  "users": [
+   "C"
+  ]
+ },
+ "HTTP POST /studio/publish": {
+  "owner": "X2",
+  "shape": "backend/app/api/studio.py: PublishIn {campaignId: str = ''; messageId: str = ''; platform: str = Field(min_length=2, max_length=32); caption: str = Field(default='', max_length=2200); mediaName: str = Field(min_length=1, max_length=200); mediaKind: str = Field(min_length=1, max_length=16); force: bool = False; recipientId: str = Field(default='', max_length=80)}; response untyped",
+  "signature": "POST /studio/publish  (request: Request, body: PublishIn)",
+  "since": "2026-10-02",
+  "users": [
+   "X1"
+  ]
+ },
+ "HTTP POST /studio/regenerate": {
+  "owner": "X2",
+  "shape": "backend/app/api/studio.py: response untyped",
+  "signature": "POST /studio/regenerate  (request: Request)",
+  "since": "2026-10-02",
+  "users": [
+   "X1"
+  ]
+ },
+ "HTTP PUT /settings/sales-policy": {
+  "owner": "X5",
+  "shape": "backend/app/api/settings.py: SalesPolicyIn {shippingMethod: str | None = None; shippingCost: str | int | None = None; shippingDays: str | None = None; shippingCities: str | None = None; freeShippingFrom: str | int | None = None; returnDays: str | int | None = None; returnNote: str | None = None; returnPayer: str | None = None; hours: str | None = None; sizeExchange: str | None = None; invoice: str | None = None; cod: str | None = None; minOrder: str | int | None = None}; response untyped",
+  "signature": "PUT /settings/sales-policy  (body: SalesPolicyIn)",
+  "since": "2026-10-02",
+  "users": [
+   "Y"
+  ]
+ },
+ "STATE campaign-ids.json": {
+  "owner": "X2",
+  "signature": "state campaign-ids.json  writers: X2, X5; readers: -",
+  "since": "2026-10-02",
+  "users": [
+   "X5"
+  ]
+ },
+ "STATE channel-scan.json": {
+  "owner": "X3",
+  "shape": "top-level keys per role: C: {categories}",
+  "signature": "state channel-scan.json  writers: X3; readers: C",
+  "since": "2026-10-02",
+  "users": [
+   "C"
+  ]
+ },
+ "STATE channels.json": {
+  "owner": "X3",
+  "signature": "state channels.json  writers: X3; readers: X5",
+  "since": "2026-10-02",
+  "users": [
+   "X5"
+  ]
+ },
+ "STATE inbox.json": {
+  "owner": "Y",
+  "shape": "top-level keys per role: X5: {threads}; Y: {threads}",
+  "signature": "state inbox.json  writers: Y; readers: X5",
+  "since": "2026-10-02",
+  "users": [
+   "X5"
+  ]
+ },
+ "STATE pay-orders.json": {
+  "owner": "C",
+  "signature": "state pay-orders.json  writers: C; readers: X5",
+  "since": "2026-10-02",
+  "users": [
+   "X5"
+  ]
+ },
+ "STATE shop.json": {
+  "owner": "C",
+  "shape": "top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, slug, status, url}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}",
+  "signature": "state shop.json  writers: C, X4, X5; readers: X1",
+  "since": "2026-10-02",
+  "users": [
+   "X1",
+   "X4",
+   "X5"
+  ]
+ },
+ "STATE support-tickets.json": {
+  "owner": "C",
+  "signature": "state support-tickets.json  writers: C; readers: X5",
+  "since": "2026-10-02",
+  "users": [
+   "X5"
+  ]
+ },
+ "STATE voice.json": {
+  "owner": "Y",
+  "shape": "top-level keys per role: X1: {toneId}",
+  "signature": "state voice.json  writers: Y; readers: X1",
+  "since": "2026-10-02",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/api/brand.py::router": {
   "owner": "X2",
   "signature": "router = APIRouter(prefix='/brand', tags=['brand'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -9,6 +375,7 @@
  "backend/app/api/campaigns.py::router": {
   "owner": "X2",
   "signature": "router = APIRouter(prefix='/campaigns', tags=['campaigns'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -16,6 +383,7 @@
  "backend/app/api/channels.py::router": {
   "owner": "X3",
   "signature": "router = APIRouter(prefix='/channels', tags=['channels'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -23,6 +391,7 @@
  "backend/app/api/chat_media.py::router": {
   "owner": "X3",
   "signature": "router = APIRouter(prefix='/chat-media', tags=['chat-media'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -30,6 +399,7 @@
  "backend/app/api/chat_payload.py::read_chat_payload": {
   "owner": "X1",
   "signature": "async def read_chat_payload(request: Request) -> tuple[str, dict | None, str, str, str, str, str]",
+  "since": "2026-09-21",
   "users": [
    "X2",
    "X4"
@@ -38,6 +408,7 @@
  "backend/app/api/inbox.py::router": {
   "owner": "Y",
   "signature": "router = APIRouter(prefix='/inbox', tags=['inbox'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -45,6 +416,7 @@
  "backend/app/api/onboard.py::router": {
   "owner": "X3",
   "signature": "router = APIRouter(prefix='/onboard', tags=['onboard'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -52,6 +424,7 @@
  "backend/app/api/pay.py::router": {
   "owner": "C",
   "signature": "router = APIRouter(tags=['pay'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -59,6 +432,7 @@
  "backend/app/api/public_media.py::router": {
   "owner": "X3",
   "signature": "router = APIRouter(tags=['public-media'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -66,6 +440,7 @@
  "backend/app/api/router_chat.py::router": {
   "owner": "X1",
   "signature": "router = APIRouter(prefix='/chat', tags=['chat'])",
+  "since": "2026-09-21",
   "users": [
    "X5"
   ]
@@ -73,6 +448,7 @@
  "backend/app/api/shop.py::router": {
   "owner": "X4",
   "signature": "router = APIRouter(prefix='/shop', tags=['shop'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -80,6 +456,7 @@
  "backend/app/api/storefront.py::router": {
   "owner": "C",
   "signature": "router = APIRouter(tags=['storefront'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -87,6 +464,7 @@
  "backend/app/api/studio.py::router": {
   "owner": "X2",
   "signature": "router = APIRouter(prefix='/studio', tags=['studio'])",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -94,6 +472,7 @@
  "backend/app/client_ip.py::client_ip": {
   "owner": "X5",
   "signature": "def client_ip(request: Request) -> str",
+  "since": "2026-10-01",
   "users": [
    "C"
   ]
@@ -101,6 +480,7 @@
  "backend/app/config.py::settings": {
   "owner": "X5",
   "signature": "settings = Settings()",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -113,6 +493,7 @@
  "backend/app/config.py::settings.arvan_api_key": {
   "owner": "X5",
   "signature": "Settings.arvan_api_key: str = ''",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -120,6 +501,7 @@
  "backend/app/config.py::settings.arvan_origin_ip": {
   "owner": "X5",
   "signature": "Settings.arvan_origin_ip: str = ''",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -127,6 +509,7 @@
  "backend/app/config.py::settings.arvan_origin_port": {
   "owner": "X5",
   "signature": "Settings.arvan_origin_port: int = 80",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -134,6 +517,7 @@
  "backend/app/config.py::settings.arvan_zone": {
   "owner": "X5",
   "signature": "Settings.arvan_zone: str = 'sozan-core.ir'",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -141,6 +525,7 @@
  "backend/app/config.py::settings.audio_bed_path": {
   "owner": "X5",
   "signature": "def Settings.audio_bed_path(self) -> Path",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -148,6 +533,7 @@
  "backend/app/config.py::settings.brand_path": {
   "owner": "X5",
   "signature": "def Settings.brand_path(self) -> Path",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -155,6 +541,7 @@
  "backend/app/config.py::settings.campaigns_path": {
   "owner": "X5",
   "signature": "def Settings.campaigns_path(self) -> Path",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -162,6 +549,7 @@
  "backend/app/config.py::settings.channel_proxy": {
   "owner": "X5",
   "signature": "Settings.channel_proxy: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X3",
@@ -171,6 +559,7 @@
  "backend/app/config.py::settings.chat_llm_model": {
   "owner": "X5",
   "signature": "Settings.chat_llm_model: str = 'qwen3.8-27b'",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -178,6 +567,7 @@
  "backend/app/config.py::settings.cloud_llm_model": {
   "owner": "X5",
   "signature": "Settings.cloud_llm_model: str = 'DeepSeek-V4-Pro'",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -185,6 +575,7 @@
  "backend/app/config.py::settings.cloud_llm_proxy": {
   "owner": "X5",
   "signature": "Settings.cloud_llm_proxy: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X4"
@@ -193,6 +584,7 @@
  "backend/app/config.py::settings.cloud_llm_token": {
   "owner": "X5",
   "signature": "Settings.cloud_llm_token: str = Field(default='', validation_alias=AliasChoices('CLOUD_LLM_TOKEN', 'OLLAMA_API_KEY'))",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X4"
@@ -201,6 +593,7 @@
  "backend/app/config.py::settings.cloud_llm_url": {
   "owner": "X5",
   "signature": "Settings.cloud_llm_url: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X4"
@@ -209,6 +602,7 @@
  "backend/app/config.py::settings.cutout_api_key": {
   "owner": "X5",
   "signature": "Settings.cutout_api_key: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -216,6 +610,7 @@
  "backend/app/config.py::settings.cutout_openrouter_model": {
   "owner": "X5",
   "signature": "Settings.cutout_openrouter_model: str = 'google/gemini-2.5-flash-image'",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -223,6 +618,7 @@
  "backend/app/config.py::settings.cutout_provider": {
   "owner": "X5",
   "signature": "Settings.cutout_provider: str = 'openrouter'",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -230,6 +626,7 @@
  "backend/app/config.py::settings.factory_script": {
   "owner": "X5",
   "signature": "def Settings.factory_script(self) -> Path",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -237,6 +634,7 @@
  "backend/app/config.py::settings.fonts_path": {
   "owner": "X5",
   "signature": "def Settings.fonts_path(self) -> Path",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X3"
@@ -245,6 +643,7 @@
  "backend/app/config.py::settings.gateway_sozan_url": {
   "owner": "X5",
   "signature": "Settings.gateway_sozan_url: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -252,6 +651,7 @@
  "backend/app/config.py::settings.instagram_app_id": {
   "owner": "X5",
   "signature": "Settings.instagram_app_id: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -259,6 +659,7 @@
  "backend/app/config.py::settings.instagram_app_secret": {
   "owner": "X5",
   "signature": "Settings.instagram_app_secret: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -266,6 +667,7 @@
  "backend/app/config.py::settings.instagram_redirect_uri": {
   "owner": "X5",
   "signature": "Settings.instagram_redirect_uri: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -273,6 +675,7 @@
  "backend/app/config.py::settings.jwt_secret": {
   "owner": "X5",
   "signature": "Settings.jwt_secret: str = 'change-me-to-a-long-random-secret'",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X3",
@@ -282,6 +685,7 @@
  "backend/app/config.py::settings.local_llm_token": {
   "owner": "X5",
   "signature": "Settings.local_llm_token: str = 'sk-local'",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "Y"
@@ -290,6 +694,7 @@
  "backend/app/config.py::settings.local_llm_url": {
   "owner": "X5",
   "signature": "Settings.local_llm_url: str = 'http://127.0.0.1:9292/v1'",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X4",
@@ -299,6 +704,7 @@
  "backend/app/config.py::settings.melipayamak_body_id": {
   "owner": "X5",
   "signature": "Settings.melipayamak_body_id: str = '547036'",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -306,6 +712,7 @@
  "backend/app/config.py::settings.melipayamak_otp_apikey": {
   "owner": "X5",
   "signature": "Settings.melipayamak_otp_apikey: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -313,6 +720,7 @@
  "backend/app/config.py::settings.melipayamak_pattern_base": {
   "owner": "X5",
   "signature": "Settings.melipayamak_pattern_base: str = 'https://api.payamak-panel.com/post/send.asmx'",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -320,6 +728,7 @@
  "backend/app/config.py::settings.melipayamak_username": {
   "owner": "X5",
   "signature": "Settings.melipayamak_username: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -327,6 +736,7 @@
  "backend/app/config.py::settings.otp_dev": {
   "owner": "X5",
   "signature": "Settings.otp_dev: bool = False",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -334,6 +744,7 @@
  "backend/app/config.py::settings.otp_ttl_seconds": {
   "owner": "X5",
   "signature": "Settings.otp_ttl_seconds: int = 300",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -341,6 +752,7 @@
  "backend/app/config.py::settings.panel_url": {
   "owner": "X5",
   "signature": "Settings.panel_url: str = 'https://app.sozan-core.ir'",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X3"
@@ -349,6 +761,7 @@
  "backend/app/config.py::settings.payment_sign_secret": {
   "owner": "X5",
   "signature": "Settings.payment_sign_secret: str = ''",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -356,6 +769,7 @@
  "backend/app/config.py::settings.public_api_url": {
   "owner": "X5",
   "signature": "Settings.public_api_url: str = 'https://api.sozan-core.ir'",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X3",
@@ -365,6 +779,7 @@
  "backend/app/config.py::settings.sendbox_api_key": {
   "owner": "X5",
   "signature": "Settings.sendbox_api_key: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -372,6 +787,7 @@
  "backend/app/config.py::settings.sendbox_base_url": {
   "owner": "X5",
   "signature": "Settings.sendbox_base_url: str = 'https://api.sendbox.chat/api/v1'",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -379,6 +795,7 @@
  "backend/app/config.py::settings.sendbox_oauth_url": {
   "owner": "X5",
   "signature": "Settings.sendbox_oauth_url: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -386,6 +803,7 @@
  "backend/app/config.py::settings.sendbox_webhook_legacy_until": {
   "owner": "X5",
   "signature": "Settings.sendbox_webhook_legacy_until: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -393,6 +811,7 @@
  "backend/app/config.py::settings.sendbox_webhook_secret": {
   "owner": "X5",
   "signature": "Settings.sendbox_webhook_secret: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -400,6 +819,7 @@
  "backend/app/config.py::settings.shop_otp_daily_cap": {
   "owner": "X5",
   "signature": "Settings.shop_otp_daily_cap: int = 200",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -407,6 +827,7 @@
  "backend/app/config.py::settings.sms_ir_api_key": {
   "owner": "X5",
   "signature": "Settings.sms_ir_api_key: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -414,6 +835,7 @@
  "backend/app/config.py::settings.sms_ir_template_id": {
   "owner": "X5",
   "signature": "Settings.sms_ir_template_id: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -421,6 +843,7 @@
  "backend/app/config.py::settings.sms_ir_token_name": {
   "owner": "X5",
   "signature": "Settings.sms_ir_token_name: str = 'Code'",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -428,6 +851,7 @@
  "backend/app/config.py::settings.sms_provider": {
   "owner": "X5",
   "signature": "Settings.sms_provider: str = 'smsir'",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -435,6 +859,7 @@
  "backend/app/config.py::settings.sozan_npm_proxy": {
   "owner": "X5",
   "signature": "Settings.sozan_npm_proxy: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -442,6 +867,7 @@
  "backend/app/config.py::settings.state_dir": {
   "owner": "X5",
   "signature": "Settings.state_dir: str = str(ROOT / 'backend' / 'data')",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -449,6 +875,7 @@
  "backend/app/config.py::settings.state_path": {
   "owner": "X5",
   "signature": "def Settings.state_path(self) -> Path",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -456,6 +883,7 @@
  "backend/app/config.py::settings.telegram_hub_bot_token": {
   "owner": "X5",
   "signature": "Settings.telegram_hub_bot_token: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -463,6 +891,7 @@
  "backend/app/config.py::settings.unipile_api_key": {
   "owner": "X5",
   "signature": "Settings.unipile_api_key: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -470,6 +899,7 @@
  "backend/app/config.py::settings.unipile_dsn": {
   "owner": "X5",
   "signature": "Settings.unipile_dsn: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -477,6 +907,7 @@
  "backend/app/config.py::settings.unipile_proxy": {
   "owner": "X5",
   "signature": "Settings.unipile_proxy: str = ''",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -484,6 +915,7 @@
  "backend/app/database.py::SessionLocal": {
   "owner": "X5",
   "signature": "SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X2"
@@ -492,13 +924,16 @@
  "backend/app/database.py::get_session": {
   "owner": "X5",
   "signature": "async def get_session() -> AsyncSession",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
  },
  "backend/app/models/user.py::Asset": {
   "owner": "X5",
+  "shape": "__tablename__ = 'assets'; id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4); campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id')); kind: Mapped[str] = mapped_column(String(24)); channel: Mapped[str] = mapped_column(String(24)); format: Mapped[str] = mapped_column(String(32)); rel_path: Mapped[str] = mapped_column(String(400)); campaign: Mapped[Campaign] = relationship(back_populates='assets')",
   "signature": "class Asset(Base)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -506,6 +941,7 @@
  "backend/app/models/user.py::Asset.campaign_id": {
   "owner": "X5",
   "signature": "Asset.campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id'))",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -513,13 +949,16 @@
  "backend/app/models/user.py::Asset.kind": {
   "owner": "X5",
   "signature": "Asset.kind: Mapped[str] = mapped_column(String(24))",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
  },
  "backend/app/models/user.py::Campaign": {
   "owner": "X5",
+  "shape": "__tablename__ = 'campaigns'; id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4); slug: Mapped[str] = mapped_column(String(80), unique=True, index=True); pillar: Mapped[str] = mapped_column(String(32)); title: Mapped[str] = mapped_column(String(120)); subtitle: Mapped[str] = mapped_column(String(200), default=''); cta: Mapped[str] = mapped_column(String(80), default=''); created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now()); assets: Mapped[list['Asset']] = relationship(back_populates='campaign', cascade='all, delete-orphan'); copies: Mapped[list['CopyVariant']] = relationship(back_populates='campaign', cascade='all, delete-orphan')",
   "signature": "class Campaign(Base)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -527,6 +966,7 @@
  "backend/app/models/user.py::Campaign.assets": {
   "owner": "X5",
   "signature": "Campaign.assets: Mapped[list['Asset']] = relationship(back_populates='campaign', cascade='all, delete-orphan')",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -534,6 +974,7 @@
  "backend/app/models/user.py::Campaign.copies": {
   "owner": "X5",
   "signature": "Campaign.copies: Mapped[list['CopyVariant']] = relationship(back_populates='campaign', cascade='all, delete-orphan')",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -541,6 +982,7 @@
  "backend/app/models/user.py::Campaign.created_at": {
   "owner": "X5",
   "signature": "Campaign.created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -548,6 +990,7 @@
  "backend/app/models/user.py::Campaign.id": {
   "owner": "X5",
   "signature": "Campaign.id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -555,13 +998,16 @@
  "backend/app/models/user.py::Campaign.slug": {
   "owner": "X5",
   "signature": "Campaign.slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
  },
  "backend/app/models/user.py::CopyVariant": {
   "owner": "X5",
+  "shape": "__tablename__ = 'copy_variants'; id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4); campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id')); channel: Mapped[str] = mapped_column(String(24)); format: Mapped[str] = mapped_column(String(32)); body: Mapped[str] = mapped_column(Text, default=''); campaign: Mapped[Campaign] = relationship(back_populates='copies')",
   "signature": "class CopyVariant(Base)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -569,6 +1015,7 @@
  "backend/app/models/user.py::CopyVariant.campaign_id": {
   "owner": "X5",
   "signature": "CopyVariant.campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id'))",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -576,6 +1023,7 @@
  "backend/app/models/user.py::CopyVariant.channel": {
   "owner": "X5",
   "signature": "CopyVariant.channel: Mapped[str] = mapped_column(String(24))",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -583,13 +1031,16 @@
  "backend/app/models/user.py::CopyVariant.format": {
   "owner": "X5",
   "signature": "CopyVariant.format: Mapped[str] = mapped_column(String(32))",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
  },
  "backend/app/models/user.py::User": {
   "owner": "X5",
+  "shape": "__tablename__ = 'users'; id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4); phone: Mapped[str] = mapped_column(String(11), unique=True, index=True); role: Mapped[str] = mapped_column(String(32), default='admin'); is_active: Mapped[bool] = mapped_column(Boolean, default=True); created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())",
   "signature": "class User(Base)",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -597,6 +1048,7 @@
  "backend/app/phone.py::normalize_digits": {
   "owner": "X5",
   "signature": "def normalize_digits(raw: str) -> str",
+  "since": "2026-09-19",
   "users": [
    "C"
   ]
@@ -604,6 +1056,7 @@
  "backend/app/phone.py::normalize_phone": {
   "owner": "X5",
   "signature": "def normalize_phone(raw: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X3"
@@ -612,116 +1065,81 @@
  "backend/app/redis_client.py::redis_client": {
   "owner": "X5",
   "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2",
    "X3"
   ]
  },
- "backend/app/redis_client.py::redis_client.brpop": {
-  "owner": "X5",
-  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
-  "users": [
-   "X2"
-  ]
- },
- "backend/app/redis_client.py::redis_client.delete": {
-  "owner": "X5",
-  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
-  "users": [
-   "C",
-   "X3"
-  ]
- },
- "backend/app/redis_client.py::redis_client.expire": {
-  "owner": "X5",
-  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
-  "users": [
-   "C"
-  ]
- },
- "backend/app/redis_client.py::redis_client.get": {
-  "owner": "X5",
-  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
-  "users": [
-   "C",
-   "X3"
-  ]
- },
- "backend/app/redis_client.py::redis_client.incr": {
-  "owner": "X5",
-  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
-  "users": [
-   "C"
-  ]
- },
- "backend/app/redis_client.py::redis_client.lpush": {
-  "owner": "X5",
-  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
-  "users": [
-   "X2"
-  ]
- },
- "backend/app/redis_client.py::redis_client.setex": {
-  "owner": "X5",
-  "signature": "redis_client = Redis.from_url(settings.redis_url, decode_responses=True)",
-  "users": [
-   "C",
-   "X3"
-  ]
- },
  "backend/app/repositories/brand_repository.py::BrandRepository": {
   "owner": "X2",
+  "shape": "def __init__(self, brand_dir: Path, fonts_dir: Path) -> None; def get(self) -> dict; def save(self, data: dict) -> dict; def save_image(self, dest: Path, raw: bytes) -> Path; def save_logo(self, raw: bytes) -> Path; def save_character(self, raw: bytes) -> Path; def ensure_logo(self) -> Path",
   "signature": "class BrandRepository",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
  },
  "backend/app/repositories/campaign_repository.py::AssetRepository": {
   "owner": "X2",
+  "shape": "def __init__(self, session: AsyncSession) -> None; async def add(self, asset: Asset) -> Asset; async def delete_generated(self, campaign_id: UUID) -> None",
   "signature": "class AssetRepository",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
  },
  "backend/app/repositories/campaign_repository.py::CampaignRepository": {
   "owner": "X2",
+  "shape": "def __init__(self, session: AsyncSession) -> None; async def list_all(self) -> list[Campaign]; async def get(self, campaign_id: UUID) -> Campaign | None; async def get_by_slug(self, slug: str) -> Campaign | None; async def create(self, campaign: Campaign) -> Campaign; async def save(self, campaign: Campaign) -> Campaign",
   "signature": "class CampaignRepository",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
  },
  "backend/app/repositories/campaign_repository.py::CopyRepository": {
   "owner": "X2",
+  "shape": "def __init__(self, session: AsyncSession) -> None; async def upsert(self, campaign_id: UUID, channel: str, fmt: str, body: str) -> CopyVariant",
   "signature": "class CopyRepository",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
  },
  "backend/app/schemas.py::CampaignCreateIn": {
   "owner": "X5",
+  "shape": "slug: str = Field(min_length=2, max_length=80, pattern='^[a-z0-9-]+$'); pillar: str; title: str; subtitle: str = ''; cta: str = ''; instagram_caption: str = ''; telegram_caption: str = ''; whatsapp_caption: str = ''",
   "signature": "class CampaignCreateIn(BaseModel)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
  },
  "backend/app/schemas.py::CampaignOut": {
   "owner": "X5",
+  "shape": "id: UUID; slug: str; pillar: str; title: str; subtitle: str; cta: str; assets: list[AssetOut]; copies: list[CopyOut]; model_config = {'from_attributes': True}",
   "signature": "class CampaignOut(BaseModel)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
  },
  "backend/app/schemas.py::CampaignUpdateIn": {
   "owner": "X5",
+  "shape": "title: str | None = None; subtitle: str | None = None; cta: str | None = None; instagram_caption: str | None = None; telegram_caption: str | None = None; whatsapp_caption: str | None = None",
   "signature": "class CampaignUpdateIn(BaseModel)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
  },
  "backend/app/schemas.py::ImportSlugIn": {
   "owner": "X5",
+  "shape": "slug: str",
   "signature": "class ImportSlugIn(BaseModel)",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -729,6 +1147,7 @@
  "backend/app/security.py::require_permission": {
   "owner": "X5",
   "signature": "def require_permission(code: str)",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -741,6 +1160,7 @@
  "backend/app/services/ai_budget_service.py::record_cost": {
   "owner": "X5",
   "signature": "def record_cost(*, surface: str, usd: float, tenant: str | None=None) -> None",
+  "since": "2026-09-28",
   "users": [
    "X2"
   ]
@@ -748,6 +1168,7 @@
  "backend/app/services/arvan_dns_service.py::check_cname": {
   "owner": "C",
   "signature": "def check_cname(domain: str, slug: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -755,6 +1176,7 @@
  "backend/app/services/arvan_dns_service.py::cname_target": {
   "owner": "C",
   "signature": "def cname_target(slug: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -762,6 +1184,7 @@
  "backend/app/services/arvan_dns_service.py::edge_dry": {
   "owner": "C",
   "signature": "def edge_dry() -> bool",
+  "since": "2026-09-27",
   "users": [
    "X4",
    "X5",
@@ -771,6 +1194,7 @@
  "backend/app/services/arvan_dns_service.py::ensure_shop_record": {
   "owner": "C",
   "signature": "def ensure_shop_record(slug: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -778,6 +1202,7 @@
  "backend/app/services/arvan_dns_service.py::hostname": {
   "owner": "C",
   "signature": "def hostname(domain: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -785,6 +1210,7 @@
  "backend/app/services/arvan_dns_service.py::is_zone_host": {
   "owner": "C",
   "signature": "def is_zone_host(host: str) -> bool",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -792,6 +1218,7 @@
  "backend/app/services/arvan_dns_service.py::public_host": {
   "owner": "C",
   "signature": "def public_host(slug: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -799,6 +1226,7 @@
  "backend/app/services/arvan_dns_service.py::start_cname_setup": {
   "owner": "C",
   "signature": "def start_cname_setup(domain: str, slug: str='') -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -806,6 +1234,7 @@
  "backend/app/services/arvan_dns_service.py::zone": {
   "owner": "C",
   "signature": "def zone() -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -813,6 +1242,7 @@
  "backend/app/services/auth_service.py::OTP_SEND_LIMIT": {
   "owner": "X5",
   "signature": "OTP_SEND_LIMIT = 5",
+  "since": "2026-09-20",
   "users": [
    "C"
   ]
@@ -820,6 +1250,7 @@
  "backend/app/services/auth_service.py::OTP_SEND_WINDOW": {
   "owner": "X5",
   "signature": "OTP_SEND_WINDOW = 900",
+  "since": "2026-09-20",
   "users": [
    "C"
   ]
@@ -827,6 +1258,7 @@
  "backend/app/services/auth_service.py::OTP_VERIFY_LIMIT": {
   "owner": "X5",
   "signature": "OTP_VERIFY_LIMIT = 5",
+  "since": "2026-09-20",
   "users": [
    "C"
   ]
@@ -834,6 +1266,7 @@
  "backend/app/services/auth_service.py::OTP_VERIFY_WINDOW": {
   "owner": "X5",
   "signature": "OTP_VERIFY_WINDOW = 300",
+  "since": "2026-09-20",
   "users": [
    "C"
   ]
@@ -841,20 +1274,25 @@
  "backend/app/services/auth_service.py::otp_test_reveal_allowed": {
   "owner": "X5",
   "signature": "def otp_test_reveal_allowed(phone: str) -> bool",
+  "since": "2026-10-01",
   "users": [
    "C"
   ]
  },
  "backend/app/services/brand_service.py::BrandService": {
   "owner": "X2",
+  "shape": "def __init__(self, brands: BrandRepository) -> None; def get(self) -> dict; def update(self, *, name: str | None, description: str | None) -> dict; def save_logo(self, filename: str, data: bytes) -> dict; def save_character(self, filename: str, data: bytes) -> dict; def logo_file(self) -> Path; def character_file(self) -> Path; def motion_file(self, name: str) -> Path; def make_logo_motion(self) -> dict",
   "signature": "class BrandService",
+  "since": "2026-09-24",
   "users": [
    "X3"
   ]
  },
  "backend/app/services/campaign_service.py::CampaignService": {
   "owner": "X2",
+  "shape": "def __init__(self, campaigns: CampaignRepository, assets: AssetRepository, copies: CopyRepository) -> None; async def list_campaigns(self) -> list[Campaign]; async def get(self, campaign_id: UUID) -> Campaign; async def create(self, *, slug: str, pillar: str, title: str, subtitle: str, cta: str, instagram_caption: str, telegram_caption: str, whatsapp_caption: str='') -> Campaign; async def update_copy(self, campaign_id: UUID, *, title: str | None, subtitle: str | None, cta: str | None, instagram_caption: str | None, telegram_caption: str | None, whatsapp_caption: str | None=None) -> Campaign; async def save_raw(self, campaign_id: UUID, filename: str, data: bytes) -> Asset; def compose_files_sync(self, slug: str) -> dict[str, str]; async def compose(self, campaign_id: UUID) -> Campaign; async def preview_outputs(self, campaign_id: UUID) -> list[dict]; async def export_zip(self, campaign_id: UUID) -> Path; def resolve_file(self, rel_path: str) -> Path; async def import_disk_slug(self, slug: str) -> Campaign",
   "signature": "class CampaignService",
+  "since": "2026-09-28",
   "users": [
    "X1"
   ]
@@ -862,6 +1300,7 @@
  "backend/app/services/catalog_sync_service.py::sync_live": {
   "owner": "C",
   "signature": "def sync_live(*, changed_images: list[str] | None=None) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X4"
@@ -870,6 +1309,7 @@
  "backend/app/services/channel_outbound_service.py::deliver": {
   "owner": "X3",
   "signature": "async def deliver(*, platform: str, sender_id: str, chat_id: str, text: str) -> None",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -877,6 +1317,7 @@
  "backend/app/services/channel_poll_service.py::poll_all": {
   "owner": "X3",
   "signature": "async def poll_all() -> None",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -884,6 +1325,7 @@
  "backend/app/services/channel_scan_service.py::brief_for_shop": {
   "owner": "X3",
   "signature": "def brief_for_shop() -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -891,6 +1333,7 @@
  "backend/app/services/channel_scan_service.py::category_from_text": {
   "owner": "X3",
   "signature": "def category_from_text(text: str) -> str",
+  "since": "2026-10-01",
   "users": [
    "X4"
   ]
@@ -898,6 +1341,7 @@
  "backend/app/services/channel_scan_service.py::get_scan": {
   "owner": "X3",
   "signature": "def get_scan() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -905,6 +1349,7 @@
  "backend/app/services/channel_scan_service.py::looks_like_product_title": {
   "owner": "X3",
   "signature": "def looks_like_product_title(title: str) -> bool",
+  "since": "2026-10-01",
   "users": [
    "C"
   ]
@@ -912,6 +1357,7 @@
  "backend/app/services/channel_scan_service.py::parse_caption_price": {
   "owner": "X3",
   "signature": "def parse_caption_price(text: str) -> tuple[int, str]",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -919,6 +1365,7 @@
  "backend/app/services/channel_scan_service.py::product_title_from_caption": {
   "owner": "X3",
   "signature": "def product_title_from_caption(caption: str, brand: str='') -> str | None",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X4"
@@ -927,6 +1374,7 @@
  "backend/app/services/channel_scan_service.py::scan_dir": {
   "owner": "X3",
   "signature": "def scan_dir() -> Path",
+  "since": "2026-10-01",
   "users": [
    "C",
    "X2",
@@ -936,6 +1384,7 @@
  "backend/app/services/channel_scan_service.py::scan_status": {
   "owner": "X3",
   "signature": "def scan_status() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -943,6 +1392,7 @@
  "backend/app/services/channel_scan_service.py::site_type_hint": {
   "owner": "X3",
   "signature": "def site_type_hint() -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -950,6 +1400,7 @@
  "backend/app/services/channel_scan_service.py::start_scan": {
   "owner": "X3",
   "signature": "def start_scan(accounts: list[dict]) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -957,6 +1408,7 @@
  "backend/app/services/channel_scan_service.py::unattributed_dir": {
   "owner": "X3",
   "signature": "def unattributed_dir() -> Path",
+  "since": "2026-10-01",
   "users": [
    "C"
   ]
@@ -964,6 +1416,7 @@
  "backend/app/services/channel_service.py::IG_RECONNECT": {
   "owner": "X3",
   "signature": "IG_RECONNECT = 'این پیج را دوباره با ورود رسمی وصل کن.'",
+  "since": "2026-09-28",
   "users": [
    "X2",
    "Y"
@@ -972,13 +1425,7 @@
  "backend/app/services/channel_service.py::PLATFORMS": {
   "owner": "X3",
   "signature": "PLATFORMS = {key: spec['label'] for key, spec in SPECS.items()}",
-  "users": [
-   "Y"
-  ]
- },
- "backend/app/services/channel_service.py::PLATFORMS.get": {
-  "owner": "X3",
-  "signature": "PLATFORMS = {key: spec['label'] for key, spec in SPECS.items()}",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -986,6 +1433,7 @@
  "backend/app/services/channel_service.py::account_for_platform": {
   "owner": "X3",
   "signature": "def account_for_platform(platform: str) -> dict | None",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -993,6 +1441,7 @@
  "backend/app/services/channel_service.py::credentials_for": {
   "owner": "X3",
   "signature": "def credentials_for(row: dict) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1000,6 +1449,7 @@
  "backend/app/services/channel_service.py::is_connected": {
   "owner": "X3",
   "signature": "def is_connected(row: dict) -> bool",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1007,6 +1457,7 @@
  "backend/app/services/channel_service.py::iter_accounts": {
   "owner": "X3",
   "signature": "def iter_accounts() -> list[dict]",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -1014,6 +1465,7 @@
  "backend/app/services/channel_service.py::list_accounts": {
   "owner": "X3",
   "signature": "def list_accounts() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1021,6 +1473,7 @@
  "backend/app/services/channel_service.py::post_target_for": {
   "owner": "X3",
   "signature": "def post_target_for(row: dict) -> str",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1028,6 +1481,7 @@
  "backend/app/services/channel_service.py::publish_targets": {
   "owner": "X3",
   "signature": "def publish_targets() -> list[dict]",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1035,6 +1489,7 @@
  "backend/app/services/channel_service.py::sendbox_account_id": {
   "owner": "X3",
   "signature": "def sendbox_account_id(row: dict) -> str",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "Y"
@@ -1043,6 +1498,7 @@
  "backend/app/services/channel_service.py::token_for": {
   "owner": "X3",
   "signature": "def token_for(row: dict) -> str",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "Y"
@@ -1051,6 +1507,7 @@
  "backend/app/services/channel_service.py::uses_hub_bot": {
   "owner": "X3",
   "signature": "def uses_hub_bot(row: dict) -> bool",
+  "since": "2026-10-01",
   "users": [
    "Y"
   ]
@@ -1058,6 +1515,7 @@
  "backend/app/services/chat_media_service.py::caption": {
   "owner": "X3",
   "signature": "def caption(kind: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -1065,6 +1523,7 @@
  "backend/app/services/chat_media_service.py::copy_file": {
   "owner": "X3",
   "signature": "def copy_file(path: Path, *, sweep: bool=True) -> dict",
+  "since": "2026-09-25",
   "users": [
    "X2"
   ]
@@ -1072,6 +1531,7 @@
  "backend/app/services/chat_media_service.py::kind_of": {
   "owner": "X3",
   "signature": "def kind_of(content_type: str, filename: str) -> str | None",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1079,6 +1539,7 @@
  "backend/app/services/chat_media_service.py::resolve": {
   "owner": "X3",
   "signature": "def resolve(name: str) -> Path",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X4"
@@ -1087,6 +1548,7 @@
  "backend/app/services/chat_media_service.py::save": {
   "owner": "X3",
   "signature": "def save(filename: str, data: bytes, content_type: str, *, sweep: bool=True) -> dict",
+  "since": "2026-09-25",
   "users": [
    "C",
    "X1",
@@ -1096,6 +1558,7 @@
  "backend/app/services/chat_media_service.py::spoken_text": {
   "owner": "X3",
   "signature": "def spoken_text(text: str, media: dict | None) -> str",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X4"
@@ -1104,6 +1567,7 @@
  "backend/app/services/claims_guard.py::check": {
   "owner": "Y",
   "signature": "async def check(text: str, facts: str, complete: Callable[..., Awaitable[dict]] | None=None) -> list[str]",
+  "since": "2026-09-27",
   "users": [
    "X2"
   ]
@@ -1111,6 +1575,7 @@
  "backend/app/services/idempotency_service.py::body_stamp": {
   "owner": "X5",
   "signature": "def body_stamp(raw: bytes) -> str",
+  "since": "2026-09-24",
   "users": [
    "X1",
    "X2",
@@ -1121,6 +1586,7 @@
  "backend/app/services/idempotency_service.py::put": {
   "owner": "X5",
   "signature": "def put(scope: str, key: str, payload: Any, stamp: str='') -> None",
+  "since": "2026-09-24",
   "users": [
    "X1",
    "X2",
@@ -1131,6 +1597,7 @@
  "backend/app/services/idempotency_service.py::recall": {
   "owner": "X5",
   "signature": "def recall(scope: str, key: str, stamp: str) -> Any | None",
+  "since": "2026-09-24",
   "users": [
    "X1",
    "X2",
@@ -1141,6 +1608,7 @@
  "backend/app/services/image_provider_service.py::generate_still": {
   "owner": "X2",
   "signature": "def generate_still(prompt: str, *, width: int=1080, height: int=1080, edit: bool=False, plan: str='', source: bytes | None=None, force_primary_error: bool=False, force_both_errors: bool=False, subject: str='', edit_kind: str='') -> bytes",
+  "since": "2026-09-27",
   "users": [
    "X4"
   ]
@@ -1148,6 +1616,7 @@
  "backend/app/services/image_provider_service.py::probe_ollama_cloud_once": {
   "owner": "X2",
   "signature": "async def probe_ollama_cloud_once() -> dict",
+  "since": "2026-09-19",
   "users": [
    "X5"
   ]
@@ -1155,6 +1624,7 @@
  "backend/app/services/inbox_service.py::expire_stale_sending": {
   "owner": "Y",
   "signature": "def expire_stale_sending(stale_sec: int=SENDING_STALE_SEC) -> int",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -1162,6 +1632,7 @@
  "backend/app/services/inbox_service.py::handle_inbound": {
   "owner": "Y",
   "signature": "async def handle_inbound(*, platform: str, sender: str, text: str, sender_id: str='', chat_id: str='', external_id: str='', media: dict | None=None) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1169,6 +1640,7 @@
  "backend/app/services/inbox_service.py::list_publish_audience": {
   "owner": "Y",
   "signature": "def list_publish_audience(*, platform: str, q: str='', limit: int=24) -> list[dict]",
+  "since": "2026-09-21",
   "users": [
    "X1",
    "X2"
@@ -1177,6 +1649,7 @@
  "backend/app/services/inbox_service.py::list_threads": {
   "owner": "Y",
   "signature": "def list_threads(*, q: str='', platform: str='', status_filter: str='') -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1184,6 +1657,7 @@
  "backend/app/services/inbox_service.py::rearm_pending_auto_replies": {
   "owner": "Y",
   "signature": "async def rearm_pending_auto_replies() -> int",
+  "since": "2026-09-26",
   "users": [
    "X5"
   ]
@@ -1191,6 +1665,7 @@
  "backend/app/services/inbox_service.py::save_auto_reply": {
   "owner": "Y",
   "signature": "def save_auto_reply(mode: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1198,6 +1673,7 @@
  "backend/app/services/inbox_service.py::unread_count": {
   "owner": "Y",
   "signature": "def unread_count() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1205,6 +1681,7 @@
  "backend/app/services/job_queue.py::enqueue": {
   "owner": "X2",
   "signature": "async def enqueue(payload: dict) -> str",
+  "since": "2026-09-25",
   "users": [
    "X1"
   ]
@@ -1212,6 +1689,7 @@
  "backend/app/services/llm.py::ARVAN_HOST_SUFFIX": {
   "owner": "X5",
   "signature": "ARVAN_HOST_SUFFIX = 'arvancloudai.ir'",
+  "since": "2026-09-21",
   "users": [
    "Y"
   ]
@@ -1219,6 +1697,7 @@
  "backend/app/services/llm.py::CLOUD_UA": {
   "owner": "X5",
   "signature": "CLOUD_UA = 'curl/8.5.0'",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1226,13 +1705,16 @@
  "backend/app/services/llm.py::INBOX_TURN_BUDGET": {
   "owner": "X5",
   "signature": "INBOX_TURN_BUDGET = 30.0",
+  "since": "2026-09-27",
   "users": [
    "Y"
   ]
  },
  "backend/app/services/llm.py::LLM_BAD_JSON": {
   "owner": "X5",
+  "shape": "LLM_BAD_JSON = {'reply': 'str', 'error': 'str'}",
   "signature": "LLM_BAD_JSON = {'reply': 'مدل پاسخ خوانا نداد. پیام را کوتاه\\u200cتر دوباره بفرست.', 'error': 'llm_bad_json'}",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -1240,6 +1722,7 @@
  "backend/app/services/llm.py::auth_scheme": {
   "owner": "X5",
   "signature": "def auth_scheme(value: object) -> str",
+  "since": "2026-10-01",
   "users": [
    "X1"
   ]
@@ -1247,6 +1730,7 @@
  "backend/app/services/llm.py::budget_capped": {
   "owner": "X5",
   "signature": "def budget_capped(surface: str) -> str | None",
+  "since": "2026-10-01",
   "users": [
    "X2"
   ]
@@ -1254,6 +1738,7 @@
  "backend/app/services/llm.py::complete_chat": {
   "owner": "X5",
   "signature": "async def complete_chat(*, system: str, turns: list[dict], surface: str='shop') -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1261,6 +1746,7 @@
  "backend/app/services/llm.py::complete_json": {
   "owner": "X5",
   "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X3",
@@ -1271,6 +1757,7 @@
  "backend/app/services/llm.py::complete_tools": {
   "owner": "X5",
   "signature": "async def complete_tools(*, messages: list[dict], tools: list[dict], temperature: float=0.2, max_tokens: int=ROUTER_MAX_TOKENS, timeout: float | None=None, surface: str='router') -> dict",
+  "since": "2026-09-27",
   "users": [
    "X1",
    "Y"
@@ -1279,6 +1766,7 @@
  "backend/app/services/llm.py::emit_usage": {
   "owner": "X5",
   "signature": "def emit_usage(*, surface: str, model: str, payload: dict, latency_ms: float=0) -> dict",
+  "since": "2026-10-01",
   "users": [
    "X1"
   ]
@@ -1286,6 +1774,7 @@
  "backend/app/services/llm.py::route_for_surface": {
   "owner": "X5",
   "signature": "def route_for_surface(surface: str) -> dict",
+  "since": "2026-09-21",
   "users": [
    "X1"
   ]
@@ -1293,13 +1782,16 @@
  "backend/app/services/llm.py::spoken_model_reply": {
   "owner": "X5",
   "signature": "def spoken_model_reply(text: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
  },
  "backend/app/services/melipayamak_otp_service.py::OtpSendError": {
   "owner": "X3",
+  "shape": "def __init__(self, error_class: str, return_code: str='') -> None",
   "signature": "class OtpSendError(RuntimeError)",
+  "since": "2026-09-29",
   "users": [
    "X5"
   ]
@@ -1307,6 +1799,7 @@
  "backend/app/services/melipayamak_otp_service.py::send_otp": {
   "owner": "X3",
   "signature": "async def send_otp(phone: str, code: str) -> str",
+  "since": "2026-09-29",
   "users": [
    "X5"
   ]
@@ -1314,6 +1807,7 @@
  "backend/app/services/observe_client.py::emit_later": {
   "owner": "X5",
   "signature": "def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, surface: str='', component: str='', stage: str='', status: str='', conversation_id: str='', turn_id: str='', operation_id: str='', job_id: str='', scan_id: str='', parent_id: str='', event_id: str='', started_at: float | None=None, duration_ms: int | None=None) -> None",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -1326,6 +1820,7 @@
  "backend/app/services/observe_client.py::observe_base": {
   "owner": "X5",
   "signature": "def observe_base() -> str",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1333,6 +1828,7 @@
  "backend/app/services/observe_client.py::safe_text": {
   "owner": "X5",
   "signature": "def safe_text(value: object, limit: int=OBSERVE_TEXT_LIMIT) -> str",
+  "since": "2026-10-01",
   "users": [
    "X2",
    "X4"
@@ -1341,6 +1837,7 @@
  "backend/app/services/onboard_service.py::brief_block": {
   "owner": "X3",
   "signature": "def brief_block() -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1348,6 +1845,7 @@
  "backend/app/services/onboard_service.py::brief_ready": {
   "owner": "X3",
   "signature": "def brief_ready(brief: dict | None=None) -> bool",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1355,6 +1853,7 @@
  "backend/app/services/onboard_service.py::get_brief": {
   "owner": "X3",
   "signature": "def get_brief() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1362,6 +1861,7 @@
  "backend/app/services/onboard_service.py::save_brief": {
   "owner": "X3",
   "signature": "def save_brief(patch: dict) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1369,6 +1869,7 @@
  "backend/app/services/pay_service.py::create_order": {
   "owner": "C",
   "signature": "async def create_order(*, title: str='', amount: int=0, product_id: str='', qty: int=1, customer: str='', channel: str='دایرکت', thread_id: str='', mobile: str='', lines: list[dict] | None=None) -> dict",
+  "since": "2026-09-19",
   "users": [
    "Y"
   ]
@@ -1376,6 +1877,7 @@
  "backend/app/services/pay_service.py::ensure_pay_secret": {
   "owner": "C",
   "signature": "def ensure_pay_secret() -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1383,6 +1885,7 @@
  "backend/app/services/pay_service.py::get_order": {
   "owner": "C",
   "signature": "def get_order(order_id: str) -> dict | None",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -1390,6 +1893,7 @@
  "backend/app/services/pay_service.py::public_order": {
   "owner": "C",
   "signature": "def public_order(row: dict) -> dict",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -1397,6 +1901,7 @@
  "backend/app/services/payment_service.py::PAYMENT_LATER": {
   "owner": "X5",
   "signature": "PAYMENT_LATER = 'پرداخت به\\u200cزودی فعال می\\u200cشود'",
+  "since": "2026-09-27",
   "users": [
    "C"
   ]
@@ -1404,6 +1909,7 @@
  "backend/app/services/payment_service.py::commission_toman": {
   "owner": "X5",
   "signature": "def commission_toman(amount: int, bps: int | None=None) -> int",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1411,6 +1917,7 @@
  "backend/app/services/payment_service.py::idpay_request": {
   "owner": "X5",
   "signature": "async def idpay_request(*, amount_toman: int, description: str, callback_url: str, order_id: str, api_key: str, sandbox: bool=False, name: str='', phone: str='') -> dict",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1418,6 +1925,7 @@
  "backend/app/services/payment_service.py::idpay_verify": {
   "owner": "X5",
   "signature": "async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: bool=False, amount_toman: int=0) -> dict",
+  "since": "2026-09-20",
   "users": [
    "C"
   ]
@@ -1425,6 +1933,7 @@
  "backend/app/services/payment_service.py::resolve_sale_gateway": {
   "owner": "X5",
   "signature": "def resolve_sale_gateway(row: dict | None=None) -> dict",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1432,6 +1941,7 @@
  "backend/app/services/payment_service.py::zarinpal_request": {
   "owner": "X5",
   "signature": "async def zarinpal_request(*, amount_toman: int, description: str, callback_url: str, mobile: str='', merchant: str='') -> dict",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1439,6 +1949,7 @@
  "backend/app/services/payment_service.py::zarinpal_verify": {
   "owner": "X5",
   "signature": "async def zarinpal_verify(*, amount_toman: int, authority: str, merchant: str='') -> dict",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1446,6 +1957,7 @@
  "backend/app/services/persian_text.py::guard_output": {
   "owner": "X1",
   "signature": "def guard_output(text: str, *, finish: str='', limit: int=800) -> str",
+  "since": "2026-09-24",
   "users": [
    "X2",
    "Y"
@@ -1454,6 +1966,7 @@
  "backend/app/services/persian_text.py::sanitize_persian": {
   "owner": "X1",
   "signature": "def sanitize_persian(text: str, *, limit: int=80) -> str",
+  "since": "2026-09-24",
   "users": [
    "C",
    "X2",
@@ -1463,6 +1976,7 @@
  "backend/app/services/pii_mask.py::mask_pii": {
   "owner": "Y",
   "signature": "def mask_pii(text: str) -> str",
+  "since": "2026-09-27",
   "users": [
    "X5"
   ]
@@ -1470,6 +1984,7 @@
  "backend/app/services/pipeline_release.py::BEHAVIOR_VERSION": {
   "owner": "X5",
   "signature": "BEHAVIOR_VERSION = '2026.09.16-pipeline'",
+  "since": "2026-09-18",
   "users": [
    "X4",
    "Y"
@@ -1478,6 +1993,7 @@
  "backend/app/services/pipeline_release.py::hub_release_id": {
   "owner": "X5",
   "signature": "def hub_release_id() -> str",
+  "since": "2026-09-18",
   "users": [
    "X4",
    "Y"
@@ -1486,6 +2002,7 @@
  "backend/app/services/plan_service.py::allow_new_channel": {
   "owner": "X5",
   "signature": "def allow_new_channel(already: int) -> str | None",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1493,6 +2010,7 @@
  "backend/app/services/plan_service.py::allow_new_site": {
   "owner": "X5",
   "signature": "def allow_new_site() -> str | None",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1500,6 +2018,7 @@
  "backend/app/services/plan_service.py::current": {
   "owner": "X5",
   "signature": "def current() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3",
    "Y"
@@ -1508,6 +2027,7 @@
  "backend/app/services/plan_service.py::current_plan_id": {
   "owner": "X5",
   "signature": "def current_plan_id() -> str",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1515,6 +2035,7 @@
  "backend/app/services/plan_service.py::record_site": {
   "owner": "X5",
   "signature": "def record_site(slug: str) -> None",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1522,6 +2043,7 @@
  "backend/app/services/plan_service.py::snapshot": {
   "owner": "X5",
   "signature": "def snapshot() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1529,6 +2051,7 @@
  "backend/app/services/product_image_service.py::remove_if_unreferenced": {
   "owner": "X2",
   "signature": "def remove_if_unreferenced(name: str) -> bool",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1536,28 +2059,25 @@
  "backend/app/services/product_image_service.py::store": {
   "owner": "X2",
   "signature": "def store(data: bytes, content_type: str, filename: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
  },
  "backend/app/services/profile_service.py::TONES": {
   "owner": "X5",
+  "shape": "TONES = {'warm': {'id': 'str', 'label': 'str', 'tone': 'str', 'summary': 'str', 'sampleReply': 'str'}, 'formal': {'id': 'str', 'label': 'str', 'tone': 'str', 'summary': 'str', 'sampleReply': 'str'}, 'street': {'id': 'str', 'label': 'str', 'tone': 'str', 'summary': 'str', 'sampleReply': 'str'}, 'luxury': {'id': 'str', 'label': 'str', 'tone': 'str', 'summary': 'str', 'sampleReply': 'str'}}",
   "signature": "TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\\u200cتعارف.', 'sampleRepl...",
+  "since": "2026-09-18",
   "users": [
    "X3",
-   "Y"
-  ]
- },
- "backend/app/services/profile_service.py::TONES.get": {
-  "owner": "X5",
-  "signature": "TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\\u200cتعارف.', 'sampleRepl...",
-  "users": [
    "Y"
   ]
  },
  "backend/app/services/profile_service.py::complete": {
   "owner": "X5",
   "signature": "def complete(phone: str, *, firstName: str, lastName: str, brandName: str, brandWork: str, toneId: str, hasLogo: bool) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1565,6 +2085,7 @@
  "backend/app/services/profile_service.py::get_profile": {
   "owner": "X5",
   "signature": "def get_profile(phone: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1572,6 +2093,7 @@
  "backend/app/services/profile_service.py::patch_profile": {
   "owner": "X5",
   "signature": "def patch_profile(phone: str, patch: dict) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1579,6 +2101,7 @@
  "backend/app/services/public_media_service.py::public_url": {
   "owner": "X3",
   "signature": "def public_url(*, name: str, ttl: int=3600) -> str",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1586,6 +2109,7 @@
  "backend/app/services/router_embed.py::cosine": {
   "owner": "X1",
   "signature": "def cosine(left: list[float], right: list[float]) -> float",
+  "since": "2026-09-22",
   "users": [
    "Y"
   ]
@@ -1593,6 +2117,7 @@
  "backend/app/services/router_service.py::bind_thread_id": {
   "owner": "X1",
   "signature": "def bind_thread_id(thread_id: str) -> None",
+  "since": "2026-10-01",
   "users": [
    "X2"
   ]
@@ -1600,6 +2125,7 @@
  "backend/app/services/router_service.py::clear_dead_busy": {
   "owner": "X1",
   "signature": "def clear_dead_busy() -> None",
+  "since": "2026-09-21",
   "users": [
    "X5"
   ]
@@ -1607,6 +2133,7 @@
  "backend/app/services/router_service.py::remember_content": {
   "owner": "X1",
   "signature": "def remember_content(extra: dict) -> None",
+  "since": "2026-10-01",
   "users": [
    "X2"
   ]
@@ -1614,6 +2141,7 @@
  "backend/app/services/router_service.py::thread_campaign_id": {
   "owner": "X1",
   "signature": "def thread_campaign_id() -> str",
+  "since": "2026-09-25",
   "users": [
    "X2"
   ]
@@ -1621,6 +2149,7 @@
  "backend/app/services/sales_policy_service.py::public_policy": {
   "owner": "Y",
   "signature": "def public_policy() -> dict",
+  "since": "2026-09-27",
   "users": [
    "X5"
   ]
@@ -1628,6 +2157,7 @@
  "backend/app/services/sales_policy_service.py::save_policy": {
   "owner": "Y",
   "signature": "def save_policy(patch: dict) -> dict",
+  "since": "2026-09-27",
   "users": [
    "X5"
   ]
@@ -1635,6 +2165,7 @@
  "backend/app/services/sendbox_service.py::send_message": {
   "owner": "X3",
   "signature": "async def send_message(*, account_id: str, recipient_id: str, text: str, media_url: str='', media_kind: str='') -> None",
+  "since": "2026-09-21",
   "users": [
    "X2"
   ]
@@ -1642,6 +2173,7 @@
  "backend/app/services/settings_service.py::allows_training": {
   "owner": "X5",
   "signature": "def allows_training() -> bool",
+  "since": "2026-09-28",
   "users": [
    "Y"
   ]
@@ -1649,6 +2181,7 @@
  "backend/app/services/settings_service.py::get_settings": {
   "owner": "X5",
   "signature": "def get_settings() -> dict",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2",
@@ -1660,6 +2193,7 @@
  "backend/app/services/settings_service.py::save_settings": {
   "owner": "X5",
   "signature": "def save_settings(patch: dict, *, hub_admin: bool=False) -> dict",
+  "since": "2026-09-20",
   "users": [
    "X3"
   ]
@@ -1667,6 +2201,7 @@
  "backend/app/services/shop_edit_service.py::apply_live_edit": {
   "owner": "X4",
   "signature": "async def apply_live_edit(shop: dict, prompt: str, view_path: str, view_target: str='', classified: dict | None=None) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1674,6 +2209,7 @@
  "backend/app/services/shop_edit_service.py::build_dir_for": {
   "owner": "X4",
   "signature": "def build_dir_for(shop: dict) -> Path | None",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1"
@@ -1682,6 +2218,7 @@
  "backend/app/services/shop_edit_service.py::has_runtime_overlay": {
   "owner": "X4",
   "signature": "def has_runtime_overlay(root: Path | None) -> bool",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1689,6 +2226,7 @@
  "backend/app/services/shop_edit_service.py::publish_shop_runtime": {
   "owner": "X4",
   "signature": "def publish_shop_runtime(shop: dict, root: Path, rels: list[str]) -> None",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1696,6 +2234,7 @@
  "backend/app/services/shop_edit_service.py::safe_view_path": {
   "owner": "X4",
   "signature": "def safe_view_path(raw: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1703,6 +2242,7 @@
  "backend/app/services/shop_edit_service.py::safe_view_target": {
   "owner": "X4",
   "signature": "def safe_view_target(raw: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1710,6 +2250,7 @@
  "backend/app/services/shop_edit_service.py::write_catalog_json": {
   "owner": "X4",
   "signature": "def write_catalog_json(root: Path, products: list[dict]) -> Path",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1717,6 +2258,7 @@
  "backend/app/services/shop_intent_service.py::CLARIFY_PAGE": {
   "owner": "X4",
   "signature": "CLARIFY_PAGE = 'کدام صفحه را بسازم: درباره ما، تماس، داستان برند، یا پرسش\\u200cهای متداول؟'",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1724,6 +2266,7 @@
  "backend/app/services/shop_intent_service.py::catalog_add": {
   "owner": "X4",
   "signature": "def catalog_add(text: str) -> dict | None",
+  "since": "2026-09-22",
   "users": [
    "X1"
   ]
@@ -1731,6 +2274,7 @@
  "backend/app/services/shop_intent_service.py::classify_actions": {
   "owner": "X4",
   "signature": "def classify_actions(prompt: str, view_target: str='', view_path: str='') -> list[dict]",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1738,6 +2282,7 @@
  "backend/app/services/shop_intent_service.py::page_kind_from_text": {
   "owner": "X4",
   "signature": "def page_kind_from_text(text: str) -> str",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1745,6 +2290,7 @@
  "backend/app/services/shop_service.py::PROTECTED_SHOP_SLUGS": {
   "owner": "X4",
   "signature": "PROTECTED_SHOP_SLUGS = frozenset({'joahr-froshi', 'cahrm-srai-pars'})",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -1752,6 +2298,7 @@
  "backend/app/services/shop_service.py::bump_pending": {
   "owner": "X4",
   "signature": "def bump_pending(shop: dict) -> dict",
+  "since": "2026-10-01",
   "users": [
    "C"
   ]
@@ -1759,6 +2306,7 @@
  "backend/app/services/shop_service.py::bump_pending_build": {
   "owner": "X4",
   "signature": "def bump_pending_build() -> None",
+  "since": "2026-09-19",
   "users": [
    "C"
   ]
@@ -1766,6 +2314,7 @@
  "backend/app/services/shop_service.py::catalog_add_reply": {
   "owner": "X4",
   "signature": "def catalog_add_reply(text: str) -> str | None",
+  "since": "2026-10-01",
   "users": [
    "X1"
   ]
@@ -1773,6 +2322,7 @@
  "backend/app/services/shop_service.py::chat": {
   "owner": "X4",
   "signature": "async def chat(text: str, media: dict | None=None, view_path: str='', view_target: str='') -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1780,6 +2330,7 @@
  "backend/app/services/shop_service.py::current_shop": {
   "owner": "X4",
   "signature": "def current_shop() -> dict",
+  "since": "2026-10-01",
   "users": [
    "C",
    "X1",
@@ -1789,6 +2340,7 @@
  "backend/app/services/shop_service.py::explicit_build": {
   "owner": "X4",
   "signature": "def explicit_build(text: str) -> bool",
+  "since": "2026-10-01",
   "users": [
    "X1"
   ]
@@ -1796,6 +2348,7 @@
  "backend/app/services/shop_service.py::explicit_rebuild": {
   "owner": "X4",
   "signature": "def explicit_rebuild(text: str) -> bool",
+  "since": "2026-10-01",
   "users": [
    "X1"
   ]
@@ -1803,6 +2356,7 @@
  "backend/app/services/shop_service.py::factory_category_slug": {
   "owner": "X4",
   "signature": "def factory_category_slug(category_fa: str) -> str",
+  "since": "2026-10-01",
   "users": [
    "C"
   ]
@@ -1810,6 +2364,7 @@
  "backend/app/services/shop_service.py::factory_item_sub": {
   "owner": "X4",
   "signature": "def factory_item_sub(title: str, category_fa: str) -> tuple[str, str]",
+  "since": "2026-10-01",
   "users": [
    "C"
   ]
@@ -1817,6 +2372,7 @@
  "backend/app/services/shop_service.py::live_url": {
   "owner": "X4",
   "signature": "def live_url(shop: dict) -> str",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -1824,6 +2380,7 @@
  "backend/app/services/shop_service.py::rebuild_from_channel_catalog": {
   "owner": "X4",
   "signature": "def rebuild_from_channel_catalog() -> dict | None",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1831,6 +2388,7 @@
  "backend/app/services/shop_service.py::reset_for_brand": {
   "owner": "X4",
   "signature": "def reset_for_brand(*, name: str, tagline: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1838,6 +2396,7 @@
  "backend/app/services/shop_service.py::shop_is_live": {
   "owner": "X4",
   "signature": "def shop_is_live(shop: dict) -> bool",
+  "since": "2026-10-01",
   "users": [
    "C",
    "X1"
@@ -1846,13 +2405,16 @@
  "backend/app/services/shop_service.py::snapshot": {
   "owner": "X4",
   "signature": "def snapshot() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
  },
  "backend/app/services/sms_service.py::PROVIDERS": {
   "owner": "X3",
+  "shape": "PROVIDERS = ({'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'}, {'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'})",
   "signature": "PROVIDERS = ({'id': 'kavenegar', 'label': 'کاوه نگار', 'docs': 'https://kavenegar.com/rest.html', 'help': 'از پنل کاوه\\u200cنگار کلید و نام الگوی پیامک را بر...",
+  "since": "2026-09-28",
   "users": [
    "X5"
   ]
@@ -1860,6 +2422,7 @@
  "backend/app/services/sms_service.py::public_catalog": {
   "owner": "X3",
   "signature": "def public_catalog() -> list[dict]",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -1867,6 +2430,7 @@
  "backend/app/services/sms_service.py::resolve_sms": {
   "owner": "X3",
   "signature": "def resolve_sms(overlay: dict | None=None) -> dict[str, str]",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X5"
@@ -1875,6 +2439,7 @@
  "backend/app/services/sms_service.py::send_otp": {
   "owner": "X3",
   "signature": "async def send_otp(*, provider: str, api_key: str, template_id: str, token_name: str, phone: str, code: str) -> None",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X5"
@@ -1883,6 +2448,7 @@
  "backend/app/services/storefront_service.py::add_product": {
   "owner": "C",
   "signature": "def add_product(*, title: str, price: int, stock: int, sku: str, image: str='', images: list | None=None, source: str='', sourceHandle: str='', description: str='', category: str='', subcategory: str='', colors: list | None=None, sizes: str='', priceNote: str='', discount: int=0) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1890,6 +2456,7 @@
  "backend/app/services/storefront_service.py::clear_scanned_catalog": {
   "owner": "C",
   "signature": "def clear_scanned_catalog() -> None",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1897,6 +2464,7 @@
  "backend/app/services/storefront_service.py::count_scanned_handle": {
   "owner": "C",
   "signature": "def count_scanned_handle(source_handles: list[str]) -> int",
+  "since": "2026-09-19",
   "users": [
    "X3"
   ]
@@ -1904,6 +2472,7 @@
  "backend/app/services/storefront_service.py::list_products": {
   "owner": "C",
   "signature": "def list_products() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X2",
@@ -1915,6 +2484,7 @@
  "backend/app/services/storefront_service.py::list_sales": {
   "owner": "C",
   "signature": "def list_sales() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -1922,6 +2492,7 @@
  "backend/app/services/storefront_service.py::price_label": {
   "owner": "C",
   "signature": "def price_label(price: int, note: str='') -> str",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -1929,6 +2500,7 @@
  "backend/app/services/storefront_service.py::referenced_image_names": {
   "owner": "C",
   "signature": "def referenced_image_names() -> set[str]",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -1936,6 +2508,7 @@
  "backend/app/services/storefront_service.py::remove_product_by_title": {
   "owner": "C",
   "signature": "def remove_product_by_title(title: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X4"
@@ -1944,6 +2517,7 @@
  "backend/app/services/storefront_service.py::remove_scanned_handle": {
   "owner": "C",
   "signature": "def remove_scanned_handle(source_handle: str) -> None",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1951,6 +2525,7 @@
  "backend/app/services/storefront_service.py::retitle_scanned_from_captions": {
   "owner": "C",
   "signature": "def retitle_scanned_from_captions() -> int",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -1958,6 +2533,7 @@
  "backend/app/services/storefront_service.py::upsert_scanned_product": {
   "owner": "C",
   "signature": "def upsert_scanned_product(*, title: str, price: int, description: str, sku: str, image: str, source: str, sourceHandle: str, category: str='', colors: list | None=None, sizes: str='', priceNote: str='', sourcePostId: str='', sourceCaption: str='', extractor: str='', confidence: float=0.0, priceStatus: str='', priceUnit: str='toman', stableKey: str='', stock: int | None=None) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -1965,6 +2541,7 @@
  "backend/app/services/studio_chat_service.py::begin_placeholder": {
   "owner": "X2",
   "signature": "def begin_placeholder() -> str",
+  "since": "2026-09-25",
   "users": [
    "X1"
   ]
@@ -1972,6 +2549,7 @@
  "backend/app/services/studio_chat_service.py::chat": {
   "owner": "X2",
   "signature": "async def chat(text: str, campaigns: CampaignService, media: dict | None=None, into_id: str='') -> dict",
+  "since": "2026-09-25",
   "users": [
    "X1"
   ]
@@ -1979,6 +2557,7 @@
  "backend/app/services/studio_chat_service.py::messages_by_id": {
   "owner": "X2",
   "signature": "def messages_by_id(ids: set[str]) -> dict[str, dict]",
+  "since": "2026-09-21",
   "users": [
    "X1"
   ]
@@ -1986,6 +2565,7 @@
  "backend/app/services/studio_chat_service.py::snapshot": {
   "owner": "X2",
   "signature": "def snapshot() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -1993,6 +2573,7 @@
  "backend/app/services/studio_compose_service.py::expire_stale": {
   "owner": "X2",
   "signature": "def expire_stale() -> None",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -2000,6 +2581,7 @@
  "backend/app/services/studio_publish_service.py::publish": {
   "owner": "X2",
   "signature": "async def publish(*, platform: str, caption: str, media_name: str, media_kind: str, message_id: str='', campaign_id: str='', force: bool=False, recipient_id: str='') -> dict",
+  "since": "2026-09-21",
   "users": [
    "X1"
   ]
@@ -2007,6 +2589,7 @@
  "backend/app/services/support_service.py::create_ticket": {
   "owner": "C",
   "signature": "def create_ticket(*, subject: str, text: str, phone: str='', order_no: str='', image_name: str='', kind: str='storefront') -> dict",
+  "since": "2026-09-29",
   "users": [
    "X5"
   ]
@@ -2014,6 +2597,7 @@
  "backend/app/services/support_service.py::list_all_tickets_for_hub_admin": {
   "owner": "C",
   "signature": "def list_all_tickets_for_hub_admin() -> list[dict]",
+  "since": "2026-09-29",
   "users": [
    "X5"
   ]
@@ -2021,6 +2605,7 @@
  "backend/app/services/support_service.py::list_tickets": {
   "owner": "C",
   "signature": "def list_tickets(*, kind: str='') -> list[dict]",
+  "since": "2026-09-29",
   "users": [
    "X5"
   ]
@@ -2028,6 +2613,7 @@
  "backend/app/services/support_service.py::reply_hub_ticket": {
   "owner": "C",
   "signature": "def reply_hub_ticket(ticket_id: str, *, text: str, status: str='') -> dict",
+  "since": "2026-10-01",
   "users": [
    "X5"
   ]
@@ -2035,6 +2621,7 @@
  "backend/app/services/telegram_alert_service.py::seller_ticket_alert": {
   "owner": "X3",
   "signature": "async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str) -> None",
+  "since": "2026-09-29",
   "users": [
    "C"
   ]
@@ -2042,6 +2629,7 @@
  "backend/app/services/telegram_service.py::pull_updates": {
   "owner": "X3",
   "signature": "async def pull_updates(*, token: str, handle: str='') -> dict",
+  "since": "2026-09-18",
   "users": [
    "Y"
   ]
@@ -2049,6 +2637,7 @@
  "backend/app/services/telegram_service.py::send_photo": {
   "owner": "X3",
   "signature": "async def send_photo(*, token: str, chat_id: str, path, caption: str='') -> None",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -2056,6 +2645,7 @@
  "backend/app/services/telegram_service.py::send_video": {
   "owner": "X3",
   "signature": "async def send_video(*, token: str, chat_id: str, path, caption: str='') -> None",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -2063,6 +2653,7 @@
  "backend/app/services/tenant_index_service.py::lookup": {
   "owner": "X5",
   "signature": "def lookup(kind: str, key: str, verify: Callable[[str], bool]) -> str | None",
+  "since": "2026-10-01",
   "users": [
    "C",
    "X3"
@@ -2071,6 +2662,7 @@
  "backend/app/services/tenant_index_service.py::upsert": {
   "owner": "X5",
   "signature": "def upsert(*, phone: str, slug: str='', order_id: str='', sendbox_id: str='') -> None",
+  "since": "2026-10-01",
   "users": [
    "C",
    "X3",
@@ -2080,6 +2672,7 @@
  "backend/app/services/tenant_lock.py::tenant_file_lock": {
   "owner": "X5",
   "signature": "def tenant_file_lock(name: str='shop') -> Iterator[None]",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2091,6 +2684,7 @@
  "backend/app/services/training_log.py::log_example": {
   "owner": "Y",
   "signature": "def log_example(**kwargs: Any) -> str",
+  "since": "2026-09-28",
   "users": [
    "X1",
    "X2",
@@ -2100,6 +2694,7 @@
  "backend/app/services/training_log.py::log_label": {
   "owner": "Y",
   "signature": "def log_label(example_id: str, labels: dict, *, tenant: str='') -> str",
+  "since": "2026-09-28",
   "users": [
    "X5"
   ]
@@ -2107,6 +2702,7 @@
  "backend/app/services/turn_parse.py::parse_turn": {
   "owner": "X1",
   "signature": "def parse_turn(text: str) -> Turn",
+  "since": "2026-09-25",
   "users": [
    "X2"
   ]
@@ -2114,6 +2710,7 @@
  "backend/app/services/voice_service.py::apply_tone": {
   "owner": "Y",
   "signature": "def apply_tone(tone_id: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X3"
@@ -2122,6 +2719,7 @@
  "backend/app/services/voice_service.py::get_voice": {
   "owner": "Y",
   "signature": "def get_voice() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3",
    "X5"
@@ -2130,6 +2728,7 @@
  "backend/app/services/voice_service.py::learn": {
   "owner": "Y",
   "signature": "async def learn(*, platform: str, handle: str, samples: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -2137,6 +2736,7 @@
  "backend/app/services/voice_service.py::merge_summary": {
   "owner": "Y",
   "signature": "def merge_summary(summary: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -2144,6 +2744,7 @@
  "backend/app/services/wallet_service.py::consume_sms": {
   "owner": "X5",
   "signature": "def consume_sms() -> dict",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -2151,6 +2752,7 @@
  "backend/app/services/wallet_service.py::credit_sale": {
   "owner": "X5",
   "signature": "def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner: str) -> dict",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -2158,6 +2760,7 @@
  "backend/app/services/wallet_service.py::get": {
   "owner": "X5",
   "signature": "def get() -> dict",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -2165,6 +2768,7 @@
  "backend/app/services/wallet_service.py::refund_sms": {
   "owner": "X5",
   "signature": "def refund_sms(charged: int=0) -> dict",
+  "since": "2026-09-20",
   "users": [
    "C"
   ]
@@ -2172,6 +2776,7 @@
  "backend/app/services/whatsapp_service.py::send_media": {
   "owner": "X3",
   "signature": "async def send_media(*, token: str, phone_number_id: str, to: str, path, caption: str='') -> None",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -2179,6 +2784,7 @@
  "backend/app/state_store.py::brand_dir": {
   "owner": "X5",
   "signature": "def brand_dir() -> Path",
+  "since": "2026-09-18",
   "users": [
    "X2",
    "X3"
@@ -2187,6 +2793,7 @@
  "backend/app/state_store.py::current_tenant": {
   "owner": "X5",
   "signature": "def current_tenant() -> str",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2199,6 +2806,7 @@
  "backend/app/state_store.py::iter_tenants": {
   "owner": "X5",
   "signature": "def iter_tenants() -> list[str]",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2209,6 +2817,7 @@
  "backend/app/state_store.py::read_json": {
   "owner": "X5",
   "signature": "def read_json(name: str, default: Any, *, shared: bool=False) -> Any",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2221,6 +2830,7 @@
  "backend/app/state_store.py::shared_lock": {
   "owner": "X5",
   "signature": "def shared_lock() -> Iterator[None]",
+  "since": "2026-09-20",
   "users": [
    "C",
    "X2",
@@ -2230,6 +2840,7 @@
  "backend/app/state_store.py::tenant_dir": {
   "owner": "X5",
   "signature": "def tenant_dir() -> Path",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X3",
@@ -2239,6 +2850,7 @@
  "backend/app/state_store.py::tenant_scope": {
   "owner": "X5",
   "signature": "def tenant_scope(phone: str) -> Iterator[None]",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2250,6 +2862,7 @@
  "backend/app/state_store.py::update_json": {
   "owner": "X5",
   "signature": "def update_json(name: str, mutate, default: Any, *, lock: str) -> Any",
+  "since": "2026-10-01",
   "users": [
    "C"
   ]
@@ -2257,6 +2870,7 @@
  "backend/app/state_store.py::write_json": {
   "owner": "X5",
   "signature": "def write_json(name: str, payload: Any, *, shared: bool=False) -> None",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2268,7 +2882,9 @@
  },
  "frontend/components/app-shell.tsx::AppShell": {
   "owner": "U",
+  "shape": "export function AppShell({ children, header, }: { children: React.ReactNode; header?: React.ReactNode; })",
   "signature": "export function AppShell(",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2281,7 +2897,9 @@
  },
  "frontend/components/auth-image.tsx::AuthImage": {
   "owner": "U",
+  "shape": "export function AuthImage({ src, alt, className, bust, }: { src: string; alt: string; className?: string; bust?: number; })",
   "signature": "export function AuthImage(",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2"
@@ -2289,7 +2907,9 @@
  },
  "frontend/components/auth-media.tsx::AuthMedia": {
   "owner": "U",
+  "shape": "export function AuthMedia({ campaignId, relPath, kind, alt, }: { campaignId: string; relPath: string; kind: string; alt: string; })",
   "signature": "export function AuthMedia(",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -2297,6 +2917,7 @@
  "frontend/components/channel-alert.tsx::ChannelAlert": {
   "owner": "X3",
   "signature": "export function ChannelAlert({ inset = true }: { inset?: boolean })",
+  "since": "2026-09-27",
   "users": [
    "X1",
    "Y"
@@ -2304,28 +2925,36 @@
  },
  "frontend/components/chat-thread.tsx::ChatMsg": {
   "owner": "X1",
+  "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; confirmId?: string; options?: string[]; campaignId?: string; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
   "signature": "export type ChatMsg =",
+  "since": "2026-09-29",
   "users": [
    "Y"
   ]
  },
  "frontend/components/chat-thread.tsx::ChatThread": {
   "owner": "X1",
+  "shape": "export function ChatThread({ messages, busy, placeholder, onSend, livePanel, pendingText, tone = \"default\", allowMedia = true, publishTargets, onPublish, onRegenerate, onApproveDraft, onDiscardFailed, onSaveCaptions, onEditDraft, showTime = false, sanitize = false, welcome = false, welcomeLines, hints, confirmId = \"\", onConfirm, onCancel, persona = \"\", aspects, }: { messages: ChatMsg[]; busy: boolean; placeholder: string; onSend: (payload: ChatSend) => Promise<void> | void; livePanel?: ReactNode; pendingText?: string; tone?: \"default\" | \"future\"; allowMedia?: boolean; publishTargets?: PublishTarget[]; onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>; onRegenerate?: (payload: { messageId: string; campaignId?: string; part: \"image\" | \"caption\"; file?: File }) => Promise<void>; onApproveDraft?: (payload: { messageId: string; text: string }) => Promise<void>; onDiscardFailed?: (payload: { messageId: string }) => Promise<void>; onSaveCaptions?: (payload: { messageId: string; captions: StudioCaptions }) => void | Promise<void>; onEditDraft?: (payload: { messageId: string; text: string }) => void; sanitize?: boolean; welcome?: boolean; welcomeLines?: string[]; /** جمله‌های راهنما که در چت خالی تایپ می‌شوند و باد می‌بردشان. */ hints?: string[]; confirmId?: string; onConfirm?: (confirmId: string) => void; onCancel?: (confirmId: string) => void; persona?: string; showTime?: boolean; /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */ aspects?: readonly { id: string; label: string; word: string }[]; })",
   "signature": "export function ChatThread(",
+  "since": "2026-09-28",
   "users": [
    "Y"
   ]
  },
  "frontend/components/domain-menu.tsx::DomainMenu": {
   "owner": "C",
+  "shape": "export function DomainMenu({ shop, busy, onSaveDomain, onBuild, }: { shop: ShopState | null; busy: boolean; onSaveDomain: (domain: string) => Promise<void>; onBuild: (rebuild?: boolean, reviseOnly?: boolean) => Promise<void>; })",
   "signature": "export function DomainMenu(",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
  },
  "frontend/components/domain-menu.tsx::ShopState": {
   "owner": "C",
+  "shape": "export type ShopState = { brand: string; slug: string; port: number; domain: string; jobId: string; status: string; url: string; urlOk?: boolean; error?: string; publicHost?: string; cnameTarget?: string; cnameOk?: boolean; cnameCheck?: { detail?: string; status?: string }; cnameSetup?: { ok?: boolean; error?: string }; pendingBuild?: number; hidePrices?: boolean; priceBlocked?: boolean; }",
   "signature": "export type ShopState =",
+  "since": "2026-09-19",
   "users": [
    "X4"
   ]
@@ -2333,6 +2962,7 @@
  "frontend/components/domain-menu.tsx::shopHostLabel": {
   "owner": "C",
   "signature": "export function shopHostLabel(url: string)",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
@@ -2340,13 +2970,16 @@
  "frontend/components/domain-menu.tsx::shopPublicUrl": {
   "owner": "C",
   "signature": "export function shopPublicUrl(shop: ShopState | null, fallback = \"\")",
+  "since": "2026-09-18",
   "users": [
    "X4"
   ]
  },
  "frontend/components/empty-state.tsx::EmptyState": {
   "owner": "U",
+  "shape": "export function EmptyState({ title, detail, action, }: { title: string; detail?: string; action?: ReactNode; })",
   "signature": "export function EmptyState(",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2",
@@ -2359,6 +2992,7 @@
  "frontend/components/field.tsx::Field": {
   "owner": "U",
   "signature": "export function Field({ label, children }: { label: string; children: React.ReactNode })",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2",
@@ -2370,6 +3004,7 @@
  "frontend/components/getting-started.tsx::GettingStarted": {
   "owner": "U",
   "signature": "export function GettingStarted()",
+  "since": "2026-09-27",
   "users": [
    "X1"
   ]
@@ -2377,6 +3012,7 @@
  "frontend/components/login-coder-scene.tsx::LoginCoderScene": {
   "owner": "U",
   "signature": "export function LoginCoderScene()",
+  "since": "2026-09-18",
   "users": [
    "X3",
    "X5"
@@ -2385,6 +3021,7 @@
  "frontend/components/onboard-gate.tsx::OnboardGate": {
   "owner": "X3",
   "signature": "export function OnboardGate({ children }: { children: React.ReactNode })",
+  "since": "2026-09-18",
   "users": [
    "U"
   ]
@@ -2392,6 +3029,7 @@
  "frontend/components/sales-policy-form.tsx::SalesPolicyForm": {
   "owner": "Y",
   "signature": "export function SalesPolicyForm()",
+  "since": "2026-09-27",
   "users": [
    "X5"
   ]
@@ -2399,6 +3037,7 @@
  "frontend/components/shop-settings-form.tsx::ShopSettingsForm": {
   "owner": "C",
   "signature": "export function ShopSettingsForm()",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -2406,6 +3045,7 @@
  "frontend/components/sozan-mark.tsx::SozanMark": {
   "owner": "U",
   "signature": "export function SozanMark({ className, glow = true }: { className?: string; glow?: boolean })",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2415,35 +3055,45 @@
  },
  "frontend/components/studio-publish.tsx::PublishPayload": {
   "owner": "X2",
+  "shape": "export type PublishPayload = { campaignId?: string; messageId?: string; platform: string; caption: string; mediaName: string; mediaKind: string; force?: boolean; recipientId?: string; }",
   "signature": "export type PublishPayload =",
+  "since": "2026-09-21",
   "users": [
    "X1"
   ]
  },
  "frontend/components/studio-publish.tsx::PublishTarget": {
   "owner": "X2",
+  "shape": "export type PublishTarget = { platform: string; label: string; handle?: string; ready: boolean; hint: string; }",
   "signature": "export type PublishTarget =",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
  },
  "frontend/components/studio-publish.tsx::StudioAttachment": {
   "owner": "X2",
+  "shape": "export type StudioAttachment = { kind: string; name: string; source?: string }",
   "signature": "export type StudioAttachment = { kind: string; name: string; source?: string };",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
  },
  "frontend/components/studio-publish.tsx::StudioCaptions": {
   "owner": "X2",
+  "shape": "export type StudioCaptions = { instagram?: string; telegram?: string; whatsapp?: string }",
   "signature": "export type StudioCaptions = { instagram?: string; telegram?: string; whatsapp?: string };",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
  },
  "frontend/components/studio-publish.tsx::StudioPublishCard": {
   "owner": "X2",
+  "shape": "export function StudioPublishCard({ campaignId, messageId, attachments, captions, published, targets, onPublish, onRegenerate, onSaveCaptions, }: { campaignId?: string; messageId?: string; attachments: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; targets: PublishTarget[]; onPublish: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>; onRegenerate?: (part: \"image\" | \"caption\", file?: File) => Promise<void>; onSaveCaptions?: (captions: StudioCaptions) => void | Promise<void>; })",
   "signature": "export function StudioPublishCard(",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -2451,6 +3101,7 @@
  "frontend/components/theme-toggle.tsx::ThemeToggle": {
   "owner": "U",
   "signature": "export function ThemeToggle({ compact = false, className }: { compact?: boolean; className?: string })",
+  "since": "2026-09-27",
   "users": [
    "X5"
   ]
@@ -2458,13 +3109,16 @@
  "frontend/components/training-choice.tsx::TrainingChoice": {
   "owner": "Y",
   "signature": "export function TrainingChoice()",
+  "since": "2026-09-28",
   "users": [
    "X5"
   ]
  },
  "frontend/components/ui/button.tsx::Button": {
   "owner": "U",
+  "shape": "export function Button({ className, variant = \"primary\", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: \"primary\" | \"ghost\" })",
   "signature": "export function Button(",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2478,6 +3132,7 @@
  "frontend/components/ui/card.tsx::Card": {
   "owner": "U",
   "signature": "export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>)",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2",
@@ -2489,6 +3144,7 @@
  "frontend/components/ui/input.tsx::Input": {
   "owner": "U",
   "signature": "export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2",
@@ -2500,6 +3156,7 @@
  "frontend/components/ui/select.tsx::Select": {
   "owner": "U",
   "signature": "export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X3",
@@ -2509,6 +3166,7 @@
  "frontend/components/ui/textarea.tsx::Textarea": {
   "owner": "U",
   "signature": "export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>)",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2",
@@ -2517,7 +3175,9 @@
  },
  "frontend/lib/api.ts::ApiError": {
   "owner": "U",
+  "shape": "export class ApiError extends Error { status: number; constructor(message: string, status: number) { super(message); this.name = \"ApiError\"; this.status = status; } }",
   "signature": "export class ApiError extends Error",
+  "since": "2026-09-21",
   "users": [
    "X3",
    "X5"
@@ -2525,14 +3185,18 @@
  },
  "frontend/lib/api.ts::Brand": {
   "owner": "U",
+  "shape": "export type Brand = { name: string; description: string; has_logo: boolean; has_character: boolean; has_motion?: boolean; }",
   "signature": "export type Brand =",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
  },
  "frontend/lib/api.ts::Campaign": {
   "owner": "U",
+  "shape": "export type Campaign = { id: string; slug: string; pillar: string; title: string; subtitle: string; cta: string; assets: Asset[]; copies: Copy[]; }",
   "signature": "export type Campaign =",
+  "since": "2026-09-18",
   "users": [
    "X2"
   ]
@@ -2540,6 +3204,7 @@
  "frontend/lib/api.ts::api": {
   "owner": "U",
   "signature": "export async function api<T>(path: string, init: RequestInit = {}): Promise<T>",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X1",
@@ -2553,6 +3218,7 @@
  "frontend/lib/api.ts::catalogImageUrl": {
   "owner": "U",
   "signature": "export function catalogImageUrl(name: string): string",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -2560,6 +3226,7 @@
  "frontend/lib/api.ts::chatMediaUrl": {
   "owner": "U",
   "signature": "export function chatMediaUrl(name: string): string",
+  "since": "2026-09-18",
   "users": [
    "X1"
   ]
@@ -2567,6 +3234,7 @@
  "frontend/lib/api.ts::clearToken": {
   "owner": "U",
   "signature": "export function clearToken()",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -2574,6 +3242,7 @@
  "frontend/lib/api.ts::fileUrl": {
   "owner": "U",
   "signature": "export function fileUrl(campaignId: string, relPath: string): string",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -2581,6 +3250,7 @@
  "frontend/lib/api.ts::getApiBase": {
   "owner": "U",
   "signature": "export function getApiBase(): string",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X2"
@@ -2589,6 +3259,7 @@
  "frontend/lib/api.ts::getOnboarded": {
   "owner": "U",
   "signature": "export function getOnboarded(): boolean",
+  "since": "2026-09-18",
   "users": [
    "X3"
   ]
@@ -2596,6 +3267,7 @@
  "frontend/lib/api.ts::getToken": {
   "owner": "U",
   "signature": "export function getToken(): string | null",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X2",
@@ -2605,6 +3277,7 @@
  "frontend/lib/api.ts::setOnboarded": {
   "owner": "U",
   "signature": "export function setOnboarded(onboarded: boolean)",
+  "since": "2026-09-18",
   "users": [
    "X3",
    "X5"
@@ -2613,6 +3286,7 @@
  "frontend/lib/api.ts::setToken": {
   "owner": "U",
   "signature": "export function setToken(token: string)",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -2620,6 +3294,7 @@
  "frontend/lib/digits.ts::formatWhen": {
   "owner": "U",
   "signature": "export function formatWhen(at: number): string",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X5",
@@ -2629,6 +3304,7 @@
  "frontend/lib/digits.ts::money": {
   "owner": "U",
   "signature": "export function money(amount: number): string",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X5",
@@ -2638,6 +3314,7 @@
  "frontend/lib/digits.ts::parseNonNegativeInt": {
   "owner": "U",
   "signature": "export function parseNonNegativeInt(raw: string): number | null",
+  "since": "2026-09-18",
   "users": [
    "C",
    "X5",
@@ -2647,6 +3324,7 @@
  "frontend/lib/digits.ts::priceText": {
   "owner": "U",
   "signature": "export function priceText(price: number, label?: string): string",
+  "since": "2026-09-18",
   "users": [
    "C"
   ]
@@ -2654,6 +3332,7 @@
  "frontend/lib/digits.ts::toLatinDigits": {
   "owner": "U",
   "signature": "export function toLatinDigits(raw: string): string",
+  "since": "2026-09-18",
   "users": [
    "X5"
   ]
@@ -2661,6 +3340,7 @@
  "frontend/lib/idempotency.ts::emptyIdempotencySlot": {
   "owner": "U",
   "signature": "export function emptyIdempotencySlot(): IdempotencySlot",
+  "since": "2026-09-20",
   "users": [
    "X1",
    "X4",
@@ -2670,6 +3350,7 @@
  "frontend/lib/idempotency.ts::finishIdempotencyKey": {
   "owner": "U",
   "signature": "export function finishIdempotencyKey(slot: IdempotencySlot, err?: unknown): void",
+  "since": "2026-09-20",
   "users": [
    "X1",
    "X4",
@@ -2679,6 +3360,7 @@
  "frontend/lib/idempotency.ts::takeIdempotencyKey": {
   "owner": "U",
   "signature": "export function takeIdempotencyKey(slot: IdempotencySlot, stamp: string): string",
+  "since": "2026-09-20",
   "users": [
    "X1",
    "X4",
@@ -2688,6 +3370,7 @@
  "frontend/lib/site-host.ts::isPanelHost": {
   "owner": "C",
   "signature": "export function isPanelHost(hostHeader: string | null): boolean",
+  "since": "2026-09-18",
   "users": [
    "U"
   ]
@@ -2695,6 +3378,7 @@
  "frontend/lib/site-host.ts::panelOriginFromHost": {
   "owner": "C",
   "signature": "export function panelOriginFromHost(hostHeader: string | null): string",
+  "since": "2026-09-18",
   "users": [
    "U"
   ]
@@ -2702,6 +3386,7 @@
  "frontend/lib/use-ai-budget.ts::useAiBudget": {
   "owner": "X5",
   "signature": "export function useAiBudget(): AiBudget | null",
+  "since": "2026-09-28",
   "users": [
    "U"
   ]
@@ -2709,6 +3394,7 @@
  "frontend/lib/use-plan.ts::usePlan": {
   "owner": "X5",
   "signature": "export function usePlan(): PlanInfo | null",
+  "since": "2026-09-27",
   "users": [
    "U"
   ]
@@ -2716,6 +3402,7 @@
  "frontend/lib/utils.ts::cn": {
   "owner": "U",
   "signature": "export function cn(...inputs: ClassValue[])",
+  "since": "2026-09-18",
   "users": [
    "X1",
    "X4",
