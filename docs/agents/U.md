@@ -85,7 +85,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 11.9k | the files most tasks touch; read the relevant one first |
-| active | 39.5k | yours to edit; read only what the task needs |
+| active | 45.6k | yours to edit; read only what the task needs |
 | rare | 29.8k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
@@ -106,7 +106,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (3.1k), `getting-started.tsx` (2.3k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
 - `frontend/components/ui/`: `button.tsx` (0.2k), `textarea.tsx` (0.1k), `select.tsx` (0.1k), `input.tsx` (0.1k), `card.tsx` (0.1k)
 - `frontend/lib/`: `api.ts` (1.9k), `theme.ts` (0.7k), `use-app-viewport.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.4k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
-- `tools/`: `ui_check.py` (1.4k)
+- `tools/`: `ui_chat_probe.mjs` (6.1k), `ui_check.py` (1.4k)
 
 **Rare (yours; only when the task names it):**
 
@@ -286,7 +286,7 @@ The system works only if every step of every flow keeps its promise. When your c
 - X4/X2/X5/Y: the tool runs: edit_shop, studio_chat, settings, auto-reply
 ```bash
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
-  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_embed_test 2>&1 | tail -3
+  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.services.router_embed_test 2>&1 | tail -3
 ```
 
 **F10 — Panel UI**

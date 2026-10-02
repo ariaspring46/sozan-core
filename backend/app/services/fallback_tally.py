@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from app.config import settings
+from app.services.pii_mask import mask_pii
 
 
 def _path() -> Path:
@@ -20,7 +21,7 @@ def _week() -> str:
 
 
 def note(kind: str, spoken: str) -> None:
-    text = " ".join(str(spoken or "").split())[:120]
+    text = mask_pii(" ".join(str(spoken or "").split()))[:120]
     if not text:
         return
     path = _path()

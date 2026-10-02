@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.6k tokens. Your core files total 32.5k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.7k tokens. Your core files total 32.5k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -308,7 +308,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `backend/app/api/inbox.py`: `router` (changed 2026-09-18) ← X5
 - `backend/app/services/claims_guard.py`: `check` (changed 2026-09-27) ← X2
 - `backend/app/services/inbox_service.py`: `expire_stale_sending` (changed 2026-09-18) ← X5; `handle_inbound` (changed 2026-09-18) ← X3; `list_publish_audience` (changed 2026-09-21) ← X1, X2; `list_threads` (changed 2026-09-18) ← X1; `rearm_pending_auto_replies` (changed 2026-09-26) ← X5; `save_auto_reply` (changed 2026-09-18) ← X1; `unread_count` (changed 2026-09-18) ← X1
-- `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X5
+- `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X1, X5
 - `backend/app/services/sales_policy_service.py`: `public_policy` (changed 2026-09-27) ← X5; `save_policy` (changed 2026-09-27) ← X5
 - `backend/app/services/training_log.py`: `log_example` (changed 2026-09-28) ← X1, X2, X4; `log_label` (changed 2026-09-28) ← X5
 - `backend/app/services/voice_service.py`: `apply_tone` (changed 2026-09-18) ← X1, X3; `get_voice` (changed 2026-09-18) ← X3, X5; `learn` (changed 2026-09-18) ← X3; `merge_summary` (changed 2026-09-18) ← X3
@@ -424,7 +424,7 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
 - X4/X2/X5/Y: the tool runs: edit_shop, studio_chat, settings, auto-reply ← **you**
 ```bash
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
-  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_embed_test 2>&1 | tail -3
+  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.services.router_embed_test 2>&1 | tail -3
 ```
 
 **F9 — Shared core: tenant state, LLM, budget, events**

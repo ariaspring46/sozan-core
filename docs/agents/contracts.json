@@ -1978,6 +1978,7 @@
   "signature": "def mask_pii(text: str) -> str",
   "since": "2026-09-27",
   "users": [
+   "X1",
    "X5"
   ]
  },
@@ -2198,6 +2199,15 @@
    "X3"
   ]
  },
+ "backend/app/services/shop_edit_service.py::NAMED_COLORS": {
+  "owner": "X4",
+  "shape": "NAMED_COLORS = {'قرمز': 'str', 'سرخ': 'str', 'آبی': 'str', 'سبز': 'str', 'مسی': 'str', 'زرشکی': 'str', 'طلایی': 'str', 'کرم': 'str', 'صورتی': 'str', 'بنفش': 'str', 'زرد': 'str', 'نارنجی': 'str', 'مشکی': 'str', 'سیاه': 'str'}",
+  "signature": "NAMED_COLORS = {'قرمز': '#B42318', 'سرخ': '#B42318', 'آبی': '#1D4ED8', 'سبز': '#15803D', 'مسی': '#C45C26', 'زرشکی': '#7A1F2B', 'طلایی': '#C9A227', 'کرم': '#F...",
+  "since": "2026-10-02",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/shop_edit_service.py::apply_live_edit": {
   "owner": "X4",
   "signature": "async def apply_live_edit(shop: dict, prompt: str, view_path: str, view_target: str='', classified: dict | None=None) -> dict",
@@ -2259,6 +2269,15 @@
   "owner": "X4",
   "signature": "CLARIFY_PAGE = 'کدام صفحه را بسازم: درباره ما، تماس، داستان برند، یا پرسش\\u200cهای متداول؟'",
   "since": "2026-09-18",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_intent_service.py::PAGE_LABELS": {
+  "owner": "X4",
+  "shape": "PAGE_LABELS = {'about': 'str', 'contact': 'str', 'story': 'str', 'faq': 'str'}",
+  "signature": "PAGE_LABELS = {'about': 'درباره ما', 'contact': 'تماس', 'story': 'داستان برند', 'faq': 'پرسش\\u200cهای متداول'}",
+  "since": "2026-10-02",
   "users": [
    "X1"
   ]
