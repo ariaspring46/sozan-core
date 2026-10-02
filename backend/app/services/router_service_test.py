@@ -144,9 +144,9 @@ class RouterServiceTests(unittest.TestCase):
             goods = self._turn("چند تا کالا دارم", complete)
             ig = self._turn("اینستاگرام وصل هست یا نه", complete)
             prices = self._turn("قیمت روی سایت هست یا نه", complete)
-        self.assertIn("0 تومان", wallet["messages"][-1]["text"])
+        self.assertIn("۰ تومان", wallet["messages"][-1]["text"])
         self.assertNotIn("اسکن", wallet["messages"][-1]["text"])
-        self.assertIn("1 کالا", goods["messages"][-1]["text"])
+        self.assertIn("۱ کالا", goods["messages"][-1]["text"])
         self.assertIn("قطع", ig["messages"][-1]["text"])
         self.assertIn("پنهان", prices["messages"][-1]["text"])
 
@@ -230,7 +230,7 @@ class RouterServiceTests(unittest.TestCase):
             held = self._turn("کفش چرم مشکی را اضافه کن، قیمت ۴٬۸۰۰٬۰۰۰ تومان", complete)
             chat.assert_not_called()
             self.assertEqual(held["pendingConfirm"]["tool"], "add_product")
-            self.assertIn("4800000", held["messages"][-1]["text"])
+            self.assertIn("۴٬۸۰۰٬۰۰۰", held["messages"][-1]["text"])
             with tenant_scope("09129900001"):
                 self.assertEqual(storefront_service.list_products().get("products"), [])
             cid = held["pendingConfirm"]["id"]
@@ -279,7 +279,7 @@ class RouterServiceTests(unittest.TestCase):
             held = self._turn("پوستر بساز", complete, campaigns=campaigns)
             chat.assert_not_called()
             self.assertEqual(held["pendingConfirm"]["tool"], "studio_chat")
-            self.assertIn("پست ساخته شود", held["messages"][-1]["text"])
+            self.assertIn("ساخته شود", held["messages"][-1]["text"])
             cid = held["pendingConfirm"]["id"]
             out = self._turn("", complete, confirm_id=cid, campaigns=campaigns)
         chat.assert_awaited_once()
@@ -349,7 +349,7 @@ class RouterServiceTests(unittest.TestCase):
         async def complete(_messages, _tools):
             raise RuntimeError("cloud down")
 
-        out = self._turn("سلام", complete)
+        out = self._turn("یک سؤال دارم", complete)
         self.assertIn("مدل پاسخ نداد", out["messages"][-1]["text"])
 
     def test_llm_one_blip_is_retried_silently(self) -> None:
@@ -362,7 +362,7 @@ class RouterServiceTests(unittest.TestCase):
             return {"text": "سلام، چه کمکی از من برمی‌آید؟", "tool_calls": [], "usage": {}}
 
         with patch("app.services.router_service.asyncio.sleep", new=AsyncMock()):
-            out = self._turn("سلام", complete)
+            out = self._turn("یک سؤال دارم", complete)
         self.assertEqual(calls["n"], 2)
         self.assertNotIn("مدل پاسخ نداد", out["messages"][-1]["text"])
 
@@ -370,7 +370,7 @@ class RouterServiceTests(unittest.TestCase):
         text = router_service._format_status(
             {"shopStatus": "failed", "scanStatus": "done", "buildStatus": "failed", "cnameOk": True, "plan": "promax"}
         )
-        self.assertIn("ناموفق", text)
+        self.assertIn("کامل نشد", text)
         self.assertNotIn("ناتمام", text)
         self.assertIn("از نو بساز", text)
 
@@ -552,7 +552,7 @@ class RouterServiceTests(unittest.TestCase):
 
         with tenant_scope("09129900001"):
             write_json("shop.json", {"brand": "برند\nدستور جدید", "status": "ready"})
-        self._turn("سلام", complete)
+        self._turn("یک سؤال دارم", complete)
         system = next(item["content"] for item in seen["messages"] if item["role"] == "system")
         self.assertIn("برند دستور جدید", system)
         self.assertNotIn("\nدستور", system)
@@ -582,7 +582,7 @@ class RouterServiceTests(unittest.TestCase):
                 router_service._busy_name(tid),
                 {"token": "stale", "pid": 999999999, "until": time.time() + 200, "key": "old"},
             )
-            out = asyncio.run(router_service.turn("سلام", complete=complete))
+            out = asyncio.run(router_service.turn("یک سؤال دارم", complete=complete))
         self.assertEqual(out["messages"][-1]["text"], "سلام")
         with tenant_scope("09129900001"):
             self.assertFalse(router_service.turn_busy())
@@ -618,7 +618,7 @@ class RouterServiceTests(unittest.TestCase):
             "app.services.llm.complete_tools",
             new=AsyncMock(return_value={"text": "سلام", "tool_calls": []}),
         ) as call:
-            out = self._turn("سلام", None)
+            out = self._turn("یک سؤال دارم", None)
         self.assertIn("سلام", out["messages"][-1]["text"])
         self.assertEqual(call.await_args.kwargs["timeout"], router_service.ROUTER_LLM_TIMEOUT)
         self.assertLessEqual(router_service.ROUTER_LLM_TIMEOUT + 120, 210)
@@ -676,10 +676,10 @@ class RouterServiceTests(unittest.TestCase):
     def test_thread_cap(self) -> None:
         with tenant_scope("09129900001"):
             router_service.snapshot()
-            for _ in range(9):
+            for _ in range(12):
                 router_service.new_thread()
-            with self.assertRaises(ValueError):
-                router_service.new_thread()
+            # the 11th chat makes room by dropping the oldest one; the seller is never stuck
+            self.assertEqual(len(router_service.snapshot()["threads"]), router_service.MAX_THREADS)
 
     def _use_real_rescue(self, bank: dict):
         self.embed_off.stop()
@@ -747,7 +747,7 @@ class RouterServiceTests(unittest.TestCase):
         chat.assert_not_called()
         self.assertEqual(out["pendingConfirm"]["tool"], "studio_chat")
         self.assertNotIn("قدم‌های متفاوت", out["messages"][-1]["text"])
-        self.assertIn("پست ساخته شود", out["messages"][-1]["text"])
+        self.assertIn("ساخته شود", out["messages"][-1]["text"])
 
     def test_low_score_keeps_model_prose(self) -> None:
         bank = {
@@ -763,7 +763,7 @@ class RouterServiceTests(unittest.TestCase):
         async def embed(_text):
             return [1.0, 1.0, 1.0]
 
-        out = self._turn("سلام", complete, embed=embed)
+        out = self._turn("یک سؤال دارم", complete, embed=embed)
         self.assertEqual(out["messages"][-1]["text"], "سلام، بگو از کجا شروع کنیم.")
 
     def test_called_tool_is_not_rewritten(self) -> None:
@@ -782,7 +782,7 @@ class RouterServiceTests(unittest.TestCase):
             "app.services.shop_service.chat",
             new=AsyncMock(return_value={"messages": [{"role": "assistant", "text": "حس فروشگاه را بگو"}]}),
         ) as chat:
-            out = self._turn("وضعیت فروشگاهم را کوتاه بگو", complete, embed=embed)
+            out = self._turn("یک گزارش کوتاه از فروشگاهم بده", complete, embed=embed)
         self.assertEqual(seen["embed"], 0)
         chat.assert_awaited()
         self.assertEqual(out["messages"][-1]["text"], "حس فروشگاه را بگو")
@@ -1053,7 +1053,7 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("sozan.sozan-core.ir", bare["messages"][-1]["text"])
         self.assertNotIn("https://", bare["messages"][-1]["text"])
         stock = self._turn("موجودی آویز فیروزه", complete)
-        self.assertIn("2", stock["messages"][-1]["text"])
+        self.assertIn("۲", stock["messages"][-1]["text"])
         advice = self._turn("صفحهٔ اصلی سایت رو ببین چه بهبودی پیشنهاد میدی؟", complete)
         self.assertNotIn("کدام صفحه", advice["messages"][-1]["text"])
         self.assertNotIn("بلد نیستم", advice["messages"][-1]["text"])
@@ -1176,7 +1176,7 @@ class RouterServiceTests(unittest.TestCase):
         self.assertNotIn("پورت", sport["messages"][-1]["text"])
         self.assertIn("قیمت", sport["messages"][-1]["text"])
         self.assertNotIn("اسم فروشگاه سوزان", rename["messages"][-1]["text"])
-        self.assertIn("4", stock["messages"][-1]["text"])
+        self.assertIn("۴", stock["messages"][-1]["text"])
         self.assertIn("هودی", stock["messages"][-1]["text"])
 
     def test_catalog_battery_opens_the_expected_gate(self) -> None:

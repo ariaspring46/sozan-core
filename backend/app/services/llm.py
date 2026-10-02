@@ -258,6 +258,12 @@ def _fallback_cloud_route() -> dict | None:
     }
 
 
+class BudgetCapped(RuntimeError):
+    """The tenant (or the company) reached its cloud cap and the local model is switched off."""
+
+    budget_capped = True
+
+
 def _emit_cloud_fallback(*, surface: str, reason: str, requested: str, used: str) -> None:
     emit_later(
         kind="llm",
@@ -1065,6 +1071,9 @@ async def complete_tools(
     if route.get("kind") != "cloud" or capped:
         if surface == "router" and not capped:
             raise RuntimeError("router_requires_cloud")
+        if capped and surface == "router" and not local_fallback_enabled():
+            # the home model needs a minute per reply; the seller gets the cap message at once instead
+            raise BudgetCapped(str(capped))
         return await _tools_once(
             _local_default_route(surface) if capped else route,
             messages=messages,
