@@ -6,7 +6,7 @@ You are programmer **U** on Sozan (`ariaspring46/sozan-core`). This file is your
 
 ## 1. Mission
 
-Own how Sozan looks and feels everywhere: design tokens (colours, type, spacing), shared UI components, the panel frame (app-shell, panel home, getting started), light/dark theme, RTL and Persian typography, mobile-first layout (390px) and accessibility, the frontend data layer (lib/api.ts, idempotency), Next/Tailwind/TypeScript config and dependencies, the public landing and legal pages, and the UI audit. Feature roles own their pages; you own the rules and building blocks they use.
+Own how Sozan looks and feels everywhere: design tokens (colours, type, spacing), shared UI components, the panel frame (app-shell, panel home, getting started), light/dark theme, RTL and Persian typography, mobile-first layout (390px) and accessibility, the frontend data layer (lib/api.ts, idempotency), Next/Tailwind/TypeScript config and dependencies, the public landing and legal pages, and the UI audit: a recurring live mobile audit of app.sozan-core.ir (tools/ui_live_audit.mjs) whose findings you fix in your files or send as exact requests to the page's owner. Feature roles own their pages; you own the rules and building blocks they use.
 
 Plan files (owner's, read-only): `owner-plan.md`. Read only the section a task cites: `grep -n '^## ' <plan>` then `sed -n 'a,bp'`.
 
@@ -28,10 +28,12 @@ Plan files (owner's, read-only): `owner-plan.md`. Read only the section a task c
 11. Design tokens live only in app/globals.css (CSS variables) and tailwind.config.js. No hex colours elsewhere (ui_check U5); add a token instead.
 12. Shared components (components/ui/*, app-shell, empty-state, field) stay backward compatible: new props optional, no renamed exports. A breaking change needs an ack from every role listed in 'Your contract'.
 13. Every page is RTL (`<html lang="fa" dir="rtl">`), Persian copy, Persian digits for numbers shown to sellers, and works at 390px wide without horizontal scroll.
-14. Accessibility floor: every <img> has alt, icon-only buttons have aria-label, focus is visible, text contrast >= 4.5:1, tap targets >= 40px.
-15. lib/api.ts is the only place that knows the API host and auth header; pages call api()/getApiBase(), never a hard-coded host (ui_check U6).
-16. Dependencies: you alone change frontend/package.json and the lockfile; keep the lockfile's registry as is (the hub builds through it).
-17. You do not change a feature page's behaviour or data flow; for a visual fix inside another role's page, send the exact class/markup change to that role.
+14. Mobile floor (360, 390 and 412px; light and dark): no horizontal scroll; full-height layouts use dvh (min-h-dvh), never 100vh/h-screen; fixed bottom bars pad with env(safe-area-inset-bottom); inputs, selects and textareas use font-size >= 16px so iOS does not zoom; nothing depends on hover; the on-screen keyboard never covers the focused field or the send/submit button.
+15. Accessibility floor: every <img> has alt, icon-only buttons have aria-label, focus is visible, text contrast >= 4.5:1, tap targets >= 44x44px (a smaller icon gets padding or a ::before hit area, not a smaller box).
+16. lib/api.ts is the only place that knows the API host and auth header; pages call api()/getApiBase(), never a hard-coded host (ui_check U6).
+17. Dependencies: you alone change frontend/package.json and the lockfile; keep the lockfile's registry as is (the hub builds through it).
+18. You do not change a feature page's behaviour or data flow; for a visual fix inside another role's page, send the exact class/markup change to that role.
+19. Severity for UI findings: P0 = page blank/stuck, a /_next chunk fails, horizontal scroll, or a flow cannot finish on a phone; P1 = control off-screen, broken image, input < 16px, unreadable contrast; P2 = tap target < 44px, clipped text, spacing/typography drift. P0 goes to the top of talk-u.md and to X5 (deploy) the same day.
 
 ## 3. Session start (at most 5 tool calls, before touching any file)
 
@@ -54,9 +56,23 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 6. **Review your own diff**: `git diff --stat`, then `git diff -- <file>` per file. Look for a secret, a debug print, a changed contract (§10), a file outside §6.
 7. **Commit and report** (§12, §13). Stop when the definition of done (§15) holds. Do not polish beyond the task.
 
+### Playbook: Live mobile audit of app.sozan-core.ir
+
+When: the owner asks for an audit, after every panel deploy (X5 says so in talk-u.md), and at least weekly.
+
+1. Ask X5 (request in talk-x5.md) for a lab-phone session file made with `tools/lab_session.py`; store it outside the repo (e.g. `~/.sozan-audit-token`, chmod 600). Never print it, never use a real seller's number, never type an OTP yourself. Without it, audit the public pages only and say so.
+2. Run `SOZAN_AUDIT_TOKEN_FILE=~/.sozan-audit-token node tools/ui_live_audit.mjs 2>&1 | tail -3` (Playwright + the machine's Chromium). It opens every panel route at 360x800, 390x844 and 412x915 in light and dark and writes `docs/ui-audit-live/<date>/report.md`, `report.json` and one screenshot per page/size/theme.
+3. Read only `report.md` (never the PNGs in bulk). Ignore anything about `10.10.34.35`: that is the Iranian ISP filter injecting a script, not our code.
+4. Any P0: stop the audit, append `## U → X5: P0 panel <date>` to talk-x5.md with the failing URL and status (for example `502 /_next/static/chunks/...`), and put the same line at the top of your report.
+5. Open 3-5 screenshots of the worst pages yourself and judge what the script cannot measure: visual hierarchy, spacing rhythm, Persian typography (line height, numerals), dark-mode contrast, empty/loading/error states, and whether the main action is reachable with one thumb.
+6. For each finding decide the owner from the route: /chat X1; /studio, /brand, /campaigns X2; /onboard, /more/channels X3; /shop X4; /login, /more, /more/settings, /more/wallet, /more/docs, /admin, /manage X5; /inbox, /sales Y; /more/inventory, /more/support, /p/<id> C; landing, about, contact, terms, refund, app-shell, panel home and components/ui are yours. Fix yours on a `u/<issue>-mobile-audit` branch; for others append to their report file `## U → <ROLE>: mobile audit <route>` with the exact class/markup change and the measured evidence.
+7. Append to talk-u.md: date, P0/P1/P2 counts, top 3 issues, what you fixed, which requests you sent. Commit `docs/ui-audit-live/<date>/report.md` and `report.json` only (screenshots stay local unless the PR needs them).
+
+Done when: every P0/P1 is fixed or has an acknowledged request in its owner's report file, and the next audit shows the counts going down.
+
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~6.9k tokens. Your core files total 9.7k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.0k tokens. Your core files total 10.4k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -68,7 +84,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 9.7k | the files most tasks touch; read the relevant one first |
+| core | 10.4k | the files most tasks touch; read the relevant one first |
 | active | 37.7k | yours to edit; read only what the task needs |
 | rare | 15.9k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
@@ -80,6 +96,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/components/app-shell.tsx` (2.8k)
 - `frontend/lib/api.ts` (1.2k)
 - `frontend/components/ui/button.tsx` (0.2k)
+- `frontend/lib/use-app-viewport.ts` (0.7k)
 
 **Active (you may edit):**
 
@@ -104,7 +121,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/public/`: `2326207.txt` (0.0k), `sozan-mark-legacy.png` (0.0k), `sozan-mark.png` (0.0k), `sozan-preview-beacon.js` (2.9k)
 - `frontend/public/fonts/`: `OFL.txt` (1.4k), `estedad-arabic.woff2` (0.0k), `estedad-latin.woff2` (0.0k)
 
-**Yours but never read** (generated or huge; change only through its script): `frontend/package-lock.json` (22.7k)
+**Yours but never read** (generated or huge; change only through its script): `docs/ui-audit-live/00-login-390-light.png` (0.0k), `docs/ui-audit-live/act-chat-steps-390.png` (0.0k), `docs/ui-audit-live/act-settings-plan-390.png` (0.0k), `docs/ui-audit-live/act-settings-saved-390.png` (0.0k), `docs/ui-audit-live/campaigns-1440-dark.png` (0.0k), `docs/ui-audit-live/campaigns-1440-light.png` (0.0k), `docs/ui-audit-live/campaigns-390-dark.png` (0.0k), `docs/ui-audit-live/campaigns-390-light.png` (0.0k), `docs/ui-audit-live/channels-1440-dark.png` (0.0k), `docs/ui-audit-live/channels-1440-light.png` (0.0k), `docs/ui-audit-live/channels-390-dark.png` (0.0k), `docs/ui-audit-live/channels-390-light.png` (0.0k), `docs/ui-audit-live/chat-1440-dark.png` (0.0k), `docs/ui-audit-live/chat-1440-light.png` (0.0k), `docs/ui-audit-live/chat-390-dark.png` (0.0k), `docs/ui-audit-live/chat-390-light.png` (0.0k), `docs/ui-audit-live/findings.json` (35.4k), `docs/ui-audit-live/inbox-1440-dark.png` (0.0k), `docs/ui-audit-live/inbox-1440-light.png` (0.0k), `docs/ui-audit-live/inbox-390-dark.png` (0.0k), `docs/ui-audit-live/inbox-390-light.png` (0.0k), `docs/ui-audit-live/inventory-1440-dark.png` (0.0k), `docs/ui-audit-live/inventory-1440-light.png` (0.0k), `docs/ui-audit-live/inventory-390-dark.png` (0.0k), `docs/ui-audit-live/inventory-390-light.png` (0.0k), `docs/ui-audit-live/more-1440-dark.png` (0.0k), `docs/ui-audit-live/more-1440-light.png` (0.0k), `docs/ui-audit-live/more-390-dark.png` (0.0k), `docs/ui-audit-live/more-390-light.png` (0.0k), `docs/ui-audit-live/onboard-1440-dark.png` (0.0k), `docs/ui-audit-live/onboard-1440-light.png` (0.0k), `docs/ui-audit-live/onboard-390-dark.png` (0.0k), `docs/ui-audit-live/onboard-390-light.png` (0.0k), `docs/ui-audit-live/onboard-result.txt` (0.1k), `docs/ui-audit-live/sales-1440-dark.png` (0.0k), `docs/ui-audit-live/sales-1440-light.png` (0.0k), `docs/ui-audit-live/sales-390-dark.png` (0.0k), `docs/ui-audit-live/sales-390-light.png` (0.0k), `docs/ui-audit-live/settings-1440-dark.png` (0.0k), `docs/ui-audit-live/settings-1440-light.png` (0.0k), `docs/ui-audit-live/settings-390-dark.png` (0.0k), `docs/ui-audit-live/settings-390-light.png` (0.0k), `docs/ui-audit-live/shop-1440-dark.png` (0.0k), `docs/ui-audit-live/shop-1440-light.png` (0.0k), `docs/ui-audit-live/shop-390-dark.png` (0.0k), `docs/ui-audit-live/shop-390-light.png` (0.0k), `docs/ui-audit-live/studio-1440-dark.png` (0.0k), `docs/ui-audit-live/studio-1440-light.png` (0.0k), `docs/ui-audit-live/studio-390-dark.png` (0.0k), `docs/ui-audit-live/studio-390-light.png` (0.0k), `docs/ui-audit-live/wallet-1440-dark.png` (0.0k), `docs/ui-audit-live/wallet-1440-light.png` (0.0k), `docs/ui-audit-live/wallet-390-dark.png` (0.0k), `docs/ui-audit-live/wallet-390-light.png` (0.0k), `frontend/package-lock.json` (22.7k)
 
 Every other file in the repo belongs to another role (see `docs/agents/README.md`).
 
@@ -203,7 +220,8 @@ python3 tools/agent_context/build.py --check
 **Merge gates** (all must hold before you ask for review):
 
 - `python3 tools/ui_check.py` prints 0 problems and `npm run build` passes.
-- Any visual change: screenshots at 390px and 1440px, light and dark, of every page whose look changed, attached to the PR (built-in Chromium + Playwright). No horizontal scroll at 390px.
+- Any visual change: `BASE=http://localhost:3000 node tools/ui_live_audit.mjs --desktop` on your branch shows no new P0/P1 on the pages you touched; attach the changed screenshots (360/390/412 and 1440, light and dark) to the PR.
+- After any change to next.config.ts, package.json, layout.tsx or app-shell is deployed: `node tools/ui_live_audit.mjs` against production prints P0=0.
 
 ## 12. Git and PR
 
@@ -298,7 +316,9 @@ cd frontend && npm run build 2>&1 | tail -15
 
 1. Use design tokens and components/ui/*; no new hex colours or one-off button styles (tools/ui_check.py).
 2. RTL and Persian: Persian copy, Persian digits for numbers sellers see, no left-aligned layouts.
-3. Mobile first: the page works at 390px with no horizontal scroll; check 1440px too.
-4. Every async view has loading, empty and error states (use components/empty-state.tsx).
-5. Accessibility: <img alt>, aria-label on icon-only buttons, rel="noreferrer" on target=_blank, visible focus.
-6. Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host.
+3. Mobile first: the page works at 360, 390 and 412px with no horizontal scroll (check 1440px too); use min-h-dvh, never h-screen/100vh; fixed bottom bars pad env(safe-area-inset-bottom); inputs >= 16px font.
+4. Tap targets >= 44x44px; nothing depends on hover.
+5. Every async view has loading, empty and error states (use components/empty-state.tsx).
+6. Accessibility: <img alt>, aria-label on icon-only buttons, rel="noreferrer" on target=_blank, visible focus.
+7. Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host.
+8. Before asking for review of a visual change: `BASE=http://localhost:3000 ROUTES=<your routes> node tools/ui_live_audit.mjs` shows no new P0/P1.

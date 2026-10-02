@@ -678,6 +678,17 @@ def verify_commands(role: dict, tests: list[str]) -> list[str]:
     return out
 
 
+def _playbooks(role: dict) -> list[str]:
+    """Named, repeatable procedures for a role (roles.json "playbooks": [{title, when, steps, done}])."""
+    out: list[str] = []
+    for pb in role.get("playbooks", []):
+        out += ["", f"### Playbook: {pb['title']}", "", f"When: {pb['when']}", ""]
+        out += [f"{i}. {step}" for i, step in enumerate(pb["steps"], 1)]
+        if pb.get("done"):
+            out += ["", f"Done when: {pb['done']}"]
+    return out
+
+
 def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, endpoints, owner, never, budget, row) -> str:
     rid = role["id"]
     report = role.get("report", "")
@@ -728,6 +739,7 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
         "5. **Verify** with §11, your modules first, then the full suite once before the PR. Show only the tail of test output.",
         "6. **Review your own diff**: `git diff --stat`, then `git diff -- <file>` per file. Look for a secret, a debug print, a changed contract (§10), a file outside §6.",
         "7. **Commit and report** (§12, §13). Stop when the definition of done (§15) holds. Do not polish beyond the task.",
+        *_playbooks(role),
         "",
         "## 5. Context budget",
         "",
