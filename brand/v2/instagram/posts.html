@@ -1,0 +1,134 @@
+<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8">
+<style>
+@font-face{font-family:Estedad;src:url(../../../frontend/public/fonts/estedad-arabic.woff2);font-weight:100 900}
+@font-face{font-family:Estedad;src:url(../../../frontend/public/fonts/estedad-latin.woff2);font-weight:100 900;unicode-range:U+0000-00FF}
+:root{--char:#1F1B18;--ash:#34302C;--cu:#C45C26;--dcu:#A24517;--ember:#E8A87C;--cream:#F6EFE6;--ink:#2A2622}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#555;font-family:Estedad,sans-serif;display:flex;flex-wrap:wrap;gap:40px;padding:40px;width:2320px}
+.post{position:relative;width:1080px;height:1350px;overflow:hidden;padding:96px 90px;display:flex;flex-direction:column}
+.dark{background:radial-gradient(ellipse 760px 640px at 50% 58%,rgba(232,168,124,.16),rgba(196,92,38,.06) 55%,transparent 78%),var(--char);color:var(--cream)}
+.light{background:radial-gradient(ellipse 800px 600px at 50% 60%,rgba(232,168,124,.22),transparent 75%),var(--cream);color:var(--ink)}
+.top{display:flex;align-items:center;gap:18px;font-weight:800;font-size:40px}
+.top svg{width:62px;height:62px}
+.top .n{margin-inline-start:auto;font-weight:500;font-size:28px;opacity:.55}
+.foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;font-size:30px;font-weight:500}
+.foot .u{direction:ltr;opacity:.7;letter-spacing:1px}
+.dark .foot .s{color:var(--ember)} .light .foot .s{color:var(--dcu)}
+.kick{font-size:34px;font-weight:600;margin-top:64px}
+.dark .kick{color:var(--ember)} .light .kick{color:var(--dcu)}
+h1{font-size:92px;line-height:1.22;font-weight:900;margin-top:18px}
+h1 em{font-style:normal;color:var(--cu)}
+.light h1 em{color:var(--dcu)}
+.sub{font-size:36px;line-height:1.75;font-weight:400;margin-top:26px;opacity:.85;max-width:860px}
+.stage{margin-top:56px;flex:1;display:flex;flex-direction:column;gap:22px}
+/* chat */
+.b{max-width:740px;font-size:33px;line-height:1.6;padding:24px 32px;border-radius:38px}
+.me{align-self:flex-start;background:var(--cu);color:#fff;border-end-start-radius:10px}
+.sz{align-self:flex-end;display:flex;gap:16px;align-items:flex-end}
+.sz .t{background:var(--ash);color:var(--cream);border-end-end-radius:10px}
+.light .sz .t{background:#fff;color:var(--ink);box-shadow:0 6px 24px rgba(42,38,34,.08)}
+.sz svg{width:56px;height:56px;flex:none}
+.chip{display:inline-flex;align-items:center;gap:10px;font-size:28px;font-weight:600;padding:12px 26px;border-radius:999px;border:2px solid currentColor}
+.dark .chip{color:var(--ember)} .light .chip{color:var(--dcu)}
+.chips{display:flex;gap:16px;flex-wrap:wrap}
+.card{background:var(--ash);border-radius:40px;padding:34px;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+.light .card{background:#fff;box-shadow:0 24px 60px rgba(42,38,34,.12)}
+</style>
+<body>
+
+<!-- 1 brand -->
+<section class="post dark" id="p1" style="align-items:center;text-align:center">
+ <div class="top" style="align-self:stretch"><span class="n">۱ از ۶</span></div>
+ <div style="margin-top:110px" class="mk" data-size="360" data-glow="1"></div>
+ <div style="font-size:150px;font-weight:900;line-height:1;margin-top:60px">سوزان</div>
+ <div style="font-size:64px;font-weight:800;margin-top:56px;color:var(--ember)">بگو. بساز. بفروش.</div>
+ <div class="sub" style="margin-top:34px">دستیار فروشِ فروشنده‌های ایرانی؛<br>فروشگاه، پست و جواب مشتری، همه در یک چت.</div>
+ <div class="foot" style="align-self:stretch"><span class="s">رایگان شروع کن</span><span class="u">sozan-core.ir</span></div>
+</section>
+
+<!-- 2 shop by chat -->
+<section class="post light" id="p2">
+ <div class="top"><span class="mk" data-size="62"></span>سوزان<span class="n">۲ از ۶</span></div>
+ <div class="kick">ساخت فروشگاه</div>
+ <h1>چند جمله بگو؛<br><em>فروشگاهت آماده است.</em></h1>
+ <div class="stage">
+  <div class="b me">یه فروشگاه برای کیف چرمی می‌خوام. رنگ‌ها کرم و قهوه‌ای.</div>
+  <div class="sz"><div class="b t">پیش از ساخت دو سؤال دارم: حس ساده و گرم، یا رسمی؟</div><span class="mk" data-size="56"></span></div>
+  <div class="b me">ساده و گرم. بساز.</div>
+  <div class="chips" style="margin-top:14px"><span class="chip">بدون کدنویسی</span><span class="chip">ویرایش روی خود صفحه</span><span class="chip">دامنهٔ شخصی</span></div>
+ </div>
+ <div class="foot"><span class="s">بگو. بساز. بفروش.</span><span class="u">sozan-core.ir</span></div>
+</section>
+
+<!-- 3 studio -->
+<section class="post dark" id="p3">
+ <div class="top"><span class="mk" data-size="62"></span>سوزان<span class="n">۳ از ۶</span></div>
+ <div class="kick">استودیوی محتوا</div>
+ <h1>پست و کپشن<br><em>برای هر کانال، جدا.</em></h1>
+ <div class="stage" style="flex-direction:row;gap:34px;align-items:flex-start;margin-top:64px">
+  <div class="card" style="width:430px;padding:22px">
+   <div style="height:430px;border-radius:26px;background:radial-gradient(circle at 50% 42%,#f2d8c2 0,#d9a47c 34%,#7a4a2c 70%,#3b2a20 100%);display:flex;align-items:center;justify-content:center">
+    <svg viewBox="0 0 120 120" width="210" height="210"><circle cx="60" cy="66" r="34" fill="none" stroke="#EDEDED" stroke-width="11"/><circle cx="60" cy="66" r="34" fill="none" stroke="#9A9A9A" stroke-width="2" opacity=".5"/><path d="M48 30 L60 16 L72 30 L60 38Z" fill="#E8E8E8" stroke="#A9A9A9" stroke-width="1.5"/></svg>
+   </div>
+   <div style="font-size:30px;font-weight:700;margin-top:22px">انگشتر نقرهٔ دست‌ساز</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;gap:20px">
+   <div class="chips"><span class="chip" style="background:var(--cu);color:#fff;border-color:var(--cu)">اینستاگرام</span><span class="chip">تلگرام</span><span class="chip">واتساپ</span></div>
+   <div class="card" style="font-size:31px;line-height:1.75">هر قطعه با دقت ساخته می‌شود؛ هدیه‌ای که حس گرمش می‌ماند. برای سفارش دایرکت بده.</div>
+   <div style="font-size:30px;color:var(--ember);font-weight:600;line-height:1.6">دانلود کن، یا با تأیید خودت بفرست.</div>
+  </div>
+ </div>
+ <div class="foot"><span class="s">بگو. بساز. بفروش.</span><span class="u">sozan-core.ir</span></div>
+</section>
+
+<!-- 4 inbox -->
+<section class="post light" id="p4">
+ <div class="top"><span class="mk" data-size="62"></span>سوزان<span class="n">۴ از ۶</span></div>
+ <div class="kick">صندوق پیام مشتری</div>
+ <h1>پیام همهٔ مشتری‌ها<br><em>یک‌جا، با لحن خودت.</em></h1>
+ <div class="stage" style="margin-top:56px;gap:18px">
+  <div class="card" style="display:flex;flex-direction:column;gap:0;padding:12px 36px">
+   <div class="row" style="display:flex;justify-content:space-between;align-items:center;padding:24px 0;border-bottom:2px solid #EFE6DA;font-size:32px"><span>این انگشتر سایز ۵۴ دارید؟</span><span class="chip" style="font-size:22px;padding:6px 18px">اینستاگرام</span></div>
+   <div class="row" style="display:flex;justify-content:space-between;align-items:center;padding:24px 0;border-bottom:2px solid #EFE6DA;font-size:32px"><span>ارسال به شیراز چند روزه؟</span><span class="chip" style="font-size:22px;padding:6px 18px">تلگرام</span></div>
+   <div class="row" style="display:flex;justify-content:space-between;align-items:center;padding:24px 0;font-size:32px"><span>ممنون، رسید.</span><span class="chip" style="font-size:22px;padding:6px 18px">اینستاگرام</span></div>
+  </div>
+  <div class="sz" style="margin-top:12px"><div class="b t"><span style="font-size:24px;font-weight:700;color:var(--dcu);display:block">پیش‌نویس سوزان</span>سلام! بله، سایز ۵۴ موجوده. لینک پرداخت رو برات گذاشتم.</div><span class="mk" data-size="56"></span></div>
+ </div>
+ <div class="foot"><span class="s">اول تو تأیید می‌کنی.</span><span class="u">sozan-core.ir</span></div>
+</section>
+
+<!-- 5 payment -->
+<section class="post dark" id="p5">
+ <div class="top"><span class="mk" data-size="62"></span>سوزان<span class="n">۵ از ۶</span></div>
+ <div class="kick">سفارش و پرداخت</div>
+ <h1>لینک پرداخت،<br><em>کنار جواب مشتری.</em></h1>
+ <div class="sub">با درگاه خودت، پول مستقیم به حساب خودت می‌رود و سوزان کارمزدی برنمی‌دارد.</div>
+ <div class="stage" style="margin-top:40px;gap:30px;justify-content:center">
+  <div class="card" style="display:flex;align-items:center;gap:28px;padding:30px 36px">
+   <div style="width:110px;height:110px;border-radius:28px;background:radial-gradient(circle at 50% 40%,#e7c39f,#9a5a33);flex:none"></div>
+   <div style="flex:1"><div style="font-size:34px;font-weight:700">کیف چرمی</div><div style="font-size:30px;opacity:.7;margin-top:6px">۱ عدد</div></div>
+   <div style="background:var(--cu);color:#fff;font-size:32px;font-weight:700;padding:20px 38px;border-radius:999px">پرداخت</div>
+  </div>
+  <div class="chips"><span class="chip">زرین‌پال</span><span class="chip">آیدی‌پی</span><span class="chip">کارت‌به‌کارت با رسید</span></div>
+ </div>
+ <div class="foot"><span class="s">بگو. بساز. بفروش.</span><span class="u">sozan-core.ir</span></div>
+</section>
+
+<!-- 6 trust + cta -->
+<section class="post light" id="p6" style="align-items:center;text-align:center">
+ <div class="top" style="align-self:stretch"><span class="mk" data-size="62"></span>سوزان<span class="n">۶ از ۶</span></div>
+ <h1 style="margin-top:150px;font-size:80px">بدون اجازهٔ تو<br><em>هیچ چیز منتشر نمی‌شود.</em></h1>
+ <div class="sub" style="margin-top:34px">ساخت فروشگاه، انتشار محتوا و هر تغییر مهم، اول از تو تأیید می‌گیرد.<br>نه رمز اینستاگرام لازم است، نه کدنویسی.</div>
+ <div style="margin-top:84px;background:var(--dcu);color:#fff;font-size:46px;font-weight:800;padding:30px 80px;border-radius:999px;box-shadow:0 20px 50px rgba(162,69,23,.3)">رایگان شروع کن</div>
+ <div style="margin-top:30px;font-size:36px;direction:ltr;font-weight:600;color:var(--dcu);letter-spacing:1px">sozan-core.ir</div>
+ <div class="foot" style="align-self:stretch;justify-content:center"><span class="s">بگو. بساز. بفروش.</span></div>
+</section>
+
+<script>
+let k=0;
+const P='M120 112C126 128 146 138 146 160C146 176 134 186 120 186C106 186 94 176 94 162C94 150 102 144 106 136C109 143 113 147 117 148C120 136 116 124 120 112Z';
+document.querySelectorAll('.mk').forEach(el=>{const s=el.dataset.size,id='c'+(k++);
+ el.innerHTML=`<svg viewBox="0 0 240 240" width="${s}" height="${s}" style="display:block${el.dataset.glow?';filter:drop-shadow(0 0 70px rgba(196,92,38,.5))':''}"><defs><mask id="${id}"><rect width="240" height="240" fill="#fff"/><path fill="#000" transform="translate(-18 -69.4) scale(1.15)" d="${P}"/></mask></defs><g mask="url(#${id})" fill="#C45C26"><rect x="16" y="20" width="208" height="164" rx="56"/><path d="M142 170C146 200 166 216 198 224C186 208 184 190 190 170Z"/></g></svg>`;
+ if(el.parentElement.classList.contains('top'))el.style.display='flex';});
+</script>
+</body></html>
