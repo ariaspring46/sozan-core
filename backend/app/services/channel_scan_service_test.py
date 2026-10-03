@@ -1,6 +1,8 @@
 import asyncio
 import json
+import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -22,6 +24,25 @@ class PageHandleAndOutcomeTests(unittest.TestCase):
             self.assertEqual(channel_scan_service.handle_in_text(text), handle, text)
         for text in ("hello", "بساز", "yes build it", "قیمت ۸۵۰ هزار", "انگشتر نقره", ""):
             self.assertEqual(channel_scan_service.handle_in_text(text), "", text)
+
+    def test_a_scan_killed_by_a_restart_does_not_stay_running_forever(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.state_store import write_json
+
+                write_json("scan-status.json", {"status": "running", "handles": ["pinkshop528_sirjan"], "startedAt": time.time() - 60})
+                self.assertEqual(channel_scan_service.scan_status()["status"], "running")
+                write_json("scan-status.json", {"status": "running", "handles": ["pinkshop528_sirjan"], "startedAt": time.time() - 3 * 3600})
+                stale = channel_scan_service.scan_status()
+                self.assertEqual(stale["status"], "error")
+                self.assertEqual(stale["error"], channel_scan_service.SCAN_STALE_FA)
+                self.assertNotIn("در جریان", channel_scan_service.scan_outcome())
+                # a row from before startedAt existed is judged by the file's age
+                write_json("scan-status.json", {"status": "running", "handles": ["pinkshop528_sirjan"]})
+                path = Path(raw) / "tenants" / "09123456789" / "scan-status.json"
+                old = time.time() - 5 * 3600
+                os.utime(path, (old, old))
+                self.assertEqual(channel_scan_service.scan_status()["status"], "error")
 
     def test_an_empty_scan_is_told_as_it_is_and_never_as_a_source_of_prices(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

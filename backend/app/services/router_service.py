@@ -126,7 +126,7 @@ def _flush_trace(out: dict) -> None:
         handle.write(json.dumps(safe, ensure_ascii=False) + "\n")
 _PERSIAN = re.compile(r"[\u0600-\u06FF]")
 _UNSAFE_ERROR = re.compile(r"[/\\]|traceback|\.py\b|https?://|exception", re.I)
-HOLD_PENDING = "اول دکمهٔ «تأیید» یا «انصراف» کارت بالا را بزن؛ نوشتن «بله» کافی نیست."
+HOLD_PENDING = "کارت همین زیر است: برای انجام «تأیید» و برای کنار گذاشتن «انصراف» را بزن؛ نوشتن «بله» کافی نیست. اگر کار دیگری می‌خواهی، همان را بگو."
 
 TOOLS = [
     {
@@ -709,7 +709,7 @@ def _direct_reply(spoken: str) -> str:
     unsent = _send_without_post(text)
     if unsent:
         return unsent
-    if any(mark in text for mark in ("چه کار", "چکار", "چه می‌توانی", "چه میتونی", "قابلیت")):
+    if any(mark in text for mark in ("چه کار", "چکار", "چ کار", "چه می‌توانی", "چه میتونی", "چی کار می", "چیکار می", "قابلیت")):
         return _CAPABILITY
     if compact in {"فروشگاه", "فروشگاهم", "سایت", "ویترین"} or (
         "دسترسی" in text and ("فروشگاه" in text or "سایت" in text)
@@ -884,9 +884,24 @@ def snapshot(thread_id: str = "") -> dict:
     with tenant_file_lock("router"):
         _ensure_index_locked()
         rows = [dict(row) for row in _messages() if isinstance(row, dict)]
-        pending = _public_pending(_pending())
+        stored = _pending()
+        pending = _public_pending(stored)
         shop = read_json("shop.json", {})
         threads = _public_threads()
+    if pending and not any(str(row.get("confirmId") or "") == str(pending["id"]) for row in rows):
+        # the card's own message fell out of the last MAX_MESSAGES rows: show it again at the end, or the seller is told
+        # to tap a card that is nowhere on screen (09145642532 was stuck like that for five hours)
+        rows.append(
+            {
+                "id": f"card-{pending['id']}",
+                "role": "assistant",
+                "text": str(pending.get("summary") or "این کار منتظر تأیید توست."),
+                "at": int(float(stored.get("expiresAt") or time.time() + CARD_TTL) - CARD_TTL),
+                "kind": "confirm",
+                "confirmId": pending["id"],
+                "tool": pending.get("tool") or "",
+            }
+        )
     brand = _data_line(shop.get("brand"), 40) if isinstance(shop, dict) else ""
     return {
         "messages": _with_studio(rows),
@@ -1169,6 +1184,12 @@ def _publish_block(args: dict, spoken: str = "") -> str:
     platform = str(args.get("platform") or "")
     if platform not in _PUBLISH_FA:
         return "انتشار فقط برای تلگرام، واتساپ یا دایرکت اینستاگرام است."
+    from app.services.studio_publish_service import channel_block
+
+    unplugged = channel_block(platform)
+    if unplugged:
+        # no card for a send that cannot happen: confirming it only failed with the same «not connected» again
+        return unplugged
     named = _bind_recipient(args, spoken)
     if named:
         return named
@@ -1382,10 +1403,14 @@ _CHANNEL_FA = {"instagram": "اینستاگرام", "telegram": "تلگرام", 
 
 def _format_status(data: dict) -> str:
     chans = data.get("channels") or []
-    chan = "، ".join(
-        f"{_CHANNEL_FA.get(str(c.get('platform')), c.get('platform'))} {'وصل است' if c.get('connected') else 'وصل نیست'}"
-        for c in chans
-    )
+    parts: list[str] = []
+    for c in chans:
+        handle = str(c.get("handle") or "").strip().lstrip("@")
+        label = _CHANNEL_FA.get(str(c.get("platform")), str(c.get("platform") or ""))
+        part = f"{label}{f' ({handle})' if handle else ''} {'وصل است' if c.get('connected') else 'وصل نیست'}"
+        if part not in parts:
+            parts.append(part)
+    chan = "، ".join(parts)
     state = str(data.get("shopStatus") or "")
     build = str(data.get("buildStatus") or "")
     host = _shop_public()
@@ -1927,13 +1952,24 @@ async def _execute(
     _append_user(original, media if isinstance(media, dict) else None)
     spoken = _merge_followup(spoken)
     choice = decide(spoken, view_path, view_target)
-    if choice["kind"] == "direct":
+    # «دکمهٔ تأیید کجاست / بالای صفحه نمیاد» is about the waiting card, not a page to build: it wins over the direct replies
+    card_ask = pending_open and choice["kind"] != "tool" and router_text.asks_for_card(spoken)
+    if choice["kind"] == "direct" and not card_ask:
         _trace(path="gate")
         direct_text = str(choice.get("text") or "")
         _append("assistant", await _voice(spoken, direct_text, situation="direct"), **_clarify_extra(direct_text))
         return snapshot()
-    if pending_open and router_text.is_confirmish(spoken):
+    if card_ask or (pending_open and router_text.is_confirmish(spoken)):
+        # the card itself comes back under the answer, buttons and all («the card above» sent a seller hunting for hours)
+        _trace(path="gate")
         await _say(spoken, HOLD_PENDING, "card_waiting")
+        _append(
+            "assistant",
+            str(pending.get("summary") or "این کار منتظر تأیید توست."),
+            kind="confirm",
+            confirmId=str(pending.get("id") or ""),
+            tool=str(pending.get("tool") or ""),
+        )
         return snapshot()
 
     history = _chooser_history(spoken)
@@ -2032,8 +2068,11 @@ async def _execute(
     args = _stamp_content_id(name, args, spoken)
     name, direct = _authority_route(name, args, spoken, view_path, view_target)
     if pending_open and name not in READ_TOOLS and not direct:
-        await _say(spoken, HOLD_PENDING, "card_waiting")
-        return snapshot()
+        # a new job replaces the open card (it shows «این کارت بسته شد»); holding every request behind it left a seller
+        # who could not find the card unable to do anything for hours. A bare «آره» still needs the card's buttons (above).
+        _clear_pending()
+        _trace(superseded=str(pending.get("tool") or ""))
+        _emit("router-card-superseded", {"tool": str(pending.get("tool") or ""), "next": name})
     if direct:
         await _say(spoken, _guard_reply(spoken, direct), "direct")
         _emit("router-tool", {"tool": name, "level": _tool_level(name), "applied": False})

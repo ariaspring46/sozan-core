@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown, ExternalLink, Globe, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useBackClose } from "@/lib/back-stack";
 
 export type ShopState = {
   brand: string;
@@ -147,6 +148,12 @@ export function DomainMenu({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, preview]);
+
+  useBackClose(open, () => {
+    setConfirmRebuild(false);
+    setOpen(false);
+  });
+  useBackClose(Boolean(preview && live), () => setPreview(false));
 
   const sheet = open ? (
     <div

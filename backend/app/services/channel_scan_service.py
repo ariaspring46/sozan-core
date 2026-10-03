@@ -5,6 +5,7 @@ import re
 import subprocess
 import tempfile
 import threading
+import time
 from html import unescape
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -171,6 +172,24 @@ def get_scan() -> dict:
     return data if isinstance(data, dict) else {}
 
 
+# a scan runs as a task inside the API process: a restart (every deploy) kills it and «running» would stay forever
+SCAN_STALE_SECONDS = 20 * 60
+SCAN_STALE_FA = "اسکن پیج نیمه‌کاره ماند؛ بگو دوباره اسکن کنم."
+
+
+def _scan_started_at(data: dict) -> float:
+    try:
+        started = float(data.get("startedAt") or 0)
+    except (TypeError, ValueError):
+        started = 0.0
+    if started:
+        return started
+    try:
+        return (tenant_dir() / "scan-status.json").stat().st_mtime  # rows written before startedAt existed
+    except OSError:
+        return 0.0
+
+
 def scan_status() -> dict:
     data = read_json("scan-status.json", {})
     if not isinstance(data, dict):
@@ -178,10 +197,15 @@ def scan_status() -> dict:
     status = str(data.get("status") or "idle")
     if status not in {"idle", "running", "done", "error"}:
         status = "idle"
+    error = str(data.get("error") or "")
+    if status == "running":
+        started = _scan_started_at(data)
+        if started and time.time() - started > SCAN_STALE_SECONDS:
+            status, error = "error", SCAN_STALE_FA
     return {
         "status": status,
         "productCount": int(data.get("productCount") or 0),
-        "error": str(data.get("error") or ""),
+        "error": error,
         "handles": [str(item) for item in (data.get("handles") or []) if str(item).strip()],
         "needsReview": bool(data.get("needsReview")),
         "errorClass": str(data.get("errorClass") or ""),
@@ -202,6 +226,8 @@ def _set_scan_status(*, status: str, product_count: int = 0, error: str = "", ha
     }
     if extra:
         payload.update(extra)
+    if status == "running":
+        payload["startedAt"] = time.time()
     write_json("scan-status.json", payload)
     return payload
 

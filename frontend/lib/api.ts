@@ -41,6 +41,41 @@ export function clearToken() {
   localStorage.removeItem("sozan_onboarded");
 }
 
+const DAY_S = 24 * 3600;
+let refreshing: Promise<void> | null = null;
+
+function tokenTimes(token: string): { iat: number; exp: number } | null {
+  try {
+    const body = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const iat = Number(body.iat);
+    const exp = Number(body.exp);
+    return Number.isFinite(iat) && Number.isFinite(exp) ? { iat, exp } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ورود تا وقتی فروشنده سر می‌زند بماند: توکنی که بیش از یک روز از ساختش گذشته
+ * (یا کمتر از یک هفته مهلت دارد، مثل توکن‌های دوازده‌ساعتهٔ قدیمی) با /auth/refresh تازه می‌شود.
+ */
+export function refreshSession(): Promise<void> {
+  const token = getToken();
+  if (!token || refreshing) return refreshing ?? Promise.resolve();
+  const times = tokenTimes(token);
+  const now = Date.now() / 1000;
+  if (times && now - times.iat < DAY_S && times.exp - now > 7 * DAY_S) return Promise.resolve();
+  refreshing = api<{ access_token?: string }>("/auth/refresh", { method: "POST", signal: timeoutSignal(15000) })
+    .then((data) => {
+      if (data.access_token && getToken() === token) setToken(data.access_token);
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
 function formatApiDetail(detail: unknown): string {
   if (typeof detail === "string") return detail;
   if (!Array.isArray(detail)) return "";

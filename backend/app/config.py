@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://127.0.0.1:6379/0"
     jwt_secret: str = "change-me-to-a-long-random-secret"
     jwt_expire_minutes: int = 720
+    # ورود فروشنده تا این‌همه روز بعد از آخرین باز کردن پنل می‌ماند؛ پنل هر روز با /auth/refresh تمدیدش می‌کند.
+    session_days: int = 60
     admin_phone: str = "09120000000"
     otp_ttl_seconds: int = 300
     otp_dev: bool = False

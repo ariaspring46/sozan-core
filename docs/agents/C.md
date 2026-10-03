@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.6k tokens. Your core files total 19.8k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.7k tokens. Your core files total 19.8k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -67,7 +67,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 19.8k | the files most tasks touch; read the relevant one first |
-| active | 57.6k | yours to edit; read only what the task needs |
+| active | 57.7k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
 | tests | 16.2k | read only the test of the module you change |
 
@@ -85,7 +85,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.3k)
 - `frontend/app/p/[id]/`: `page.tsx` (0.8k)
-- `frontend/components/`: `shop-settings-form.tsx` (8.7k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.3k), `domain-menu.tsx` (4.2k)
+- `frontend/components/`: `shop-settings-form.tsx` (8.7k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.3k), `domain-menu.tsx` (4.3k)
 - `frontend/lib/`: `site-host.ts` (0.1k)
 
 **Rare (yours; only when the task names it):**
@@ -148,6 +148,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T>  
 export function catalogImageUrl(name: string): string  # changed 2026-09-18
 export function fileUrl(campaignId: string, relPath: string): string  # changed 2026-09-18
 export function getApiBase(): string  # changed 2026-09-18
+```
+**`frontend/lib/back-stack.ts`** — owner U
+```
+export function useBackClose(open: boolean, onBack: () => boolean | void)  # changed 2026-10-03
 ```
 **`frontend/lib/digits.ts`** — owner U
 ```

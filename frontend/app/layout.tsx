@@ -17,7 +17,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  interactiveWidget: "overlays-content",
+  // کیبورد اندروید خود صفحه را کوتاه کند تا نوار نوشتن بالای کیبورد بیاید
+  // (overlays-content هیچ اندازه‌ای را عوض نمی‌کرد و کادر چت زیر کیبورد می‌ماند).
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
