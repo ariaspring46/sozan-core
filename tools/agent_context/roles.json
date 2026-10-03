@@ -693,6 +693,7 @@
         "tools/ui_live_audit.mjs",
         "tools/ui_chat_probe.mjs",
         "tools/ui_shop_probe.mjs",
+        "tools/ui_studio_probe.mjs",
         "tools/ui_mobile_audit.mjs",
         "docs/ui-audit-live/**"
       ],

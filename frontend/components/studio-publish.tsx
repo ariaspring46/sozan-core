@@ -39,6 +39,17 @@ const CHANNELS = [
   { platform: "whatsapp", label: "واتساپ", limit: 1024 },
 ] as const;
 
+/** «تصویر» به‌تنهایی کمک نمی‌کند: فروشنده باید بداند کدام خروجی پست، استوری یا عریض است. */
+function mediaLabel(item: StudioAttachment): string {
+  const blob = `${item.source || ""} ${item.name || ""}`;
+  if (item.kind === "video") return /reel/.test(blob) ? "ویدیوی ریلز" : "ویدیو";
+  if (/story/.test(blob)) return "استوری";
+  if (/wide/.test(blob)) return "عکس عریض";
+  if (/tg-post/.test(blob)) return "پست کانال";
+  if (/feed/.test(blob)) return "پست اینستاگرام";
+  return "تصویر";
+}
+
 function pickMedia(attachments: StudioAttachment[], platform: string): StudioAttachment {
   const sourceOf = (item: StudioAttachment) => item.source || item.name || "";
   const image = attachments.find((item) => item.kind === "image");
@@ -86,6 +97,8 @@ export function StudioPublishCard({
   const [error, setError] = useState("");
   const [confirmFor, setConfirmFor] = useState("");
   const [savedHint, setSavedHint] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [audienceError, setAudienceError] = useState(false);
   const [mediaByChannel, setMediaByChannel] = useState<Record<string, string>>({});
   const [sentAt, setSentAt] = useState<Record<string, number>>(published || {});
   const [audienceQ, setAudienceQ] = useState("");
@@ -115,11 +128,12 @@ export function StudioPublishCard({
     const timer = window.setTimeout(() => {
       void Promise.resolve(onSaveCaptions(drafts))
         .then(() => {
+          setSaveError("");
           setSavedHint(true);
-          window.setTimeout(() => setSavedHint(false), 1200);
+          window.setTimeout(() => setSavedHint(false), 2500);
         })
         .catch(() => {
-          setError("کپشن ذخیره نشد");
+          setSaveError("کپشن ذخیره نشد. دوباره امتحان کن.");
         });
     }, 800);
     return () => window.clearTimeout(timer);
@@ -132,8 +146,14 @@ export function StudioPublishCard({
     const timer = window.setTimeout(() => {
       const query = audienceQ.trim() ? `?q=${encodeURIComponent(audienceQ.trim())}` : "";
       void api<{ rows?: AudienceRow[] }>(`/studio/audience${query}`)
-        .then((data) => setAudience(data.rows || []))
-        .catch(() => setAudience([]));
+        .then((data) => {
+          setAudience(data.rows || []);
+          setAudienceError(false);
+        })
+        .catch(() => {
+          setAudience([]);
+          setAudienceError(true);
+        });
     }, audienceQ ? 280 : 0);
     return () => window.clearTimeout(timer);
   }, [igReady, audienceQ]);
@@ -146,6 +166,13 @@ export function StudioPublishCard({
 
   if (!attachments.length) return null;
 
+  // ارسال به کانال یا مشتری برگشت‌پذیر نیست: لمس اول فقط آماده می‌کند، لمس دوم (تا ۶ ثانیه) می‌فرستد.
+  useEffect(() => {
+    if (!confirmFor) return;
+    const timer = window.setTimeout(() => setConfirmFor(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [confirmFor]);
+
   async function send(platform: (typeof CHANNELS)[number]["platform"], force = false) {
     const spec = CHANNELS.find((item) => item.platform === platform);
     if (!spec) return;
@@ -154,7 +181,7 @@ export function StudioPublishCard({
       return;
     }
     const sentAlready = Boolean(sentAt[platform] || published?.[platform]);
-    if (sentAlready && !force) {
+    if (!force) {
       setConfirmFor(platform);
       return;
     }
@@ -262,6 +289,9 @@ export function StudioPublishCard({
               maxLength={channel.limit}
               onChange={(event) => setDrafts({ ...drafts, [key]: event.target.value })}
             />
+            <p className={`text-end text-xs ${(drafts[key] || "").length >= channel.limit - 20 ? "text-danger" : "text-muted"}`}>
+              {(drafts[key] || "").length.toLocaleString("fa-IR")} از {channel.limit.toLocaleString("fa-IR")}
+            </p>
             {attachments.length > 1 ? (
               <div className="flex flex-wrap gap-2" role="group" aria-label="رسانهٔ ارسال">
                 {attachments.map((item) => (
@@ -272,7 +302,7 @@ export function StudioPublishCard({
                     aria-pressed={selected === item.name}
                     onClick={() => setMediaByChannel({ ...mediaByChannel, [channel.platform]: item.name })}
                   >
-                    {item.kind === "video" ? "ویدیو" : "تصویر"}
+                    {mediaLabel(item)}
                   </button>
                 ))}
               </div>
@@ -296,7 +326,11 @@ export function StudioPublishCard({
                   <p className="text-sm text-muted">از اخیر یک نفر را انتخاب کن؛ بدون مخاطب ارسال نمی‌شود.</p>
                 )}
                 <div className="max-h-48 space-y-1 overflow-y-auto overscroll-contain">
-                  {audience.length === 0 ? (
+                  {audienceError ? (
+                    <p className="text-sm text-danger" role="alert">
+                      فهرست مخاطب‌ها خوانده نشد. جستجو را دوباره بزن.
+                    </p>
+                  ) : audience.length === 0 ? (
                     <p className="text-sm text-muted">در صندوق مخاطب اینستاگرام نیست. اول پیام‌های تازه را در صندوق بگیر.</p>
                   ) : (
                     audience.map((row) => (
@@ -331,7 +365,9 @@ export function StudioPublishCard({
               {busy === channel.platform
                 ? "در حال ارسال…"
                 : confirmFor === channel.platform
-                  ? "مطمئنی؟ دوباره بفرست"
+                  ? sent
+                    ? "مطمئنی؟ دوباره بفرست"
+                    : `مطمئنی؟ بفرست به ${channel.platform === "instagram" && picked ? picked.sender : channel.label}`
                   : sent
                     ? "ارسال دوباره"
                     : channel.platform === "telegram"
@@ -349,6 +385,7 @@ export function StudioPublishCard({
       })}
       {savedHint ? <p className="text-sm text-muted" role="status">ذخیره شد</p> : null}
       {notice ? <p className="text-sm text-signal" role="status">{notice}</p> : null}
+      {saveError ? <p className="text-sm text-danger" role="alert">{saveError}</p> : null}
       {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
       <Link className="inline-flex min-h-11 items-center text-sm text-warm" href="/more/channels">
         تنظیم حساب کانال‌ها

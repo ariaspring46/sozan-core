@@ -86,7 +86,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 |---|---|---|
 | core | 12.2k | the files most tasks touch; read the relevant one first |
 | active | 52.6k | yours to edit; read only what the task needs |
-| rare | 29.8k | yours; read only when the task names it |
+| rare | 30.7k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
 **Core:**
@@ -117,7 +117,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/app/contact/`: `page.tsx` (0.2k)
 - `frontend/app/refund/`: `page.tsx` (0.2k)
 - `frontend/app/terms/`: `page.tsx` (0.4k)
-- `frontend/components/`: `auth-image.tsx` (0.5k), `auth-media.tsx` (0.6k), `landing-slogan-rotator.tsx` (0.4k), `legal-page.tsx` (0.8k), `login-coder-scene.tsx` (1.1k)
+- `frontend/components/`: `auth-image.tsx` (0.5k), `auth-media.tsx` (1.5k), `landing-slogan-rotator.tsx` (0.4k), `legal-page.tsx` (0.8k), `login-coder-scene.tsx` (1.1k)
 - `frontend/public/`: `2326207.txt` (0.0k), `sozan-mark-256.webp` (0.0k), `sozan-mark-legacy.png` (0.0k), `sozan-mark.png` (0.0k), `sozan-preview-beacon.js` (2.9k)
 - `frontend/public/fonts/`: `OFL-vazirmatn.txt` (1.4k), `OFL.txt` (1.4k), `estedad-arabic.woff2` (0.0k), `estedad-latin.woff2` (0.0k), `vazirmatn-var.woff2` (0.0k)
 - `tools/`: `ui_live_audit.mjs` (2.6k), `ui_mobile_audit.mjs` (8.5k)
@@ -189,7 +189,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 
 - `frontend/components/app-shell.tsx`: `AppShell` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y
 - `frontend/components/auth-image.tsx`: `AuthImage` (changed 2026-09-18) ← C, X2
-- `frontend/components/auth-media.tsx`: `AuthMedia` (changed 2026-09-18) ← X2
+- `frontend/components/auth-media.tsx`: `AuthMedia` (changed 2026-10-03) ← X2; `MEDIA_RATIO` (changed 2026-10-03) ← X2; `downloadMedia` (changed 2026-10-03) ← X2
 - `frontend/components/empty-state.tsx`: `EmptyState` (changed 2026-09-18) ← C, X2, X3, X4, X5, Y
 - `frontend/components/field.tsx`: `Field` (changed 2026-09-18) ← C, X2, X3, X5, Y
 - `frontend/components/getting-started.tsx`: `GettingStarted` (changed 2026-09-27) ← X1
@@ -202,7 +202,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `frontend/components/ui/select.tsx`: `Select` (changed 2026-09-18) ← C, X3, Y
 - `frontend/components/ui/textarea.tsx`: `Textarea` (changed 2026-09-18) ← C, X2, X3
 - `frontend/lib/api.ts`: `ApiError` (changed 2026-09-21) ← X3, X5; `Brand` (changed 2026-09-18) ← X2; `Campaign` (changed 2026-09-18) ← X2; `api` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-18) ← C; `chatMediaUrl` (changed 2026-09-18) ← X1; `clearToken` (changed 2026-09-18) ← X5; `fileUrl` (changed 2026-09-18) ← C; `getApiBase` (changed 2026-09-18) ← C, X2; `getOnboarded` (changed 2026-09-18) ← X3; `getToken` (changed 2026-09-18) ← X1, X2, X3; `setOnboarded` (changed 2026-09-18) ← X3, X5; `setToken` (changed 2026-09-18) ← X5; `timeoutSignal` (changed 2026-10-02) ← X1, X3
-- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← X1, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← X5
+- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← X1, X2, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← X5
 - `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-20) ← X1, X4, Y; `finishIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y; `takeIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y
 - `frontend/lib/utils.ts`: `cn` (changed 2026-09-18) ← X1, X2, X4, Y
 
