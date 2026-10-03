@@ -423,6 +423,68 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 self.assertTrue(saved["cnameOk"])
                 self.assertEqual(saved["cnameCheck"]["status"], "sozan-host")
 
+    def _domain_shop(self, raw: str, **extra) -> None:
+        write_json(
+            "shop.json",
+            {**shop_service.DEFAULT_SHOP, "slug": "mine", "port": 12390, "publicHost": "mine.sozan-core.ir", "status": "ready", **extra},
+        )
+
+    def test_set_domain_rejects_text_that_is_not_a_domain(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            self._domain_shop(raw)
+            for text in ("bad domain with spaces", "localhost", "shop..example.com", "-bad-.com", "http://", "javascript:alert(1)", "127.0.0.1"):
+                with self.assertRaises(ValueError, msg=text):
+                    shop_service.set_domain(text)
+
+    def test_set_domain_refuses_sozan_hosts_that_are_not_its_own(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            self._domain_shop(raw)
+            for text in ("sozan-core.ir", "app.sozan-core.ir", "api.sozan-core.ir", "evil.sozan-core.ir", "other-shop.sozan-core.ir"):
+                with self.assertRaises(ValueError, msg=text) as ctx:
+                    shop_service.set_domain(text)
+                self.assertIn("سوزان", str(ctx.exception))
+            self.assertNotEqual(shop_service._shop().get("domain"), "app.sozan-core.ir")
+
+    def test_set_domain_accepts_persian_domain_as_punycode(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            self._domain_shop(raw)
+            with (
+                patch.object(shop_service, "_write_shop_upstream"),
+                patch.object(shop_service, "_publish_dns", side_effect=lambda shop: shop),
+                patch("app.services.arvan_dns_service.check_cname", return_value={"ok": False, "status": "waiting", "detail": "w"}),
+                patch("app.services.arvan_dns_service.start_cname_setup", return_value={"ok": True}),
+                patch("app.services.channel_scan_service.scan_status", return_value={}),
+                patch.object(shop_service, "_factory_status", return_value={}),
+                patch.object(shop_service, "_refresh_job", side_effect=lambda shop: shop),
+            ):
+                shop_service.set_domain("https://فروشگاه.ir/")
+            self.assertEqual(shop_service._shop()["domain"], "xn--mgbtj4c7ad63e.ir")
+
+    def test_set_domain_empty_box_returns_to_the_sozan_address(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            self._domain_shop(raw, domain="shop.example.com")
+            with (
+                patch.object(shop_service, "_write_shop_upstream"),
+                patch.object(shop_service, "_publish_dns", side_effect=lambda shop: shop),
+                patch("app.services.channel_scan_service.scan_status", return_value={}),
+                patch.object(shop_service, "_factory_status", return_value={}),
+                patch.object(shop_service, "_refresh_job", side_effect=lambda shop: shop),
+            ):
+                shop_service.set_domain("   ")
+            self.assertEqual(shop_service._shop()["domain"], "mine.sozan-core.ir")
+
+    def test_shop_reply_never_shows_an_internal_address_or_status_jargon(self) -> None:
+        out = shop_service._seller_words(
+            "وضعیت بیلد: ready و سایت زنده است روی http://127.0.0.1:12410 و http://10.0.0.5:3000/x", "https://a.sozan-core.ir"
+        )
+        self.assertNotIn("127.0.0.1", out)
+        self.assertNotIn("10.0.0.5", out)
+        self.assertNotIn("بیلد", out)
+        self.assertNotIn("ready", out)
+        self.assertIn("وضعیت ساخت: آماده", out)
+        self.assertIn("https://a.sozan-core.ir", out)
+        self.assertEqual(shop_service._seller_words("آدرس https://shop.example.com باز است"), "آدرس https://shop.example.com باز است")
+
     def test_write_shop_upstream_rebuilds_without_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             map_path = Path(raw) / "shop-upstreams.map"

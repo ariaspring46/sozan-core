@@ -51,11 +51,13 @@
         "backend/app/services/persian_text.py",
         "backend/app/api/router_chat.py",
         "backend/app/api/chat_payload.py",
+        "backend/app/api/chat_payload_test.py",
         "backend/app/data/**",
         "backend/scripts/refresh_router_intents.py",
         "frontend/app/chat/**",
         "frontend/components/chat-thread.tsx",
         "frontend/components/chat-attach.tsx",
+        "frontend/components/link-text.tsx",
         "frontend/components/typing-hints.tsx",
         "tools/qa50_battery.json",
         "tools/qa50_battery.py",
@@ -690,6 +692,7 @@
         "talk-u.md",
         "tools/ui_live_audit.mjs",
         "tools/ui_chat_probe.mjs",
+        "tools/ui_shop_probe.mjs",
         "tools/ui_mobile_audit.mjs",
         "docs/ui-audit-live/**"
       ],
@@ -911,6 +914,7 @@
         "app.services.turn_parse_test",
         "app.services.router_text_test",
         "app.services.router_chat_behavior_test",
+        "app.api.chat_payload_test",
         "app.services.router_embed_test"
       ]
     },

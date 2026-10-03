@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Copy, ExternalLink, Monitor, RefreshCw, Smartphone, X } from "lucide-react";
+import { Check, Copy, ExternalLink, Monitor, RefreshCw, Smartphone, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shopHostLabel } from "@/components/domain-menu";
 
@@ -38,6 +38,28 @@ const PAGES = [
   { path: "/products", label: "کالاها" },
   { path: "/cart", label: "سبد" },
 ] as const;
+
+const STEP_FA: Record<BuildStep["state"], string> = { done: "انجام شد", active: "در حال انجام", wait: "منتظر", fail: "ناموفق" };
+
+/** نشانک مرحله با شکل (✓، نقطهٔ زنده، ✕، حلقهٔ خالی) و متن برای صفحه‌خوان؛ فقط رنگ نیست. */
+function StepMark({ state }: { state: BuildStep["state"] }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
+        state === "done" && "bg-accent text-onAccent",
+        state === "active" && "bg-signal/20",
+        state === "fail" && "bg-danger text-onAccent",
+        state === "wait" && "border border-line",
+      )}
+    >
+      {state === "done" ? <Check size={10} strokeWidth={3} /> : null}
+      {state === "fail" ? <X size={10} strokeWidth={3} /> : null}
+      {state === "active" ? <span className="sozan-breathe h-1.5 w-1.5 rounded-full bg-signal" /> : null}
+    </span>
+  );
+}
 
 function clock(sec: number) {
   const m = Math.floor(sec / 60).toLocaleString("fa-IR");
@@ -217,6 +239,7 @@ function ShopLivePreview({
   const [pick, setPick] = useState("");
   const [frameLoaded, setFrameLoaded] = useState(false);
   const [frameStale, setFrameStale] = useState(false);
+  const [frameDead, setFrameDead] = useState(false);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const src = useMemo(() => frameUrl(href, path, bust + reload, mode), [href, path, bust, reload, mode]);
 
@@ -225,6 +248,25 @@ function ShopLivePreview({
     setFrameStale(false);
     const timer = window.setTimeout(() => setFrameStale(true), 8000);
     return () => window.clearTimeout(timer);
+  }, [src]);
+  // یک iframe که صفحهٔ خطای مرورگر یا پراکسی را بار کند «load» می‌دهد؛ پس خودِ نشانی را بی‌صدا می‌سنجیم.
+  useEffect(() => {
+    setFrameDead(false);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 10000);
+    fetch(src, { method: "HEAD", mode: "no-cors", cache: "no-store", signal: controller.signal })
+      .catch(() => {
+        if (!controller.signal.aborted || timedOut) setFrameDead(true);
+      })
+      .finally(() => window.clearTimeout(timer));
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [src]);
   const pipeline = build?.pipeline || [];
   const live = overlay && (build?.status === "running" || build?.status === "queued");
@@ -444,12 +486,12 @@ function ShopLivePreview({
           <button
             type="button"
             onClick={() => setReload((value) => value + 1)}
-            className="absolute inset-x-3 top-3 rounded-2xl border border-accent/30 bg-paper/95 px-3 py-2 text-sm text-warm shadow-card"
+            className="absolute bottom-3 left-1/2 inline-flex min-h-11 -translate-x-1/2 items-center whitespace-nowrap rounded-full border border-accent/30 bg-paper/95 px-4 text-sm text-warm shadow-card"
           >
             پیش‌نمایش را تازه کن
           </button>
         ) : null}
-        {frameStale && !frameLoaded && !overlay ? (
+        {((frameStale && !frameLoaded) || frameDead) && !overlay ? (
           <div className="absolute inset-x-3 top-3 rounded-2xl border border-danger/30 bg-paper/95 px-3 py-2 shadow-card">
             <p className="text-sm text-danger">پیش‌نمایش بار نشد — تازه کن</p>
             <button type="button" className="inline-flex min-h-11 items-center text-sm text-warm underline" onClick={() => setReload((value) => value + 1)}>
@@ -461,9 +503,7 @@ function ShopLivePreview({
           <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-accent/25 bg-paper/95 px-3 py-2 shadow-card">
             <p className="text-xs text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
             <p className={cn("mt-0.5 text-sm", failed ? "text-danger" : "text-ink")}>{title}</p>
-            <p className={cn("text-xs", failed ? "text-danger" : "text-muted")}>
-              {live ? `زمان ساخت ${clock(seconds)}` : failed ? "ساخت کامل نشد." : ""}
-            </p>
+            {live ? <p className="text-xs text-muted">{`زمان ساخت ${clock(seconds)}`}</p> : null}
             {failed && onRetry ? (
               <button type="button" className="mt-1 inline-flex min-h-11 items-center text-sm text-warm underline" onClick={onRetry}>
                 دوباره بساز
@@ -473,17 +513,10 @@ function ShopLivePreview({
               <ol className="mt-2 space-y-1">
                 {pipeline.map((step) => (
                   <li key={step.id} className="flex items-center gap-2 text-xs">
-                    <span
-                      className={cn(
-                        "h-1.5 w-1.5 shrink-0 rounded-full",
-                        step.state === "done" && "bg-accent",
-                        step.state === "active" && "sozan-breathe bg-signal",
-                        step.state === "fail" && "bg-danger",
-                        step.state === "wait" && "border border-line",
-                      )}
-                    />
+                    <StepMark state={step.state} />
                     <span className={cn(step.state === "wait" && "text-muted", step.state === "fail" && "text-danger")}>
                       {step.label}
+                      <span className="sr-only"> — {STEP_FA[step.state]}</span>
                     </span>
                   </li>
                 ))}
@@ -510,7 +543,7 @@ function ShopPipeline({
   onRetry?: () => void;
 }) {
   const pipeline = build.pipeline || [];
-  const title = live ? build.stepLabel || "سوزان در حال ساخت سایت است…" : "ساخت کامل نشد";
+  const title = live ? build.stepLabel || "سوزان در حال ساخت سایت است…" : build.error || "ساخت کامل نشد";
   return (
     <section
       className={cn(
@@ -531,9 +564,7 @@ function ShopPipeline({
         <div className="min-w-0 flex-1">
           <p className="text-xs text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
           <p className="mt-1 text-sm font-medium leading-6 text-ink">{title}</p>
-          <p className={cn("mt-0.5 text-xs", failed ? "text-danger" : "text-muted")}>
-            {live ? `زمان ساخت ${clock(seconds)}` : "ساخت کامل نشد."}
-          </p>
+          {live ? <p className="mt-0.5 text-xs text-muted">{`زمان ساخت ${clock(seconds)}`}</p> : null}
           {failed && onRetry ? (
             <button type="button" className="mt-1 inline-flex min-h-11 items-center text-sm text-warm underline" onClick={onRetry}>
               دوباره بساز
@@ -545,15 +576,7 @@ function ShopPipeline({
         <ol className="relative mt-4 space-y-2">
           {pipeline.map((step) => (
             <li key={step.id} className="flex items-center gap-3 text-sm">
-              <span
-                className={cn(
-                  "flex h-2.5 w-2.5 shrink-0 items-center justify-center rounded-full",
-                  step.state === "done" && "bg-accent",
-                  step.state === "active" && "sozan-breathe bg-signal",
-                  step.state === "fail" && "bg-danger outline outline-2 outline-danger/30",
-                  step.state === "wait" && "border border-line bg-transparent",
-                )}
-              />
+              <StepMark state={step.state} />
               <span
                 className={cn(
                   "leading-6",
@@ -563,6 +586,7 @@ function ShopPipeline({
                 )}
               >
                 {step.label}
+                <span className="sr-only"> — {STEP_FA[step.state]}</span>
               </span>
             </li>
           ))}

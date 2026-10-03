@@ -3028,6 +3028,14 @@
    "X1"
   ]
  },
+ "frontend/components/link-text.tsx::LinkText": {
+  "owner": "X1",
+  "signature": "export function LinkText({ text }: { text: string })",
+  "since": "2026-10-03",
+  "users": [
+   "X4"
+  ]
+ },
  "frontend/components/login-coder-scene.tsx::LoginCoderScene": {
   "owner": "U",
   "signature": "export function LoginCoderScene()",

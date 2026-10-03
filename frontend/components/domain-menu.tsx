@@ -94,6 +94,9 @@ export function DomainMenu({
   const [confirmRebuild, setConfirmRebuild] = useState(false);
   const [domain, setDomain] = useState(personalDomainValue(shop));
   const [mounted, setMounted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saved, setSaved] = useState(false);
   const live = shopPublicUrl(shop);
   const running = shop?.status === "running" || shop?.status === "queued";
   const hostLabel = Boolean(live) && !running && shop?.status !== "failed";
@@ -110,6 +113,22 @@ export function DomainMenu({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  /** خطای سرور (دامنهٔ نامعتبر، دامنهٔ دیگران، قطع شبکه) داخل همین کادر دیده می‌شود، نه بی‌صدا بسته‌شدن. */
+  async function saveDomain() {
+    setSaveError("");
+    setSaved(false);
+    setSaving(true);
+    try {
+      await onSaveDomain(domain.trim());
+      if (domain.trim()) setSaved(true);
+      else setOpen(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "ذخیره نشد. دوباره امتحان کن.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     setDomain(personalDomainValue(shop));
@@ -179,8 +198,19 @@ export function DomainMenu({
           id="shop-domain"
           dir="ltr"
           placeholder="shop.example.com"
+          inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="done"
           value={domain}
           onChange={(event) => setDomain(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              void saveDomain();
+            }
+          }}
         />
         {shop?.cnameTarget ? (
           <p className="wrap-any rounded-xl bg-canvas px-3 py-2 text-sm leading-6 text-muted" dir="ltr">
@@ -194,9 +224,19 @@ export function DomainMenu({
         ) : null}
         {shop?.cnameCheck?.detail ? <p className="text-sm leading-6 text-warm">{shop.cnameCheck.detail}</p> : null}
         {shop?.cnameSetup?.error ? <p className="text-sm leading-6 text-danger" role="alert">{shop.cnameSetup.error}</p> : null}
+        {saveError ? (
+          <p className="text-sm leading-6 text-danger" role="alert">
+            {saveError}
+          </p>
+        ) : null}
+        {saved ? (
+          <p className="text-sm leading-6 text-warm" role="status">
+            ذخیره شد. رکورد CNAME بالا را در پنل دامنه‌ات بگذار؛ وقتی DNS رسید وضعیت «درست» می‌شود.
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-2">
-          <Button type="button" disabled={busy} onClick={() => void onSaveDomain(domain).then(() => setOpen(false))}>
-            ذخیره دامنه
+          <Button type="button" disabled={busy || saving} onClick={() => void saveDomain()}>
+            {saving ? "در حال ذخیره…" : "ذخیره دامنه"}
           </Button>
           <Button
             type="button"
@@ -292,6 +332,8 @@ export function DomainMenu({
         aria-label={hostLabel ? `دامنه و انتشار؛ آدرس فروشگاه ${label}` : `دامنه و انتشار؛ ${label}`}
         onClick={() => {
           setDomain(personalDomainValue(shop));
+          setSaveError("");
+          setSaved(false);
           setOpen(true);
         }}
       >

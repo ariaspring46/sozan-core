@@ -938,6 +938,7 @@ async def apply_hero_image(shop: dict, root: Path, prompt: str) -> dict:
 
 
 EDIT_FAIL_ONE = "این تغییر روی صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
+CLARIFY_EDIT = "نفهمیدم چه چیزی عوض شود. مثلاً بگو «رنگ دکمه‌ها را زرشکی کن» یا روی یک متن در پیش‌نمایش بزن."
 EDIT_FAIL_MARKERS = ("صفحه ساخته نشد", "روی این صفحه پیدا نشد", "تیتر روی این صفحه پیدا نشد", "دوباره بفرست")
 
 
@@ -1030,9 +1031,9 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
     elif kind == "reject_foreign":
         text = "این پیام ویرایش فروشگاه نیست."
     elif kind == "ask_clarify":
-        text = str(action.get("reply") or "دقیق‌تر بگو.")
+        text = str(action.get("reply") or CLARIFY_EDIT)
     elif kind == "greet":
-        text = "فروشگاه زنده‌ست. صفحه را همین‌جا ببین و بگو چه عوض شود."
+        text = "خواهش می‌کنم! هر چه خواستی عوض شود بگو." if action.get("thanks") else "فروشگاه زنده‌ست. صفحه را همین‌جا ببین و بگو چه عوض شود."
     else:
         text = "تغییر روی همین صفحه اعمال شد." if ok else "این تغییر روی این صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
     if ok and frame_only and "کادر" not in text:
