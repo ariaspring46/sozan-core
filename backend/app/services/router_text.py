@@ -146,7 +146,9 @@ def strip_markdown(text: str) -> str:
 
 # "می" / "نمی" glued to a verb stem with no half-space: نمیکنم، میتوانم، میخوام، میشه، میدانم ...
 # Only stems that cannot start another word are listed: میز، میوه، میدان، میگو، میدیا، میگرن stay untouched.
-_L = r"(?![\u0600-\u06FF])"
+# letters only: «؛ ، ؟» sit inside \u0600-\u06FF too, and «نمیکنه؛» must still be repaired
+_LETTERS = "\u0621-\u064A\u0670-\u06D3"
+_L = rf"(?![{_LETTERS}])"
 _STEMS = (
     r"توان\w*", rf"تون(?:م|ی|ه|یم|ید|ن){_L}", r"خواه\w*", rf"خوا(?:م|ی|د|ه|یم|ید|ن){_L}", r"خوان\w*", r"خور\w*",
     rf"کن(?:م|ی|ه|د|یم|ید|ند|ن){_L}", rf"کش(?:م|ی|ه|د|یم|ید|ند){_L}", r"شو\w*", rf"ش(?:ه|م|ی|یم|ید|ن){_L}",
@@ -156,7 +158,7 @@ _STEMS = (
     r"پرس\w*", r"ساز\w*", r"سپار\w*", r"یاب\w*", r"افت\w*", r"ماند\w*", rf"بر(?:م|ی|ه|د|یم|ید|ن){_L}",
     rf"زن(?:م|ی|ه|د|یم|ید|ن){_L}",
 )
-_MI_VERB = re.compile(r"(?<![\u0600-\u06FF\u200c])(ن?می)(?=(?:" + "|".join(_STEMS) + "))")
+_MI_VERB = re.compile(rf"(?<![{_LETTERS}\u200c])(ن?می)(?=(?:" + "|".join(_STEMS) + "))")
 _COMPOUND = {
     "قیمتگذاری": "قیمت‌گذاری",
     "پیشنویس": "پیش‌نویس",
@@ -164,7 +166,7 @@ _COMPOUND = {
     "ویترینها": "ویترین‌ها",
 }
 # a word of three or more letters ending in a joining letter, then ها with no half-space: کیفها، باتریها
-_PLURAL = re.compile(r"([\u0600-\u06FF]{3,})ها(?![\u0600-\u06FF])")
+_PLURAL = re.compile(rf"([{_LETTERS}]{{3,}})ها(?![{_LETTERS}])")
 _JOINERS = set("بتثجحخسشصضطظعغفقکگلمنهیپچ")
 
 
@@ -219,3 +221,55 @@ def price_problem(text: str, price: int) -> str:
     if int(price or 0) > 10_000_000_000:
         return "این قیمت خیلی بالاست؛ عدد را دوباره بنویس."
     return ""
+
+
+# ---------------------------------------------------------------- what is (not) a shop build, what answers a question
+
+_NOT_LETTER = r"(?<![\u0621-\u064A\u0670-\u06D3])"
+_CONTENT = re.compile(_NOT_LETTER + r"(?:پست|کپشن|استوری|ریلز|بنر|تبلیغ)(?![\u0621-\u064A\u0670-\u06D3])")
+_CONTENT_SKIP = re.compile(r"پست\s*(?:پیشتاز|سفارشی|ایران)|با\s*پست|ارسال")
+_STORE_WORD = r"(?:فروشگاه|ویترین|سایت|وب.?سایت)"
+_NOT_CONTENT = r"(?:(?!پست|کپشن|استوری|ریلز|بنر|تبلیغ).){0,24}"
+_STORE_BUILD = re.compile(rf"{_STORE_WORD}{_NOT_CONTENT}(?:بساز|درست\s*کن|طراحی)|(?:بساز|درست\s*کن|طراحی){_NOT_CONTENT}{_STORE_WORD}")
+
+
+def is_content_request(text: str) -> bool:
+    """A post / caption / story request is never a shop build, even when the seller has no shop yet:
+    «برای انگشتر یک پست بساز» builds a post. «فروشگاه بساز، ارسال با پست پیشتاز» is still a shop."""
+    value = text or ""
+    if not _CONTENT.search(_CONTENT_SKIP.sub(" ", value)):
+        return False
+    return _STORE_BUILD.search(value) is None
+
+
+_COMPLAINT = re.compile(r"بد[یه]|هیچ|نمی.?کن|چرا|احمق|بی.?فایده|خراب|مزخرف|ضعیف|اشتباه")
+_BARE = {"بله", "آره", "نه", "نخیر", "باشه", "اوکی", "ok", "خب", "خوب", "آهان", "هوم"}
+
+
+def answers_ask(asked: str, spoken: str) -> bool:
+    """Whether `spoken` can be the answer to Sozan's own question, not a bare yes/no or a complaint
+    that only happens to be short (those are new turns; gluing them to the old request invents a command)."""
+    compact = re.sub(r"[\s؟?!.،]+", " ", spoken or "").strip().lower()
+    if not compact or compact in _BARE or _COMPLAINT.search(compact):
+        return False
+    if ("قیمت" in asked or "تومان" in asked) and not re.search(r"[\d۰-۹]", compact):
+        return False
+    return True
+
+
+_ACTION_CHIP = re.compile(r"(?:کن|بزن|بساز|بنویس|حذف|پاک|بفرست|منتشر|عوض|پنهان)(?![\u0621-\u064A\u0670-\u06D3])")
+
+
+def clean_options(question: str, options: list[str]) -> list[str]:
+    """Tap answers under a question must be answers: short, not commands («قیمت را پنهان کن»), and numbers for a price question.
+    A tap sends the text as the seller's next message, so a chip that is really a command would run something the seller never meant."""
+    price_question = "قیمت" in question or "تومان" in question
+    kept: list[str] = []
+    for item in options:
+        text = re.sub(r"\s+", " ", str(item)).strip()
+        if not text or len(text.split()) > 5 or len(text) > 40 or text in kept or _ACTION_CHIP.search(text):
+            continue
+        if price_question and not re.search(r"[\d۰-۹٠-٩]", text):
+            continue
+        kept.append(text)
+    return kept[:5]

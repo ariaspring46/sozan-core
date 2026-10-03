@@ -17,6 +17,10 @@ class ChatPayloadTests(unittest.TestCase):
             parse_chat_json({"text": ""})
         self.assertEqual(empty.exception.status_code, 400)
         self.assertIn("لازم", empty.exception.detail)
+        with self.assertRaises(HTTPException) as blank:
+            parse_chat_json({"text": "   \n  "})
+        self.assertEqual(blank.exception.status_code, 400)
+        self.assertIn("لازم", blank.exception.detail)
         with self.assertRaises(HTTPException) as long:
             parse_chat_json({"text": "ا" * 4001})
         self.assertEqual(long.exception.status_code, 400)

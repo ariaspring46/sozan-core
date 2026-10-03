@@ -40,22 +40,33 @@ def _site_path(src: str) -> str:
     return str(PurePosixPath("/" + path.lstrip("/")))
 
 
-def classify(src: str, products: list[dict]) -> tuple[str, str, dict | None]:
-    """(kind, file name, product row) for a picture path; kind is '' when it cannot be swapped."""
+def _row_by_product_path(product: str, products: list[dict]) -> dict | None:
+    """The inventory row of a storefront card path like /products/<id>."""
+    wanted = PurePosixPath(_site_path(product)).name if product else ""
+    if not wanted or not _site_path(product).startswith("/products/"):
+        return None
+    return next((row for row in products if str(row.get("id") or "") == wanted), None)
+
+
+def classify(src: str, products: list[dict], product: str = "") -> tuple[str, str, dict | None]:
+    """(kind, file name, product row) for a picture; kind is '' when it cannot be swapped.
+
+    `product` is the /products/<id> card the press sat in: a product with no photo yet (a placeholder, or nothing) still gets one."""
     path = _site_path(src)
     name = PurePosixPath(path).name if path else ""
-    if not name:
-        return "", "", None
     if name == "hero.png":
         return "hero", name, None
     if name == "brand-logo.png":
         return "logo", name, None
-    if path.startswith("/products/"):
+    if name and path.startswith("/products/"):
         for row in products:
             images = {Path(str(item)).name for item in (row.get("images") or [])}
             images.add(Path(str(row.get("image") or "")).name)
             if name in images:
                 return "product", name, row
+    row = _row_by_product_path(product, products)
+    if row is not None:
+        return "product", "", row
     return "", name, None
 
 
@@ -89,7 +100,7 @@ def _png_bytes(img: Image.Image, *, alpha: bool) -> bytes:
     return out.getvalue()
 
 
-def replace_image(shop: dict, data: bytes, content_type: str, filename: str, src: str) -> dict:
+def replace_image(shop: dict, data: bytes, content_type: str, filename: str, src: str, product: str = "") -> dict:
     from app.services import catalog_sync_service, shop_edit_service as edit, shop_undo_service, storefront_service
     from app.services.shop_service import PROTECTED_SHOP_SLUGS
 
@@ -100,7 +111,7 @@ def replace_image(shop: dict, data: bytes, content_type: str, filename: str, src
     if slug in PROTECTED_SHOP_SLUGS:
         raise ValueError("این فروشگاه را از اینجا نمی‌شود ویرایش کرد.")
     products = storefront_service.list_products().get("products") or []
-    kind, name, row = classify(src, products)
+    kind, name, row = classify(src, products, product)
     if not kind:
         raise ValueError(CANNOT)
     img = _open(data, content_type, filename)
@@ -145,12 +156,13 @@ def replace_image(shop: dict, data: bytes, content_type: str, filename: str, src
             if main and main not in old:
                 old.insert(0, main)
             stored = product_image_service.store(data, content_type, filename)
-            fresh = [stored if item == name else item for item in old]
+            # a known photo is replaced in place; a product without one (or with a placeholder) gets the photo as its first
+            fresh = [stored if item == name else item for item in old] if name in old else [stored, *old]
             meta["product"] = {"id": str(row.get("id") or ""), "images": old}
             storefront_service.update_product(str(row.get("id") or ""), {"images": fresh, "image": fresh[0]})
             sync = catalog_sync_service.sync_live(changed_images=[stored])
             needs_rebuild = not sync.get("live")
-            reply = f"عکس «{row.get('title') or 'کالا'}» عوض شد."
+            reply = f"عکس «{row.get('title') or 'کالا'}» {'عوض شد' if name in old else 'گذاشته شد'}."
     except Exception:
         edit._rollback_turn(shop, root, snap_name, [], tree_before, hero_before)
         if isinstance(meta.get("product"), dict):

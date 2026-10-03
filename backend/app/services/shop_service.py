@@ -1836,7 +1836,7 @@ def _interview_turn(text: str, brief: dict) -> str | None:
     return None
 
 
-async def _guided_turn(raw: str, rows: list[dict], brief: dict, shop: dict) -> str | None:
+async def _guided_turn(raw: str, rows: list[dict], brief: dict, shop: dict) -> dict | None:
     """The setup talk (shop_interview_service: assess, decide, speak); the fixed script is the fallback.
 
     A build starts only when the seller confirmed a proposal made on the previous turn (or typed «بساز» themselves
@@ -1852,25 +1852,28 @@ async def _guided_turn(raw: str, rows: list[dict], brief: dict, shop: dict) -> s
         return None
     turn = await shop_interview_service.turn(rows, brief, shop)
     if turn is None:
-        return _interview_turn(raw, brief)
+        scripted = _interview_turn(raw, brief)
+        return {"text": scripted} if scripted else None
     if turn.get("skip"):
         return None
     if not turn["build"]:
-        return str(turn["reply"])
+        return {"text": str(turn["reply"]), "options": turn.get("options") or []}
     result = start_build(prompt=raw, rebuild=bool(shop.get("slug")), revise_only=None)
     if not (result.get("ok") or result.get("queued")):
         detail = _operator_error(str(result.get("error") or result.get("message") or ""))
         if detail and detail != SAFE_BUILD and "مشکل موقت" not in detail:
-            return f"ساخت شروع نشد: {detail}"
-        return "ساخت الان ممکن نیست، چند دقیقهٔ دیگر."
+            return {"text": f"ساخت شروع نشد: {detail}"}
+        return {"text": "ساخت الان ممکن نیست، چند دقیقهٔ دیگر."}
     plain = "ساخت فروشگاه شروع شد. مرحله‌ها را همین‌جا می‌بینی."
-    return await shop_voice_service.say(
-        "build_started",
-        [plain, *shop_voice_service.brief_facts(onboard_service.get_brief())],
-        seller_text=raw,
-        fallback=plain,
-        patched=True,
-    )
+    return {
+        "text": await shop_voice_service.say(
+            "build_started",
+            [plain, *shop_voice_service.brief_facts(onboard_service.get_brief())],
+            seller_text=raw,
+            fallback=plain,
+            patched=True,
+        )
+    }
 
 
 def _pack(shop: dict, rows: list[dict], assistant: dict | None = None, extra: dict | None = None) -> dict:
@@ -1912,18 +1915,18 @@ def undo_edit() -> dict:
     return {**snapshot(), "patched": bool(out.get("patched")), "reply": out.get("reply") or "", "preview": out.get("preview") or {}}
 
 
-def replace_image(data: bytes, content_type: str, filename: str, src: str) -> dict:
+def replace_image(data: bytes, content_type: str, filename: str, src: str, product: str = "") -> dict:
     """Put a photo the seller uploaded in place of the picture they held a finger on."""
     from app.services import shop_image_service
 
     shop = _refresh_job(_shop())
     if str(shop.get("status") or "") in BUILD_BUSY:
         raise ValueError("سایت در حال بیلد است؛ بعد از تمام شدن عکس را عوض کن.")
-    out = shop_image_service.replace_image(shop, data, content_type, filename, src)
+    out = shop_image_service.replace_image(shop, data, content_type, filename, src, product)
     return {**snapshot(), "patched": True, "reply": out.get("reply") or "", "preview": out.get("preview") or {}, "kind": out.get("kind") or ""}
 
 
-async def chat(text: str, media: dict | None = None, view_path: str = "", view_target: str = "") -> dict:
+async def chat(text: str, media: dict | None = None, view_path: str = "", view_target: str = "", confirmed: bool = False) -> dict:
     from app.services import (
         channel_scan_service,
         chat_media_service,
@@ -1978,11 +1981,19 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
             assistant = {
                 "id": str(uuid4()),
                 "role": "assistant",
-                "text": guided,
+                "text": guided["text"],
                 "at": int(time.time()),
+                **({"kind": "ask", "options": guided["options"]} if guided.get("options") else {}),
             }
             _append_assistant(rows, assistant)
             return _pack(shop, rows, assistant)
+    if not media_only and live and _wants_full_rebuild(raw) and not confirmed:
+        # a typed «از نو بساز» replaces the whole site and clears the undo stack: ask once, the panel shows two buttons
+        plain = "از نو ساختن سایت فعلی را با طرح تازه عوض می‌کند و «برگشت» پاک می‌شود. همین را بسازم؟"
+        reply = await shop_voice_service.say("rebuild_confirm", [plain], seller_text=raw, fallback=plain)
+        assistant = {"id": str(uuid4()), "role": "assistant", "text": reply, "at": int(time.time()), "kind": "ask"}
+        _append_assistant(rows, assistant)
+        return _pack(shop, rows, assistant, {"needsConfirm": True})
     if not media_only and ((live and _explicit_rebuild(raw)) or (not live and _explicit_build(raw))):
         if not live and not onboard_service.brief_ready():
             missing = []

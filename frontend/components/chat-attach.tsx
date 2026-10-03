@@ -71,12 +71,12 @@ export function ChatAttach({ kind, name }: { kind: string; name: string }) {
       </button>
     );
   }
-  if (!url) return <div ref={holder} className="mt-2 h-24 w-full max-w-[14rem] animate-pulse rounded-2xl bg-paper/40" />;
+  if (!url) return <div ref={holder} className="sozan-shimmer mt-2 h-40 w-full rounded-2xl" aria-hidden />;
   if (kind === "image") {
-    return <img src={url} alt="" className="mt-2 max-h-52 w-auto max-w-full rounded-2xl object-cover" />;
+    return <img src={url} alt="" className="mt-2 max-h-80 w-full rounded-2xl border border-line/60 object-cover" />;
   }
   if (kind === "video") {
-    return <video src={url} className="mt-2 max-h-52 w-full rounded-2xl" controls playsInline />;
+    return <video src={url} className="mt-2 max-h-80 w-full rounded-2xl border border-line/60" controls playsInline />;
   }
   return <audio src={url} className="mt-2 w-full" controls />;
 }

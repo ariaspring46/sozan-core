@@ -6,7 +6,8 @@ import { Hammer, Undo2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { DomainMenu, shopPublicUrl, type ShopState } from "@/components/domain-menu";
 import { ShopLiveBuild, type BuildLive, type PreviewPatch } from "@/components/shop-live-build";
-import { ShopEditor, friendlyReply, type ShopMsg, type ShopSelection } from "@/components/shop-editor";
+import { ShopEditor, friendlyReply, selectionPhoto, type ShopMsg, type ShopSelection } from "@/components/shop-editor";
+import { ConfirmCard } from "@/components/chat-parts";
 import { ShopEditSheet } from "@/components/shop-edit-sheet";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,8 @@ type EditPayload = ShopPayload & {
   preview?: PreviewPatch;
   reply?: string;
   turn?: { rolledBack?: boolean; needsRebuild?: boolean };
+  /** «از نو بساز» تایپ‌شده: سایت را عوض نکرد و تأیید خواست. */
+  needsConfirm?: boolean;
 };
 type EditOutcome = { ok: boolean; patched: boolean; reply: string };
 
@@ -121,6 +124,7 @@ export default function ShopPage() {
   const [sheetError, setSheetError] = useState("");
   const [undoing, setUndoing] = useState(false);
   const [notice, setNotice] = useState("");
+  const [rebuildAsk, setRebuildAsk] = useState<{ text: string; command: string } | null>(null);
   const isMobile = useMediaQuery("(max-width: 1023px)");
   const prevStatus = useRef("");
   const buildKey = useRef(emptyIdempotencySlot());
@@ -158,6 +162,7 @@ export default function ShopPage() {
     const status = shop?.status || build?.status || "";
     if (prevStatus.current === "running" && status === "ready") {
       setPreviewKey((value) => value + 1);
+      setNotice("فروشگاه ساخته شد و همین حالا زنده است.");
     }
     prevStatus.current = status;
   }, [shop?.status, build?.status]);
@@ -243,22 +248,28 @@ export default function ShopPage() {
 
   /** یک دستور ویرایش به ویرایشگر زندهٔ فروشگاه؛ پیش‌نمایش بدون رفتن به چت به‌روز می‌شود. */
   const runEdit = useCallback(
-    async (text: string, opts?: { target?: string; viewPath?: string }): Promise<EditOutcome> => {
+    async (text: string, opts?: { target?: string; viewPath?: string; confirm?: boolean }): Promise<EditOutcome> => {
       const target = (opts?.target || "").trim();
       const path = opts?.viewPath || viewPath;
       setEditing(true);
       setError("");
       setSheetError("");
-      const stamp = `${path}\0${target}\0${text}`;
+      const stamp = `${path}\0${target}\0${text}\0${opts?.confirm ? "1" : ""}`;
       const key = takeIdempotencyKey(editKey.current, stamp);
       try {
         const data = await api<EditPayload>("/shop/chat", {
           method: "POST",
           headers: { "Idempotency-Key": key },
-          body: JSON.stringify({ text, viewPath: path, viewTarget: target }),
+          body: JSON.stringify({ text, viewPath: path, viewTarget: target, ...(opts?.confirm ? { confirm: true } : {}) }),
         });
         finishIdempotencyKey(editKey.current);
         apply(data);
+        if (data.needsConfirm) {
+          setRebuildAsk({ text: lastReply(data.messages), command: text });
+          if (isMobile) closeSheet();
+          return { ok: true, patched: false, reply: "" };
+        }
+        setRebuildAsk(null);
         const preview = data.preview || null;
         if (preview?.viewPath) setSeekPath(preview.viewPath);
         if (hasPatch(preview)) setApplyPatch({ ...preview, seq: Number(data.shop?.undoDepth || 0) });
@@ -316,15 +327,16 @@ export default function ShopPage() {
   /** عکس انتخاب‌شده را با عکس گوشی عوض می‌کند. */
   const replaceImage = useCallback(
     async (file: File) => {
-      const src = selection?.src || "";
-      if (!src) return false;
+      const photo = selection ? selectionPhoto(selection) : null;
+      if (!selection || !photo) return false;
       setEditing(true);
       setSheetError("");
       try {
         const small = await shrinkImage(file);
         const body = new FormData();
         body.append("file", small);
-        body.append("src", src);
+        body.append("src", photo.src);
+        if (selection.product) body.append("product", selection.product);
         const data = await api<EditPayload>("/shop/image", { method: "POST", body });
         apply(data);
         setApplyPatch({ reload: true, seq: Number(data.shop?.undoDepth || 0) });
@@ -338,13 +350,13 @@ export default function ShopPage() {
         setEditing(false);
       }
     },
-    [selection?.src, closeSheet],
+    [selection, closeSheet],
   );
 
   const onPick = useCallback(
     (picked: ShopSelection, longPress: boolean) => {
       const clean = { ...picked, text: picked.text.trim() };
-      if (!clean.text && !clean.tag && !clean.src) return;
+      if (!clean.text && !clean.tag && !clean.src && !clean.image) return;
       setSelection(clean);
       if (isMobile && longPress) {
         setNotice("");
@@ -450,13 +462,29 @@ export default function ShopPage() {
               clearPick={clearPick}
               compact={mobilePreview}
             />
-            {mobilePreview && notice ? (
+            {notice ? (
               <p
                 className="pointer-events-none absolute inset-x-3 top-3 z-30 rounded-2xl border border-accent/30 bg-paper/95 px-4 py-3 text-sm leading-7 text-ink shadow-card"
                 role="status"
               >
                 {friendlyReply(notice)}
               </p>
+            ) : null}
+            {rebuildAsk ? (
+              <div className="absolute inset-x-3 bottom-3 z-40">
+                <ConfirmCard
+                  tool="shop_chat"
+                  text={rebuildAsk.text}
+                  open
+                  busy={editing || busy}
+                  onConfirm={() => {
+                    const command = rebuildAsk.command;
+                    setRebuildAsk(null);
+                    void runEdit(command, { confirm: true });
+                  }}
+                  onCancel={() => setRebuildAsk(null)}
+                />
+              </div>
             ) : null}
             {mobilePreview && sheetOpen && selection ? (
               <>

@@ -72,7 +72,7 @@ Done when: every P0/P1 is fixed or has an acknowledged request in its owner's re
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.1k tokens. Your core files total 12.6k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.1k tokens. Your core files total 13.1k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -84,14 +84,14 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 12.6k | the files most tasks touch; read the relevant one first |
-| active | 66.1k | yours to edit; read only what the task needs |
-| rare | 32.5k | yours; read only when the task names it |
+| core | 13.1k | the files most tasks touch; read the relevant one first |
+| active | 74.1k | yours to edit; read only what the task needs |
+| rare | 33.0k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
 **Core:**
 
-- `frontend/app/globals.css` (5.6k)
+- `frontend/app/globals.css` (6.1k)
 - `frontend/tailwind.config.js` (0.4k)
 - `frontend/components/app-shell.tsx` (3.8k)
 - `frontend/lib/api.ts` (1.9k)
@@ -102,11 +102,11 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 - `./`: `talk-u.md` (5.8k)
 - `frontend/`: `tailwind.config.js` (0.4k), `package.json` (0.2k), `tsconfig.json` (0.2k), `next.config.ts` (0.0k)
-- `frontend/app/`: `globals.css` (5.6k), `page.tsx` (0.5k), `layout.tsx` (0.4k)
+- `frontend/app/`: `globals.css` (6.1k), `page.tsx` (0.5k), `layout.tsx` (0.4k)
 - `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (3.8k), `getting-started.tsx` (2.3k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
 - `frontend/components/ui/`: `button.tsx` (0.2k), `textarea.tsx` (0.1k), `select.tsx` (0.1k), `input.tsx` (0.1k), `card.tsx` (0.1k)
 - `frontend/lib/`: `api.ts` (1.9k), `theme.ts` (0.7k), `use-app-viewport.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.4k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
-- `tools/`: `ui_shop_mobile_probe.mjs` (6.8k), `ui_shop_probe.mjs` (6.5k), `ui_chat_probe.mjs` (6.1k), `ui_studio_probe.mjs` (3.7k), `ui_menu_probe.mjs` (2.8k), `ui_check.py` (1.4k)
+- `tools/`: `ui_shop_mobile_probe.mjs` (8.5k), `ui_shop_probe.mjs` (6.5k), `ui_chat_probe.mjs` (6.1k), `ui_chat_visual.mjs` (3.8k), `ui_studio_probe.mjs` (3.7k), `ui_menu_probe.mjs` (2.8k), `ui_chat_live.mjs` (1.9k), `ui_check.py` (1.4k)
 
 **Rare (yours; only when the task names it):**
 
@@ -118,7 +118,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/app/refund/`: `page.tsx` (0.2k)
 - `frontend/app/terms/`: `page.tsx` (0.4k)
 - `frontend/components/`: `auth-image.tsx` (0.5k), `auth-media.tsx` (1.5k), `landing-slogan-rotator.tsx` (0.4k), `legal-page.tsx` (0.8k), `login-coder-scene.tsx` (1.1k)
-- `frontend/public/`: `2326207.txt` (0.0k), `sozan-mark-256.webp` (0.0k), `sozan-mark-legacy.png` (0.0k), `sozan-mark.png` (0.0k), `sozan-preview-beacon.js` (4.5k)
+- `frontend/public/`: `2326207.txt` (0.0k), `sozan-mark-256.webp` (0.0k), `sozan-mark-legacy.png` (0.0k), `sozan-mark.png` (0.0k), `sozan-preview-beacon.js` (5.0k)
 - `frontend/public/fonts/`: `OFL-vazirmatn.txt` (1.4k), `OFL.txt` (1.4k), `estedad-arabic.woff2` (0.0k), `estedad-latin.woff2` (0.0k), `vazirmatn-var.woff2` (0.0k)
 - `tools/`: `ui_live_audit.mjs` (2.6k), `ui_mobile_audit.mjs` (8.5k)
 
@@ -194,7 +194,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `frontend/components/field.tsx`: `Field` (changed 2026-09-18) ← C, X2, X3, X5, Y
 - `frontend/components/getting-started.tsx`: `GettingStarted` (changed 2026-09-27) ← X1
 - `frontend/components/login-coder-scene.tsx`: `LoginCoderScene` (changed 2026-09-18) ← X3, X5
-- `frontend/components/sozan-mark.tsx`: `SozanMark` (changed 2026-09-18) ← C, X1, X3, X5
+- `frontend/components/sozan-mark.tsx`: `SozanMark` (changed 2026-09-18) ← C, X1, X3, X4, X5
 - `frontend/components/theme-toggle.tsx`: `ThemeToggle` (changed 2026-09-27) ← X5
 - `frontend/components/ui/button.tsx`: `Button` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y
 - `frontend/components/ui/card.tsx`: `Card` (changed 2026-09-18) ← C, X2, X3, X5, Y
@@ -202,7 +202,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `frontend/components/ui/select.tsx`: `Select` (changed 2026-09-18) ← C, X3, Y
 - `frontend/components/ui/textarea.tsx`: `Textarea` (changed 2026-09-18) ← C, X2, X3
 - `frontend/lib/api.ts`: `ApiError` (changed 2026-09-21) ← X3, X5; `Brand` (changed 2026-09-18) ← X2; `Campaign` (changed 2026-09-18) ← X2; `api` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-18) ← C; `chatMediaUrl` (changed 2026-09-18) ← X1; `clearToken` (changed 2026-09-18) ← X5; `fileUrl` (changed 2026-09-18) ← C; `getApiBase` (changed 2026-09-18) ← C, X2; `getOnboarded` (changed 2026-09-18) ← X3; `getToken` (changed 2026-09-18) ← X1, X2, X3; `setOnboarded` (changed 2026-09-18) ← X3, X5; `setToken` (changed 2026-09-18) ← X5; `timeoutSignal` (changed 2026-10-02) ← X1, X3
-- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← X1, X2, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← X5
+- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← X2, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← X5
 - `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-20) ← X1, X4, Y; `finishIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y; `takeIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y
 - `frontend/lib/utils.ts`: `cn` (changed 2026-09-18) ← X1, X2, X4, Y
 

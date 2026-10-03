@@ -37,8 +37,9 @@ const PAGE = (body) => `<!doctype html><html lang="fa" dir="rtl"><head><meta cha
 .hero h1{position:absolute;bottom:20px;right:16px;margin:0;color:#fff}.card{padding:16px}.card img{width:100%;height:200px;object-fit:cover}button{padding:14px 22px}</style></head><body>${body}
 <div style="height:1400px"></div><script src="/sozan-preview-beacon.js?v=live1" defer></script></body></html>`;
 const HOME_HTML = PAGE(`<header><a href="/products" id="nav-products">کالاها</a><a href="/cart">سبد</a></header>
-<section class="hero" id="hero"><div class="veil" id="veil"></div><h1 id="title">زیورآلات دست‌ساز نیشابور</h1></section>
+<section class="hero" id="hero"><div class="veil" id="veil"></div><p id="hero-copy" style="position:absolute;top:24px;right:16px;margin:0;color:#fff">مد و کفش</p><h1 id="title">زیورآلات دست‌ساز نیشابور</h1></section>
 <p id="lede" style="padding:0 16px">هر قطعه با دست ساخته می‌شود.</p>
+<a class="card" id="nophoto" href="/products/p1" style="display:block;text-decoration:none;color:#222"><h3 id="nph">کیف چرمی</h3><span>۹۰۰٬۰۰۰ تومان</span></a>
 <div class="card"><img id="prod" src="/_next/image?url=%2Fproducts%2Fa1.jpg&w=640&q=75" alt="انگشتر نقره"><h3 id="ptitle">انگشتر نقره</h3><button id="cta">مشاهده محصولات</button></div>`);
 const PRODUCTS_HTML = PAGE(`<header><a href="/" id="nav-home">خانه</a></header><h1 id="all" style="padding:16px">همه کالاها</h1>`);
 
@@ -57,7 +58,7 @@ async function boot(browser, { w = 390, h = 844 } = {}) {
       if (e.data && e.data.source === "sozan-preview") window.__previewMsgs.push(JSON.stringify(e.data.pick || e.data).slice(0, 200));
     });
   }, TOKEN);
-  const S = { pending: 0, undo: 0, building: false, chats: [], images: [], undos: 0, builds: [], bodies: [] };
+  const S = { pending: 0, undo: 0, building: false, chats: [], images: [], undos: 0, builds: [], chatBuilds: [], bodies: [] };
   const cap = [];
   await ctx.route(`https://${HOST}/**`, async (route) => {
     const url = new URL(route.request().url());
@@ -83,7 +84,21 @@ async function boot(browser, { w = 390, h = 844 } = {}) {
       return {
         ...base,
         shop: { ...base.shop, status: S.building ? "running" : "ready", slug: "qa-shop", publicHost: HOST, url: `https://${HOST}`, pendingBuild: S.pending, undoDepth: S.undo },
-        build: { ...(base.build || {}), status: S.building ? "running" : "ready", url: `https://${HOST}`, pipeline: [] },
+        build: {
+          ...(base.build || {}),
+          status: S.building ? "running" : "ready",
+          url: `https://${HOST}`,
+          stepLabel: S.building ? "در حال طراحی ظاهر و چیدن کالاها…" : "",
+          startedAt: S.building ? new Date(Date.now() - 38000).toISOString() : undefined,
+          pipeline: S.building
+            ? [
+                { id: "archetype", label: "فهم نوع فروشگاه", state: "done" },
+                { id: "DESIGN_CLOUD", label: "طراحی ظاهر", state: "active" },
+                { id: "COPY_TEMPLATE", label: "ساخت صفحه‌ها", state: "wait" },
+                { id: "DOCKER", label: "روشن کردن سایت", state: "wait" },
+              ]
+            : [],
+        },
         ...extra,
       };
     };
@@ -92,6 +107,13 @@ async function boot(browser, { w = 390, h = 844 } = {}) {
       const body = JSON.parse(req.postData() || "{}");
       S.chats.push(body);
       await sleep(500);
+      if (/از نو بساز/.test(body.text) && !body.confirm) {
+        return route.fulfill(json(await view({ patched: false, preview: {}, needsConfirm: true, messages: [{ id: "rb", role: "assistant", kind: "ask", text: "از نو ساختن سایت فعلی را عوض می‌کند و «برگشت» پاک می‌شود. همین را بسازم؟" }] })));
+      }
+      if (/از نو بساز/.test(body.text) && body.confirm) {
+        S.chatBuilds.push(body.text);
+        return route.fulfill(json(await view({ patched: false, preview: {}, messages: [{ id: "rb2", role: "assistant", text: "ساخت فروشگاه شروع شد." }] })));
+      }
       if (/نمی‌دانم/.test(body.text)) {
         return route.fulfill(json(await view({ patched: false, preview: {}, messages: [{ id: "q", role: "assistant", text: "منظورت کدام بخش است؟ بگو تا دقیق‌تر عوضش کنم." }] })));
       }
@@ -115,7 +137,7 @@ async function boot(browser, { w = 390, h = 844 } = {}) {
     }
     if (isPathname(url, "/shop/image") && method === "POST") {
       const raw = req.postDataBuffer()?.toString("latin1") || "";
-      S.images.push({ src: (/name="src"\r\n\r\n([^\r]*)/.exec(raw) || [])[1] || "", hasFile: /name="file"/.test(raw), bytes: raw.length });
+      S.images.push({ src: (/name="src"\r\n\r\n([^\r]*)/.exec(raw) || [])[1] || "", product: (/name="product"\r\n\r\n([^\r]*)/.exec(raw) || [])[1] || "", hasFile: /name="file"/.test(raw), bytes: raw.length });
       await sleep(400);
       S.pending += 1;
       S.undo += 1;
@@ -271,6 +293,26 @@ async function main() {
   await closeSheet(page);
   await sleep(300);
 
+  // 6b) a typed «از نو بساز» does not rebuild by itself: a confirm card with two buttons appears over the preview
+  await hold(cdp, await framePoint(page, "#lede"));
+  await page.locator("#shop-sheet-command").fill("فروشگاه را از نو بساز");
+  await page.getByRole("button", { name: "بفرست" }).click();
+  await sleep(1500);
+  const askCard = page.getByText("همین را بسازم؟").first();
+  const buildsBeforeAsk = S.chatBuilds.length;
+  rec("rebuild.asks-first", (await askCard.count()) === 1 && S.chats[S.chats.length - 1].confirm !== true && (await sheet(page).count()) === 0, "card shown, sheet closed, nothing built");
+  await shot(page, "04b-rebuild-confirm");
+  await page.getByRole("button", { name: "انصراف" }).click();
+  await sleep(300);
+  rec("rebuild.cancel-dismisses", (await page.getByText("همین را بسازم؟").count()) === 0 && S.chatBuilds.length === buildsBeforeAsk, "cancel closes the card and builds nothing");
+  await hold(cdp, await framePoint(page, "#lede"));
+  await page.locator("#shop-sheet-command").fill("فروشگاه را از نو بساز");
+  await page.getByRole("button", { name: "بفرست" }).click();
+  await sleep(1500);
+  await page.getByRole("button", { name: "تأیید" }).click();
+  await sleep(1200);
+  rec("rebuild.confirm-resends-with-flag", S.chats[S.chats.length - 1].confirm === true && S.chatBuilds.length === buildsBeforeAsk + 1, JSON.stringify(S.chats[S.chats.length - 1]));
+
   // 7) hold on the picture (an overlay sits on it): image sheet, upload goes to /shop/image with the picture's src
   const veilPoint = await framePoint(page, "#veil", 0.5, 0.3);
   await hold(cdp, veilPoint);
@@ -283,6 +325,26 @@ async function main() {
   await sleep(1800);
   rec("image.uploaded-with-src", S.images.length === before + 1 && /hero\.png/.test(S.images[S.images.length - 1]?.src || "") && S.images[S.images.length - 1].hasFile, JSON.stringify(S.images[S.images.length - 1] || {}).slice(0, 140));
   rec("image.sheet-closes", (await sheet(page).count()) === 0, "after the swap");
+
+  // 7b) words on top of the picture: the text can be edited AND the picture behind it can be swapped
+  await hold(cdp, await framePoint(page, "#hero-copy"));
+  const overText = (await sheet(page).count()) ? await sheet(page).innerText() : "";
+  await shot(page, "05b-sheet-text-over-image");
+  rec("hold.text-over-image-offers-both", /ثبت متن/.test(overText) && /عکس از گوشی/.test(overText) && /با هوش مصنوعی/.test(overText), overText.replace(/\s+/g, " ").slice(0, 110));
+  let beforeCount = S.images.length;
+  await page.locator('input[type="file"]').setInputFiles({ name: "x.png", mimeType: "image/png", buffer: PNG });
+  await sleep(1500);
+  rec("image.behind-text-swapped", S.images.length === beforeCount + 1 && /hero\.png/.test(S.images[S.images.length - 1]?.src || ""), JSON.stringify(S.images[S.images.length - 1] || {}).slice(0, 120));
+
+  // 7c) a product card that has no photo yet
+  await hold(cdp, await framePoint(page, "#nph"));
+  const noPhoto = (await sheet(page).count()) ? await sheet(page).innerText() : "";
+  rec("hold.product-without-photo", /افزودن عکس برای این کالا/.test(noPhoto), noPhoto.replace(/\s+/g, " ").slice(0, 110));
+  beforeCount = S.images.length;
+  await page.locator('input[type="file"]').setInputFiles({ name: "p.png", mimeType: "image/png", buffer: PNG });
+  await sleep(1500);
+  const sentLast = S.images[S.images.length - 1] || {};
+  rec("image.product-card-hint-sent", S.images.length === beforeCount + 1 && sentLast.product === "/products/p1" && sentLast.src === "", JSON.stringify(sentLast).slice(0, 140));
 
   // 8) product photo through next/image
   await hold(cdp, await framePoint(page, "#prod"));
@@ -318,6 +380,9 @@ async function main() {
   await shot(page, "07-building");
   rec("build.sent-as-revise", S.builds.length === 1 && S.builds[0].rebuild === true && S.builds[0].reviseOnly === true, JSON.stringify(S.builds[0] || {}));
   rec("build.locks-both-buttons", !building.build && !building.undo && /در حال بیلد/.test(building.label), building.label.replace(/\s+/g, " "));
+  const cover = await page.evaluate(() => ({ text: document.body.innerText.replace(/\s+/g, " "), bars: document.querySelectorAll('[role="progressbar"] > span').length }));
+  rec("build.progress-cover-shows-the-steps", /در حال طراحی ظاهر/.test(cover.text) && /فهم نوع فروشگاه/.test(cover.text) && cover.bars === 4, `bars=${cover.bars}`);
+  rec("build.cover-blocks-holding-the-half-built-site", (await sheet(page).count()) === 0, "no sheet while building");
   await sleep(7500);
   const done = { build: await enabled(page, "بیلد"), undo: await enabled(page, "برگشت") };
   rec("build.undo-disabled-after-build", !done.undo && !done.build && S.undo === 0, `build=${done.build} undo=${done.undo}`);

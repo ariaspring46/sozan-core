@@ -19,7 +19,24 @@ import { Button } from "@/components/ui/button";
 import { LinkText } from "@/components/link-text";
 
 export type ShopMsg = { id: string; role: "user" | "assistant"; text: string; at?: number };
-export type ShopSelection = { text: string; tag: string; kind?: "image" | "text" | "block"; src?: string; alt?: string };
+export type ShopSelection = {
+  text: string;
+  tag: string;
+  kind?: "image" | "text" | "block";
+  src?: string;
+  alt?: string;
+  /** عکسی که زیر متن یا داخل همین بخش است؛ با نگه داشتن روی نوشتهٔ روی عکس هم عوض‌کردنش ممکن است. */
+  image?: { src: string; alt?: string };
+  /** `/products/<id>` کارتی که بخش داخل آن است؛ کالای بی‌عکس هم با همین عکس می‌گیرد. */
+  product?: string;
+};
+
+/** عکس قابل‌عوض‌شدن این انتخاب (خود عکس، یا عکس پشت متن)، یا فقط کارت کالای بی‌عکس. */
+export function selectionPhoto(selection: ShopSelection): { src: string; alt?: string } | null {
+  if (selection.kind === "image" && selection.src) return { src: selection.src, alt: selection.alt };
+  if (selection.image?.src) return selection.image;
+  return selection.product ? { src: "", alt: "" } : null;
+}
 
 /** سقف متن اشاره‌شده در سرور (`viewTarget` تا ۸۰ نویسه). */
 export const TARGET_MAX = 80;

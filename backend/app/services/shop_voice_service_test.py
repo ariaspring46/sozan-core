@@ -16,6 +16,13 @@ class ReplyChecks(unittest.TestCase):
         self.assertFalse(voice.acceptable("Done! Your title was changed."))
         self.assertFalse(voice.acceptable("سایتت روی http://127.0.0.1:9000 باز است و آماده است."))
 
+    def test_markup_words_and_unfilled_slots_never_reach_the_seller(self) -> None:
+        self.assertFalse(voice.acceptable("تیتر h1 هنوز سر جایش است و حذف نشده، می‌خواهی بردارم؟"))
+        self.assertFalse(voice.acceptable("پیشنهادم این است که اسمش «بوتیک [نام شما]» باشد، همین را بسازم؟"))
+        self.assertFalse(voice.acceptable("اسم فروشگاه را {brand} می‌گذارم و شعارش را بعداً می‌گویم"))
+        self.assertTrue(voice.acceptable("اسمش را «نقره‌خانه» می‌گذارم، همین را بسازم یا چیزی را عوض کنم؟"))
+        self.assertEqual(voice.clean_reply("نمیکنم؛ فروشگاهت را میسازم"), "نمی‌کنم؛ فروشگاهت را می‌سازم")
+
     def test_a_quoted_fact_must_survive(self) -> None:
         keep = ["«نقرهٔ نیشابور»"]
         self.assertFalse(voice.acceptable("تیتر عوض شد و همین‌جا می‌بینی.", must_keep=["نقرهٔ نیشابور"]))

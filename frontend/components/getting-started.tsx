@@ -103,8 +103,8 @@ export function GettingStarted() {
   };
 
   return (
-    <section aria-label="شروع کار" className="mx-3 mt-3 overflow-hidden rounded-2xl border border-accent/30 bg-canvas shadow-card sm:mx-4">
-      <div className="flex items-center gap-1 p-1.5">
+    <section aria-label="شروع کار" className="mx-3 mt-2 shrink-0 overflow-hidden rounded-2xl border border-accent/30 bg-canvas shadow-sm sm:mx-4">
+      <div className="flex items-center gap-1 px-1.5 py-1">
         {next ? (
           <Link href={next.href} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl px-2.5 hover:bg-paper">
             <span className="shrink-0 rounded-full bg-paper px-2 py-0.5 text-xs text-warm">

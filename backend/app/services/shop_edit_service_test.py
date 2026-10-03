@@ -32,6 +32,16 @@ from app.state_store import tenant_scope
 
 
 class ShopEditPatchTests(unittest.TestCase):
+    def test_replies_never_show_a_tag_name_and_a_question_is_not_an_edit(self) -> None:
+        from app.services import shop_edit_service
+
+        text = shop_edit_service._reply_for_verify({"type": "delete_text", "target": "h1"}, {"ok": False})
+        self.assertNotIn("h1", text)
+        shown = shop_edit_service._reply_for_verify({"type": "delete_text", "target": "قیمت ویژه"}, {"ok": True})
+        self.assertIn("«قیمت ویژه»", shown)
+        for kind in ("ask_clarify", "reply_only", "greet"):
+            self.assertNotIn("بیلد", shop_edit_service._reply_for_verify({"type": kind, "reply": "x"}, {"ok": True}, frame_only=True), kind)
+
     def test_selected_heading_patches_brand_and_page(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

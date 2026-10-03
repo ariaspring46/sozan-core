@@ -1,5 +1,6 @@
 import asyncio
 import tempfile
+import time
 import unittest
 from unittest.mock import AsyncMock, patch
 
@@ -231,7 +232,10 @@ class Turns(unittest.TestCase):
         self.assertEqual(out["mode"], "propose")
         self.assertTrue(onboard_service.get_brief()["proposed"])
         self.assertFalse(onboard_service.brief_ready(onboard_service.get_brief()))  # a proposal is not yet the seller's word
-        yes, said = self._turn({"confirms_build": True, "confidence": 60}, "x", rows=[{"id": "2", "role": "user", "text": "آره بساز"}])
+        yes, said = self._turn(
+            {"confirms_build": True, "confidence": 60}, "x",
+            rows=[{"id": "1", "role": "assistant", "text": out["reply"]}, {"id": "2", "role": "user", "text": "آره بساز"}],
+        )
         self.assertTrue(yes["build"])
         said.assert_not_awaited()  # no words needed, the build starts
         brief = onboard_service.get_brief()
@@ -279,6 +283,27 @@ class Turns(unittest.TestCase):
         out, _ = self._turn({"confidence": 40, "missing": [{"slot": "name", "question": "اسمش چیست؟"}]}, "اسم فروشگاهت چیه؟", rows=[{"id": "9", "role": "user", "text": "آره"}])
         self.assertFalse(out["build"])
 
+    def test_a_proposal_goes_stale_after_half_an_hour_and_a_bare_yes_then_builds_nothing(self) -> None:
+        onboard_service.save_brief({"style": "boutique", "colors": "کرم"})
+        loop._save_state({"mode": "propose", "turns": 4, "at": time.time() - loop.PROPOSAL_TTL - 60})
+        out, _ = self._turn({"confidence": 40, "missing": [{"slot": "name", "question": "اسمش چیست؟"}]}, "اسم فروشگاهت چیه؟", rows=[{"id": "9", "role": "user", "text": "آره"}])
+        self.assertFalse(out["build"])
+        self.assertEqual(out["mode"], "ask")
+
+    def test_a_proposal_is_answered_only_when_it_is_still_the_last_thing_sozan_said(self) -> None:
+        onboard_service.save_brief({"style": "boutique", "colors": "کرم"})
+        proposal = "پیشنهاد من یک سایت گرم است. همین را بسازم یا چیزی را عوض کنم؟"
+        for assistant_last, builds in ((proposal, True), ("وضعیت: ساخت فروشگاه در جریان نیست.", False)):
+            loop._save_state({"mode": "propose", "turns": 4, "at": time.time(), "said": loop._squash(proposal)[:24]})
+            rows = [{"id": "a", "role": "assistant", "text": assistant_last}, {"id": "9", "role": "user", "text": "آره"}]
+            out, _ = self._turn({"confidence": 40, "missing": [{"slot": "name", "question": "اسمش چیست؟"}]}, "اسم فروشگاهت چیه؟", rows=rows)
+            self.assertEqual(out["build"], builds, assistant_last)
+
+    def test_a_reply_that_claims_the_build_already_started_is_never_shown(self) -> None:
+        out, _ = self._turn({"hurry": True, "suggest": {"style": "boutique", "colors": "کرم"}, "confidence": 20}, "باشه، همین را می‌سازم. همین را بسازم یا چیزی را عوض کنم؟")
+        self.assertNotIn("می‌سازم", out["reply"])
+        self.assertIn("بسازم", out["reply"])
+
     def test_after_the_build_the_interview_steps_aside(self) -> None:
         loop._save_state({"mode": "build", "turns": 6})
         with patch.object(voice, "complete_json", new=AsyncMock(side_effect=AssertionError("no model after the build started"))):
@@ -297,6 +322,24 @@ class Turns(unittest.TestCase):
         loop.reset()
         self.assertEqual(loop._state(), {})
         self.assertFalse(onboard_service.get_brief()["proposed"])
+
+
+class QuickAnswers(unittest.TestCase):
+    def test_taps_follow_the_question_just_asked(self) -> None:
+        style = loop.quick_answers("ask", _assessment(missing=[{"slot": "style", "question": "حس سایت؟"}]))
+        self.assertEqual(style[:3], ["لوکس و خلوت", "خیابانی و پرانرژی", "بوتیک گرم و خانوادگی"])
+        self.assertEqual(style[-1], loop.DELEGATE_ANSWER)
+        self.assertEqual(loop.quick_answers("ask", _assessment(missing=[{"slot": "story", "question": "داستان؟"}])), [])
+        self.assertEqual(loop.quick_answers("ask", _assessment(missing=[])), [])
+        yes = loop.quick_answers("propose", _assessment())
+        self.assertEqual(yes, ["آره، بساز", "چیزی را عوض کنم"])
+        self.assertTrue(loop.is_ack(yes[0]))
+        self.assertTrue(loop.is_delegate(loop.DELEGATE_ANSWER))
+        self.assertFalse(loop.is_ack(yes[1]))
+
+    def test_a_tap_answer_is_understood_by_the_loop(self) -> None:
+        for answer in ("لوکس و خلوت", "کرم و قهوه‌ای", "از دایرکت اینستاگرام", "فقط کالاها"):
+            self.assertFalse(loop.is_ack(answer), answer)  # these are content, not a yes
 
 
 class GuidedTurn(unittest.TestCase):
@@ -323,15 +366,15 @@ class GuidedTurn(unittest.TestCase):
         with patch.object(voice, "complete_json", new=AsyncMock(return_value={"reply": "شروع کردم؛ پیشرفتش را در صفحهٔ «فروشگاه» می‌بینی."})):
             out, start = self._guided("آره، شروع کن", {"reply": "", "build": True, "mode": "build"})
         start.assert_called_once()
-        self.assertIn("شروع کردم", out)
+        self.assertIn("شروع کردم", out["text"])
 
     def test_a_refused_build_is_not_announced(self) -> None:
         out, start = self._guided("آره، شروع کن", {"reply": "", "build": True, "mode": "build"}, build={"ok": False, "error": ""})
-        self.assertNotIn("شروع شد", out)
+        self.assertNotIn("شروع شد", out["text"])
 
     def test_no_model_means_the_old_script(self) -> None:
         out, _ = self._guided("یه فروشگاه می‌خوام", None, brief={})
-        self.assertEqual(out, shop_service.STYLE_Q)
+        self.assertEqual(out, {"text": shop_service.STYLE_Q})
 
     def test_a_stepping_aside_interview_leaves_the_message_to_the_shop_chat(self) -> None:
         out, start = self._guided("همینو بساز", {"reply": "", "build": False, "mode": "build", "skip": True}, brief={})

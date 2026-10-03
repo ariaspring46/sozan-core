@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +30,15 @@ def _idempotency_key(request: Request) -> str:
     return (request.headers.get("Idempotency-Key") or request.headers.get("X-Idempotency-Key") or "").strip()
 
 
+def _confirmed(raw: bytes) -> bool:
+    """The panel re-sends a command with `"confirm": true` after the seller pressed the confirm button."""
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return False
+    return isinstance(body, dict) and body.get("confirm") is True
+
+
 @router.post("/chat")
 async def shop_chat(request: Request, _user=Depends(require_permission("campaigns:write"))):
     key = _idempotency_key(request)
@@ -38,7 +48,7 @@ async def shop_chat(request: Request, _user=Depends(require_permission("campaign
     if cached is not None:
         return cached
     text, media, view_path, view_target, _confirm, _cancel, _thread = await read_chat_payload(request)
-    out = await shop_service.chat(text, media, view_path, view_target)
+    out = await shop_service.chat(text, media, view_path, view_target, confirmed=_confirmed(raw))
     idempotency_service.put("shop-chat", key, out, stamp)
     return out
 
@@ -92,10 +102,11 @@ async def shop_undo(request: Request, _user=Depends(require_permission("campaign
 async def shop_image(
     file: UploadFile = File(...),
     src: str = Form("", max_length=2000),
+    product: str = Form("", max_length=300),
     _user=Depends(require_permission("campaigns:write")),
 ):
     data = await file.read()
     try:
-        return await asyncio.to_thread(shop_service.replace_image, data, file.content_type or "", file.filename or "photo.jpg", src)
+        return await asyncio.to_thread(shop_service.replace_image, data, file.content_type or "", file.filename or "photo.jpg", src, product)
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

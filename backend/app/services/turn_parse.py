@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
+from app.services import turn_subject
+
 _DATA = Path(__file__).resolve().parent.parent / "data"
 _WORD = r"(?<![\u0600-\u06FF\w]){token}(?![\u0600-\u06FF\w])"
 
@@ -78,7 +80,7 @@ def _subject(text: str, data: dict) -> str:
     for drop in drops:
         cleaned = cleaned.replace(drop, " ")
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" ،؛.")
-    return cleaned[:36]
+    return turn_subject.guard(cleaned, text)[:36]
 
 
 # «رمز» فقط وقتی کلمهٔ مستقل است؛ در «قرمز» و «رمزگذاری» پنهان نیست.
