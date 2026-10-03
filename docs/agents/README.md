@@ -6,9 +6,9 @@ Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Eac
 
 | role | area | harness | core | active | rare | tests | report file |
 |---|---|---|---|---|---|---|---|
-| X1 | Router and panel chat | [X1.md](X1.md) (9.7k) | 41.8k | 114.0k | 9.8k | 36.4k | `talk-x1.md` |
-| X2 | Studio, images and brand content | [X2.md](X2.md) (10.2k) | 41.3k | 82.5k | 53.6k | 32.5k | `talk-x2.md` |
-| X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (10.3k) | 15.5k | 74.2k | 1.2k | 34.6k | `talk-x3.md` |
+| X1 | Router and panel chat | [X1.md](X1.md) (9.7k) | 42.4k | 114.6k | 9.8k | 37.8k | `talk-x1.md` |
+| X2 | Studio, images and brand content | [X2.md](X2.md) (10.2k) | 41.3k | 82.6k | 53.6k | 32.5k | `talk-x2.md` |
+| X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (10.3k) | 15.5k | 74.5k | 1.2k | 35.0k | `talk-x3.md` |
 | X4 | Shop build and live editing | [X4.md](X4.md) (9.8k) | 31.1k | 105.2k | 2.3k | 46.5k | `talk-x4.md` |
 | X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (12.1k) | 21.8k | 78.9k | 19.7k | 49.7k | `talk-x5.md` |
 | Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (9.7k) | 32.5k | 65.8k | 19.8k | 36.0k | `sales-agent-talk.md` |

@@ -34,7 +34,9 @@ class RouterServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.embed_off = patch("app.services.router_embed.rescue_tool", new=AsyncMock(return_value=""))
-        self.patches = [patch.object(settings, "state_dir", self.tmp.name), self.embed_off]
+        # channels count as connected unless a test says otherwise (publish cards are only shown for a channel that can send)
+        self.plugged = patch("app.services.studio_publish_service.channel_block", return_value="")
+        self.patches = [patch.object(settings, "state_dir", self.tmp.name), self.embed_off, self.plugged]
         for item in self.patches:
             item.start()
 
@@ -538,6 +540,84 @@ class RouterServiceTests(unittest.TestCase):
         self.assertEqual(hidden["pendingConfirm"]["id"], cid)
         self.assertIn("انجام نشد", hidden["messages"][-1]["text"])
         self.assertNotIn("secret-trace", hidden["messages"][-1]["text"])
+
+    def test_open_card_trimmed_out_of_history_is_shown_again(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        first = self._turn("پیش‌نویس", complete)
+        cid = first["pendingConfirm"]["id"]
+        with tenant_scope("09129900001"):
+            tid = first["threadId"]
+            # the confirm row fell out of the last MAX_MESSAGES rows (09145642532 was told to tap a card that was not there)
+            rows = [row for row in first["messages"] if row.get("confirmId") != cid]
+            write_json(f"router-{tid}-messages.json", rows)
+            shown = router_service.snapshot(tid)
+        last = shown["messages"][-1]
+        self.assertEqual((last.get("kind"), last.get("confirmId")), ("confirm", cid))
+        self.assertEqual(shown["pendingConfirm"]["id"], cid)
+        self.assertEqual(sum(1 for row in shown["messages"] if row.get("confirmId") == cid), 1)
+        self.assertEqual(sum(1 for row in first["messages"] if row.get("confirmId") == cid), 1)
+
+    def test_a_new_job_replaces_the_open_card_but_a_bare_yes_still_needs_it(self) -> None:
+        modes = iter(["draft", "send"])
+
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": next(modes)}}]}
+
+        first = self._turn("پیش‌نویس جواب‌ها", complete)
+        old = first["pendingConfirm"]["id"]
+        held = self._turn("آره", complete)
+        self.assertEqual(held["pendingConfirm"]["id"], old)
+        self.assertIn("دکمه", held["messages"][-1]["text"])
+        out = self._turn("جواب‌ها خودکار فرستاده شود", complete)
+        self.assertIsNotNone(out["pendingConfirm"])
+        self.assertNotEqual(out["pendingConfirm"]["id"], old)
+        self.assertNotIn("نوشتن «بله» کافی نیست", out["messages"][-1]["text"])
+
+    def test_no_send_card_for_a_channel_that_is_not_connected(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "publish_post", "arguments": {"platform": "instagram"}}]}
+
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "m1",
+                        "role": "assistant",
+                        "text": "آماده",
+                        "campaignId": "c1",
+                        "captions": {"instagram": "رژ لب دراگون"},
+                        "attachments": [{"kind": "image", "name": "ig-feed.png", "source": "ig-feed.png"}],
+                    }
+                ],
+            )
+        sent = AsyncMock()
+        with patch(
+            "app.services.studio_publish_service.channel_block",
+            return_value="این کانال وصل نیست. از بیشتر → کانال‌ها حساب را ثبت کن.",
+        ), patch("app.services.studio_publish_service.publish", new=sent):
+            out = self._turn("پست رو بفرست اینستاگرام", complete)
+        sent.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("وصل نیست", out["messages"][-1]["text"])
+
+    def test_status_names_each_channel_once(self) -> None:
+        text = router_service._format_status(
+            {
+                "channels": [
+                    {"platform": "instagram", "handle": "", "connected": False},
+                    {"platform": "instagram", "handle": "", "connected": False},
+                    {"platform": "telegram", "handle": "@shop", "connected": True},
+                ]
+            }
+        )
+        self.assertIn("کانال‌ها: اینستاگرام وصل نیست، تلگرام (shop) وصل است", text)
+
+    def test_colloquial_what_can_you_do_gets_the_capability_list(self) -> None:
+        for text in ("کلا چ کارهایی برام انجام میدی", "چیکار میکنی برام"):
+            self.assertEqual(router_service._direct_reply(text), router_service._CAPABILITY, text)
 
     def test_attachment_is_stored_and_link_reaches_model(self) -> None:
         seen: dict = {}

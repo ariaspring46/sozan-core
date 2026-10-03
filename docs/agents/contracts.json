@@ -2667,6 +2667,14 @@
    "X5"
   ]
  },
+ "backend/app/services/studio_publish_service.py::channel_block": {
+  "owner": "X2",
+  "signature": "def channel_block(platform: str) -> str",
+  "since": "2026-10-03",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/studio_publish_service.py::publish": {
   "owner": "X2",
   "signature": "async def publish(*, platform: str, caption: str, media_name: str, media_kind: str, message_id: str='', campaign_id: str='', force: bool=False, recipient_id: str='') -> dict",
