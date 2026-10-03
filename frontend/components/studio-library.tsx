@@ -212,7 +212,7 @@ function LibraryCard({ item, now, draft }: { item: LibraryItem; now: number; dra
               <li key={`${item.id}-${asset.relPath}`}>
                 <div className="mb-1 flex items-center justify-between gap-2">
                   <p className="text-xs text-muted">{labelOf(asset)}</p>
-                  <button type="button" className="tap inline-flex items-center gap-1 text-xs text-warm" onClick={() => void save(asset)}>
+                  <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-xl px-3 text-xs text-warm hover:bg-paper" onClick={() => void save(asset)}>
                     <Download size={13} aria-hidden="true" />
                     دانلود
                   </button>
