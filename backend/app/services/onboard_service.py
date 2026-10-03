@@ -48,11 +48,27 @@ def brief_block() -> str:
     brief = get_brief()
     if not brief:
         return "مصاحبه فروشگاه هنوز تمام نشده."
+    extra = [
+        f"{label}: {brief[key]}"
+        for key, label in (
+            ("audience", "مشتری‌ها"),
+            ("story", "داستان برند"),
+            ("brandName", "اسم و شعار"),
+            ("tone", "لحن"),
+            ("order", "سفارش و ارسال"),
+            ("reference", "طرح موردعلاقهٔ فروشنده"),
+            ("avoid", "نباید در سایت باشد"),
+        )
+        if str(brief.get(key) or "").strip()
+    ]
+    wishes = [str(item) for item in brief.get("wishes") or [] if str(item).strip()]
+    if wishes:
+        extra.append("خواسته‌های ویژهٔ فروشنده (اولویت بالا، تا حد ممکن اجرا شود): " + "؛ ".join(wishes))
     return (
         f"سبک سایت: {brief.get('style') or '—'}\n"
         f"رنگ‌ها: {brief.get('colors') or '—'}\n"
         f"ویژگی‌ها: {brief.get('features') or '—'}\n"
-        f"نکته کاربر: {brief.get('notes') or '—'}"
+        f"نکته کاربر: {brief.get('notes') or '—'}" + "".join(f"\n{line}" for line in extra)
     )
 
 

@@ -1,11 +1,8 @@
 import asyncio
-import tempfile
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from app.config import settings
-from app.services import onboard_service, shop_service, shop_voice_service as voice
-from app.state_store import tenant_scope
+from app.services import shop_voice_service as voice
 
 
 def _run(coro):
@@ -100,86 +97,6 @@ class SayTests(unittest.TestCase):
         lie = {"reply": "حله، رنگ را عوض کردم و روی سایت آمد."}
         with patch.object(voice, "complete_json", new=AsyncMock(return_value=lie)):
             self.assertEqual(_run(voice.say("edit_not_done", ["رنگ پیدا نشد."], fallback="F", patched=False)), "F")
-
-
-class InterviewTests(unittest.TestCase):
-    def setUp(self) -> None:
-        patcher = patch.object(voice, "_capped", return_value=False)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-    def _turn(self, payload: dict, brief: dict | None = None):
-        with patch.object(voice, "complete_json_chat", new=AsyncMock(return_value=payload)), patch.object(
-            voice, "_catalog_lines", return_value="کالایی نیست."
-        ):
-            return _run(voice.interview_turn([{"id": "1", "role": "user", "text": "انگشتر نقره می‌فروشم"}], brief or {}, {"brand": "نقره‌خانه"}))
-
-    def test_turn_carries_reply_brief_and_flags(self) -> None:
-        out = self._turn(
-            {"reply": "چه خوب! مشتری‌هات بیشتر چه سنی هستند و دوست داری سایت چه حسی داشته باشد؟", "brief": {"style": "boutique", "audience": "زن‌های جوان"}, "ready": False}
-        )
-        self.assertIn("مشتری‌هات", out["reply"])
-        self.assertEqual(out["brief"], {"style": "boutique", "audience": "زن‌های جوان"})
-        self.assertFalse(out["ready"] or out["build"])
-
-    def test_unusable_model_output_means_fallback_to_the_script(self) -> None:
-        self.assertIsNone(self._turn({"error": "llm_unreachable"}))
-        self.assertIsNone(self._turn({"reply": "ok"}))
-
-
-class GuidedTurnTests(unittest.TestCase):
-    def _guided(self, raw: str, turn: dict | None, brief: dict, shop: dict | None = None):
-        shop = {"status": "idle", "slug": "", "brand": "نقره‌خانه", **(shop or {})}
-        with patch.object(voice, "interview_turn", new=AsyncMock(return_value=turn)), patch.object(
-            shop_service, "start_build", return_value={"ok": True}
-        ) as start:
-            out = _run(shop_service._guided_turn(raw, [], brief, shop))
-        return out, start
-
-    def test_the_brief_grows_from_the_model_and_nothing_builds_by_itself(self) -> None:
-        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-            turn = {"reply": "عالی؛ رنگ‌ها چی باشد؟ مثلاً چیزی که با نقره بنشیند.", "brief": {"style": "atelier", "audience": "خانم‌های شهری"}, "ready": False, "build": True}
-            out, start = self._guided("لوکس و خلوت", turn, onboard_service.get_brief())
-            self.assertEqual(out, turn["reply"])
-            start.assert_not_called()  # build=True is not enough without a style and colours
-            brief = onboard_service.get_brief()
-            self.assertEqual(brief["style"], "atelier")
-            self.assertEqual(brief["audience"], "خانم‌های شهری")
-            self.assertFalse(brief["proposed"])
-
-    def test_a_seller_who_says_go_starts_the_build(self) -> None:
-        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-            onboard_service.save_brief({"style": "atelier", "colors": "کرم و مشکی"})
-            turn = {"reply": "باشه، همین الان شروع می‌کنم.", "brief": {}, "ready": True, "build": True}
-            out, start = self._guided("آره، شروع کن", turn, onboard_service.get_brief())
-            self.assertEqual(out, turn["reply"])
-            start.assert_called_once()
-            asked, start = self._guided("شروع کنم؟", turn, onboard_service.get_brief())
-            start.assert_not_called()  # a question is not an order
-
-    def test_a_build_the_factory_refuses_is_not_announced(self) -> None:
-        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-            onboard_service.save_brief({"style": "atelier", "colors": "کرم و مشکی", "proposed": True})
-            turn = {"reply": "باشه، همین الان شروع می‌کنم.", "brief": {}, "ready": True, "build": True}
-            shop = {"status": "idle", "slug": "", "brand": "x"}
-            with patch.object(voice, "interview_turn", new=AsyncMock(return_value=turn)), patch.object(
-                shop_service, "start_build", return_value={"ok": False, "error": ""}
-            ):
-                out = _run(shop_service._guided_turn("آره، شروع کن", [], onboard_service.get_brief(), shop))
-            self.assertNotIn("شروع می‌کنم", out)
-
-    def test_model_failure_falls_back_to_the_old_script(self) -> None:
-        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-            out, _ = self._guided("یه فروشگاه می‌خوام", None, {})
-            self.assertEqual(out, shop_service.STYLE_Q)
-
-    def test_no_interview_while_building_or_after_the_shop_exists(self) -> None:
-        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-            turn = {"reply": "یک چیزی بگو.", "brief": {}, "ready": False, "build": False}
-            self.assertIsNone(self._guided("سلام", turn, {}, {"status": "running"})[0])
-            done = {"style": "atelier", "colors": "کرم"}
-            self.assertIsNone(self._guided("سلام", turn, done, {"slug": "x", "status": "failed"})[0])
-            self.assertIsNone(self._guided("بساز", turn, done)[0])
 
 
 if __name__ == "__main__":

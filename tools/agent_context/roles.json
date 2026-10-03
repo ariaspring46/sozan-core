@@ -278,6 +278,8 @@
         "backend/app/services/shop_undo_service_test.py",
         "backend/app/services/shop_image_service.py",
         "backend/app/services/shop_voice_service.py",
+        "backend/app/services/shop_interview_service.py",
+        "backend/app/services/shop_interview_service_test.py",
         "backend/app/services/shop_voice_service_test.py",
         "tools/agentic_probes/p_shop_edit.py",
         "tools/agentic_probes/p_shop_create_page.py",
