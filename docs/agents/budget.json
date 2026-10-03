@@ -3,14 +3,14 @@
  "owned_source_max": 80000,
  "roles": [
   {
-   "active": 114556,
-   "core": 42376,
-   "core_pct": 94,
+   "active": 116206,
+   "core": 42728,
+   "core_pct": 95,
    "id": "X1",
    "loose_contracts": 2,
    "manifest": 9732,
    "rare": 9801,
-   "tests": 37775
+   "tests": 38194
   },
   {
    "active": 82618,
@@ -83,7 +83,7 @@
    "tests": 16166
   },
   {
-   "active": 87273,
+   "active": 88171,
    "core": 15522,
    "core_pct": 34,
    "id": "U",
@@ -93,7 +93,7 @@
    "tests": 0
   },
   {
-   "active": 214066,
+   "active": 214195,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",

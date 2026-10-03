@@ -286,6 +286,17 @@ _CONFIRMISH = frozenset(
 )
 
 
+_CARD_ASK = re.compile(r"کجا|نیست|نمیاد|نمی‌?آید|نمی‌?بینم|پیدا|دوباره|بفرس|وجود|نداره|ندارد|کدوم|کدام")
+
+
+def asks_for_card(text: str) -> bool:
+    """«دکمهٔ تأیید کجاست؟ / دکمه تایید نیست / دوباره بفرس دکمه رو»: said while a card waits, the answer is the card itself."""
+    raw = text or ""
+    if "دکمه" in raw:
+        return True
+    return "کارت" in raw and "کارت به کارت" not in raw and "کارت‌به‌کارت" not in raw and bool(_CARD_ASK.search(raw))
+
+
 def is_confirmish(text: str) -> bool:
     """A bare «آره / تأیید زدم / نه»: said while a card is open it needs the card's buttons. Anything else (a question, a new
     topic) is answered normally; a write tool is still held back while the card is open."""

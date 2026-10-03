@@ -126,7 +126,7 @@ def _flush_trace(out: dict) -> None:
         handle.write(json.dumps(safe, ensure_ascii=False) + "\n")
 _PERSIAN = re.compile(r"[\u0600-\u06FF]")
 _UNSAFE_ERROR = re.compile(r"[/\\]|traceback|\.py\b|https?://|exception", re.I)
-HOLD_PENDING = "اول دکمهٔ «تأیید» یا «انصراف» روی کارتِ منتظر را بزن؛ نوشتن «بله» کافی نیست. اگر کار دیگری می‌خواهی، همان را بگو."
+HOLD_PENDING = "کارت همین زیر است: برای انجام «تأیید» و برای کنار گذاشتن «انصراف» را بزن؛ نوشتن «بله» کافی نیست. اگر کار دیگری می‌خواهی، همان را بگو."
 
 TOOLS = [
     {
@@ -1952,13 +1952,24 @@ async def _execute(
     _append_user(original, media if isinstance(media, dict) else None)
     spoken = _merge_followup(spoken)
     choice = decide(spoken, view_path, view_target)
-    if choice["kind"] == "direct":
+    # «دکمهٔ تأیید کجاست / بالای صفحه نمیاد» is about the waiting card, not a page to build: it wins over the direct replies
+    card_ask = pending_open and choice["kind"] != "tool" and router_text.asks_for_card(spoken)
+    if choice["kind"] == "direct" and not card_ask:
         _trace(path="gate")
         direct_text = str(choice.get("text") or "")
         _append("assistant", await _voice(spoken, direct_text, situation="direct"), **_clarify_extra(direct_text))
         return snapshot()
-    if pending_open and router_text.is_confirmish(spoken):
+    if card_ask or (pending_open and router_text.is_confirmish(spoken)):
+        # the card itself comes back under the answer, buttons and all («the card above» sent a seller hunting for hours)
+        _trace(path="gate")
         await _say(spoken, HOLD_PENDING, "card_waiting")
+        _append(
+            "assistant",
+            str(pending.get("summary") or "این کار منتظر تأیید توست."),
+            kind="confirm",
+            confirmId=str(pending.get("id") or ""),
+            tool=str(pending.get("tool") or ""),
+        )
         return snapshot()
 
     history = _chooser_history(spoken)

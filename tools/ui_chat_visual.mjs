@@ -37,6 +37,12 @@ const SCENES = {
     { id: "1", role: "user", text: "برای انگشتر نقره یک پست اینستاگرام بساز", at: now - 60 },
     { id: "2", role: "assistant", kind: "confirm", confirmId: "c1", tool: "studio_chat", at: now - 50, text: "پست اینستاگرام برای «انگشتر نقره» ساخته شود؟ عکس و کپشن آماده می‌شود و فقط وقتی بگویی منتشر می‌شود." },
   ],
+  // a card the seller scrolled past: the conversation went on below it (09145642532 never found the button)
+  confirm_old: [
+    { id: "1", role: "user", text: "چندتا برند هستن. اسماشونو بفرستم؟", at: now - 900 },
+    { id: "2", role: "assistant", kind: "confirm", confirmId: "c3", tool: "publish_post", at: now - 890, text: "این پست در اینستاگرام منتشر شود؟ «رژ لب و خط لب دراگون»" },
+    ...Array.from({ length: 14 }, (_, i) => ({ id: `o${i}`, role: i % 2 ? "assistant" : "user", text: i % 2 ? "فروشگاه هنوز ساخته نشده؛ بگو از کجا شروع کنیم." : "ساخت ویترین از صفر", at: now - 800 + i * 20 })),
+  ],
   confirm_build: [
     { id: "1", role: "user", text: "فروشگاه را از نو بساز", at: now - 60 },
     { id: "2", role: "assistant", kind: "confirm", confirmId: "c2", tool: "shop_chat", at: now - 50, text: "فروشگاه از نو ساخته شود؟ سایت فعلی با طرح تازه جایگزین می‌شود و چند دقیقه طول می‌کشد." },
@@ -77,7 +83,7 @@ async function shoot(browser, scene, { w = 390, h = 844, dark = false, busy = fa
   });
   const json = (body) => ({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(body) });
   const messages = SCENES[scene];
-  const pending = scene === "confirm" ? { id: "c1" } : scene === "confirm_build" ? { id: "c2" } : null;
+  const pending = scene === "confirm" ? { id: "c1" } : scene === "confirm_build" ? { id: "c2" } : scene === "confirm_old" ? { id: "c3" } : null;
   await page.route(`${API}/**`, async (route) => {
     const req = route.request();
     const p = new URL(req.url()).pathname;
@@ -143,6 +149,34 @@ async function interactions(browser) {
   await page.getByRole("button", { name: "انصراف", exact: true }).click();
   await sleep(1500);
   rec("card.cancel-posts-its-id", posts.length === 1 && posts[0].cancelId === "c1", JSON.stringify(posts[0] || {}));
+  rec("dock.hidden-while-the-card-is-on-screen", (await page.getByRole("region", { name: "کار منتظر تأیید" }).count()) === 0);
+  await ctx.close();
+
+  // a waiting card scrolled out of sight: its buttons sit above the composer, and the title brings the card back
+  ({ ctx, page } = await shoot(browser, "confirm_old", { name: "dock" }));
+  const dock = page.getByRole("region", { name: "کار منتظر تأیید" });
+  const dockInfo = await dock.evaluate((el) => ({
+    text: el.textContent.trim(),
+    btns: [...el.querySelectorAll("button")].map((b) => Math.round(b.getBoundingClientRect().height)),
+    bottom: Math.round(el.getBoundingClientRect().bottom),
+    composer: Math.round(document.querySelector("textarea").getBoundingClientRect().top),
+  })).catch(() => null);
+  rec("dock.shows-when-the-card-is-off-screen", Boolean(dockInfo && dockInfo.text.includes("ارسال پست") && dockInfo.bottom <= dockInfo.composer), JSON.stringify(dockInfo));
+  rec("dock.buttons-44px", Boolean(dockInfo && dockInfo.btns.length === 3 && dockInfo.btns.every((h) => h >= 44)), JSON.stringify(dockInfo?.btns));
+  posts.length = 0;
+  await dock.getByRole("button", { name: /^تأیید/ }).click();
+  await sleep(1500);
+  rec("dock.confirm-posts-the-card-id", posts.length === 1 && posts[0].confirmId === "c3", JSON.stringify(posts[0] || {}));
+  await ctx.close();
+  ({ ctx, page } = await shoot(browser, "confirm_old", { name: "dock-jump" }));
+  await page.getByRole("button", { name: /نشان دادن کارت/ }).click();
+  await sleep(1200);
+  const jumped = await page.evaluate(() => {
+    const card = document.querySelector('[data-confirm="c3"]')?.getBoundingClientRect();
+    return { top: Math.round(card?.top ?? -1), bottom: Math.round(card?.bottom ?? -1), vh: innerHeight };
+  });
+  rec("dock.title-scrolls-to-the-card", jumped.top >= 0 && jumped.bottom <= jumped.vh, JSON.stringify(jumped));
+  rec("dock.hides-once-the-card-is-seen", (await page.getByRole("region", { name: "کار منتظر تأیید" }).count()) === 0);
   await ctx.close();
 
   // the typing bubble sits on the assistant's side while the reply is awaited

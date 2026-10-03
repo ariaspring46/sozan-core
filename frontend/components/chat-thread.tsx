@@ -13,6 +13,7 @@ import {
   BuildNote,
   ComposeWait,
   ConfirmCard,
+  PendingDock,
   QuickReplies,
   RevealText,
   shortWhen,
@@ -130,6 +131,10 @@ export function ChatThread({
   useEffect(() => {
     if (!busy) setTapped({});
   }, [busy]);
+  const tap = (id: string, how: "confirm" | "cancel") => {
+    setTapped((prev) => ({ ...prev, [id]: how }));
+    (how === "confirm" ? onConfirm : onCancel)?.(id);
+  };
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
   /** آخرین جایی که خود برنامه گفتگو را به آن برد؛ رویداد scroll در همان‌جا کار کاربر نیست. */
@@ -205,7 +210,7 @@ export function ChatThread({
 
               if (msg.kind === "confirm") {
                 return (
-                  <div key={msg.id} className={cn("flex flex-col", side)}>
+                  <div key={msg.id} data-confirm={msg.confirmId} className={cn("flex flex-col", side)}>
                     <article className="w-full max-w-[92%]">
                       <ConfirmCard
                         tool={msg.tool}
@@ -213,18 +218,8 @@ export function ChatThread({
                         open={Boolean(msg.confirmId && onConfirm && msg.confirmId === confirmId)}
                         busy={busy}
                         tapped={tapped[msg.confirmId || ""]}
-                        onConfirm={() => {
-                          setTapped((prev) => ({ ...prev, [msg.confirmId || ""]: "confirm" }));
-                          onConfirm?.(msg.confirmId || "");
-                        }}
-                        onCancel={
-                          onCancel
-                            ? () => {
-                                setTapped((prev) => ({ ...prev, [msg.confirmId || ""]: "cancel" }));
-                                onCancel(msg.confirmId || "");
-                              }
-                            : undefined
-                        }
+                        onConfirm={() => tap(msg.confirmId || "", "confirm")}
+                        onCancel={onCancel ? () => tap(msg.confirmId || "", "cancel") : undefined}
                       />
                       {showTime && msg.at ? <p className="mt-1 px-1 text-[11px] text-muted/80">{shortWhen(msg.at)}</p> : null}
                     </article>
@@ -438,7 +433,23 @@ export function ChatThread({
         placeholder={placeholder}
         allowMedia={allowMedia}
         aspects={aspects}
-        banner={banner}
+        banner={
+          <>
+            {confirmId && onConfirm ? (
+              <PendingDock
+                cardId={confirmId}
+                tool={messages.findLast((row) => row.confirmId === confirmId)?.tool}
+                busy={busy}
+                tapped={tapped[confirmId]}
+                scroller={scrollerRef}
+                version={messages.length}
+                onConfirm={() => tap(confirmId, "confirm")}
+                onCancel={onCancel ? () => tap(confirmId, "cancel") : undefined}
+              />
+            ) : null}
+            {banner}
+          </>
+        }
         away={away && messages.length > 0}
         onJump={() => {
           stickRef.current = true;

@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ReactNode, RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, CheckCircle2, Hammer, ImageIcon, Megaphone, MessageSquareText, Package, PencilRuler, Send, Sparkles, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
@@ -202,6 +202,87 @@ export function ConfirmCard({
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * کارت منتظر تأیید که الان روی صفحه نیست (بالاتر رفته یا گفتگو جلو رفته): نوار کوچک بالای کادر نوشتن با همان دو دکمه.
+ * فروشنده‌ای (۰۹۱۴۵۶۴۲۵۳۲) کارت را پیدا نکرد و چت ساعت‌ها فقط «دکمهٔ تأیید را بزن» می‌گفت؛ دکمه باید همیشه دمِ دست باشد.
+ */
+export function PendingDock({
+  cardId,
+  tool,
+  busy,
+  tapped,
+  scroller,
+  version,
+  onConfirm,
+  onCancel,
+}: {
+  cardId: string;
+  tool?: string;
+  busy: boolean;
+  tapped?: "confirm" | "cancel";
+  scroller: RefObject<HTMLDivElement | null>;
+  /** با هر پیام تازه دوباره می‌سنجد کارت دیده می‌شود یا نه. */
+  version: number;
+  onConfirm: () => void;
+  onCancel?: () => void;
+}) {
+  const [cardInView, setCardInView] = useState(true);
+  const cards = () => [...(scroller.current?.querySelectorAll<HTMLElement>(`[data-confirm="${CSS.escape(cardId)}"]`) || [])];
+  useEffect(() => {
+    const root = scroller.current;
+    const found = cards();
+    if (!root || !found.length || typeof IntersectionObserver === "undefined") {
+      setCardInView(false);
+      return;
+    }
+    const seen = new Map<Element, boolean>();
+    const watch = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) seen.set(entry.target, entry.isIntersecting);
+        setCardInView([...seen.values()].some(Boolean));
+      },
+      { root, threshold: 0.75 },
+    );
+    found.forEach((card) => watch.observe(card));
+    return () => watch.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardId, scroller, version]);
+  if (cardInView) return null;
+  const spec = CONFIRM_KIND[tool || ""] || { title: "تأیید کار", icon: Check };
+  const Icon = spec.icon;
+  return (
+    <div role="region" aria-label="کار منتظر تأیید" className="sozan-card sozan-rise flex items-center gap-2 rounded-[1.3rem] p-1.5 ps-2">
+      <button
+        type="button"
+        className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-2xl text-start"
+        aria-label={`${spec.title}، منتظر تأیید توست؛ نشان دادن کارت`}
+        onClick={() => cards().pop()?.scrollIntoView({ block: "center", behavior: "smooth" })}
+      >
+        <span className="sozan-tile flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">
+          <Icon size={16} aria-hidden />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[11px] text-warm">{tapped === "confirm" ? "در حال انجام…" : tapped === "cancel" ? "لغو شد" : "منتظر تأیید توست"}</span>
+          <span className="block truncate text-sm font-bold text-ink">{spec.title}</span>
+        </span>
+      </button>
+      {tapped ? null : (
+        <>
+          <Button type="button" className="sozan-send shrink-0 gap-1.5 rounded-2xl px-4" disabled={busy} onClick={onConfirm}>
+            <Check size={16} aria-hidden />
+            تأیید
+          </Button>
+          {onCancel ? (
+            <Button type="button" variant="ghost" className="shrink-0 rounded-2xl border-line/60 bg-transparent px-3" disabled={busy} onClick={onCancel}>
+              انصراف
+            </Button>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

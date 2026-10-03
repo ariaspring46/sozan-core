@@ -443,7 +443,8 @@ class RouterServiceTests(unittest.TestCase):
         cid = first["pendingConfirm"]["id"]
         out = self._turn("بله", complete)
         self.assertEqual(out["pendingConfirm"]["id"], cid)
-        self.assertIn("تأیید", out["messages"][-1]["text"])
+        self.assertIn("تأیید", out["messages"][-2]["text"])
+        self.assertEqual(out["messages"][-1].get("confirmId"), cid)
 
     def test_read_passes_while_card_is_open(self) -> None:
         async def opening(_messages, _tools):
@@ -569,11 +570,29 @@ class RouterServiceTests(unittest.TestCase):
         old = first["pendingConfirm"]["id"]
         held = self._turn("آره", complete)
         self.assertEqual(held["pendingConfirm"]["id"], old)
-        self.assertIn("دکمه", held["messages"][-1]["text"])
+        self.assertIn("تأیید", held["messages"][-2]["text"])
+        self.assertEqual((held["messages"][-1].get("kind"), held["messages"][-1].get("confirmId")), ("confirm", old))
         out = self._turn("جواب‌ها خودکار فرستاده شود", complete)
         self.assertIsNotNone(out["pendingConfirm"])
         self.assertNotEqual(out["pendingConfirm"]["id"], old)
         self.assertNotIn("نوشتن «بله» کافی نیست", out["messages"][-1]["text"])
+
+    def test_asking_where_the_button_is_brings_the_card_back(self) -> None:
+        calls = {"model": 0}
+
+        async def complete(_messages, _tools):
+            calls["model"] += 1
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        cid = self._turn("پیش‌نویس جواب‌ها", complete)["pendingConfirm"]["id"]
+        for text in ("دکمه تایید کجاست؟", "دوباره بفرس دکمه تایید رو برام", "دکمه تایید یا انصراف بالای صفحه نمیاد", "کارت رو پیدا نمی‌کنم"):
+            out = self._turn(text, complete)
+            last = out["messages"][-1]
+            self.assertEqual((last.get("kind"), last.get("confirmId")), ("confirm", cid), text)
+            self.assertEqual(out["pendingConfirm"]["id"], cid, text)
+            self.assertNotIn("بالای صفحه", out["messages"][-2]["text"], text)
+        self.assertEqual(calls["model"], 1)
+        self.assertFalse(router_service.router_text.asks_for_card("پرداخت کارت به کارت هست؟"))
 
     def test_no_send_card_for_a_channel_that_is_not_connected(self) -> None:
         async def complete(_messages, _tools):
