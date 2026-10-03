@@ -107,7 +107,15 @@ export function AppShell({
     let pointerDown = false;
     let recheckLater = false;
     const recheck = () => setTyping(isField(document.activeElement));
-    const onIn = (event: FocusEvent) => setTyping(isField(event.target));
+    // فوکوس رفتن به یک دکمه هنگام فشردن (Chrome اندروید) هم نباید وسط ضربه نوار پایین را برگرداند.
+    const onIn = (event: FocusEvent) => {
+      const field = isField(event.target);
+      if (!field && pointerDown) {
+        recheckLater = true;
+        return;
+      }
+      setTyping(field);
+    };
     const onOut = () =>
       window.setTimeout(() => {
         if (pointerDown) recheckLater = true;

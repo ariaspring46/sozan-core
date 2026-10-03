@@ -16,6 +16,22 @@ def _nolock(_name: str = "studio"):
     yield
 
 
+
+_VOICE_PATCHES: list = []
+
+
+def setUpModule() -> None:
+    # The assistant's own voice (shop_voice_service) asks the cloud model; tests that are not about it take the plain fallbacks.
+    for name in ("complete_json", "complete_json_chat"):
+        started = patch(f"app.services.shop_voice_service.{name}", new=AsyncMock(return_value={"error": "llm_unreachable"}))
+        started.start()
+        _VOICE_PATCHES.append(started)
+
+
+def tearDownModule() -> None:
+    while _VOICE_PATCHES:
+        _VOICE_PATCHES.pop().stop()
+
 class FakeCampaigns:
     def __init__(self) -> None:
         self.created = 0
@@ -488,6 +504,26 @@ class StudioChatTests(unittest.TestCase):
             drop_unclaimed=True,
         )
         self.assertIn("دست‌ساز", claimed["instagram"])
+
+    def test_the_sellers_own_caption_is_saved_as_typed(self) -> None:
+        typed = "گردنبند فیروزه ✨\nارسال رایگان برای مشهد، ضمانت اصالت\n\nBrand: Zara-style\n#فیروزه #Mashhad"
+        out = studio_chat_service._seller_captions({"instagram": typed, "telegram": typed + "\r\n\r\n\r\n", "whatsapp": ""})
+        self.assertEqual(out["instagram"], typed)
+        self.assertIn("ارسال رایگان", out["telegram"])
+        self.assertIn("#Mashhad", out["telegram"])
+        self.assertNotIn("\r", out["telegram"])
+        self.assertEqual(out["whatsapp"], "")
+        long = studio_chat_service._seller_captions({"instagram": "الف" * 5000, "telegram": "", "whatsapp": ""})
+        self.assertEqual(len(long["instagram"]), studio_chat_service.CAPTION_LIMITS["instagram"])
+
+    def test_model_text_is_still_guarded_but_marketing_words_stay(self) -> None:
+        out = studio_chat_service._clip_captions(
+            {"instagram": "کیفیت بالا و ارسال رایگان برای همه", "telegram": "سلام", "whatsapp": "سلام"},
+            spoken="یک پست بساز",
+            drop_unclaimed=True,
+        )
+        self.assertIn("کیفیت بالا", out["instagram"])
+        self.assertNotIn("ارسال رایگان", out["instagram"])
 
     def test_no_text_on_photo_clears_overlay(self) -> None:
         self.assertTrue(studio_chat_service._no_overlay_text("عکس انگشتر بساز؛ روی عکس هیچ نوشته‌ای نباشد"))

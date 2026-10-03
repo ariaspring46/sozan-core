@@ -67,7 +67,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 19.8k | the files most tasks touch; read the relevant one first |
-| active | 57.5k | yours to edit; read only what the task needs |
+| active | 57.6k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
 | tests | 16.2k | read only the test of the module you change |
 
@@ -331,9 +331,9 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `backend/app/services/arvan_dns_service.py`: `check_cname` (changed 2026-09-18) ← X4; `cname_target` (changed 2026-09-18) ← X4; `edge_dry` (changed 2026-09-27) ← X4, X5, Y; `ensure_shop_record` (changed 2026-09-18) ← X4; `hostname` (changed 2026-09-18) ← X4; `is_zone_host` (changed 2026-09-18) ← X4; `public_host` (changed 2026-09-18) ← X4; `start_cname_setup` (changed 2026-09-18) ← X4; `zone` (changed 2026-09-18) ← X4
 - `backend/app/services/catalog_sync_service.py`: `sync_live` (changed 2026-09-18) ← X1, X4
 - `backend/app/services/pay_service.py`: `create_order` (changed 2026-09-19) ← Y; `ensure_pay_secret` (changed 2026-09-18) ← X4; `get_order` (changed 2026-09-18) ← Y; `public_order` (changed 2026-09-18) ← Y
-- `backend/app/services/storefront_service.py`: `add_product` (changed 2026-09-18) ← X4; `clear_scanned_catalog` (changed 2026-09-18) ← X3; `count_scanned_handle` (changed 2026-09-19) ← X3; `list_products` (changed 2026-09-18) ← X1, X2, X3, X4, Y; `list_sales` (changed 2026-09-18) ← X5; `price_label` (changed 2026-09-18) ← X4; `referenced_image_names` (changed 2026-09-18) ← X2; `remove_product_by_title` (changed 2026-09-18) ← X1, X4; `remove_scanned_handle` (changed 2026-09-18) ← X3; `retitle_scanned_from_captions` (changed 2026-09-18) ← X5; `upsert_scanned_product` (changed 2026-09-18) ← X3
+- `backend/app/services/storefront_service.py`: `add_product` (changed 2026-09-18) ← X4; `clear_scanned_catalog` (changed 2026-09-18) ← X3; `count_scanned_handle` (changed 2026-09-19) ← X3; `list_products` (changed 2026-09-18) ← X1, X2, X3, X4, Y; `list_sales` (changed 2026-09-18) ← X5; `price_label` (changed 2026-09-18) ← X4; `referenced_image_names` (changed 2026-09-18) ← X2; `remove_product_by_title` (changed 2026-09-18) ← X1, X4; `remove_scanned_handle` (changed 2026-09-18) ← X3; `retitle_scanned_from_captions` (changed 2026-09-18) ← X5; `update_product` (changed 2026-10-03) ← X4; `upsert_scanned_product` (changed 2026-09-18) ← X3
 - `backend/app/services/support_service.py`: `create_ticket` (changed 2026-09-29) ← X5; `list_all_tickets_for_hub_admin` (changed 2026-09-29) ← X5; `list_tickets` (changed 2026-09-29) ← X5; `reply_hub_ticket` (changed 2026-10-01) ← X5
-- `frontend/components/domain-menu.tsx`: `DomainMenu` (changed 2026-09-18) ← X4; `ShopState` (changed 2026-09-19) ← X4; `shopHostLabel` (changed 2026-09-18) ← X4; `shopPublicUrl` (changed 2026-09-18) ← X4
+- `frontend/components/domain-menu.tsx`: `DomainMenu` (changed 2026-09-18) ← X4; `ShopState` (changed 2026-10-03) ← X4; `shopHostLabel` (changed 2026-09-18) ← X4; `shopPublicUrl` (changed 2026-09-18) ← X4
 - `frontend/components/shop-settings-form.tsx`: `ShopSettingsForm` (changed 2026-09-18) ← X5
 - `frontend/lib/site-host.ts`: `isPanelHost` (changed 2026-09-18) ← U; `panelOriginFromHost` (changed 2026-09-18) ← U
 

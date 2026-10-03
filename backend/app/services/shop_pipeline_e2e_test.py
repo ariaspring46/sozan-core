@@ -4,13 +4,29 @@ import asyncio
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 from app.config import settings
 from app.services import shop_edit_service, shop_service
 from app.services.shop_route_service import classify_turn, shop_state
 from app.state_store import tenant_scope
 
+
+
+_VOICE_PATCHES: list = []
+
+
+def setUpModule() -> None:
+    # The assistant's own voice (shop_voice_service) asks the cloud model; tests that are not about it take the plain fallbacks.
+    for name in ("complete_json", "complete_json_chat"):
+        started = patch(f"app.services.shop_voice_service.{name}", new=AsyncMock(return_value={"error": "llm_unreachable"}))
+        started.start()
+        _VOICE_PATCHES.append(started)
+
+
+def tearDownModule() -> None:
+    while _VOICE_PATCHES:
+        _VOICE_PATCHES.pop().stop()
 
 class ShopPipelineScenarioTests(unittest.TestCase):
     def test_onboarding_to_ready_states(self) -> None:

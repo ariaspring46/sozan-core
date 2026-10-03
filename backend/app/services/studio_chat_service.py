@@ -25,6 +25,7 @@ STUDIO_SYSTEM = """تو استودیوی محتوای سوزان هستی. فق�
 اسم کالا باید در هر سه کپشن بیاید.
 imagePrompt یک جملهٔ انگلیسی است و ویژگی نگفته را در آن نیاور. اگر کالا گردنبند است بنویس full necklace laid out in a long loop. واژهٔ فارسی ممنوع.
 editKind یکی از background، scene، none است. background یعنی فقط پس‌زمینه عوض شود. scene یعنی کالا داخل صحنهٔ تازه برود، مثل جعبه یا دست یا کنار شیء دیگر.
+reply را مثل یک همکار خودمانی و کوتاه بنویس (یک تا سه جمله): بگو چه ساخته‌ای و اگر چیزی کپشن را بهتر می‌کند (قیمت، مناسبت، تخفیف، عکس بهتر) یک سؤال کوتاه بپرس. جملهٔ قالبی نگو.
 جملهٔ «در حال ساخت» را ننویس؛ کد آن را اضافه می‌کند.
 instagram حدود ۲۵۰ تا ۴۰۰ کاراکتر، telegram حداکثر ۴۰۰، whatsapp حداکثر ۲۸۰."""
 STUB_COPY = frozenset({"متن فارسی", "تیتر کوتاه", "title", "reply", "cta", "subtitle", "کمپین جدید", "ببین"})
@@ -135,7 +136,7 @@ def _save(rows: list[dict]) -> None:
 
 
 _CLAIM_WORDS = ("خالص", "طلا", "الماس", "یاقوت", "عیار", "پلاتین", "برلیان")
-_FLUFF = ("کیفیت بالا", "منحصر به فرد")
+_FLUFF: tuple[str, ...] = ()  # marketing adjectives are the model's job; only claims about the product are guarded
 _SALES_CLAIMS = ("چرم طبیعی", "قابل سفارش", "ارسال رایگان", "ضمانت", "قیمت مناسب")
 _HASHTAG_GUARDED = ("طلا", "الماس", "یاقوت", "پلاتین", "برلیان", "نقره", "چرم", "ابریشم", "فیروزه", "طبیعی", "ضمانت", "رایگان", "پرفروش", "دستساز", "دست‌ساز", "لاکچری", "فانتزی", "بدل", "بدلی")
 _BACKSTAGE = ("عکس", "تصویر", "پس‌زمینه", "پس زمینه", "آماده شد", "آماده می‌کنیم", "آماده ميكنيم", "زاویه", "زاويه")
@@ -1206,10 +1207,19 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         payload={"role": "user", "text": safe_text(spoken), "id": user_msg["id"]},
     )
     if _is_greeting(spoken) and not media:
+        from app.services import shop_voice_service
+
+        plain = "بگو برای اینستاگرام، تلگرام یا واتساپ چه پستی می‌خواهی. تصویر کالا را هم می‌توانی پیوست کنی."
         assistant = {
             "id": str(uuid4()),
             "role": "assistant",
-            "text": "بگو برای اینستاگرام، تلگرام یا واتساپ چه پستی می‌خواهی. تصویر کالا را هم می‌توانی پیوست کنی.",
+            "text": await shop_voice_service.say(
+                "studio_greeting",
+                ["فروشنده سلام کرده. از اینجا می‌شود برای اینستاگرام، تلگرام یا واتساپ پست و کپشن ساخت و عکس کالا را هم پیوست کرد."],
+                seller_text=spoken,
+                fallback=plain,
+                surface="studio",
+            ),
             "at": int(time.time()),
         }
         rows = _put_assistant(assistant, into_id)
@@ -1460,8 +1470,23 @@ def recently_published(message_id: str, platform: str, window: int = 60) -> bool
     return False
 
 
+_CTRL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _seller_captions(captions: dict) -> dict:
+    """What the seller typed is theirs: the claim, hashtag and sentence guards are for model text. Only length and control
+    characters are handled, line breaks, hashtags, Latin brand names and the seller's own offers (ارسال رایگان…) stay."""
+    out = {}
+    for key, limit in CAPTION_LIMITS.items():
+        text = _CTRL_CHARS.sub("", str(captions.get(key) or "")).replace("\r\n", "\n").replace("\r", "\n")
+        text = re.sub(r"[ \t]+\n", "\n", text)
+        text = re.sub(r"\n{3,}", "\n\n", text).strip()
+        out[key] = text[:limit]
+    return out
+
+
 def update_captions(message_id: str, captions: dict) -> dict:
-    clipped = _clip_captions(captions if isinstance(captions, dict) else {})
+    clipped = _seller_captions(captions if isinstance(captions, dict) else {})
     campaign_id = ""
 
     def apply(row: dict) -> None:

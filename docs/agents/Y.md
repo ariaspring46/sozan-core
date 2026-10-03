@@ -228,7 +228,7 @@ def recall(scope: str, key: str, stamp: str) -> Any | None  # changed 2026-09-24
 ARVAN_HOST_SUFFIX = 'arvancloudai.ir'  # changed 2026-09-21
 INBOX_TURN_BUDGET = 30.0  # changed 2026-09-27
 LLM_BAD_JSON = {'reply': 'مدل پاسخ خوانا نداد. پیام را کوتاه\u200cتر دوباره بفرست.', 'error': 'llm_bad_json'}  # changed 2026-09-18
-async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict  # changed 2026-09-18
+async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700, temperature: float=0.2) -> dict  # changed 2026-10-03
 async def complete_tools(*, messages: list[dict], tools: list[dict], temperature: float=0.2, max_tokens: int=ROUTER_MAX_TOKENS, timeout: float | None=None, surface: str='router') -> dict  # Tool-call round. Router and inbox are cloud-first.  # changed 2026-09-27
 def spoken_model_reply(text: str) -> str  # changed 2026-09-18
 ```

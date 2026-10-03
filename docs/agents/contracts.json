@@ -1533,7 +1533,8 @@
   "signature": "def kind_of(content_type: str, filename: str) -> str | None",
   "since": "2026-09-18",
   "users": [
-   "X2"
+   "X2",
+   "X4"
   ]
  },
  "backend/app/services/chat_media_service.py::resolve": {
@@ -1745,13 +1746,21 @@
  },
  "backend/app/services/llm.py::complete_json": {
   "owner": "X5",
-  "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict",
-  "since": "2026-09-18",
+  "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700, temperature: float=0.2) -> dict",
+  "since": "2026-10-03",
   "users": [
    "X2",
    "X3",
    "X4",
    "Y"
+  ]
+ },
+ "backend/app/services/llm.py::complete_json_chat": {
+  "owner": "X5",
+  "signature": "async def complete_json_chat(*, system: str, turns: list[dict], surface: str='shop', temperature: float=0.7, max_tokens: int=900, plain_ok: bool=False) -> dict",
+  "since": "2026-10-03",
+  "users": [
+   "X4"
   ]
  },
  "backend/app/services/llm.py::complete_tools": {
@@ -2062,7 +2071,8 @@
   "signature": "def store(data: bytes, content_type: str, filename: str) -> str",
   "since": "2026-09-18",
   "users": [
-   "C"
+   "C",
+   "X4"
   ]
  },
  "backend/app/services/profile_service.py::TONES": {
@@ -2429,6 +2439,14 @@
    "X1"
   ]
  },
+ "backend/app/services/shop_voice_service.py::say": {
+  "owner": "X4",
+  "signature": "async def say(situation: str, facts: list[str], *, seller_text: str='', fallback: str, patched: bool | None=None, surface: str='shop') -> str",
+  "since": "2026-10-03",
+  "users": [
+   "X2"
+  ]
+ },
  "backend/app/services/sms_service.py::PROVIDERS": {
   "owner": "X3",
   "shape": "PROVIDERS = ({'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'}, {'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'})",
@@ -2547,6 +2565,14 @@
   "since": "2026-09-18",
   "users": [
    "X5"
+  ]
+ },
+ "backend/app/services/storefront_service.py::update_product": {
+  "owner": "C",
+  "signature": "def update_product(product_id: str, patch: dict) -> dict",
+  "since": "2026-10-03",
+  "users": [
+   "X4"
   ]
  },
  "backend/app/services/storefront_service.py::upsert_scanned_product": {
@@ -2988,9 +3014,9 @@
  },
  "frontend/components/domain-menu.tsx::ShopState": {
   "owner": "C",
-  "shape": "export type ShopState = { brand: string; slug: string; port: number; domain: string; jobId: string; status: string; url: string; urlOk?: boolean; error?: string; publicHost?: string; cnameTarget?: string; cnameOk?: boolean; cnameCheck?: { detail?: string; status?: string }; cnameSetup?: { ok?: boolean; error?: string }; pendingBuild?: number; hidePrices?: boolean; priceBlocked?: boolean; }",
+  "shape": "export type ShopState = { brand: string; slug: string; port: number; domain: string; jobId: string; status: string; url: string; urlOk?: boolean; error?: string; publicHost?: string; cnameTarget?: string; cnameOk?: boolean; cnameCheck?: { detail?: string; status?: string }; cnameSetup?: { ok?: boolean; error?: string }; pendingBuild?: number; /** چند تغییر هنوز با «برگشت» پس گرفتنی است؛ بعد از هر بیلد ۰ می‌شود. */ undoDepth?: number; hidePrices?: boolean; priceBlocked?: boolean; }",
   "signature": "export type ShopState =",
-  "since": "2026-09-19",
+  "since": "2026-10-03",
   "users": [
    "X4"
   ]

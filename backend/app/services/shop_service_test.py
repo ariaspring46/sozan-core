@@ -61,6 +61,22 @@ def _live_shop_chat(*, login_root: Path | None = None):
         tmp.cleanup()
 
 
+
+_VOICE_PATCHES: list = []
+
+
+def setUpModule() -> None:
+    # The assistant's own voice (shop_voice_service) asks the cloud model; tests that are not about it take the plain fallbacks.
+    for name in ("complete_json", "complete_json_chat"):
+        started = patch(f"app.services.shop_voice_service.{name}", new=AsyncMock(return_value={"error": "llm_unreachable"}))
+        started.start()
+        _VOICE_PATCHES.append(started)
+
+
+def tearDownModule() -> None:
+    while _VOICE_PATCHES:
+        _VOICE_PATCHES.pop().stop()
+
 class LiveShopChatRouteTests(unittest.TestCase):
     def test_homepage_advice_question_answers_instead_of_editing(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -139,7 +155,7 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 "preview": {"colors": {"primary": "#B42318"}},
             }
             result = asyncio.run(shop_service.chat("میخواهم رنگ آن قرمز باشد"))
-        self.assertIn("انتشار تغییرات", result["assistant"]["text"])
+        self.assertIn("بیلد", result["assistant"]["text"])
         self.assertEqual(result["preview"]["colors"]["primary"], "#B42318")
         self.assertTrue(result["patched"])
         answer.assert_not_called()
