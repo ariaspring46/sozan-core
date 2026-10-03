@@ -14,6 +14,7 @@ import {
   ComposeWait,
   ConfirmCard,
   QuickReplies,
+  RevealText,
   shortWhen,
   TypingBubble,
   useFreshIds,
@@ -252,9 +253,9 @@ export function ChatThread({
                     </p>
                   ) : null}
                   {msg.text ? (
-                    <p className={cn("wrap-any whitespace-pre-wrap", msg.role === "assistant" && fresh.has(msg.id) && "sozan-reveal")}>
+                    <RevealText className="wrap-any whitespace-pre-wrap" on={msg.role === "assistant" && fresh.has(msg.id)}>
                       {msg.role === "assistant" ? <LinkText text={sanitizeShopText(msg.text, sanitize)} /> : sanitizeShopText(msg.text, sanitize)}
-                    </p>
+                    </RevealText>
                   ) : null}
                   {msg.captions && !onPublish ? (
                     <div className="wrap-any mt-2 space-y-1 text-xs leading-6 text-muted">

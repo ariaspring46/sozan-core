@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, CheckCircle2, Hammer, ImageIcon, Megaphone, MessageSquareText, Package, PencilRuler, Send, Sparkles, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
@@ -47,6 +47,43 @@ export function TypingBubble({ label }: { label: string }) {
         <SozanOrb size={44} busy className="relative" />
       </span>
     </div>
+  );
+}
+
+/**
+ * متن جواب تازهٔ سوزان مثل نوشته‌شدن زنده می‌آید: حباب از یک خط تا اندازهٔ کامل بزرگ می‌شود (زمان به نسبت طول متن)،
+ * خط آخر در لبه محو است و هر چه زیر متن است (پاسخ‌های سریع، کپشن) درست وقتی نوشتن تمام شد بالا می‌آید.
+ * متن از اول کامل در صفحه است (صفحه‌خوان).
+ */
+export function RevealText({ on, className, children }: { on: boolean; className?: string; children: ReactNode }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const played = useRef(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!on || played.current || !el || typeof el.animate !== "function") return;
+    played.current = true;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const full = el.scrollHeight;
+    const line = parseFloat(getComputedStyle(el).lineHeight) || 28;
+    if (full <= line * 1.5) return;
+    const ms = Math.round(Math.min(2400, (full / line) * 340));
+    const below: HTMLElement[] = [];
+    for (let node = el.nextElementSibling; node; node = node.nextElementSibling) below.push(node as HTMLElement);
+    below.forEach((node) => (node.style.display = "none"));
+    el.classList.add("sozan-writing");
+    const run = el.animate([{ height: `${line}px` }, { height: `${full}px` }], { duration: ms, easing: "cubic-bezier(0.3, 0.5, 0.45, 1)" });
+    run.onfinish = run.oncancel = () => {
+      el.classList.remove("sozan-writing");
+      below.forEach((node) => {
+        node.style.display = "";
+        node.animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 380, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" });
+      });
+    };
+  }, [on]);
+  return (
+    <p ref={ref} className={cn(className, on && "sozan-reveal")}>
+      {children}
+    </p>
   );
 }
 

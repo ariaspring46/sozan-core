@@ -896,24 +896,19 @@ html:has(.sozan-landing) {
   animation: sozan-shimmer 2.2s linear infinite;
 }
 
-/* جواب تازهٔ سوزان از بالا به پایین «نوشته» می‌شود (ماسک متحرک؛ متن از اول در صفحه و برای صفحه‌خوان کامل است) */
-@property --sozan-reveal {
-  syntax: "<percentage>";
-  inherits: false;
-  initial-value: 120%;
-}
-@keyframes sozan-reveal {
-  from {
-    --sozan-reveal: -20%;
-  }
-  to {
-    --sozan-reveal: 120%;
-  }
+/* جواب تازهٔ سوزان «نوشته» می‌شود (RevealText): حباب قد می‌کشد و خط آخر در لبه محو است */
+.sozan-writing {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.9em), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 1.9em), transparent);
 }
 .sozan-reveal {
-  -webkit-mask-image: linear-gradient(to bottom, #000 var(--sozan-reveal), transparent calc(var(--sozan-reveal) + 20%));
-  mask-image: linear-gradient(to bottom, #000 var(--sozan-reveal), transparent calc(var(--sozan-reveal) + 20%));
-  animation: sozan-reveal 1.7s cubic-bezier(0.45, 0.15, 0.55, 0.95) 0.15s backwards;
+  animation: sozan-fade 0.5s ease-out backwards;
+}
+@keyframes sozan-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 /* دکمهٔ «بفرست» که جای میکروفون می‌نشیند کمی می‌پرد */
@@ -974,6 +969,8 @@ html:has(.sozan-landing) {
 }
 .sozan-float {
   animation: sozan-float 6s ease-in-out infinite;
+  /* لایهٔ جدا: هالهٔ مات با هر فریم دوباره کشیده نمی‌شود */
+  will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -987,7 +984,7 @@ html:has(.sozan-landing) {
   .sozan-sheet {
     animation: none;
   }
-  .sozan-reveal {
+  .sozan-writing {
     -webkit-mask-image: none;
     mask-image: none;
   }

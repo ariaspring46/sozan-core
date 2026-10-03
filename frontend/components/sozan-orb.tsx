@@ -107,10 +107,16 @@ export function SozanOrb({
         const size = dot * (0.45 + 0.85 * depth) * (1 + 0.55 * shown);
         ctx.fillStyle = `rgba(${r},${g},${b},${0.14 + 0.86 * depth})`;
         ctx.beginPath();
+        // نقطه‌های ریز و کم‌رنگ پشت کره مربع کشیده می‌شوند (در این اندازه فرقی دیده نمی‌شود و ارزان‌تر است).
+        const square = k < 4 && size < 2.2;
         for (let i = 0; i < points.length; i++) {
           if (Math.min(BUCKETS - 1, Math.floor(ds[i] * BUCKETS)) !== k) continue;
-          ctx.moveTo(xs[i] + size, ys[i]);
-          ctx.arc(xs[i], ys[i], size, 0, Math.PI * 2);
+          if (square) {
+            ctx.rect(xs[i] - size, ys[i] - size, size * 2, size * 2);
+          } else {
+            ctx.moveTo(xs[i] + size, ys[i]);
+            ctx.arc(xs[i], ys[i], size, 0, Math.PI * 2);
+          }
         }
         ctx.fill();
       }

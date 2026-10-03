@@ -91,7 +91,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Core:**
 
-- `frontend/app/globals.css` (9.0k)
+- `frontend/app/globals.css` (8.9k)
 - `frontend/tailwind.config.js` (0.4k)
 - `frontend/components/app-shell.tsx` (3.9k)
 - `frontend/lib/api.ts` (1.9k)
@@ -102,7 +102,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 - `./`: `talk-u.md` (5.8k)
 - `frontend/`: `tailwind.config.js` (0.4k), `package.json` (0.2k), `tsconfig.json` (0.2k), `next.config.ts` (0.0k)
-- `frontend/app/`: `globals.css` (9.0k), `page.tsx` (0.5k), `layout.tsx` (0.4k)
+- `frontend/app/`: `globals.css` (8.9k), `page.tsx` (0.5k), `layout.tsx` (0.4k)
 - `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (3.9k), `getting-started.tsx` (2.8k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
 - `frontend/components/ui/`: `button.tsx` (0.2k), `textarea.tsx` (0.1k), `select.tsx` (0.1k), `input.tsx` (0.1k), `card.tsx` (0.1k)
 - `frontend/lib/`: `api.ts` (1.9k), `theme.ts` (0.7k), `use-app-viewport.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.4k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
