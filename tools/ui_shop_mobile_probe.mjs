@@ -35,7 +35,7 @@ const PAGE = (body) => `<!doctype html><html lang="fa" dir="rtl"><head><meta cha
 <style>body{margin:0;font-family:sans-serif;background:#faf7f2}header{display:flex;gap:8px;padding:6px 12px;background:#fff}header a{padding:14px 10px;color:#333}
 .hero{position:relative;height:260px;background:url(/images/hero.png) center/cover}.veil{position:absolute;inset:0;background:linear-gradient(transparent,rgba(0,0,0,.35))}
 .hero h1{position:absolute;bottom:20px;right:16px;margin:0;color:#fff}.card{padding:16px}.card img{width:100%;height:200px;object-fit:cover}button{padding:14px 22px}</style></head><body>${body}
-<div style="height:1400px"></div><script src="/sozan-preview-beacon.js?v=live1" defer></script></body></html>`;
+<div style="height:1400px"></div><script src="/sozan-preview-beacon.js?v=live2" defer></script></body></html>`;
 const HOME_HTML = PAGE(`<header><a href="/products" id="nav-products">کالاها</a><a href="/cart">سبد</a></header>
 <section class="hero" id="hero"><div class="veil" id="veil"></div><p id="hero-copy" style="position:absolute;top:24px;right:16px;margin:0;color:#fff">مد و کفش</p><h1 id="title">زیورآلات دست‌ساز نیشابور</h1></section>
 <p id="lede" style="padding:0 16px">هر قطعه با دست ساخته می‌شود.</p>
