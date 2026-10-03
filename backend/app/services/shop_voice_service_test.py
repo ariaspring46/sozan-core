@@ -22,6 +22,7 @@ class ReplyChecks(unittest.TestCase):
         self.assertFalse(voice.acceptable("اسم فروشگاه را {brand} می‌گذارم و شعارش را بعداً می‌گویم"))
         self.assertTrue(voice.acceptable("اسمش را «نقره‌خانه» می‌گذارم، همین را بسازم یا چیزی را عوض کنم؟"))
         self.assertEqual(voice.clean_reply("نمیکنم؛ فروشگاهت را میسازم"), "نمی‌کنم؛ فروشگاهت را می‌سازم")
+        self.assertEqual(voice.clean_reply("پیج pinkshop528_sirjan و mahsoo__beauty را خواندم _مهم_"), "پیج pinkshop528_sirjan و mahsoo__beauty را خواندم مهم")
 
     def test_a_quoted_fact_must_survive(self) -> None:
         keep = ["«نقرهٔ نیشابور»"]

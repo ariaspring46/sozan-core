@@ -77,6 +77,38 @@ def tearDownModule() -> None:
     while _VOICE_PATCHES:
         _VOICE_PATCHES.pop().stop()
 
+class BeforeTheFirstBuildChatTests(unittest.TestCase):
+    def setUp(self) -> None:
+        for item in (
+            patch("app.services.shop_service.complete_chat", new=AsyncMock(return_value="ANSWER")),
+            patch("app.services.shop_service.emit_later"),  # a stray observe event would leak into the outbox cap test
+        ):
+            item.start()
+            self.addCleanup(item.stop)
+
+    def test_without_prices_the_seller_can_choose_an_inquiry_only_shop(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                out = asyncio.run(shop_service.chat("قیمت نزن، فقط استعلام"))
+                self.assertTrue(shop_service._shop().get("hidePrices"))
+                self.assertIn("استعلام", out["assistant"]["text"])
+                self.assertFalse(shop_service._missing_sellable_price(shop_service._shop()))
+
+    def test_a_question_about_prices_does_not_flip_the_shop_to_inquiry_only(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                asyncio.run(shop_service.chat("یعنی بدون قیمت هم می‌شود؟"))
+                self.assertFalse(shop_service._shop().get("hidePrices"))
+
+    def test_naming_the_page_starts_a_scan_of_that_page(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                with patch("app.services.channel_scan_service.start_scan") as scan:
+                    out = asyncio.run(shop_service.chat("pinkshop528_sirjan"))
+                scan.assert_called_once_with([{"platform": "instagram", "handle": "pinkshop528_sirjan"}])
+                self.assertIn("pinkshop528_sirjan", out["assistant"]["text"])
+
+
 class LiveShopChatRouteTests(unittest.TestCase):
     def test_a_typed_full_rebuild_asks_first_and_builds_only_when_confirmed(self) -> None:
         with _live_shop_chat():
@@ -628,6 +660,25 @@ class PriceMissingBuildTests(unittest.TestCase):
                 spawn.assert_not_called()
                 factory.assert_not_called()
                 self.assertEqual(result["code"], "price_missing")
+
+    def test_an_empty_catalog_is_told_apart_from_missing_prices_and_offers_the_way_out(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                with patch.object(shop_service, "_run_factory") as factory, patch.object(shop_service, "_emit_build"):
+                    empty = shop_service.start_build(prompt="بساز", rebuild=False)
+                    factory.assert_not_called()
+                self.assertEqual(empty["code"], "price_missing")
+                self.assertEqual(empty["reason"], "no_products")
+                self.assertIn("هیچ کالایی", empty["error"])
+                self.assertIn("بدون قیمت بساز", empty["error"])
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="رژ لب", price=0, stock=1, sku="r", category="آرایشی")
+                with patch.object(shop_service, "_run_factory"), patch.object(shop_service, "_emit_build"):
+                    unpriced = shop_service.start_build(prompt="بساز", rebuild=False)
+                self.assertEqual(unpriced["reason"], "price_missing")
+                self.assertIn("بدون قیمت بساز", unpriced["error"])
+                self.assertEqual(shop_service._operator_error(empty["error"]), shop_service.NO_PRODUCTS)
 
     def test_empty_catalog_blocks_unless_hide_prices(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

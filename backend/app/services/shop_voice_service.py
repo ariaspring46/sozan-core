@@ -73,7 +73,9 @@ def _persian(text: str) -> bool:
 def clean_reply(text: object) -> str:
     """A model reply shaped for a chat bubble: no markdown, no stray quotes, bounded."""
     value = str(text or "").strip()
-    value = re.sub(r"[*_`#>]+", "", value)
+    value = re.sub(r"[*`#>]+", "", value)
+    # a markdown underscore goes, the one inside a page name («pink_shop», «mahsoo__beauty») stays
+    value = re.sub(r"_+", lambda m: m.group() if 0 < m.start() and m.end() < len(value) and value[m.start() - 1].isascii() and value[m.start() - 1].isalnum() and value[m.end()].isascii() and value[m.end()].isalnum() else "", value)
     value = re.sub(r"\s*\n\s*", " ", value)
     value = re.sub(r"\s{2,}", " ", value)
     return fix_halfspace(value.strip(" \"'"))[:REPLY_MAX]

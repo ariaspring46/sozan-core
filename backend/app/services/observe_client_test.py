@@ -11,6 +11,13 @@ from app.services import observe_client
 
 class OutboxCapTests(unittest.TestCase):
     def setUp(self) -> None:
+        # a daemon thread left by an earlier test (emit_later without a loop) may still be flushing the outbox and would
+        # rewrite the file under this test; wait for such threads (bounded) so the cap is measured alone
+        import threading
+
+        for thread in threading.enumerate():
+            if thread is not threading.main_thread() and thread.daemon and not thread.name.startswith("sozan-"):
+                thread.join(timeout=8)
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self._state = patch.object(settings, "state_dir", self._tmp.name)
