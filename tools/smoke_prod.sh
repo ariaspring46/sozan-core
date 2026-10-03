@@ -37,6 +37,20 @@ grep -qi "javascript" "$HDR" && ok "beacon is javascript" || bad "beacon content
 [ "$(wc -c <"$BODY")" -gt 5000 ] && ok "beacon body present" || bad "beacon body too small"
 check_code "panel is not an open API" api.sozan-core.ir /shop 401
 
+# the CDN must serve the beacon file that is on the hub, at the very URL the shop page injects (stale CDN copy = old editor behaviour)
+BEACON_FILE="${SMOKE_BEACON_FILE:-/var/lib/sozan-core/sozan-preview-beacon.js}"
+if [ "$MODE" = "public" ] && [ -f "$BEACON_FILE" ]; then
+  fetch "$SHOP" / >/dev/null
+  url="$(grep -o '/sozan-preview-beacon.js?v=[A-Za-z0-9._-]*' "$BODY" | head -1)"
+  if [ -z "$url" ]; then
+    bad "the shop page does not inject the beacon"
+  else
+    served="$(curl -s -m 15 "https://$SHOP$url" | sha256sum | cut -d' ' -f1)"
+    mine="$(sha256sum "$BEACON_FILE" | cut -d' ' -f1)"
+    [ "$served" = "$mine" ] && ok "CDN serves the deployed beacon ($url)" || bad "CDN serves an OLD beacon at $url: bump v= in deploy/nginx-sozan-core.conf and run deploy/nginx-apply.sh"
+  fi
+fi
+
 if [ "$MODE" = "local" ]; then
   check_code "unknown shop host" nosuchshop.sozan-core.ir / "404|503"
   fetch app.sozan-core.ir /login >/dev/null
