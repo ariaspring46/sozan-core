@@ -393,6 +393,7 @@
         ".github/workflows/**",
         "scripts/**",
         "tools/lab_session.py",
+        "tools/smoke_prod.sh",
         "tools/remove_test_tenant.py",
         "tools/agentic_probes/run_all.sh",
         "tools/agentic_probes/p_outbox_chain.py",
