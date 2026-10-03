@@ -273,6 +273,18 @@
     return best;
   }
 
+  /** The picture the finger is on although it takes no pointer events: the biggest one in a near ancestor whose box holds the point. */
+  function imageBehind(top, x, y) {
+    var node = top.parentElement;
+    for (var hops = 0; node && hops < 6 && String(node.tagName || "").toLowerCase() !== "body"; hops++, node = node.parentElement) {
+      var cand = bestImageIn(node);
+      if (!cand) continue;
+      var r = cand.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return cand;
+    }
+    return null;
+  }
+
   function imageSrc(el) {
     if (!el || el.nodeType !== 1) return "";
     var tag = String(el.tagName || "").toLowerCase();
@@ -304,6 +316,8 @@
     }
     if (!top) return null;
     if (FORM_TAGS[String(top.tagName || "").toLowerCase()]) return null;
+    // a decoration picture often has pointer-events:none (the real hero does), so elementsFromPoint never lists it
+    if (!image) image = imageBehind(top, x, y);
     if (ownText(top)) return { el: meaningful(top), image: image };
     return { el: meaningful(image || top), image: image };
   }
