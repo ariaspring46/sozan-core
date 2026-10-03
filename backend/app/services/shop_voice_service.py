@@ -61,10 +61,11 @@ _FA = re.compile(r"[؀-ۿ]")
 _LATIN = re.compile(r"[A-Za-z]")
 _URL = re.compile(r"https?://|www\.|127\.0\.0\.1|localhost", re.I)
 _QUOTED = re.compile(r"«([^»]{1,80})»")
+_FAILED = re.compile(r"نشد|نیست|نمی‌شود|نمی‌توان|ممکن نیست|ناموفق|پیدا نشد")
 # nothing in the system tells the seller later, so the model must not promise it
 _PROMISE = re.compile(r"خبر(?:ت)?\s*می‌?(?:کنم|دم)|بهت\s*(?:می‌?گم|خبر)|اطلاع\s*می‌?دم")
 # a success verb that is not negated («نشد»، «نکردم»)
-_SUCCESS = re.compile(r"(?<![نم])(?:شد|کردم|گذاشتم|ساختم|عوض کردم|اعمال)(?![؀-ۿ])")
+_SUCCESS = re.compile(r"(?<![نم])(?:شد|کردم|گذاشتم|ساختم|فرستادم|نوشتم|دادم|زدم|نشست|رسید|اعمال)(?![\u0600-\u06FF])")
 
 
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩٬,", "01234567890123456789  ")
@@ -158,6 +159,8 @@ async def say(
     facts = [str(item).strip() for item in facts if str(item or "").strip()]
     if _capped(surface):
         return fallback
+    if patched is None and _FAILED.search(" ".join(facts)):
+        patched = False  # the system says it did not work: the reply may not sound like it did
     must_keep = [item for fact in facts for item in _QUOTED.findall(fact)]
     earlier = _recent_lines(recent)
     user = (

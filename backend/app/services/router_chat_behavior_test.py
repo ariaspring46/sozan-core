@@ -15,6 +15,22 @@ from app.state_store import read_json, tenant_scope, write_json
 PHONE = "09129900001"
 
 
+
+_VOICE_PATCHES: list = []
+
+
+def setUpModule() -> None:
+    # The assistant's own voice (shop_voice_service) asks the cloud model; tests that are not about it take the plain fallbacks.
+    for name in ("complete_json", "complete_json_chat"):
+        started = patch(f"app.services.shop_voice_service.{name}", new=AsyncMock(return_value={"error": "llm_unreachable"}))
+        started.start()
+        _VOICE_PATCHES.append(started)
+
+
+def tearDownModule() -> None:
+    while _VOICE_PATCHES:
+        _VOICE_PATCHES.pop().stop()
+
 class RouterChatBehaviorTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()

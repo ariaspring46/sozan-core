@@ -1720,6 +1720,14 @@
    "Y"
   ]
  },
+ "backend/app/services/llm.py::_budget_capped": {
+  "owner": "X5",
+  "signature": "def _budget_capped(surface: str) -> str | None",
+  "since": "2026-10-03",
+  "users": [
+   "X4"
+  ]
+ },
  "backend/app/services/llm.py::auth_scheme": {
   "owner": "X5",
   "signature": "def auth_scheme(value: object) -> str",
@@ -2441,9 +2449,10 @@
  },
  "backend/app/services/shop_voice_service.py::say": {
   "owner": "X4",
-  "signature": "async def say(situation: str, facts: list[str], *, seller_text: str='', fallback: str, patched: bool | None=None, surface: str='shop') -> str",
+  "signature": "async def say(situation: str, facts: list[str], *, seller_text: str='', fallback: str, patched: bool | None=None, surface: str='shop', recent: list[dict] | None=None) -> str",
   "since": "2026-10-03",
   "users": [
+   "X1",
    "X2"
   ]
  },
