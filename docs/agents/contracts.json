@@ -1346,6 +1346,15 @@
    "X4"
   ]
  },
+ "backend/app/services/channel_scan_service.py::handle_in_text": {
+  "owner": "X3",
+  "signature": "def handle_in_text(text: str) -> str",
+  "since": "2026-10-03",
+  "users": [
+   "X1",
+   "X4"
+  ]
+ },
  "backend/app/services/channel_scan_service.py::looks_like_product_title": {
   "owner": "X3",
   "signature": "def looks_like_product_title(title: str) -> bool",
@@ -1379,6 +1388,14 @@
    "C",
    "X2",
    "X4"
+  ]
+ },
+ "backend/app/services/channel_scan_service.py::scan_outcome": {
+  "owner": "X3",
+  "signature": "def scan_outcome() -> str",
+  "since": "2026-10-03",
+  "users": [
+   "X1"
   ]
  },
  "backend/app/services/channel_scan_service.py::scan_status": {

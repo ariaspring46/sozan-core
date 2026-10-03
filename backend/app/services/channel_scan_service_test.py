@@ -10,6 +10,41 @@ from app.services import channel_scan_service, shop_service
 from app.state_store import tenant_scope
 
 
+class PageHandleAndOutcomeTests(unittest.TestCase):
+    def test_a_named_page_is_found_in_the_chat_but_a_plain_word_is_not(self) -> None:
+        for text, handle in (
+            ("pinkshop528_sirjan", "pinkshop528_sirjan"),
+            ("@pinkshop528_sirjan", "pinkshop528_sirjan"),
+            ("https://www.instagram.com/mahsoo__beauty/", "mahsoo__beauty"),
+            ("پیج من pinkshop528_sirjan هست", "pinkshop528_sirjan"),
+            ("اینستاگرام: shop.sirjan", "shop.sirjan"),
+        ):
+            self.assertEqual(channel_scan_service.handle_in_text(text), handle, text)
+        for text in ("hello", "بساز", "yes build it", "قیمت ۸۵۰ هزار", "انگشتر نقره", ""):
+            self.assertEqual(channel_scan_service.handle_in_text(text), "", text)
+
+    def test_an_empty_scan_is_told_as_it_is_and_never_as_a_source_of_prices(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.state_store import write_json
+
+                self.assertIn("هیچ پیجی اسکن نشده", channel_scan_service.scan_outcome())
+                write_json("scan-status.json", {"status": "done", "productCount": 0, "handles": ["mahsoo__beauty"], "rejected": 1})
+                write_json("channel-scan.json", {"accounts": [{"platform": "instagram", "handle": "mahsoo__beauty", "fetched": False, "products": []}]})
+                outcome = channel_scan_service.scan_outcome()
+                self.assertIn("mahsoo__beauty", outcome)
+                self.assertIn("نتیجه‌ای نداشت", outcome)
+                self.assertIn("نمی‌شود از پیج برداشت", outcome)
+                write_json("scan-status.json", {"status": "running", "productCount": 0, "handles": ["pinkshop528_sirjan"]})
+                self.assertIn("pinkshop528_sirjan", channel_scan_service.scan_outcome())
+                self.assertIn("در جریان", channel_scan_service.scan_outcome())
+                write_json("scan-status.json", {"status": "done", "productCount": 0, "handles": ["mahsoo__beauty"], "rejected": 1})
+                brief = channel_scan_service.brief_for_shop()
+                self.assertIn("نتیجهٔ اسکن:", brief)
+                self.assertIn("قول اسکن نده", brief)
+                self.assertNotIn("نگو به پیج یا اینستاگرام دسترسی نداری", brief)
+
+
 class ChannelScanTests(unittest.TestCase):
     def test_scan_sendbox_posts_without_graph(self) -> None:
         page = {
