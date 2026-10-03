@@ -785,12 +785,15 @@ async def _write_hashtags(spoken: str, into_id: str) -> dict:
 def content_library(campaigns: list) -> dict:
     expire_stale_compose(600)
     compose_by: dict[str, dict] = {}
+    latest_at: dict[str, int] = {}
     drafts: list[dict] = []
     rows = [row for row in _messages() if isinstance(row, dict)]
     for row in rows:
         if not isinstance(row, dict) or row.get("role") == "user":
             continue
         cid = str(row.get("campaignId") or "")
+        if cid:
+            latest_at[cid] = max(latest_at.get(cid, 0), int(row.get("at") or 0))
         compose = row.get("compose") if isinstance(row.get("compose"), dict) else {}
         status = str(compose.get("status") or "")
         if cid and status:
@@ -824,6 +827,8 @@ def content_library(campaigns: list) -> dict:
                 "compose": status,
                 "composeStage": str(meta.get("stage") or ""),
                 "startedAt": meta.get("startedAt") or 0,
+                # when the seller last touched it: two posts for the same product are told apart by date
+                "at": latest_at.get(cid, 0),
             }
         )
     seen = {str(item.get("id") or "") for item in items}
@@ -838,6 +843,7 @@ def content_library(campaigns: list) -> dict:
             continue
         item["id"] = cid
         item["title"] = "کمپین"
+        item["at"] = latest_at.get(cid, 0)
         items.append(item)
         seen.add(cid)
     return {"items": items, "drafts": drafts}
