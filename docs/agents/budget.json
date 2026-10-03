@@ -3,14 +3,14 @@
  "owned_source_max": 80000,
  "roles": [
   {
-   "active": 106452,
-   "core": 44959,
+   "active": 106839,
+   "core": 44944,
    "core_pct": 100,
    "id": "X1",
    "loose_contracts": 2,
    "manifest": 9604,
    "rare": 9801,
-   "tests": 35999
+   "tests": 36371
   },
   {
    "active": 82535,
