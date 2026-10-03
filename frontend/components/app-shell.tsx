@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Clapperboard, Inbox, MessageCircle, MoreHorizontal, ShoppingBag, Store } from "lucide-react";
+import { Clapperboard, Inbox, MessageCircle, Menu, MoreHorizontal, ShoppingBag, Store, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SozanMark } from "@/components/sozan-mark";
 import { api } from "@/lib/api";
@@ -15,7 +15,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 type Tab = { href: string; label: string; icon: typeof MessageCircle };
 
-/** ستون ثابت دسکتاپ: همهٔ مقصدها. */
+/** همهٔ مقصدها: ستون ثابت دسکتاپ و منوی همبرگری موبایل. */
 const TABS: readonly Tab[] = [
   { href: "/chat", label: "چت", icon: MessageCircle },
   { href: "/shop", label: "فروشگاه", icon: Store },
@@ -25,10 +25,7 @@ const TABS: readonly Tab[] = [
   { href: "/more", label: "بیشتر", icon: MoreHorizontal },
 ];
 
-/** نوار پایین موبایل: پنج مقصد اصلی؛ استودیو از «بیشتر» و چت در دسترس است. */
-const MOBILE_TABS: readonly Tab[] = TABS.filter((tab) => tab.href !== "/studio");
-
-function tabActive(pathname: string, href: string, mobile: boolean) {
+function tabActive(pathname: string, href: string) {
   if (href === "/studio") {
     return pathname.startsWith("/studio") || pathname.startsWith("/campaigns");
   }
@@ -36,9 +33,7 @@ function tabActive(pathname: string, href: string, mobile: boolean) {
     return pathname === "/sales" || pathname.startsWith("/sales/");
   }
   if (href === "/more") {
-    const inMore = pathname === "/more" || pathname.startsWith("/more/") || pathname.startsWith("/brand");
-    const studio = pathname.startsWith("/studio") || pathname.startsWith("/campaigns");
-    return inMore || (mobile && studio);
+    return pathname === "/more" || pathname.startsWith("/more/") || pathname.startsWith("/brand");
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -84,7 +79,9 @@ export function AppShell({
   const pathname = usePathname();
   useAppViewport();
   const [unread, setUnread] = useState(0);
-  const [typing, setTyping] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
   const plan = usePlan();
   const aiBudget = useAiBudget();
 
@@ -98,52 +95,24 @@ export function AppShell({
     applyTheme(readTheme());
   }, []);
 
-  // وقتی کیبورد موبایل باز است، نوار پایین جا را از فیلد نوشتن نگیرد.
   useEffect(() => {
-    const isField = (el: EventTarget | null) =>
-      el instanceof HTMLElement && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && !["checkbox", "radio", "file", "button", "submit"].includes((el as HTMLInputElement).type)) || el.isContentEditable);
-    // نوار پایین بعد از رها شدن انگشت/ماوس برمی‌گردد، نه وسط ضربه: اگر هنگام خروج از کادر (ضربه روی «بفرست»)
-    // همان لحظه برگردد، دکمه بین فشار و رها کردن ۵۷ پیکسل بالا می‌پرد و ضربه گم می‌شود.
-    let pointerDown = false;
-    let recheckLater = false;
-    const recheck = () => setTyping(isField(document.activeElement));
-    // فوکوس رفتن به یک دکمه هنگام فشردن (Chrome اندروید) هم نباید وسط ضربه نوار پایین را برگرداند.
-    const onIn = (event: FocusEvent) => {
-      const field = isField(event.target);
-      if (!field && pointerDown) {
-        recheckLater = true;
-        return;
-      }
-      setTyping(field);
+    setMenuOpen(false);
+  }, [pathname]);
+
+  // منوی موبایل: Escape می‌بندد، فوکوس داخل منو می‌رود و بعد از بستن به دکمهٔ منو برمی‌گردد.
+  useEffect(() => {
+    if (!menuOpen) return;
+    closeButton.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
     };
-    const onOut = () =>
-      window.setTimeout(() => {
-        if (pointerDown) recheckLater = true;
-        else recheck();
-      }, 0);
-    const onDown = () => {
-      pointerDown = true;
-    };
-    const onUp = () => {
-      pointerDown = false;
-      if (recheckLater) {
-        recheckLater = false;
-        window.setTimeout(recheck, 80);
-      }
-    };
-    document.addEventListener("focusin", onIn);
-    document.addEventListener("focusout", onOut);
-    document.addEventListener("pointerdown", onDown, true);
-    document.addEventListener("pointerup", onUp, true);
-    document.addEventListener("pointercancel", onUp, true);
+    window.addEventListener("keydown", onKey);
+    const opener = menuButton.current;
     return () => {
-      document.removeEventListener("focusin", onIn);
-      document.removeEventListener("focusout", onOut);
-      document.removeEventListener("pointerdown", onDown, true);
-      document.removeEventListener("pointerup", onUp, true);
-      document.removeEventListener("pointercancel", onUp, true);
+      window.removeEventListener("keydown", onKey);
+      opener?.focus();
     };
-  }, []);
+  }, [menuOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -181,7 +150,7 @@ export function AppShell({
           <span className="font-bold text-ink">سوزان</span>
         </div>
         {TABS.map((tab) => {
-          const active = tabActive(pathname, tab.href, false);
+          const active = tabActive(pathname, tab.href);
           const Icon = tab.icon;
           return (
             <Link
@@ -217,9 +186,21 @@ export function AppShell({
         ) : null}
       </nav>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:pb-[env(safe-area-inset-bottom,0px)]">
-        <header className="relative z-20 flex shrink-0 items-center gap-3 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
-          <SozanMark className="h-9 w-9 shrink-0 md:hidden" />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0px)]">
+        <header className="relative z-20 flex shrink-0 items-center gap-2 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
+          <button
+            ref={menuButton}
+            type="button"
+            aria-label={unread > 0 ? `منو، ${unread} خوانده‌نشده` : "منو"}
+            aria-haspopup="dialog"
+            aria-expanded={menuOpen}
+            aria-controls="app-menu"
+            onClick={() => setMenuOpen(true)}
+            className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink hover:bg-canvas md:hidden"
+          >
+            <Menu size={24} aria-hidden />
+            {unread > 0 ? <span aria-hidden className="absolute end-2 top-2 h-2.5 w-2.5 rounded-full bg-accentStrong ring-2 ring-paper" /> : null}
+          </button>
           <div className="min-w-0 flex-1">{header}</div>
         </header>
         {aiBudget && aiBudget.tier !== "ok" && aiBudget.note ? (
@@ -233,37 +214,76 @@ export function AppShell({
           </div>
         ) : null}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
-        <nav
-          aria-label="ناوبری"
-          className={cn(
-            "shrink-0 border-t border-line bg-canvas pb-[env(safe-area-inset-bottom,0px)] md:hidden",
-            typing ? "hidden" : "flex",
-          )}
-        >
-          {MOBILE_TABS.map((tab) => {
-            const active = tabActive(pathname, tab.href, true);
-            const Icon = tab.icon;
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                aria-current={active ? "page" : undefined}
-                aria-label={label(tab)}
-                className={cn(
-                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-xs",
-                  active ? "font-bold text-warm" : "text-muted",
-                )}
-              >
-                <span className="relative">
-                  <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
-                  {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
-                </span>
-                <span>{tab.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
       </div>
+
+      {menuOpen ? (
+        <div className="absolute inset-0 z-50 md:hidden">
+          <button type="button" aria-label="بستن منو" tabIndex={-1} className="absolute inset-0 cursor-default bg-black/55" onClick={() => setMenuOpen(false)} />
+          <nav
+            id="app-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="منوی سوزان"
+            className="absolute inset-y-0 start-0 flex w-[min(19rem,86%)] flex-col gap-1 overflow-y-auto overscroll-contain border-e border-line bg-canvas px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-card"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2 px-1">
+              <span className="flex items-center gap-2">
+                <SozanMark className="h-9 w-9" />
+                <span className="font-bold text-ink">سوزان</span>
+              </span>
+              <button
+                ref={closeButton}
+                type="button"
+                aria-label="بستن منو"
+                onClick={() => setMenuOpen(false)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted hover:bg-paper"
+              >
+                <X size={22} aria-hidden />
+              </button>
+            </div>
+            {TABS.map((tab) => {
+              const active = tabActive(pathname, tab.href);
+              const Icon = tab.icon;
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={label(tab)}
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "relative flex min-h-12 items-center gap-3 rounded-xl px-3 text-[15px]",
+                    active ? "bg-paper font-bold text-warm" : "text-ink hover:bg-paper/60",
+                  )}
+                >
+                  {active ? <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-accent" /> : null}
+                  <span className="relative">
+                    <Icon size={22} strokeWidth={active ? 2.4 : 1.8} aria-hidden />
+                    {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
+                  </span>
+                  <span className="truncate">{tab.label}</span>
+                </Link>
+              );
+            })}
+            <ThemeToggle compact className="mt-auto" />
+            {plan ? (
+              <div className="mt-2 rounded-2xl border border-line bg-paper p-3 text-sm">
+                <p className="text-xs text-muted">پلن فعلی</p>
+                <p className="font-bold text-ink">{plan.label}</p>
+                {plan.canUpgrade ? (
+                  <Link
+                    href="/more/settings#plans"
+                    onClick={() => setMenuOpen(false)}
+                    className="mt-2 flex min-h-11 items-center justify-center rounded-xl bg-accentStrong px-3 text-sm font-bold text-onAccent"
+                  >
+                    ارتقای پلن
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+          </nav>
+        </div>
+      ) : null}
     </div>
   );
 }

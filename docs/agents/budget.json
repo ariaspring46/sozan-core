@@ -83,17 +83,17 @@
    "tests": 16166
   },
   {
-   "active": 63033,
-   "core": 12320,
-   "core_pct": 27,
+   "active": 66115,
+   "core": 12592,
+   "core_pct": 28,
    "id": "U",
    "loose_contracts": 0,
-   "manifest": 9115,
-   "rare": 32298,
+   "manifest": 9123,
+   "rare": 32494,
    "tests": 0
   },
   {
-   "active": 211495,
+   "active": 211648,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",
