@@ -61,10 +61,25 @@ _FA = re.compile(r"[؀-ۿ]")
 _LATIN = re.compile(r"[A-Za-z]")
 _URL = re.compile(r"https?://|www\.|127\.0\.0\.1|localhost", re.I)
 _QUOTED = re.compile(r"«([^»]{1,80})»")
+_FAILED = re.compile(r"نشد|نیست|نمی‌شود|نمی‌توان|ممکن نیست|ناموفق|پیدا نشد")
 # nothing in the system tells the seller later, so the model must not promise it
 _PROMISE = re.compile(r"خبر(?:ت)?\s*می‌?(?:کنم|دم)|بهت\s*(?:می‌?گم|خبر)|اطلاع\s*می‌?دم")
 # a success verb that is not negated («نشد»، «نکردم»)
-_SUCCESS = re.compile(r"(?<![نم])(?:شد|کردم|گذاشتم|ساختم|عوض کردم|اعمال)(?![؀-ۿ])")
+_SUCCESS = re.compile(r"(?<![نم])(?:شد|کردم|گذاشتم|ساختم|فرستادم|نوشتم|دادم|زدم|نشست|رسید|اعمال)(?![\u0600-\u06FF])")
+
+
+_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩٬,", "01234567890123456789  ")
+_DOMAIN = re.compile(r"(?<![\w.-])(?:[a-z0-9-]+\.)+[a-z]{2,}(?![\w-])", re.I)
+_NUMBER = re.compile(r"\d{2,}")
+
+
+def _hard_tokens(text: str) -> set[str]:
+    """Hosts and numbers in the facts: a reworded reply may not lose or change them."""
+    flat = str(text or "").translate(_DIGITS).replace(" ", "")
+    spaced = str(text or "").translate(_DIGITS)
+    found = {item.lower() for item in _DOMAIN.findall(spaced)}
+    found |= set(_NUMBER.findall(flat))
+    return found
 
 
 def _persian(text: str) -> bool:
@@ -98,11 +113,34 @@ def acceptable(
         for quoted in _QUOTED.findall(reply):
             if quoted not in facts:
                 return False
+        flat = reply.translate(_DIGITS).replace(" ", "").lower()
+        for token in _hard_tokens(facts):
+            if token not in flat:
+                return False
     if patched is False and _SUCCESS.search(reply):
         return False
     if patched is True and re.search(r"نشد|نتوانستم|نمی‌شود", reply):
         return False
     return True
+
+
+def _capped(surface: str) -> bool:
+    """A tenant over its AI budget gets the plain text at once: the budget fallback would be the slow local model."""
+    from app.services.llm import _budget_capped
+
+    try:
+        return bool(_budget_capped(surface))
+    except Exception:
+        return False
+
+
+def _recent_lines(recent: list[dict] | None) -> str:
+    lines = []
+    for row in (recent or [])[-4:]:
+        text = re.sub(r"\s+", " ", str(row.get("text") or "")).strip()[:160]
+        if text:
+            lines.append(f"{'سوزان' if row.get('role') == 'assistant' else 'فروشنده'}: {text}")
+    return "\n".join(lines)
 
 
 async def say(
@@ -113,13 +151,22 @@ async def say(
     fallback: str,
     patched: bool | None = None,
     surface: str = "shop",
+    recent: list[dict] | None = None,
 ) -> str:
-    """The same news in the model's words; the plain `fallback` when the model fails or bends a fact."""
+    """The same news in the model's words; the plain `fallback` when the model fails or bends a fact.
+
+    `seller_text=""` for a refusal: the model then sees only the facts, never the words that might be an attack."""
     facts = [str(item).strip() for item in facts if str(item or "").strip()]
+    if _capped(surface):
+        return fallback
+    if patched is None and _FAILED.search(" ".join(facts)):
+        patched = False  # the system says it did not work: the reply may not sound like it did
     must_keep = [item for fact in facts for item in _QUOTED.findall(fact)]
+    earlier = _recent_lines(recent)
     user = (
         f"وضعیت: {situation}\n"
-        f"حرف فروشنده: {seller_text.strip()[:300] or '—'}\n"
+        + (f"گفتگوی اخیر (برای تکرار نکردن جمله‌ها):\n{earlier}\n" if earlier else "")
+        + f"حرف فروشنده: {seller_text.strip()[:300] or '—'}\n"
         "واقعیت‌ها:\n" + "\n".join(f"- {fact}" for fact in facts)
     )
     parsed = await complete_json(SAY_SYSTEM, user, surface=surface, max_tokens=260, temperature=0.7)
@@ -189,6 +236,8 @@ def _as_json_turn(row: dict) -> dict:
 
 async def interview_turn(rows: list[dict], brief: dict, shop: dict) -> dict | None:
     """One turn of the setup talk. None when the model could not answer (the caller falls back to its fixed script)."""
+    if _capped("shop"):
+        return None
     turns = [_as_json_turn(row) for row in rows if str(row.get("id") or "") != "shop-build-live"][-KEEP_TURNS:]
     status = "قبلاً پیشنهاد ساخت داده‌ای." if brief.get("proposed") else "هنوز پیشنهاد ساخت نداده‌ای."
     system = (

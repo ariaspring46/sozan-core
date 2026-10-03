@@ -44,6 +44,7 @@
         "backend/app/services/router_service.py",
         "backend/app/services/router_embed.py",
         "backend/app/services/router_text.py",
+        "backend/app/services/router_voice.py",
         "backend/app/services/router_text_test.py",
         "backend/app/services/router_chat_behavior_test.py",
         "backend/app/services/turn_parse.py",

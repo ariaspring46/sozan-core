@@ -41,6 +41,12 @@ class ReplyChecks(unittest.TestCase):
         self.assertFalse(voice.acceptable("ساخت شروع شد و بعدش خبرت می‌کنم که آماده شد."))
         self.assertTrue(voice.acceptable("ساخت شروع شد و پیشرفتش را همین‌جا می‌بینی."))
 
+    def test_numbers_and_hosts_of_the_facts_must_survive(self) -> None:
+        facts = "کالا «انگشتر» با ۱٬۲۰۰٬۰۰۰ تومان روی nogre.sozan-core.ir آمد."
+        self.assertTrue(voice.acceptable("انگشتر با 1200000 تومان روی nogre.sozan-core.ir آمد و باز می‌شود.", facts=facts.replace("«انگشتر»", "انگشتر")))
+        self.assertFalse(voice.acceptable("انگشتر با قیمتی که گفتی روی سایتت آمد و باز می‌شود.", facts=facts.replace("«انگشتر»", "انگشتر")))
+        self.assertFalse(voice.acceptable("انگشتر با 900000 تومان روی nogre.sozan-core.ir آمد و باز می‌شود.", facts=facts.replace("«انگشتر»", "انگشتر")))
+
     def test_markdown_and_newlines_are_flattened(self) -> None:
         self.assertEqual(voice.clean_reply("**سلام**\n\nچطوری؟"), "سلام چطوری؟")
 
@@ -58,6 +64,17 @@ class ReplyChecks(unittest.TestCase):
 
 
 class SayTests(unittest.TestCase):
+    def setUp(self) -> None:
+        patcher = patch.object(voice, "_capped", return_value=False)  # the shared test ledger may be full
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_over_budget_means_the_plain_text_and_no_model_call(self) -> None:
+        with patch.object(voice, "_capped", return_value=True), patch.object(
+            voice, "complete_json", new=AsyncMock(side_effect=AssertionError("capped tenants must not wait for a model"))
+        ):
+            self.assertEqual(_run(voice.say("edit_result", ["x"], fallback="F")), "F")
+
     def test_model_words_are_used_when_they_keep_the_facts(self) -> None:
         reply = {"reply": "تیتر را شد «نقرهٔ نیشابور»؛ همین‌جا می‌بینی‌اش."}
         with patch.object(voice, "complete_json", new=AsyncMock(return_value=reply)):
@@ -71,6 +88,14 @@ class SayTests(unittest.TestCase):
         with patch.object(voice, "complete_json", new=AsyncMock(return_value={"error": "llm_unreachable", "reply": "مدل پاسخ نداد."})):
             self.assertEqual(_run(voice.say("edit_result", ["x"], fallback="F")), "F")
 
+    def test_a_failure_in_the_facts_is_not_reworded_as_success_even_without_the_flag(self) -> None:
+        lie = {"reply": "حله، پست را فرستادم و همین الان روی تلگرام نشست."}
+        with patch.object(voice, "complete_json", new=AsyncMock(return_value=lie)):
+            self.assertEqual(_run(voice.say("tool_result", ["پست ارسال نشد؛ تلگرام وصل نیست."], fallback="F")), "F")
+        ok = {"reply": "ارسال نشد چون تلگرام وصل نیست؛ اول وصلش کن بعد دوباره بگو."}
+        with patch.object(voice, "complete_json", new=AsyncMock(return_value=ok)):
+            self.assertEqual(_run(voice.say("tool_result", ["پست ارسال نشد؛ تلگرام وصل نیست."], fallback="F")), ok["reply"])
+
     def test_a_failure_is_never_dressed_up_as_success(self) -> None:
         lie = {"reply": "حله، رنگ را عوض کردم و روی سایت آمد."}
         with patch.object(voice, "complete_json", new=AsyncMock(return_value=lie)):
@@ -78,6 +103,11 @@ class SayTests(unittest.TestCase):
 
 
 class InterviewTests(unittest.TestCase):
+    def setUp(self) -> None:
+        patcher = patch.object(voice, "_capped", return_value=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _turn(self, payload: dict, brief: dict | None = None):
         with patch.object(voice, "complete_json_chat", new=AsyncMock(return_value=payload)), patch.object(
             voice, "_catalog_lines", return_value="کالایی نیست."
