@@ -6,11 +6,11 @@ Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Eac
 
 | role | area | harness | core | active | rare | tests | report file |
 |---|---|---|---|---|---|---|---|
-| X1 | Router and panel chat | [X1.md](X1.md) (9.3k) | 44.5k | 90.2k | 9.8k | 32.2k | `talk-x1.md` |
-| X2 | Studio, images and brand content | [X2.md](X2.md) (10.1k) | 40.7k | 81.2k | 53.6k | 32.0k | `talk-x2.md` |
+| X1 | Router and panel chat | [X1.md](X1.md) (9.4k) | 45.0k | 91.1k | 9.8k | 33.7k | `talk-x1.md` |
+| X2 | Studio, images and brand content | [X2.md](X2.md) (10.2k) | 40.7k | 81.2k | 53.6k | 32.0k | `talk-x2.md` |
 | X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (10.3k) | 15.5k | 73.0k | 1.2k | 33.8k | `talk-x3.md` |
-| X4 | Shop build and live editing | [X4.md](X4.md) (9.4k) | 30.2k | 94.6k | 2.3k | 36.2k | `talk-x4.md` |
-| X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (12.0k) | 21.9k | 77.3k | 19.2k | 48.7k | `talk-x5.md` |
+| X4 | Shop build and live editing | [X4.md](X4.md) (9.4k) | 30.2k | 95.3k | 2.3k | 36.9k | `talk-x4.md` |
+| X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (12.0k) | 21.9k | 77.3k | 19.2k | 48.9k | `talk-x5.md` |
 | Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (9.7k) | 32.5k | 65.4k | 19.8k | 35.7k | `sales-agent-talk.md` |
 | Z | Phone voice agent | [Z.md](Z.md) (4.9k) | 33.4k | 79.1k | 29.4k | 14.8k | `voice-agent-talk.md` |
 | C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (10.6k) | 19.8k | 57.6k | 11.6k | 16.2k | `storefront-talk.md` |
