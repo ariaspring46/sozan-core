@@ -279,3 +279,15 @@ def clean_options(question: str, options: list[str]) -> list[str]:
             continue
         kept.append(text)
     return kept[:5]
+
+
+_CONFIRMISH = frozenset(
+    "آره اره بله بلی باشه اوکی ok okay تایید تأیید زدم زدمش بزن بکن انجام بده حتما حتماً قبول موافقم خب خوب نه نخیر لغو انصراف کنسل ولش کن چک کنم شد دادم".split()
+)
+
+
+def is_confirmish(text: str) -> bool:
+    """A bare «آره / تأیید زدم / نه»: said while a card is open it needs the card's buttons. Anything else (a question, a new
+    topic) is answered normally; a write tool is still held back while the card is open."""
+    words = [word for word in re.split(r"[\s\u200c.,،؛:!؟?]+", (text or "").lower()) if word]
+    return 0 < len(words) <= 4 and all(word in _CONFIRMISH for word in words)

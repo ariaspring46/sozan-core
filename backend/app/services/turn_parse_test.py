@@ -37,6 +37,12 @@ class TurnParseTests(unittest.TestCase):
         self.assertEqual(parse_turn("برای باشگاه ورزشی پست بساز").subject, "باشگاه ورزشی")
         self.assertEqual(parse_turn("سلام. برای فروشگاهم یک پوستر بساز").subject, "")
 
+    def test_a_first_or_second_person_verb_is_not_a_publish_command(self) -> None:
+        for text in ("چندتا برند هستن. اسماشونو بفرستم؟", "می‌خوای بفرستی؟", "اطلاعاتشو بفرستم"):
+            self.assertNotEqual(parse_turn(text).act, "publish", text)
+        for text in ("این پست را بفرست", "منتشرش کن", "پست را منتشر کن", "بفرستش"):
+            self.assertEqual(parse_turn(text).act, "publish", text)
+
     def test_spec_file_has_the_four_states(self) -> None:
         path = Path(__file__).resolve().parents[1] / "data" / "router_spec.json"
         states = json.loads(path.read_text(encoding="utf-8"))["states"]

@@ -41,3 +41,14 @@ def vocab_subject(text: str) -> str:
 def guard(cleaned: str, original: str) -> str:
     """The cleaned phrase when it is a plain subject, else the product word the seller used (or nothing: the caller asks)."""
     return vocab_subject(original) if is_junk(cleaned) else cleaned
+
+
+_L = "\u0621-\u064A\u0670-\u06D3"
+
+
+def wants_publish(text: str, marks: list) -> bool:
+    """«بفرست / منتشر کن / انتشار» as a command. «اسماشونو بفرستم؟» (I send?) and «بفرستی» are not: a first or second person
+    verb asks or talks, it does not tell Sozan to publish the last post."""
+    return any(
+        re.search(rf"(?<![{_L}]){re.escape(str(mark))}(?:ش|ید|یدش|ین)?(?![{_L}])", text or "") for mark in marks if mark
+    )

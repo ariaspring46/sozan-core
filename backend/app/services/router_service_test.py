@@ -1360,6 +1360,15 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("پاک نمی‌کنم", out["messages"][-1]["text"])
 
 
+class OpenCardDoesNotSilenceTheChatTests(unittest.TestCase):
+    def test_only_a_bare_yes_or_no_needs_the_buttons(self) -> None:
+        from app.services import router_text
+
+        for text in ("آره", "بله", "تایید زدم", "زدم. چک کن", "نه", "باشه"):
+            self.assertTrue(router_text.is_confirmish(text), text)
+        for text in ("برا ساختن کانال باید هزینه کنم؟", "چندتا برند هستن. اسماشونو بفرستم؟", "قیمت‌ها را مخفی کن", "وضعیت فروشگاه"):
+            self.assertFalse(router_text.is_confirmish(text), text)
+
 class PagePriceClaimTests(unittest.TestCase):
     def test_prices_on_the_page_get_the_real_scan_outcome_never_a_promise(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
