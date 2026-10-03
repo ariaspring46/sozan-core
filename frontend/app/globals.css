@@ -120,13 +120,41 @@ body {
   top: var(--vv-top, 0px);
   left: var(--vv-left, 0px);
   width: var(--vv-width, 100%);
-  height: var(--app-height, 100svh);
-  max-height: var(--app-height, 100svh);
+  height: calc(var(--app-height, 100dvh) - var(--keyboard-inset, 0px));
+  max-height: calc(var(--app-height, 100dvh) - var(--keyboard-inset, 0px));
+}
+
+/* ورود و آنبورد بیرون قاب پنل‌اند؛ بدون این، کیبورد اندروید فیلد را می‌پوشاند. */
+.sozan-lamp {
+  position: fixed;
+  top: var(--vv-top, 0px);
+  left: var(--vv-left, 0px);
+  width: var(--vv-width, 100%);
+  min-height: 0;
+  height: calc(var(--app-height, 100dvh) - var(--keyboard-inset, 0px));
+  max-height: calc(var(--app-height, 100dvh) - var(--keyboard-inset, 0px));
+}
+
+html.sozan-keyboard .sozan-lamp {
+  align-items: flex-end;
+  overflow-y: auto;
+}
+
+html.sozan-keyboard .sozan-lamp > .z-10 {
+  margin-top: 0;
+  padding-top: 1.25rem;
+}
+
+html.sozan-keyboard .sozan-app-shell nav.md\:hidden {
+  display: none;
 }
 
 .sozan-app-shell input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .sozan-app-shell textarea,
-.sozan-app-shell select {
+.sozan-app-shell select,
+.sozan-lamp input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.sozan-lamp textarea,
+.sozan-lamp select {
   font-size: 16px;
 }
 
@@ -681,6 +709,9 @@ html:has(.sozan-landing) {
   opacity: 1;
   z-index: 0;
   pointer-events: none;
+  top: var(--vv-top, 0px);
+  bottom: auto;
+  height: calc(var(--app-height, 100dvh) - var(--keyboard-inset, 0px));
 }
 
 .login-code-drift {

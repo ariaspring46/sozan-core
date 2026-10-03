@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DropStaleWorkers } from "@/components/drop-stale-workers";
 import { OnboardGate } from "@/components/onboard-gate";
+import { AppViewportSync } from "@/lib/use-app-viewport";
 import { THEME_BAR, THEME_BOOT } from "@/lib/theme";
 import "./globals.css";
 
@@ -18,7 +19,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  interactiveWidget: "overlays-content",
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preload" href="/fonts/estedad-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       <body className="min-h-screen bg-canvas font-vazir text-ink antialiased">
+        <AppViewportSync />
         <DropStaleWorkers />
         <OnboardGate>{children}</OnboardGate>
       </body>

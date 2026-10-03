@@ -83,7 +83,57 @@ def check() -> list[str]:
                     problems.append(f"U5 {rel}:{n}: hex colour outside design tokens ({HEX.search(code).group(0)})")
                 if rel not in API_HOST_ALLOWED and "api.sozan-core.ir" in code:
                     problems.append(f"U6 {rel}:{n}: API host hard-coded; use getApiBase()")
+    problems.extend(check_keyboard())
     return problems
+
+
+def check_keyboard() -> list[str]:
+    """U8: mobile keyboard must resize the shell and the login lamp, without double-subtracting.
+
+    The arithmetic mirror below stays in Python because CI runs this file before Node is installed.
+    """
+    problems: list[str] = []
+    layout = (FRONT / "app" / "layout.tsx").read_text(encoding="utf-8")
+    css = (FRONT / "app" / "globals.css").read_text(encoding="utf-8")
+    hook = (FRONT / "lib" / "use-app-viewport.ts").read_text(encoding="utf-8")
+    if 'interactiveWidget: "resizes-content"' not in layout or "AppViewportSync" not in layout:
+        problems.append("U8 frontend/app/layout.tsx: keyboard viewport sync missing")
+    if "--keyboard-inset" not in css or ".sozan-lamp" not in css:
+        problems.append("U8 frontend/app/globals.css: keyboard inset missing on shell/lamp")
+    if "export function viewportFrame" not in hook or "geometrychange" not in hook:
+        problems.append("U8 frontend/lib/use-app-viewport.ts: viewportFrame/virtualKeyboard missing")
+    if "viewportTookKeyboard || vkHeight <= KEYBOARD_PX ? 0 : vkHeight" not in hook:
+        problems.append("U8 frontend/lib/use-app-viewport.ts: keyboard inset must not be subtracted twice")
+    cases = [
+        ({"vv": 500, "inner": 800, "top": 0, "vk": 0, "closed": 800}, {"app": 500, "inset": 0, "open": True, "closed": 800}),
+        ({"vv": 800, "inner": 800, "top": 0, "vk": 320, "closed": 800}, {"app": 800, "inset": 320, "open": True, "closed": 800}),
+        ({"vv": 500, "inner": 500, "top": 0, "vk": 320, "closed": 800}, {"app": 500, "inset": 0, "open": True, "closed": 800}),
+        ({"vv": 800, "inner": 800, "top": 0, "vk": 0, "closed": 800}, {"app": 800, "inset": 0, "open": False, "closed": 800}),
+        ({"vv": 720, "inner": 800, "top": 0, "vk": 0, "closed": 800}, {"app": 720, "inset": 0, "open": False, "closed": 800}),
+    ]
+    for raw, want in cases:
+        got = _viewport_frame(raw["vv"], raw["inner"], raw["top"], raw["vk"], raw["closed"])
+        if got != want:
+            problems.append(f"U8 viewportFrame: {raw} -> {got} != {want}")
+    return problems
+
+
+def _viewport_frame(vv_height: float, inner_height: float, offset_top: float, vk_height: float, closed_height: float) -> dict:
+    """Mirror of viewportFrame in frontend/lib/use-app-viewport.ts."""
+    threshold = 120
+    vv = round(vv_height)
+    inner = round(inner_height)
+    top = round(offset_top)
+    cap = round(max(inner, vv) * 0.7)
+    vk = min(cap, max(0, round(vk_height)))
+    closed = round(closed_height) or max(vv, inner)
+    vv_inset = max(0, inner - vv - top)
+    shrunk = closed - vv
+    took = vv_inset > threshold or shrunk > threshold
+    inset = 0 if took or vk <= threshold else vk
+    opened = took or inset > threshold
+    closed_next = max(vv, inner) if vk <= threshold and vv >= closed - 40 else closed
+    return {"app": vv, "inset": inset, "open": opened, "closed": closed_next}
 
 
 def main() -> int:
