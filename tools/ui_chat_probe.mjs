@@ -49,7 +49,7 @@ async function open(browser, opts = {}) {
   await page.waitForSelector("textarea", { timeout: 20000 });
   await sleep(1200);
   if (fresh) {
-    await page.getByRole("button", { name: "گفتگوی تازه" }).click();
+    await page.getByRole("button", { name: "گفتگوی تازه", exact: true }).click();
     await sleep(900);
   }
   return { ctx, page, errors };
@@ -88,7 +88,7 @@ async function say(page, text, { waitMs = 0 } = {}) {
 async function waitIdle(page, timeout = 60000) {
   // the composer stays enabled while the model works (the keyboard stays open): busy ends when Sozan's typing bubble is gone
   await sleep(300);
-  await page.waitForFunction(() => !document.querySelector(".sozan-wave"), null, { timeout });
+  await page.waitForFunction(() => !document.querySelector(".sozan-wave, [data-typing]"), null, { timeout });
   await sleep(300);
 }
 
@@ -350,7 +350,7 @@ async function main() {
       timeline.push(
         await page.evaluate(() => {
           const t = document.body.innerText;
-          return t.includes("سلام، من سوزانم") ? "welcome" : document.querySelectorAll("article").length ? "messages" : document.querySelector("textarea") ? "empty-shell" : "blank";
+          return t.includes("من سوزانم") ? "welcome" : document.querySelectorAll("article").length ? "messages" : document.querySelector("textarea") ? "empty-shell" : "blank";
         }),
       );
       await sleep(60);

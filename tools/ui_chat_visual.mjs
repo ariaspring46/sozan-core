@@ -148,13 +148,13 @@ async function interactions(browser) {
   // the typing bubble sits on the assistant's side while the reply is awaited
   ({ ctx, page } = await shoot(browser, "talk", { busy: true, name: "typing-side" }));
   const side = await page.evaluate(() => {
-    const bubble = document.querySelector('[role="status"] .sozan-wave')?.closest("div.sozan-ai, div.rounded-2xl");
+    const bubble = document.querySelector("[data-typing]");
     const mine = [...document.querySelectorAll("article")].find((a) => a.className.includes("accentStrong"));
     const r = bubble?.getBoundingClientRect();
     const u = mine?.getBoundingClientRect();
-    return { typing: r ? Math.round(r.left + r.width / 2) : -1, mine: u ? Math.round(u.left + u.width / 2) : -1, vw: innerWidth, dots: document.querySelectorAll(".sozan-wave").length, lines: document.querySelectorAll(".sozan-shimmer").length };
+    return { typing: r ? Math.round(r.left + r.width / 2) : -1, mine: u ? Math.round(u.left + u.width / 2) : -1, vw: innerWidth, orb: document.querySelectorAll("[data-typing] canvas").length, label: document.querySelector("[data-typing]")?.textContent.trim() };
   });
-  rec("typing.on-the-assistant-side", side.typing > 0 && side.typing < side.vw / 2 && side.mine > side.vw / 2 && side.dots === 3 && side.lines >= 2, JSON.stringify(side));
+  rec("typing.on-the-assistant-side", side.typing > 0 && side.typing < side.vw / 2 && side.mine > side.vw / 2 && side.orb === 1 && Boolean(side.label), JSON.stringify(side));
   await ctx.close();
 
   // empty chat: the orb is drawn and a starter card puts its opening words in the box (nothing is sent)

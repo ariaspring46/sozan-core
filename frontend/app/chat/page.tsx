@@ -1,17 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SquarePen } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ChannelAlert } from "@/components/channel-alert";
 import { GettingStarted } from "@/components/getting-started";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
-import { CHAT_STARTERS } from "@/components/chat-welcome";
+import { CHAT_STARTERS, greeting } from "@/components/chat-welcome";
+import { ChatHeader, type ThreadRow } from "@/components/chat-header";
 import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
 import { api, timeoutSignal } from "@/lib/api";
 import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
-
-type ThreadRow = { id: string; title: string; at?: number };
 
 type ChatPayload = {
   messages: ChatMsg[];
@@ -21,14 +19,6 @@ type ChatPayload = {
   threadId?: string;
   threads?: ThreadRow[];
 };
-
-function welcomeLines(brand: string) {
-  const name = brand.trim();
-  return [
-    "سلام، من سوزانم",
-    `${name ? `دستیار ${name} هستم. ` : ""}فروشگاه، محتوا یا دایرکت را ساده بگو؛ کار مهم فقط با تأیید تو انجام می‌شود.`,
-  ];
-}
 
 const STUDIO_ASPECTS = [
   { id: "post", label: "پست ۴:۵", word: "" },
@@ -216,46 +206,19 @@ export default function ChatPage() {
     <AppShell
       scene
       header={
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="shrink-0">
-            <h1 className="whitespace-nowrap font-sozan text-lg font-extrabold leading-6">سوزان</h1>
-            <p className="text-xs text-muted">دستیار فروش تو</p>
-          </div>
-          <div className="min-w-0 flex-1" />
-          {threads.length ? (
-            <label className="sr-only" htmlFor="sozan-thread">
-              گفتگوها
-            </label>
-          ) : null}
-          {threads.length ? (
-            <select
-              id="sozan-thread"
-              className="sozan-glass min-h-11 min-w-0 max-w-[9rem] rounded-full px-3 text-sm text-ink sm:max-w-[14rem]"
-              value={threadId}
-              onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
-            >
-              {threads.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.title}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          <button
-            type="button"
-            aria-label="گفتگوی تازه"
-            title="گفتگوی تازه"
-            className="sozan-glass inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-warm"
-            onClick={() => void startThread().catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
-          >
-            <SquarePen size={19} aria-hidden="true" />
-          </button>
-        </div>
+        <ChatHeader
+          busy={busy}
+          threads={threads}
+          threadId={threadId}
+          onOpen={(id) => void openThread(id).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
+          onNew={() => void startThread().catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
+          extra={messages.length ? <GettingStarted compact /> : null}
+        />
       }
     >
       <div className="flex h-full flex-col">
         <ChannelAlert />
-        <GettingStarted />
+        {messages.length ? null : <GettingStarted />}
         <div className="min-h-0 flex-1">
           <ChatThread
             messages={messages}
@@ -274,7 +237,7 @@ export default function ChatPage() {
             }
             pendingText={pending}
             welcome
-            welcomeLines={welcomeLines(brand)}
+            welcomeLines={greeting(brand)}
             starters={CHAT_STARTERS}
             aspects={STUDIO_ASPECTS}
             placeholder="به سوزان بگو…"

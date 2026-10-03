@@ -1,12 +1,11 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, CheckCircle2, Hammer, ImageIcon, Megaphone, MessageSquareText, Package, PencilRuler, Send, Sparkles, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { SozanMark } from "@/components/sozan-mark";
 import { SozanOrb } from "@/components/sozan-orb";
 
 /** ساعت پیام: امروز فقط ساعت، قدیمی‌تر روز و ساعت. */
@@ -19,11 +18,11 @@ export function shortWhen(at: number): string {
   return `${date.toLocaleDateString("fa-IR", { day: "numeric", month: "long" })}، ${time}`;
 }
 
-/** آواتار سوزان کنار حباب: نشان سوزان در دایرهٔ شیشه‌ای. */
+/** آواتار سوزان کنار حباب: همان گوی سوزان، کوچک و ساکن (یک بار کشیده می‌شود). */
 export function Avatar() {
   return (
-    <span className="sozan-glass relative mb-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
-      <SozanMark className="h-5 w-5" glow={false} />
+    <span className="relative mb-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center">
+      <SozanOrb size={34} still />
     </span>
   );
 }
@@ -34,30 +33,37 @@ export function AvatarSpacer() {
 }
 
 /**
- * وقتی مدل دارد می‌نویسد: همان‌جا که جواب می‌آید (سمت سوزان) یک حباب با نقطه‌های موجی و دو خط سایه‌ای که با رسیدن جواب جایش را می‌دهد؛
- * جای آواتار، گوی سوزان تند می‌چرخد.
+ * وقتی مدل دارد می‌نویسد: همان‌جا که جواب می‌آید (سمت سوزان) گوی سوزان تند می‌چرخد و کنارش متن درخشانی می‌گوید چه می‌کند.
  * هر چه انتظار طولانی‌تر شود متن صادقانه‌تر می‌شود تا کاربر فکر نکند برنامه قفل کرده.
  */
 export function TypingBubble({ label }: { label: string }) {
   return (
-    <div className="ms-auto flex w-fit max-w-[86%] flex-col gap-1" role="status" aria-live="polite">
-      <div className="flex items-end gap-2">
-        <div className="sozan-ai min-w-[8.5rem] rounded-[1.4rem] rounded-bl-md px-4 py-3">
-          <span className="flex items-center gap-1.5" aria-hidden>
-            <span className="sozan-wave h-2 w-2 rounded-full bg-accent" />
-            <span className="sozan-wave h-2 w-2 rounded-full bg-accent" />
-            <span className="sozan-wave h-2 w-2 rounded-full bg-accent" />
-          </span>
-          <span className="mt-2.5 block space-y-1.5" aria-hidden>
-            <span className="sozan-shimmer block h-2.5 w-36 rounded-full" />
-            <span className="sozan-shimmer block h-2.5 w-24 rounded-full" />
-          </span>
-        </div>
-        <SozanOrb size={40} busy className="-mb-1.5 -ms-1" />
-      </div>
-      <p className="me-11 text-xs text-muted">{label}</p>
+    <div className="ms-auto flex w-fit max-w-[90%] items-center gap-2" role="status" aria-live="polite" data-typing>
+      <span className="sozan-ai rounded-full px-4 py-2.5">
+        <span className="sozan-shine text-[14px] font-medium">{label}</span>
+      </span>
+      <span className="relative shrink-0">
+        <span aria-hidden className="sozan-halo absolute -inset-3 rounded-full" />
+        <SozanOrb size={44} busy className="relative" />
+      </span>
     </div>
   );
+}
+
+/**
+ * پیام‌هایی که بعد از باز شدن گفتگو رسیده‌اند (نه تاریخچه): فقط این‌ها با نوشته‌شدن تدریجی نشان داده می‌شوند.
+ * رسیدن یک‌بارهٔ چند پیام (عوض کردن گفتگو) تاریخچه حساب می‌شود.
+ */
+export function useFreshIds(ids: string[], ready: boolean): Set<string> {
+  const known = useRef<Set<string> | null>(null);
+  const fresh = useRef(new Set<string>());
+  if (ready && !known.current) known.current = new Set(ids);
+  if (known.current) {
+    const added = ids.filter((id) => !known.current?.has(id));
+    added.forEach((id) => known.current?.add(id));
+    if (added.length <= 3) added.forEach((id) => fresh.current.add(id));
+  }
+  return fresh.current;
 }
 
 export function useWaitLabel(busy: boolean, base: string): string {
@@ -73,6 +79,7 @@ export function useWaitLabel(busy: boolean, base: string): string {
   }, [busy]);
   if (secs >= 25) return "کند شده؛ هنوز منتظر جواب هستم…";
   if (secs >= 8) return "کمی طول می‌کشد؛ هنوز دارم کار می‌کنم…";
+  if (secs >= 3) return "دارم جواب را می‌چینم…";
   return base;
 }
 
@@ -81,13 +88,14 @@ export function QuickReplies({ options, disabled, onPick }: { options: string[];
   return (
     <div className="mt-3" role="group" aria-label="پاسخ‌های پیشنهادی">
       <div className="flex flex-wrap gap-2">
-        {options.map((option) => (
+        {options.map((option, index) => (
           <button
             key={option}
             type="button"
             disabled={disabled}
+            style={{ animationDelay: `${200 + index * 60}ms` }}
             onClick={() => onPick(option)}
-            className="min-h-11 rounded-full border border-accent/45 bg-accent/10 px-4 text-[14px] font-medium text-ink backdrop-blur transition active:scale-95 enabled:hover:border-accent enabled:hover:bg-accent/20 disabled:opacity-50"
+            className="sozan-rise min-h-11 rounded-full border border-accent/45 bg-accent/10 px-4 text-[14px] font-medium text-ink backdrop-blur transition active:scale-95 enabled:hover:border-accent enabled:hover:bg-accent/20 disabled:opacity-50"
           >
             {option}
           </button>

@@ -1,13 +1,12 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mic, Paperclip, SendHorizontal, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChatAttach } from "@/components/chat-attach";
 import { ChatWelcome, type ChatStarter } from "@/components/chat-welcome";
-import { useVoiceRecorder, VoiceListening } from "@/components/chat-voice";
+import { ChatComposer, type Aspect, type ChatSend, type ComposerHandle } from "@/components/chat-composer";
 import {
   Avatar,
   AvatarSpacer,
@@ -17,6 +16,7 @@ import {
   QuickReplies,
   shortWhen,
   TypingBubble,
+  useFreshIds,
   useWaitLabel,
   VoteButtons,
 } from "@/components/chat-parts";
@@ -49,7 +49,7 @@ export type ChatMsg = {
   error?: string;
 };
 
-export type ChatSend = { text: string; file?: File };
+export type { ChatSend };
 
 const SHOP_DENY = /seed phrase|bitcoin|private key|mnemonic|Traceback|FAIL:/i;
 const SHOP_WELCOME = [
@@ -64,17 +64,12 @@ export function sanitizeShopText(text: string, enabled?: boolean) {
   return text;
 }
 
-const STUDIO_WORDS = /پست|استوری|ریلز|ریل|عکس|تصویر|کمپین|بنر|کپشن/;
-const WAIT_LINES = ["دارم فکر می‌کنم…", "یک لحظه…", "جواب را می‌چینم…"];
-
 export function ChatThread({
   messages,
   busy,
   placeholder,
   onSend,
-  livePanel,
   pendingText,
-  tone = "default",
   allowMedia = true,
   publishTargets,
   onPublish,
@@ -100,9 +95,7 @@ export function ChatThread({
   busy: boolean;
   placeholder: string;
   onSend: (payload: ChatSend) => Promise<void> | void;
-  livePanel?: ReactNode;
   pendingText?: string;
-  tone?: "default" | "future";
   allowMedia?: boolean;
   publishTargets?: PublishTarget[];
   onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>;
@@ -122,16 +115,15 @@ export function ChatThread({
   persona?: string;
   showTime?: boolean;
   /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */
-  aspects?: readonly { id: string; label: string; word: string }[];
+  aspects?: readonly Aspect[];
   /** تا تاریخچه نرسیده، صفحهٔ خوشامد نشان داده نمی‌شود (سوسوی «سلام، من سوزانم» در بازدید دوباره). */
   loading?: boolean;
   /** خطا یا اعلان؛ بالای کادر نوشتن می‌نشیند تا کنار جایی باشد که کاربر دست دارد. */
   banner?: ReactNode;
 }) {
-  const [draft, setDraft] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const voice = useVoiceRecorder(setFile);
-  const [waitLine, setWaitLine] = useState(WAIT_LINES[0]);
+  const composer = useRef<ComposerHandle>(null);
+  const [typing, setTyping] = useState(false);
+  const [away, setAway] = useState(false);
   /** کارتی که فروشنده همین حالا لمسش کرد: تا آمدن جواب مدل (چند ثانیه) بسته یا «در حال انجام» می‌ماند؛ اگر درخواست شکست خورد دوباره باز می‌شود. */
   const [tapped, setTapped] = useState<Record<string, "confirm" | "cancel">>({});
   useEffect(() => {
@@ -139,76 +131,35 @@ export function ChatThread({
   }, [busy]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const draftRef = useRef<HTMLTextAreaElement>(null);
-  const future = tone === "future";
-  const waitLabel = useWaitLabel(busy, future ? waitLine : "در حال نوشتن…");
-  const canSend = Boolean((draft.trim() || (allowMedia && file)) && !busy);
+  const waitLabel = useWaitLabel(busy, "دارم فکر می‌کنم…");
+  const fresh = useFreshIds(
+    messages.map((msg) => msg.id),
+    Boolean(persona) && !loading,
+  );
 
-  const fitDraft = () => {
-    const el = draftRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 112)}px`;
-  };
-
-  const stickToEnd = () => {
+  const stickToEnd = useCallback(() => {
     const el = scrollerRef.current;
     // چت خالی پایین نمی‌رود تا گوی و سلام خوشامد از بالا دیده شوند.
     if (el && stickRef.current && el.querySelector("article")) el.scrollTop = el.scrollHeight;
-  };
-
-  useEffect(() => {
-    stickToEnd();
-  }, [messages, busy, pendingText, file]);
-
-  useEffect(() => {
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", stickToEnd);
-    return () => vv?.removeEventListener("resize", stickToEnd);
   }, []);
 
+  // پیش از نقاشی: رویداد scroll مرورگر (جابه‌جایی محتوا) نباید «دنبال کردن گفتگو» را خاموش کند.
+  useLayoutEffect(() => {
+    stickToEnd();
+  }, [messages, busy, pendingText, stickToEnd]);
+
+  // بزرگ و کوچک شدن محتوا یا قاب (اعلان، پیوست، کیبورد) گفتگو را پایین نگه می‌دارد.
   useEffect(() => {
-    fitDraft();
-  }, [draft]);
-
-  useEffect(() => {
-    if (!busy || !future) return;
-    let index = 0;
-    const timer = window.setInterval(() => {
-      index = (index + 1) % WAIT_LINES.length;
-      setWaitLine(WAIT_LINES[index]);
-    }, 2200);
-    return () => window.clearInterval(timer);
-  }, [busy, future]);
-
-  const [aspect, setAspect] = useState("");
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!canSend) return;
-    let text = draft.trim();
-    const chosen = (aspects || []).find((row) => row.id === aspect);
-    if (chosen && chosen.word && !text.includes(chosen.word)) text = `${text} (${chosen.word})`.trim();
-    const attached = file || undefined;
-    const keepKeyboard = document.activeElement === draftRef.current;
-    stickRef.current = true;
-    // مثل هر چت دیگر: کادر همان لحظه خالی می‌شود و متن در حباب «در حال ارسال» دیده می‌شود.
-    setDraft("");
-    setFile(null);
-    try {
-      await onSend({ text, file: attached });
-    } catch {
-      // ارسال نشد: متن برمی‌گردد (اگر در این فاصله چیز تازه‌ای نوشته، متن قبلی بالای آن می‌نشیند).
-      setDraft((current) => (current.trim() ? `${text}\n${current}` : text));
-      setFile((current) => current || attached || null);
-    }
-    if (keepKeyboard) window.requestAnimationFrame(() => draftRef.current?.focus());
-  }
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(stickToEnd);
+    watch.observe(el);
+    if (el.firstElementChild) watch.observe(el.firstElementChild);
+    return () => watch.disconnect();
+  }, [stickToEnd]);
 
   return (
     <div className="flex h-full flex-col bg-transparent">
-      {livePanel}
       <div
         ref={scrollerRef}
         className="sozan-fade-top min-h-0 flex-1 overflow-y-auto"
@@ -216,6 +167,7 @@ export function ChatThread({
           const el = scrollerRef.current;
           if (!el) return;
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+          setAway(!stickRef.current);
         }}
       >
         <div className="sozan-log mx-auto max-w-3xl space-y-3 px-4 pb-8 pt-5" role="log" aria-live="polite" aria-relevant="additions text" aria-label="گفتگو">
@@ -227,14 +179,7 @@ export function ChatThread({
             </div>
           ) : messages.length === 0 && !pendingText ? (
             welcome || welcomeLines ? (
-              <ChatWelcome
-                lines={welcomeLines || SHOP_WELCOME}
-                starters={starters}
-                onPick={(text) => {
-                  setDraft(text);
-                  window.requestAnimationFrame(() => draftRef.current?.focus());
-                }}
-              />
+              <ChatWelcome lines={welcomeLines || SHOP_WELCOME} starters={starters} excited={typing} onPick={(text) => composer.current?.fill(text)} />
             ) : (
               <p className="pt-10 text-center text-sm leading-7 text-muted">پیام را پایین بنویس.</p>
             )
@@ -307,7 +252,7 @@ export function ChatThread({
                     </p>
                   ) : null}
                   {msg.text ? (
-                    <p className="wrap-any whitespace-pre-wrap">
+                    <p className={cn("wrap-any whitespace-pre-wrap", msg.role === "assistant" && fresh.has(msg.id) && "sozan-reveal")}>
                       {msg.role === "assistant" ? <LinkText text={sanitizeShopText(msg.text, sanitize)} /> : sanitizeShopText(msg.text, sanitize)}
                     </p>
                   ) : null}
@@ -342,7 +287,7 @@ export function ChatThread({
                             className="h-auto py-1 text-xs"
                             disabled={busy}
                             onClick={() => {
-                              setDraft(msg.text);
+                              composer.current?.fill(msg.text);
                               onEditDraft?.({ messageId: msg.id, text: msg.text });
                             }}
                           >
@@ -482,109 +427,25 @@ export function ChatThread({
           ) : null}
         </div>
       </div>
-      <form className="sozan-dock relative z-10 -mt-6 shrink-0 space-y-2 px-3 pb-2.5 pt-5 [&>*]:mx-auto [&>*]:max-w-3xl" onSubmit={(event) => void submit(event)}>
-        {banner}
-        {file ? (
-          <div className="sozan-glass flex items-center justify-between gap-2 rounded-2xl px-3 text-sm text-muted">
-            <span className="truncate">{file.type.startsWith("image/") ? "تصویر" : file.type.startsWith("video/") ? "ویدیو" : "صدا"} · {file.name}</span>
-            <button type="button" className="inline-flex min-h-11 shrink-0 items-center px-2 text-warm" onClick={() => setFile(null)}>
-              حذف
-            </button>
-          </div>
-        ) : null}
-        {voice.recording ? <VoiceListening level={voice.level} /> : null}
-        {voice.micError ? <p className="text-sm text-danger" role="alert">{voice.micError}</p> : null}
-        {aspects?.length && STUDIO_WORDS.test(draft) ? (
-          <div className="flex items-center gap-2 px-1" role="group" aria-label="نسبت تصویر">
-            {aspects.map((row) => {
-              const on = aspect === row.id || (!aspect && row.id === "post");
-              return (
-                <button
-                  key={row.id}
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => setAspect((value) => (value === row.id ? "" : row.id))}
-                  className={cn(
-                    "tap min-h-9 rounded-xl px-3 text-[13px] font-medium",
-                    on ? "border border-accent/40 bg-accent/15 text-warm" : "sozan-glass text-muted",
-                  )}
-                >
-                  {row.label}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-        <div className="flex items-end gap-2">
-          {allowMedia ? (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                className="hidden"
-                accept="image/*,video/mp4,video/webm,audio/*"
-                onChange={(event) => {
-                  setFile(event.target.files?.[0] || null);
-                  event.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                className="sozan-glass inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full text-ink/80 shadow-card"
-                aria-label="پیوست تصویر یا ویدیو"
-                disabled={busy}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Paperclip size={20} />
-              </button>
-            </>
-          ) : null}
-          <div className="sozan-glass flex min-w-0 flex-1 items-end rounded-[1.65rem] p-[3px] ps-3 shadow-card transition focus-within:border-accent/50 focus-within:ring-4 focus-within:ring-accent/15">
-            <textarea
-              ref={draftRef}
-              className="max-h-28 min-h-11 min-w-0 flex-1 resize-none bg-transparent px-1 py-2.5 text-[16px] leading-6 outline-none"
-              rows={1}
-              value={draft}
-              enterKeyHint="send"
-              placeholder={placeholder}
-              aria-label={placeholder}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-                // روی گوشی Enter خط تازه است و دکمهٔ «بفرست» می‌فرستد؛ روی کامپیوتر Enter می‌فرستد.
-                if (window.matchMedia("(pointer: coarse)").matches) return;
-                event.preventDefault();
-                if (canSend) event.currentTarget.form?.requestSubmit();
-              }}
-            />
-            <Button
-              type="submit"
-              aria-label="بفرست"
-              className="sozan-send h-11 w-11 shrink-0 rounded-full p-0 transition-transform enabled:active:scale-90"
-              disabled={!canSend}
-              onMouseDown={(event) => event.preventDefault()}
-            >
-              <SendHorizontal size={20} className="-scale-x-100" aria-hidden />
-            </Button>
-          </div>
-          {allowMedia ? (
-            <button
-              type="button"
-              className={cn(
-                "inline-flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full shadow-card",
-                voice.recording ? "bg-danger text-onAccent" : "sozan-glass text-ink/80",
-              )}
-              aria-label={voice.recording ? "پایان ضبط" : "ضبط صدا"}
-              disabled={busy}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => void voice.toggle()}
-            >
-              {voice.recording ? <Square size={17} fill="currentColor" /> : <Mic size={20} />}
-            </button>
-          ) : null}
-        </div>
-      </form>
+      <ChatComposer
+        handle={composer}
+        busy={busy}
+        placeholder={placeholder}
+        allowMedia={allowMedia}
+        aspects={aspects}
+        banner={banner}
+        away={away && messages.length > 0}
+        onJump={() => {
+          stickRef.current = true;
+          setAway(false);
+          scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
+        }}
+        onSend={(payload) => {
+          stickRef.current = true;
+          return onSend(payload);
+        }}
+        onTyping={setTyping}
+      />
     </div>
   );
 }

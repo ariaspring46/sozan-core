@@ -811,10 +811,23 @@ html:has(.sozan-landing) {
   filter: blur(10px);
 }
 
-/* حلقهٔ مدار دور گوی با یک نقطهٔ روشن که آرام می‌چرخد */
+/* حلقهٔ مدار دور گوی با یک نقطهٔ روشن که آرام می‌چرخد؛ مدار دوم کم‌رنگ‌تر و برعکس */
 .sozan-orbit {
   border: 1px solid rgb(var(--c-accent) / 0.22);
   animation: sozan-live-orbit 14s linear infinite;
+}
+.sozan-orbit-b {
+  border-color: rgb(var(--c-accent) / 0.1);
+  border-style: dashed;
+  animation-duration: 26s;
+  animation-direction: reverse;
+}
+.sozan-orbit-b::after {
+  width: 4px;
+  height: 4px;
+  top: -2px;
+  margin-left: -2px;
+  opacity: 0.7;
 }
 .sozan-orbit::after {
   content: "";
@@ -868,8 +881,69 @@ html:has(.sozan-landing) {
   box-shadow: 0 8px 18px -6px rgb(var(--c-accent) / 0.7);
 }
 .sozan-dock .sozan-send:disabled {
-  background: transparent;
-  border-color: transparent;
+  background-color: rgb(var(--c-surface) / 0.72);
+  color: rgb(var(--c-muted));
+  box-shadow: none;
+}
+
+/* متن درخشان «دارم فکر می‌کنم…»: نوری از رویش رد می‌شود */
+.sozan-shine {
+  background-image: linear-gradient(100deg, rgb(var(--c-muted)) 30%, rgb(var(--c-warm)) 50%, rgb(var(--c-muted)) 70%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sozan-shimmer 2.2s linear infinite;
+}
+
+/* جواب تازهٔ سوزان از بالا به پایین «نوشته» می‌شود (ماسک متحرک؛ متن از اول در صفحه و برای صفحه‌خوان کامل است) */
+@property --sozan-reveal {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 120%;
+}
+@keyframes sozan-reveal {
+  from {
+    --sozan-reveal: -20%;
+  }
+  to {
+    --sozan-reveal: 120%;
+  }
+}
+.sozan-reveal {
+  -webkit-mask-image: linear-gradient(to bottom, #000 var(--sozan-reveal), transparent calc(var(--sozan-reveal) + 20%));
+  mask-image: linear-gradient(to bottom, #000 var(--sozan-reveal), transparent calc(var(--sozan-reveal) + 20%));
+  animation: sozan-reveal 1.7s cubic-bezier(0.45, 0.15, 0.55, 0.95) 0.15s backwards;
+}
+
+/* دکمهٔ «بفرست» که جای میکروفون می‌نشیند کمی می‌پرد */
+@keyframes sozan-pop {
+  from {
+    transform: scale(0.6) rotate(-25deg);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.sozan-pop {
+  animation: sozan-pop 0.28s cubic-bezier(0.3, 1.5, 0.5, 1) backwards;
+}
+
+/* برگهٔ پایین‌کش (فهرست گفتگوها) */
+@keyframes sozan-sheet {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.sozan-sheet {
+  animation: sozan-sheet 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
 
 /* ورود پیام تازه: آخرین پیام گفتگو، کارت‌ها و پنل ضبط آرام بالا می‌آیند. */
@@ -906,8 +980,16 @@ html:has(.sozan-landing) {
   .sozan-rise,
   .sozan-log > :last-child,
   .sozan-float,
-  .sozan-orbit {
+  .sozan-orbit,
+  .sozan-shine,
+  .sozan-reveal,
+  .sozan-pop,
+  .sozan-sheet {
     animation: none;
+  }
+  .sozan-reveal {
+    -webkit-mask-image: none;
+    mask-image: none;
   }
 }
 

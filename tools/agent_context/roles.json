@@ -62,6 +62,8 @@
         "frontend/components/chat-parts.tsx",
         "frontend/components/link-text.tsx",
         "frontend/components/chat-welcome.tsx",
+        "frontend/components/chat-composer.tsx",
+        "frontend/components/chat-header.tsx",
         "frontend/components/chat-voice.tsx",
         "frontend/components/sozan-orb.tsx",
         "tools/qa50_battery.json",

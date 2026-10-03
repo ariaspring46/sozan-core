@@ -72,7 +72,7 @@ Done when: every P0/P1 is fixed or has an acknowledged request in its owner's re
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.1k tokens. Your core files total 15.4k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.1k tokens. Your core files total 16.1k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -84,14 +84,14 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 15.4k | the files most tasks touch; read the relevant one first |
-| active | 77.6k | yours to edit; read only what the task needs |
+| core | 16.1k | the files most tasks touch; read the relevant one first |
+| active | 78.9k | yours to edit; read only what the task needs |
 | rare | 33.4k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
 **Core:**
 
-- `frontend/app/globals.css` (8.3k)
+- `frontend/app/globals.css` (9.0k)
 - `frontend/tailwind.config.js` (0.4k)
 - `frontend/components/app-shell.tsx` (3.9k)
 - `frontend/lib/api.ts` (1.9k)
@@ -102,8 +102,8 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 - `./`: `talk-u.md` (5.8k)
 - `frontend/`: `tailwind.config.js` (0.4k), `package.json` (0.2k), `tsconfig.json` (0.2k), `next.config.ts` (0.0k)
-- `frontend/app/`: `globals.css` (8.3k), `page.tsx` (0.5k), `layout.tsx` (0.4k)
-- `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (3.9k), `getting-started.tsx` (2.3k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
+- `frontend/app/`: `globals.css` (9.0k), `page.tsx` (0.5k), `layout.tsx` (0.4k)
+- `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (3.9k), `getting-started.tsx` (2.8k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
 - `frontend/components/ui/`: `button.tsx` (0.2k), `textarea.tsx` (0.1k), `select.tsx` (0.1k), `input.tsx` (0.1k), `card.tsx` (0.1k)
 - `frontend/lib/`: `api.ts` (1.9k), `theme.ts` (0.7k), `use-app-viewport.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.4k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
 - `tools/`: `ui_shop_mobile_probe.mjs` (8.9k), `ui_shop_probe.mjs` (6.5k), `ui_chat_probe.mjs` (6.1k), `ui_chat_visual.mjs` (4.6k), `ui_studio_probe.mjs` (3.7k), `ui_menu_probe.mjs` (2.8k), `ui_chat_live.mjs` (1.9k), `ui_check.py` (1.4k)
@@ -192,9 +192,9 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `frontend/components/auth-media.tsx`: `AuthMedia` (changed 2026-10-03) ← X2; `MEDIA_RATIO` (changed 2026-10-03) ← X2; `downloadMedia` (changed 2026-10-03) ← X2
 - `frontend/components/empty-state.tsx`: `EmptyState` (changed 2026-09-18) ← C, X2, X3, X4, X5, Y
 - `frontend/components/field.tsx`: `Field` (changed 2026-09-18) ← C, X2, X3, X5, Y
-- `frontend/components/getting-started.tsx`: `GettingStarted` (changed 2026-09-27) ← X1
+- `frontend/components/getting-started.tsx`: `GettingStarted` (changed 2026-10-03) ← X1
 - `frontend/components/login-coder-scene.tsx`: `LoginCoderScene` (changed 2026-09-18) ← X3, X5
-- `frontend/components/sozan-mark.tsx`: `SozanMark` (changed 2026-09-18) ← C, X1, X3, X4, X5
+- `frontend/components/sozan-mark.tsx`: `SozanMark` (changed 2026-09-18) ← C, X3, X4, X5
 - `frontend/components/theme-toggle.tsx`: `ThemeToggle` (changed 2026-09-27) ← X5
 - `frontend/components/ui/button.tsx`: `Button` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y
 - `frontend/components/ui/card.tsx`: `Card` (changed 2026-09-18) ← C, X2, X3, X5, Y

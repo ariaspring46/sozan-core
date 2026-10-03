@@ -38,11 +38,14 @@ function reducedMotion() {
 export function SozanOrb({
   size = 120,
   busy = false,
+  still = false,
   level,
   className,
 }: {
   size?: number;
   busy?: boolean;
+  /** فقط یک بار کشیده شود (آواتار کنار پیام‌ها): بی‌حلقهٔ انیمیشن. */
+  still?: boolean;
   level?: MutableRefObject<number>;
   className?: string;
 }) {
@@ -60,7 +63,7 @@ export function SozanOrb({
     const points = spherePoints(Math.round(Math.min(560, Math.max(110, size * 3.1))));
     let front = tone(canvas, "--orb-front");
     let back = tone(canvas, "--orb-back");
-    const still = reducedMotion();
+    const frozen = still || reducedMotion();
     const tilt = 0.42;
     const sinT = Math.sin(tilt);
     const cosT = Math.cos(tilt);
@@ -80,7 +83,7 @@ export function SozanOrb({
     const draw = (now: number) => {
       const target = Math.max(0, Math.min(1, level?.current || 0));
       shown += (target - shown) * 0.22;
-      const breathe = still ? 0 : 0.018 * Math.sin(now / 1500) + (busyRef.current ? 0.035 * Math.sin(now / 240) : 0);
+      const breathe = frozen ? 0 : 0.018 * Math.sin(now / 1500) + (busyRef.current ? 0.035 * Math.sin(now / 240) : 0);
       const half = canvas.width / 2;
       const radius = half * 0.7 * (1 + 0.24 * shown + breathe);
       const dot = dpr * Math.max(0.85, size / 105);
@@ -119,7 +122,7 @@ export function SozanOrb({
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       if (!visible || document.hidden) return;
-      if (still) {
+      if (frozen) {
         if (Math.abs((level?.current || 0) - drawnLevel) > 0.01) draw(now);
         return;
       }
@@ -147,16 +150,18 @@ export function SozanOrb({
         : new IntersectionObserver((rows) => {
             visible = rows.some((row) => row.isIntersecting);
           });
-    watch?.observe(canvas);
     draw(last);
-    frame = window.requestAnimationFrame(tick);
+    if (!still) {
+      watch?.observe(canvas);
+      frame = window.requestAnimationFrame(tick);
+    }
     return () => {
       window.cancelAnimationFrame(frame);
       watch?.disconnect();
       themeWatch.disconnect();
       scheme?.removeEventListener?.("change", retone);
     };
-  }, [size, level]);
+  }, [size, level, still]);
 
   return <canvas ref={canvasRef} aria-hidden className={cn("pointer-events-none block", className)} style={{ width: size, height: size }} />;
 }
