@@ -103,11 +103,11 @@ export function GettingStarted() {
   };
 
   return (
-    <section aria-label="شروع کار" className="mx-3 mt-2 shrink-0 overflow-hidden rounded-2xl border border-accent/30 bg-canvas shadow-sm sm:mx-4">
+    <section aria-label="شروع کار" className="sozan-glass mx-3 mt-1 shrink-0 overflow-hidden rounded-2xl sm:mx-4">
       <div className="flex items-center gap-1 px-1.5 py-1">
         {next ? (
           <Link href={next.href} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-xl px-2.5 hover:bg-paper">
-            <span className="shrink-0 rounded-full bg-paper px-2 py-0.5 text-xs text-warm">
+            <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-warm">
               {doneCount.toLocaleString("fa-IR")} از {steps.length.toLocaleString("fa-IR")}
             </span>
             <span className="min-w-0">
@@ -129,8 +129,8 @@ export function GettingStarted() {
           <X size={18} aria-hidden />
         </button>
       </div>
-      <div className="h-1 bg-line" aria-hidden>
-        <div className="h-full bg-warm" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+      <div className="h-[3px] bg-line/40" aria-hidden>
+        <div className="h-full rounded-full bg-gradient-to-l from-accent to-warm" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
       </div>
       {open ? (
         <ol className="space-y-1 p-2">

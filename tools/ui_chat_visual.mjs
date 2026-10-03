@@ -62,8 +62,9 @@ const SCENES = {
 
 const posts = [];
 
-async function shoot(browser, scene, { w = 390, h = 844, dark = false, busy = false, name } = {}) {
+async function shoot(browser, scene, { w = 390, h = 844, dark = false, busy = false, name, mic = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, isMobile: w < 800, hasTouch: w < 800, locale: "fa-IR", colorScheme: dark ? "dark" : "light" });
+  if (mic) await ctx.grantPermissions(["microphone"], { origin: BASE });
   await ctx.addInitScript((t) => {
     localStorage.setItem("sozan_token", t);
     localStorage.setItem("sozan_onboarded", "1");
@@ -147,7 +148,7 @@ async function interactions(browser) {
   // the typing bubble sits on the assistant's side while the reply is awaited
   ({ ctx, page } = await shoot(browser, "talk", { busy: true, name: "typing-side" }));
   const side = await page.evaluate(() => {
-    const bubble = document.querySelector('[role="status"] .sozan-wave')?.closest("div.rounded-2xl");
+    const bubble = document.querySelector('[role="status"] .sozan-wave')?.closest("div.sozan-ai, div.rounded-2xl");
     const mine = [...document.querySelectorAll("article")].find((a) => a.className.includes("accentStrong"));
     const r = bubble?.getBoundingClientRect();
     const u = mine?.getBoundingClientRect();
@@ -155,10 +156,47 @@ async function interactions(browser) {
   });
   rec("typing.on-the-assistant-side", side.typing > 0 && side.typing < side.vw / 2 && side.mine > side.vw / 2 && side.dots === 3 && side.lines >= 2, JSON.stringify(side));
   await ctx.close();
+
+  // empty chat: the orb is drawn and a starter card puts its opening words in the box (nothing is sent)
+  ({ ctx, page } = await shoot(browser, "empty", { name: "starter" }));
+  const orb = await page.evaluate(() => {
+    const c = document.querySelector("canvas");
+    if (!c) return { ok: false };
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    let lit = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 30) lit += 1;
+    return { ok: true, lit, cards: document.querySelectorAll('[aria-label="شروع سریع"] button').length };
+  });
+  rec("welcome.orb-drawn-and-four-cards", orb.ok && orb.lit > 500 && orb.cards === 4, JSON.stringify(orb));
+  posts.length = 0;
+  await page.getByRole("button", { name: /ساخت پست/ }).click();
+  await sleep(400);
+  const box = await page.evaluate(() => ({ value: document.querySelector("textarea")?.value, focused: document.activeElement?.tagName }));
+  rec("welcome.card-fills-the-box", box.value === "یک پست اینستاگرام بساز برای " && box.focused === "TEXTAREA" && posts.length === 0, JSON.stringify(box));
+  await ctx.close();
+
+  // voice: Chromium's fake microphone; the listening panel with the orb shows, stop leaves a voice file ready to send
+  ({ ctx, page } = await shoot(browser, "talk", { name: "voice", mic: true }));
+  await page.getByRole("button", { name: "ضبط صدا", exact: true }).click();
+  await sleep(1600);
+  const listening = await page.evaluate(() => ({
+    panel: [...document.querySelectorAll('[role="status"]')].some((el) => el.textContent.includes("دارم گوش می‌دهم")),
+    orbs: document.querySelectorAll("form canvas").length,
+  }));
+  await page.screenshot({ path: path.join(OUT, "voice-listening-390.png") });
+  rec("voice.listening-panel", listening.panel && listening.orbs === 1, JSON.stringify(listening));
+  await page.getByRole("button", { name: "پایان ضبط", exact: true }).click();
+  await sleep(900);
+  const after = await page.evaluate(() => ({
+    chip: document.querySelector("form")?.textContent.includes("صدا · voice."),
+    panel: [...document.querySelectorAll('[role="status"]')].some((el) => el.textContent.includes("دارم گوش می‌دهم")),
+  }));
+  rec("voice.stop-leaves-a-file", Boolean(after.chip) && !after.panel, JSON.stringify(after));
+  await ctx.close();
 }
 
 async function main() {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
   await interactions(browser);
   for (const scene of Object.keys(SCENES)) {
     const { ctx } = await shoot(browser, scene);
@@ -166,7 +204,7 @@ async function main() {
   }
   const typing = await shoot(browser, "talk", { busy: true, name: "typing" });
   await typing.ctx.close();
-  for (const scene of ["talk", "confirm", "post"]) {
+  for (const scene of ["empty", "talk", "confirm", "post"]) {
     const dark = await shoot(browser, scene, { dark: true });
     await dark.ctx.close();
   }

@@ -117,7 +117,7 @@ def list_products() -> dict  # changed 2026-09-18
 ```
 **`frontend/components/app-shell.tsx`** — owner U
 ```
-export function AppShell(  # changed 2026-09-18
+export function AppShell(  # changed 2026-10-03
 ```
 **`frontend/components/empty-state.tsx`** — owner U
 ```
@@ -174,7 +174,7 @@ def cosine(left: list[float], right: list[float]) -> float  # changed 2026-09-22
 **`frontend/components/chat-thread.tsx`** — owner X1
 ```
 export type ChatMsg =  # changed 2026-10-03
-export function ChatThread(  # changed 2026-10-02
+export function ChatThread(  # changed 2026-10-03
 ```
 **`backend/app/services/channel_outbound_service.py`** — owner X3
 ```

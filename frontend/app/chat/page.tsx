@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { SquarePen } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ChannelAlert } from "@/components/channel-alert";
 import { GettingStarted } from "@/components/getting-started";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
+import { CHAT_STARTERS } from "@/components/chat-welcome";
 import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
 import { api, timeoutSignal } from "@/lib/api";
 import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
@@ -24,25 +25,10 @@ type ChatPayload = {
 function welcomeLines(brand: string) {
   const name = brand.trim();
   return [
-    name ? `سلام، من سوزانم — برای ${name}.` : "سلام، من سوزانم.",
-    "فروشگاه، محتوا یا دایرکت را همین‌جا بگو.",
-    "تغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.",
+    "سلام، من سوزانم",
+    `${name ? `دستیار ${name} هستم. ` : ""}فروشگاه، محتوا یا دایرکت را ساده بگو؛ کار مهم فقط با تأیید تو انجام می‌شود.`,
   ];
 }
-
-/** نمونه‌جمله‌هایی که سوزان واقعاً انجام می‌دهد؛ در چت خالی تایپ می‌شوند. */
-const CHAT_HINTS = [
-  "برای انگشتر نقره یک پست اینستاگرام بساز",
-  "رنگ دکمه‌های فروشگاه را زرشکی کن",
-  "حس فروشگاه را لوکس و خلوت کن",
-  "یک بخش درباره ما به سایت اضافه کن",
-  "برای تخفیف یلدا پست بساز",
-  "دایرکت‌های اینستاگرام را خودکار جواب بده",
-  "دستبند چرم را با قیمت ۴۵۰٬۰۰۰ تومان اضافه کن",
-  "دامنهٔ فروشگاه من چیه؟",
-  "اینستاگرام وصل هست یا نه؟",
-  "تو چه کارهایی می‌توانی بکنی؟",
-];
 
 const STUDIO_ASPECTS = [
   { id: "post", label: "پست ۴:۵", word: "" },
@@ -228,11 +214,12 @@ export default function ChatPage() {
 
   return (
     <AppShell
+      scene
       header={
         <div className="flex min-w-0 items-center gap-2">
           <div className="shrink-0">
-            <p className="text-sm text-muted">گفتگو</p>
-            <h1 className="whitespace-nowrap text-lg font-bold">سوزان</h1>
+            <h1 className="whitespace-nowrap font-sozan text-lg font-extrabold leading-6">سوزان</h1>
+            <p className="text-xs text-muted">دستیار فروش تو</p>
           </div>
           <div className="min-w-0 flex-1" />
           {threads.length ? (
@@ -243,7 +230,7 @@ export default function ChatPage() {
           {threads.length ? (
             <select
               id="sozan-thread"
-              className="min-h-11 min-w-0 max-w-[9rem] rounded-xl border border-line bg-canvas px-2 text-sm text-ink sm:max-w-[14rem]"
+              className="sozan-glass min-h-11 min-w-0 max-w-[9rem] rounded-full px-3 text-sm text-ink sm:max-w-[14rem]"
               value={threadId}
               onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
             >
@@ -258,15 +245,15 @@ export default function ChatPage() {
             type="button"
             aria-label="گفتگوی تازه"
             title="گفتگوی تازه"
-            className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-line text-warm"
+            className="sozan-glass inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-warm"
             onClick={() => void startThread().catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
           >
-            <Plus size={20} aria-hidden="true" />
+            <SquarePen size={19} aria-hidden="true" />
           </button>
         </div>
       }
     >
-      <div className="sozan-chat flex h-full flex-col">
+      <div className="flex h-full flex-col">
         <ChannelAlert />
         <GettingStarted />
         <div className="min-h-0 flex-1">
@@ -288,7 +275,7 @@ export default function ChatPage() {
             pendingText={pending}
             welcome
             welcomeLines={welcomeLines(brand)}
-            hints={CHAT_HINTS}
+            starters={CHAT_STARTERS}
             aspects={STUDIO_ASPECTS}
             placeholder="به سوزان بگو…"
             persona="سوزان"

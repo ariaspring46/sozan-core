@@ -4,6 +4,8 @@ module.exports = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      /* گوشی کوتاه (مثلاً ۳۶۰×۶۴۰ یا کیبورد باز): صفحهٔ خوشامد چت جمع‌وجورتر می‌شود. */
+      screens: { short: { raw: "(max-height: 700px)" } },
       colors: {
         ink: "rgb(var(--c-ink) / <alpha-value>)",
         muted: "rgb(var(--c-muted) / <alpha-value>)",
