@@ -63,6 +63,20 @@ class SettingsApiGuardTests(unittest.TestCase):
         self.assertEqual(res.status_code, 403)
         self.assertEqual(stored.get("mockSms"), False)
 
+    def test_studio_keys_are_only_for_the_hub_admin(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), patch.object(settings, "admin_phone", "09135409482"), patch(
+                "app.hub_admin.is_hub_admin", side_effect=lambda phone: phone == "09135409482"
+            ):
+                seller = self._client("09121111111").get("/settings").json()
+                admin = self._client("09135409482").get("/settings").json()
+        for key in ("adminPhone", "gatewayPublicUrl", "mockSms", "otpTtlSeconds"):
+            self.assertNotIn(key, seller, key)
+            self.assertIn(key, admin, key)
+        self.assertFalse(seller["hubAdmin"])
+        self.assertTrue(admin["hubAdmin"])
+        self.assertIn("subscription", seller)
+
     def test_admin_patch_mock_sms_ok(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), patch.object(settings, "admin_phone", "09135409482"):

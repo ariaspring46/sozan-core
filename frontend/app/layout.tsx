@@ -7,6 +7,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "سوزان",
   description: "سوزان: ساخت فروشگاه، نوشتن پست و جواب دادن به مشتری، فقط با چت.",
+  // آیفون: «افزودن به صفحهٔ اصلی» مثل اپ باز شود
+  appleWebApp: { capable: true, title: "سوزان", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

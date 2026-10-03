@@ -97,9 +97,21 @@ async def feedback(body: FeedbackIn, _user=Depends(require_permission("campaigns
     return {"ok": True}
 
 
+def _for_user(data: dict[str, Any], user) -> dict[str, Any]:
+    """Studio keys (owner phone, gateway URL, OTP mode) are the hub's, not the seller's: only the hub admin sees them,
+    and `hubAdmin` tells the settings page to show its advanced section."""
+    out = dict(data)
+    admin = _is_hub_admin(user)
+    out["hubAdmin"] = admin
+    if not admin:
+        for key in STUDIO_KEYS:
+            out.pop(key, None)
+    return out
+
+
 @router.get("")
-async def read_settings(_user=Depends(require_permission("campaigns:read"))) -> dict[str, Any]:
-    return public_settings()
+async def read_settings(user=Depends(require_permission("campaigns:read"))) -> dict[str, Any]:
+    return _for_user(public_settings(), user)
 
 
 @router.patch("")
@@ -112,7 +124,7 @@ async def patch_settings(
     if any(key in patch for key in STUDIO_KEYS) and not hub_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "این تنظیمات فقط برای مدیر هاب است")
     try:
-        return save_settings(patch, hub_admin=hub_admin)
+        return _for_user(save_settings(patch, hub_admin=hub_admin), user)
     except PermissionError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     except ValueError as exc:
