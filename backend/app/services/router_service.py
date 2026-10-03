@@ -908,6 +908,38 @@ def _append(role: str, text: str, **extra) -> dict:
     return _commit(role, text, **extra)
 
 
+def _is_hostile(spoken: str) -> bool:
+    from app.services.turn_parse import parse_turn
+
+    text = spoken or ""
+    return bool(
+        _HOSTILE.search(text)
+        or _NEVER_RE.search(text)
+        or router_text.has_payment_number(text)
+        or parse_turn(text).topic in {"secret", "shaba", "other_shop"}
+    )
+
+
+async def _voice(spoken: str, text: str, *, situation: str = "reply") -> str:
+    """The router shows no fixed sentence while the model can say it. The facts stay; the words are the model's.
+
+    A refusal is voiced from the facts alone (the seller's words may be an attack). Without a model, or over the AI
+    budget, the plain text is shown."""
+    from app.services import shop_voice_service
+
+    plain = str(text or "")
+    if not plain.strip():
+        return plain
+    hostile = _is_hostile(spoken)
+    return await shop_voice_service.say(
+        situation,
+        [plain],
+        seller_text="" if hostile else spoken,
+        fallback=plain,
+        recent=None if hostile else [row for row in _messages()[-6:] if isinstance(row, dict)],
+    )
+
+
 def _commit(
     role: str,
     text: str,
@@ -1861,11 +1893,11 @@ async def _execute(
     pending = _pending()
     if cancel_id and pending.get("id") == cancel_id:
         tool = str(pending.get("tool") or "")
-        _commit("assistant", "باشه، انجامش نمی‌دهم.", clear_pending=True)
+        _commit("assistant", await _voice("", "باشه، انجامش نمی‌دهم.", situation="card_cancelled"), clear_pending=True)
         _emit("router-cancel", {"tool": tool})
         return snapshot()
     if confirm_id and pending.get("id") == confirm_id and not _card_open(pending):
-        _commit("assistant", CARD_EXPIRED, clear_pending=True)
+        _commit("assistant", await _voice("", CARD_EXPIRED, situation="card_expired"), clear_pending=True)
         _emit("router-card-expired", {"tool": str(pending.get("tool") or "")})
         return snapshot()
     if confirm_id and pending.get("id") == confirm_id:
@@ -1873,7 +1905,7 @@ async def _execute(
         args = pending.get("arguments") if isinstance(pending.get("arguments"), dict) else {}
         rejected = _reject_write(name, args)
         if rejected:
-            _commit("assistant", rejected, clear_pending=True)
+            _commit("assistant", await _voice("", rejected, situation="refused"), clear_pending=True)
             return snapshot()
         try:
             reply, extra = await _run_tool(
@@ -1887,7 +1919,7 @@ async def _execute(
                 view_target=str(pending.get("viewTarget") or ""),
             )
         except Exception as exc:
-            _append("assistant", _tool_error(name, exc))
+            _append("assistant", await _voice("", _tool_error(name, exc), situation="tool_failed"))
             return snapshot()
         _commit("assistant", reply, clear_pending=True, **extra)
         _remember_content(extra)
@@ -1899,11 +1931,11 @@ async def _execute(
     if pending.get("id") and not pending_open:
         _clear_pending()
         _append_user(original, media if isinstance(media, dict) else None)
-        _append("assistant", CARD_EXPIRED)
+        _append("assistant", await _voice(spoken, CARD_EXPIRED, situation="card_expired"))
         return snapshot()
     if _over_daily_cap(_usage_row()):
         _append_user(original, media if isinstance(media, dict) else None)
-        _append("assistant", "برای امروز کافی است؛ فردا دوباره از چت استفاده کن.")
+        _append("assistant", await _voice(spoken, "برای امروز کافی است؛ فردا دوباره از چت استفاده کن.", situation="daily_limit"))
         return snapshot()
     _append_user(original, media if isinstance(media, dict) else None)
     spoken = _merge_followup(spoken)
@@ -1911,10 +1943,10 @@ async def _execute(
     if choice["kind"] == "direct":
         _trace(path="gate")
         direct_text = str(choice.get("text") or "")
-        _append("assistant", direct_text, **_clarify_extra(direct_text))
+        _append("assistant", await _voice(spoken, direct_text, situation="direct"), **_clarify_extra(direct_text))
         return snapshot()
     if pending_open and not any(mark in spoken for mark in ("وضعیت", "صندوق", "خوانده")):
-        _append("assistant", HOLD_PENDING)
+        _append("assistant", await _voice(spoken, HOLD_PENDING, situation="card_waiting"))
         return snapshot()
 
     history = _chooser_history(spoken)
@@ -1976,6 +2008,8 @@ async def _execute(
         else:
             refusal = _refusal_reply(spoken)
             reply = refusal or _polish_model_text(spoken, str((result or {}).get("text") or ""), str((result or {}).get("finish_reason") or ""))
+            if refusal or reply == CLARIFY_FALLBACK:
+                reply = await _voice(spoken, reply, situation="refused" if refusal else "needs_detail")
             if not refusal:
                 from app.services.fallback_tally import note
 
@@ -1985,7 +2019,7 @@ async def _execute(
 
     call, dropped = _choose_call(calls)
     if call is None:
-        _append("assistant", "این کار را از چت نمی‌توانم انجام دهم.")
+        _append("assistant", await _voice(spoken, "این کار را از چت نمی‌توانم انجام دهم.", situation="refused"))
         return snapshot()
     name = str(call.get("name") or "")
     args = call.get("arguments") if isinstance(call.get("arguments"), dict) else {}
@@ -1996,31 +2030,31 @@ async def _execute(
     if dropped:
         _emit("router-extra-tools", {"kept": name, "dropped": dropped[:6]})
     if _never_tool(name):
-        _append("assistant", "این کار از چت انجام نمی‌شود.")
+        _append("assistant", await _voice(spoken, "این کار از چت انجام نمی‌شود.", situation="refused"))
         _emit("router-denied", {"tool": name[:80], "level": "never"}, status="error")
         return snapshot()
     if name not in ALLOWED:
-        _append("assistant", "این کار را از چت نمی‌توانم انجام دهم.")
+        _append("assistant", await _voice(spoken, "این کار را از چت نمی‌توانم انجام دهم.", situation="refused"))
         _emit("router-unknown-tool", {"tool": name[:80], "level": "never"}, status="error")
         return snapshot()
     rejected = _reject_write(name, args)
     if rejected:
-        _append("assistant", rejected)
+        _append("assistant", await _voice(spoken, rejected, situation="refused"))
         _emit("router-unknown-tool", {"tool": name[:80], "level": _tool_level(name)}, status="error")
         return snapshot()
     args = _stamp_content_id(name, args, spoken)
     name, direct = _authority_route(name, args, spoken, view_path, view_target)
     if pending_open and name not in READ_TOOLS and not direct:
-        _append("assistant", HOLD_PENDING)
+        _append("assistant", await _voice(spoken, HOLD_PENDING, situation="card_waiting"))
         return snapshot()
     if direct:
-        _append("assistant", _guard_reply(spoken, direct))
+        _append("assistant", await _voice(spoken, _guard_reply(spoken, direct), situation="direct"))
         _emit("router-tool", {"tool": name, "level": _tool_level(name), "applied": False})
         return snapshot()
     if name == "studio_chat":
         blocked = _studio_without_post(spoken)
         if blocked:
-            _append("assistant", blocked)
+            _append("assistant", await _voice(spoken, blocked, situation="needs_detail"))
             _emit("router-tool", {"tool": name, "level": "read", "applied": False})
             return snapshot()
     from app.services.shop_service import explicit_rebuild as _explicit_rebuild
@@ -2048,7 +2082,7 @@ async def _execute(
     if name == "ask_user":
         question, options = _ask_message(args)
         if not options and question in {"کدام را می‌خواهی؟", "کدام را می‌خواهی"}:
-            question = _fact_reply(spoken) or "این را در پروندهٔ فروشگاه ندارم."
+            question = await _voice(spoken, _fact_reply(spoken) or "این را در پروندهٔ فروشگاه ندارم.", situation="direct")
         extra = {"kind": "ask", "options": options} if options else {"kind": "ask"}
         _append("assistant", question, **extra)
         _emit("router-tool", {"tool": "ask_user", "level": "read"})
@@ -2065,9 +2099,12 @@ async def _execute(
             view_target=view_target,
         )
     except Exception as exc:
-        _append("assistant", _tool_error(name, exc))
+        _append("assistant", await _voice(spoken, _tool_error(name, exc), situation="tool_failed"))
         return snapshot()
-    _append("assistant", _guard_reply(spoken, reply), **extra)
+    guarded = _guard_reply(spoken, reply)
+    if name in READ_TOOLS:
+        guarded = await _voice(spoken, guarded, situation="status_report")
+    _append("assistant", guarded, **extra)
     _remember_content(extra)
     _emit("router-tool", {"tool": name, "level": _tool_level(name)})
     return snapshot()
