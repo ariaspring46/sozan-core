@@ -51,6 +51,7 @@
         "backend/app/services/persian_text.py",
         "backend/app/api/router_chat.py",
         "backend/app/api/chat_payload.py",
+        "backend/app/api/chat_payload_test.py",
         "backend/app/data/**",
         "backend/scripts/refresh_router_intents.py",
         "frontend/app/chat/**",
@@ -912,6 +913,7 @@
         "app.services.turn_parse_test",
         "app.services.router_text_test",
         "app.services.router_chat_behavior_test",
+        "app.api.chat_payload_test",
         "app.services.router_embed_test"
       ]
     },

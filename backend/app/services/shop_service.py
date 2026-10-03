@@ -435,13 +435,44 @@ def domain_owner(host: str) -> str:
     return ""
 
 
+def _domain_input(raw: str) -> str:
+    """Host for what the seller typed: '' for an empty box, ValueError for text that is not a usable domain.
+
+    A typo used to fall back silently to the Sozan address while the panel said «saved»; Persian names
+    (فروشگاه.ir) are converted to punycode; an IP address is not a domain."""
+    from urllib.parse import urlparse
+
+    from app.services import arvan_dns_service
+
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    host = arvan_dns_service.hostname(text)
+    if not host and any(ord(ch) > 127 for ch in text):
+        try:
+            label = (urlparse(text if "://" in text else "https://" + text).hostname or "").rstrip(".")
+            host = arvan_dns_service.hostname(label.encode("idna").decode("ascii")) if label else ""
+        except UnicodeError:
+            host = ""
+    if not host:
+        raise ValueError("این دامنه معتبر نیست. مثلاً shop.example.com بنویس.")
+    if re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", host):
+        raise ValueError("نشانی IP دامنه نیست. نام دامنه را بنویس.")
+    return host
+
+
 def set_domain(domain: str) -> dict:
     from app.services import arvan_dns_service
     from app.state_store import current_tenant
 
     shop = _shop()
-    host = arvan_dns_service.hostname(domain)
+    host = _domain_input(domain)
     if host:
+        own_public = str(shop.get("publicHost") or "").strip().lower().rstrip(".")
+        if arvan_dns_service.is_zone_host(host) and host != own_public:
+            # app.، api.، خود دامنهٔ اصلی یا نشانی آزاد زیر آن: هر کدام وارد نقشهٔ nginx می‌شد و می‌توانست
+            # reload همهٔ فروشگاه‌ها را بشکند (کلید تکراری) یا یک زیردامنهٔ سوزان را اشغال کند.
+            raise ValueError("نشانی‌های سوزان برای خود سوزان و فروشگاه‌هاست. دامنهٔ شخصی خودت را بنویس.")
         owner = domain_owner(host)
         if owner and owner != current_tenant():
             raise ValueError("این دامنه برای فروشگاه دیگری ثبت شده است.")
@@ -892,6 +923,20 @@ def _factory_status(shop: dict) -> dict:
         started_at=str(result.get("createdAt") or ""),
         elapsed=result.get("elapsedSec"),
     )
+
+
+_STATUS_WORD = {"ready": "آماده", "done": "آماده", "running": "در حال ساخت", "queued": "در صف", "failed": "ناموفق", "idle": "ساخته نشده"}
+_INTERNAL_URL_IN_TEXT = re.compile(
+    r"https?://(?:localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?\S*",
+    re.IGNORECASE,
+)
+
+
+def _seller_words(text: str, public_url: str = "") -> str:
+    """The model sometimes repeats what it was given: an internal address or «بیلد: ready». The seller reads neither."""
+    value = _INTERNAL_URL_IN_TEXT.sub(public_url, str(text or ""))
+    value = value.replace("بیلد", "ساخت")
+    return re.sub(r"\b(ready|done|running|queued|failed|idle)\b", lambda m: _STATUS_WORD[m.group(1).lower()], value, flags=re.I)
 
 
 _INTERNAL_URL = re.compile(
@@ -1975,8 +2020,8 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
         f"{shop_workspace_service.instructions_block()}\n"
         f"صفحه پیش‌نمایش: {view_path or '/'}\n"
         f"متن اشاره‌شده: {view_target or '—'}\n"
-        f"وضعیت بیلد: {build.get('status') or 'idle'} {build.get('stepLabel') or ''}\n"
-        f"نشانی: {build.get('url') or 'هنوز آماده نیست'}\n"
+        f"وضعیت ساخت: {_STATUS_WORD.get(str(build.get('status') or 'idle'), 'نامشخص')} {build.get('stepLabel') or ''}\n"
+        f"نشانی: {_seller_url(str(build.get('url') or '')) or 'هنوز آماده نیست'}\n"
         f"{_storefront_capability_notes(shop, view_path)}\n"
         f"{SHOP_LIVE_HINT if live else SHOP_SETUP_HINT}"
     )
@@ -1990,6 +2035,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
     reply = (
         (reply or "").replace("atelier", "لوکس و خلوت").replace("street", "خیابانی").replace("boutique", "بوتیک خانوادگی")
     ).strip()
+    reply = _seller_words(reply, _seller_url(str(build.get("url") or "")))
     if not reply:
         reply = "اینجام. از فروشگاه بپرس یا اگر آماده بودی بگو بساز."
     assistant = {

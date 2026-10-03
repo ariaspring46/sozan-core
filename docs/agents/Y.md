@@ -424,7 +424,7 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
 - X4/X2/X5/Y: the tool runs: edit_shop, studio_chat, settings, auto-reply ← **you**
 ```bash
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
-  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.services.router_embed_test 2>&1 | tail -3
+  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.api.chat_payload_test app.services.router_embed_test 2>&1 | tail -3
 ```
 
 **F9 — Shared core: tenant state, LLM, budget, events**

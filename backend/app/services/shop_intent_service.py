@@ -248,7 +248,7 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
         return [{"type": "reject_foreign", "reason": reason}]
     compact = text.replace("؟", "").replace("?", "").strip()
     if compact in GREET or compact.lower() in CONTINUE:
-        return [{"type": "greet"}]
+        return [{"type": "greet", "thanks": any(word in compact for word in ("مرسی", "ممنون", "تشکر"))}]
     if wants_revert(text):
         return [{"type": "revert"}]
     pinned = _pinned_write(text, target, view_path)
