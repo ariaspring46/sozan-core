@@ -57,6 +57,7 @@
         "frontend/app/chat/**",
         "frontend/components/chat-thread.tsx",
         "frontend/components/chat-attach.tsx",
+        "frontend/components/link-text.tsx",
         "frontend/components/typing-hints.tsx",
         "tools/qa50_battery.json",
         "tools/qa50_battery.py",
