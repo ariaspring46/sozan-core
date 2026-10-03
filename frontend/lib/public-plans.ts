@@ -7,6 +7,10 @@ export type PublicPlan = {
   features: string[];
   checkout: string;
   purchasable: boolean;
+  /** تعداد کانال؛ ۰ یعنی همهٔ کانال‌ها. */
+  channels?: number;
+  smsQuota?: number;
+  workspaces?: number;
 };
 
 export type PublicCatalog = {

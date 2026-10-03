@@ -3029,6 +3029,14 @@
    "X4"
   ]
  },
+ "frontend/components/chat-parts.tsx::RevealText": {
+  "owner": "X1",
+  "signature": "export function RevealText({ on, className, children }: { on: boolean; className?: string; children: ReactNode })",
+  "since": "2026-10-03",
+  "users": [
+   "U"
+  ]
+ },
  "frontend/components/chat-thread.tsx::ChatMsg": {
   "owner": "X1",
   "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; /** ابزاری که کارت تأیید برایش آمده (عنوان و نماد کارت از روی آن). */ tool?: string; confirmId?: string; options?: string[]; campaignId?: string; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
@@ -3165,6 +3173,15 @@
    "X3",
    "X4",
    "X5"
+  ]
+ },
+ "frontend/components/sozan-orb.tsx::SozanOrb": {
+  "owner": "X1",
+  "shape": "export function SozanOrb({ size = 120, busy = false, still = false, level, className, }: { size?: number; busy?: boolean; /** فقط یک بار کشیده شود (آواتار کنار پیام‌ها): بی‌حلقهٔ انیمیشن. */ still?: boolean; level?: MutableRefObject<number>; className?: string; })",
+  "signature": "export function SozanOrb(",
+  "since": "2026-10-03",
+  "users": [
+   "U"
   ]
  },
  "frontend/components/studio-publish.tsx::PublishPayload": {

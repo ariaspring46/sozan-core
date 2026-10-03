@@ -698,6 +698,7 @@
         "frontend/app/terms/**",
         "frontend/app/refund/**",
         "frontend/components/landing-page.tsx",
+        "frontend/components/landing-phone.tsx",
         "frontend/components/landing-slogan-rotator.tsx",
         "frontend/components/legal-page.tsx",
         "frontend/components/brand-logo.tsx",
