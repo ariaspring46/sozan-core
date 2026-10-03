@@ -161,7 +161,7 @@ def _topic(text: str, write: bool) -> str:
 
 
 def _act(text: str, data: dict, *, revise: bool, topic: str) -> str:
-    if any(mark in text for mark in data.get("publish_marks") or []):
+    if turn_subject.wants_publish(text, data.get("publish_marks") or []):
         return "publish"
     if revise or _has_mark(text, ["کپشن", "هشتگ", "استوری"]):
         return "studio"

@@ -1929,7 +1929,7 @@ async def _execute(
         direct_text = str(choice.get("text") or "")
         _append("assistant", await _voice(spoken, direct_text, situation="direct"), **_clarify_extra(direct_text))
         return snapshot()
-    if pending_open and not any(mark in spoken for mark in ("وضعیت", "صندوق", "خوانده")):
+    if pending_open and router_text.is_confirmish(spoken):
         await _say(spoken, HOLD_PENDING, "card_waiting")
         return snapshot()
 
