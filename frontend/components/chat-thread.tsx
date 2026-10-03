@@ -11,6 +11,7 @@ import { SozanMark } from "@/components/sozan-mark";
 import { StudioPublishCard, type PublishPayload, type PublishTarget, type StudioAttachment, type StudioCaptions } from "@/components/studio-publish";
 import { formatWhen } from "@/lib/digits";
 import { TypingHints } from "@/components/typing-hints";
+import { LinkText } from "@/components/link-text";
 
 export type ChatMsg = {
   id: string;
@@ -387,7 +388,11 @@ export function ChatThread({
                     {[msg.platformLabel || msg.platform, msg.sender].filter(Boolean).join(" · ")}
                   </p>
                 ) : null}
-                {msg.text ? <p className="wrap-any whitespace-pre-wrap">{sanitizeShopText(msg.text, sanitize)}</p> : null}
+                {msg.text ? (
+                  <p className="wrap-any whitespace-pre-wrap">
+                    {msg.role === "assistant" ? <LinkText text={sanitizeShopText(msg.text, sanitize)} /> : sanitizeShopText(msg.text, sanitize)}
+                  </p>
+                ) : null}
                 {msg.captions && !onPublish ? (
                   <div className="wrap-any mt-2 space-y-1 text-xs leading-6 text-muted">
                     {msg.captions.instagram ? <p className="whitespace-pre-wrap">اینستاگرام: {msg.captions.instagram}</p> : null}

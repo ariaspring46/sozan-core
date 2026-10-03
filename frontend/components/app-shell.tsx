@@ -102,13 +102,38 @@ export function AppShell({
   useEffect(() => {
     const isField = (el: EventTarget | null) =>
       el instanceof HTMLElement && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && !["checkbox", "radio", "file", "button", "submit"].includes((el as HTMLInputElement).type)) || el.isContentEditable);
+    // نوار پایین بعد از رها شدن انگشت/ماوس برمی‌گردد، نه وسط ضربه: اگر هنگام خروج از کادر (ضربه روی «بفرست»)
+    // همان لحظه برگردد، دکمه بین فشار و رها کردن ۵۷ پیکسل بالا می‌پرد و ضربه گم می‌شود.
+    let pointerDown = false;
+    let recheckLater = false;
+    const recheck = () => setTyping(isField(document.activeElement));
     const onIn = (event: FocusEvent) => setTyping(isField(event.target));
-    const onOut = () => window.setTimeout(() => setTyping(isField(document.activeElement)), 0);
+    const onOut = () =>
+      window.setTimeout(() => {
+        if (pointerDown) recheckLater = true;
+        else recheck();
+      }, 0);
+    const onDown = () => {
+      pointerDown = true;
+    };
+    const onUp = () => {
+      pointerDown = false;
+      if (recheckLater) {
+        recheckLater = false;
+        window.setTimeout(recheck, 80);
+      }
+    };
     document.addEventListener("focusin", onIn);
     document.addEventListener("focusout", onOut);
+    document.addEventListener("pointerdown", onDown, true);
+    document.addEventListener("pointerup", onUp, true);
+    document.addEventListener("pointercancel", onUp, true);
     return () => {
       document.removeEventListener("focusin", onIn);
       document.removeEventListener("focusout", onOut);
+      document.removeEventListener("pointerdown", onDown, true);
+      document.removeEventListener("pointerup", onUp, true);
+      document.removeEventListener("pointercancel", onUp, true);
     };
   }, []);
 

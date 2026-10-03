@@ -42,6 +42,7 @@ export default function ShopPage() {
   const [build, setBuild] = useState<BuildLive | null>(null);
   const [messages, setMessages] = useState<ShopMsg[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -65,13 +66,22 @@ export default function ShopPage() {
   const load = useCallback(async () => {
     const data = await api<ShopPayload>("/shop");
     apply(data);
+    setLoadFailed(false);
   }, []);
 
-  useEffect(() => {
+  const firstLoad = useCallback(() => {
+    setError("");
     void load()
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        setError(err.message);
+        setLoadFailed(true);
+      })
       .finally(() => setLoaded(true));
   }, [load]);
+
+  useEffect(() => {
+    firstLoad();
+  }, [firstLoad]);
 
   useEffect(() => {
     const status = shop?.status || build?.status || "";
@@ -193,7 +203,9 @@ export default function ShopPage() {
               فروشگاه
               {building ? <span className="sozan-breathe h-1.5 w-1.5 rounded-full bg-signal" /> : null}
             </p>
-            <h1 className="truncate text-lg font-bold">{shop?.brand || "فروشگاه"}</h1>
+            <h1 dir="auto" className="truncate text-lg font-bold">
+              {shop?.brand || "فروشگاه"}
+            </h1>
           </div>
           <DomainMenu
             shop={shop}
@@ -220,7 +232,7 @@ export default function ShopPage() {
           {priceBlocked ? (
             <p className="relative px-3 pt-2 text-sm text-danger">
               بدون قیمت تومان ویترین فروش نمی‌شود.{" "}
-              <Link href="/more/inventory?focus=price" className="text-warm underline">
+              <Link href="/more/inventory?focus=price" className="inline-flex min-h-11 items-center text-warm underline">
                 ثبت قیمت
               </Link>
             </p>
@@ -230,7 +242,18 @@ export default function ShopPage() {
           ) : null}
           {/* پیش‌نمایش تقریباً کل صفحه را می‌گیرد؛ «باز کردن ویترین» در نوار بالای خود پیش‌نمایش است. */}
           <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto p-2 sm:p-3">
-            {loaded && !live && !building && !build?.status ? (
+            {loaded && loadFailed && !shop ? (
+              <EmptyState
+                title="فروشگاه بالا نیامد"
+                detail="اینترنت یا سرور جواب نداد. فروشگاهت سر جایش است؛ چند لحظه بعد دوباره امتحان کن."
+                action={
+                  <Button type="button" onClick={firstLoad}>
+                    دوباره امتحان کن
+                  </Button>
+                }
+              />
+            ) : null}
+            {loaded && !loadFailed && !live && !building && !build?.status ? (
               <EmptyState
                 title="هنوز سایت فروشگاه ساخته نشده"
                 detail="در چت بگو چه حسی و چه رنگی می‌خواهی؛ بعد همین‌جا می‌سازم و هر بخشش را ویرایش می‌کنی."

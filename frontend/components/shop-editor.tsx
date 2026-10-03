@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { LinkText } from "@/components/link-text";
 
 export type ShopMsg = { id: string; role: "user" | "assistant"; text: string; at?: number };
 export type ShopSelection = { text: string; tag: string };
@@ -124,8 +125,10 @@ export function ShopEditor({
     event.preventDefault();
     const text = draft.trim();
     if (!text) return;
+    const keepKeyboard = document.activeElement === draftRef.current;
     const ok = await run(text, target ? { target } : undefined);
     if (ok) setDraft("");
+    if (keepKeyboard) window.requestAnimationFrame(() => draftRef.current?.focus());
   }
 
   function toggle(next: Tool) {
@@ -203,7 +206,7 @@ export function ShopEditor({
                 rows={2}
                 maxLength={TARGET_MAX}
                 value={selText}
-                disabled={locked}
+                readOnly={locked}
                 onChange={(event) => setSelText(event.target.value)}
                 className="w-full resize-none rounded-xl border border-field bg-paper px-3 py-2 text-[16px] leading-7 text-ink outline-none focus:border-accent"
               />
@@ -293,7 +296,7 @@ export function ShopEditor({
             id="shop-name"
             value={nameText}
             maxLength={40}
-            disabled={locked}
+            readOnly={locked}
             onChange={(event) => setNameText(event.target.value)}
             className="min-w-0 flex-1 rounded-xl border border-field bg-paper px-3 text-[16px] text-ink outline-none focus:border-accent"
           />
@@ -323,7 +326,7 @@ export function ShopEditor({
               value={ctaText}
               maxLength={30}
               placeholder="مثلاً همین حالا بخر"
-              disabled={locked}
+              readOnly={locked}
               onChange={(event) => setCtaText(event.target.value)}
               className="min-w-0 flex-1 rounded-xl border border-field bg-paper px-3 text-[16px] text-ink outline-none focus:border-accent"
             />
@@ -366,12 +369,18 @@ export function ShopEditor({
           ref={draftRef}
           id="shop-command"
           value={draft}
-          disabled={locked}
+          readOnly={locked}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={target ? "بگو با این چه کنم…" : "بگو چه چیزی در سایت عوض شود…"}
           className="min-h-11 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-muted"
         />
-        <Button type="submit" aria-label="بفرست" className="h-11 w-11 shrink-0 p-0" disabled={locked || !draft.trim()}>
+        <Button
+          type="submit"
+          aria-label="بفرست"
+          className="h-11 w-11 shrink-0 p-0"
+          disabled={locked || !draft.trim()}
+          onMouseDown={(event) => event.preventDefault()}
+        >
           <SendHorizontal size={17} className="-scale-x-100" />
         </Button>
       </form>
@@ -382,7 +391,9 @@ export function ShopEditor({
         ) : buildBusy ? (
           <span className="text-warm">سایت در حال انتشار است؛ کمی صبر کن.</span>
         ) : lastReply ? (
-          <span className="text-muted">سوزان: {friendlyReply(lastReply.text)}</span>
+          <span className="line-clamp-1 text-muted sm:line-clamp-2">
+            سوزان: <LinkText text={friendlyReply(lastReply.text)} />
+          </span>
         ) : null}
       </p>
 
@@ -401,7 +412,7 @@ export function ShopEditor({
                   row.role === "user" ? "ms-6 bg-accent/10 text-ink" : "me-6 bg-paper text-ink",
                 )}
               >
-                {row.role === "assistant" ? friendlyReply(row.text) : row.text}
+                {row.role === "assistant" ? <LinkText text={friendlyReply(row.text)} /> : row.text}
               </li>
             ))}
           </ol>
