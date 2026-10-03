@@ -39,7 +39,13 @@ function measure() {
   for (const el of document.querySelectorAll("a[href],button,[role=button],input:not([type=hidden]),select,textarea,[role=tab]")) {
     if (!visible(el)) continue;
     const r = el.getBoundingClientRect();
-    if (r.width < 44 || r.height < 44) out.small.push(`${label(el)} ${Math.round(r.width)}x${Math.round(r.height)}`);
+    // the real touch area: `.tap` widens it with an invisible ::after, and a checkbox inside a label is tapped through the label
+    const after = getComputedStyle(el, "::after");
+    const hit = after.content !== "none" && after.position === "absolute" ? { w: parseFloat(after.width) || 0, h: parseFloat(after.height) || 0 } : { w: 0, h: 0 };
+    const lab = el.closest("label") ? el.closest("label").getBoundingClientRect() : { width: 0, height: 0 };
+    const touchW = Math.max(r.width, hit.w, lab.width);
+    const touchH = Math.max(r.height, hit.h, lab.height);
+    if (touchW < 44 || touchH < 44) out.small.push(`${label(el)} ${Math.round(touchW)}x${Math.round(touchH)}`);
     if (r.right > vw + 1 || r.left < -1) out.offscreen.push(`${label(el)} left=${Math.round(r.left)} right=${Math.round(r.right)}`);
   }
   for (const el of document.querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea")) {
@@ -47,7 +53,7 @@ function measure() {
     if (visible(el) && fs < 16) out.inputs.push(`${label(el)} font ${fs}px (iOS zooms below 16px)`);
   }
   for (const el of document.querySelectorAll("h1,h2,h3,p,span,button,a,label,td")) {
-    if (!visible(el) || !el.textContent.trim()) continue;
+    if (!visible(el) || !el.textContent.trim() || el.classList.contains("sr-only")) continue; // sr-only is clipped on purpose
     const s = getComputedStyle(el);
     if ((s.overflow === "hidden" || s.textOverflow === "ellipsis" || s.overflowX === "hidden") && el.scrollWidth > el.clientWidth + 2) out.clipped.push(label(el));
   }
@@ -56,7 +62,7 @@ function measure() {
     const s = getComputedStyle(el);
     if ((s.position === "fixed" || s.position === "sticky") && visible(el)) {
       const r = el.getBoundingClientRect();
-      if (r.bottom >= window.innerHeight - 2 && parseFloat(s.paddingBottom) < 8) out.vh.push(`${label(el)}: fixed bottom bar without safe-area padding`);
+      if (r.bottom >= window.innerHeight - 2 && r.height < window.innerHeight * 0.4 && parseFloat(s.paddingBottom) < 8) out.vh.push(`${label(el)}: fixed bottom bar without safe-area padding`);
     }
   }
   out.small = [...new Set(out.small)].slice(0, 15);
