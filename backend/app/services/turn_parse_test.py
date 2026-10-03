@@ -35,6 +35,7 @@ class TurnParseTests(unittest.TestCase):
         self.assertEqual(parse_turn("یه کپشن بزن واسه چیزی که خودت میدونی").subject, "")
         self.assertIn("گردنبند", subject)
         self.assertEqual(parse_turn("برای باشگاه ورزشی پست بساز").subject, "باشگاه ورزشی")
+        self.assertEqual(parse_turn("سلام. برای فروشگاهم یک پوستر بساز").subject, "")
 
     def test_a_first_or_second_person_verb_is_not_a_publish_command(self) -> None:
         for text in ("چندتا برند هستن. اسماشونو بفرستم؟", "می‌خوای بفرستی؟", "اطلاعاتشو بفرستم"):

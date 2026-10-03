@@ -1369,6 +1369,37 @@ class OpenCardDoesNotSilenceTheChatTests(unittest.TestCase):
         for text in ("برا ساختن کانال باید هزینه کنم؟", "چندتا برند هستن. اسماشونو بفرستم؟", "قیمت‌ها را مخفی کن", "وضعیت فروشگاه"):
             self.assertFalse(router_text.is_confirmish(text), text)
 
+class PagePriceClaimTests(unittest.TestCase):
+    def test_prices_on_the_page_get_the_real_scan_outcome_never_a_promise(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                write_json("scan-status.json", {"status": "done", "productCount": 0, "handles": ["mahsoo__beauty"], "rejected": 1})
+                write_json("channel-scan.json", {"accounts": [{"platform": "instagram", "handle": "mahsoo__beauty", "fetched": False, "products": []}]})
+                for text in ("قیمت ها توی صفحه اینستاگرامم هست", "از توی پیجم گفتم بردار قیمتا رو", "عیبت اینه قیمتا رو سه بار گفتم خودت بردار", "اسکن چی شد"):
+                    direct = router_service.decide(text)
+                    self.assertEqual(direct["kind"], "direct", text)
+                    self.assertIn("mahsoo__beauty", direct["text"])
+                    self.assertIn("نتیجه‌ای نداشت", direct["text"])
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="رژ لب", price=450000, stock=1, sku="r", category="آرایشی", source="instagram", sourceHandle="mahsoo__beauty")
+                after = router_service.decide("قیمت ها توی صفحه اینستاگرامم هست")
+                self.assertNotIn("نتیجه‌ای نداشت", after.get("text", ""))
+
+    def test_a_question_about_sozans_own_request_is_not_a_price_lookup(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                self.assertNotEqual(router_service.decide("قیمت چیو میخوای")["kind"], "direct")
+                self.assertNotEqual(router_service.decide("قیمت چی را می‌خواهید؟")["kind"], "direct")
+
+    def test_a_poster_request_is_never_forced_into_a_shop_build(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                self.assertFalse(router_service._force_shop_build("سلام. برای فروشگاهم یک پوستر بساز"))
+                self.assertTrue(router_service._force_shop_build("یه فروشگاه برام بساز"))
+                self.assertTrue(router_service._force_shop_build("pinkshop528_sirjan"))
+                self.assertFalse(router_service._force_shop_build("hello"))
+
 
 class RouterVoiceTests(unittest.TestCase):
     """The gate's fixed sentences are said by the model when it can; the plain text is the fallback."""

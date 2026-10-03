@@ -126,7 +126,7 @@ def redirect_reply(text: str) -> str:
 # ---------------------------------------------------------------- what a model wrote
 
 _FENCE = re.compile(r"```[a-z]*\n?|```")
-_BOLD = re.compile(r"(\*\*|__)(.+?)\1", re.S)
+_BOLD = re.compile(r"(?<![\w])(\*\*|__)(.+?)\1(?![\w])", re.S)  # «mahsoo__beauty» is a page name, not bold
 _ITALIC = re.compile(r"(?<![\w*])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![\w*])")
 _HEADING = re.compile(r"^\s{0,3}#{1,6}\s*", re.M)
 _BULLET = re.compile(r"^\s*[-*•]\s+", re.M)
@@ -226,10 +226,11 @@ def price_problem(text: str, price: int) -> str:
 # ---------------------------------------------------------------- what is (not) a shop build, what answers a question
 
 _NOT_LETTER = r"(?<![\u0621-\u064A\u0670-\u06D3])"
-_CONTENT = re.compile(_NOT_LETTER + r"(?:پست|کپشن|استوری|ریلز|بنر|تبلیغ)(?![\u0621-\u064A\u0670-\u06D3])")
+_CONTENT = re.compile(_NOT_LETTER + r"(?:پست|کپشن|استوری|ریلز|بنر|تبلیغ|پوستر|تیزر|ویدیو|ویدئو|لوگو)(?![\u0621-\u064A\u0670-\u06D3])")
+_IMAGE_OBJECT = re.compile(r"(?<!با )(?<!با\u200c)(?:عکس|تصویر)(?:\s+\S+){0,2}\s+(?:بساز|درست\s*کن|طراحی\s*کن)")  # «با عکس بزرگ» is a trait of the shop
 _CONTENT_SKIP = re.compile(r"پست\s*(?:پیشتاز|سفارشی|ایران)|با\s*پست|ارسال")
 _STORE_WORD = r"(?:فروشگاه|ویترین|سایت|وب.?سایت)"
-_NOT_CONTENT = r"(?:(?!پست|کپشن|استوری|ریلز|بنر|تبلیغ).){0,24}"
+_NOT_CONTENT = r"(?:(?!پست|کپشن|استوری|ریلز|بنر|تبلیغ|پوستر|تیزر|ویدیو|ویدئو|لوگو|عکس|تصویر).){0,24}"
 _STORE_BUILD = re.compile(rf"{_STORE_WORD}{_NOT_CONTENT}(?:بساز|درست\s*کن|طراحی)|(?:بساز|درست\s*کن|طراحی){_NOT_CONTENT}{_STORE_WORD}")
 
 
@@ -237,9 +238,14 @@ def is_content_request(text: str) -> bool:
     """A post / caption / story request is never a shop build, even when the seller has no shop yet:
     «برای انگشتر یک پست بساز» builds a post. «فروشگاه بساز، ارسال با پست پیشتاز» is still a shop."""
     value = text or ""
-    if not _CONTENT.search(_CONTENT_SKIP.sub(" ", value)):
+    if not (_CONTENT.search(_CONTENT_SKIP.sub(" ", value)) or _IMAGE_OBJECT.search(value)):
         return False
-    return _STORE_BUILD.search(value) is None
+    built = _STORE_BUILD.search(value)
+    if built is None:
+        return True
+    # «یه لوگو برای فروشگاهم طراحی کن»: the thing to make comes first and the shop only says who it is for
+    noun = _CONTENT.search(value) or _IMAGE_OBJECT.search(value)
+    return bool(noun) and noun.start() < built.start()
 
 
 _COMPLAINT = re.compile(r"بد[یه]|هیچ|نمی.?کن|چرا|احمق|بی.?فایده|خراب|مزخرف|ضعیف|اشتباه")

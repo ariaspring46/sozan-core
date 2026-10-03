@@ -68,6 +68,11 @@ SHOP_LIVE_HINT = """فروشگاه همین الان زنده است. مصاحب
 سلام را کوتاه جواب بده. دکمهٔ بیلد فقط سایت را با next build تازه می‌کند. کارخانهٔ کامل فقط اگر صریح گفت از نو بساز."""
 
 PRICE_MISSING = "بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام."
+PRICE_HINT = "اگر قیمت نداری بگو «بدون قیمت بساز» تا ویترین فقط استعلام بگیرد."
+NO_PRODUCTS = (
+    "هنوز هیچ کالایی در کاتالوگ نیست. کالا را با عکس و قیمت از «بیشتر ← انبار» اضافه کن، یا اسم درست پیجت را بگو تا اسکن کنم، "
+    "یا بگو «بدون قیمت بساز» تا ویترین فقط استعلام بگیرد."
+)
 BUILD_MSG_ID = "shop-build-live"
 BUILD_BUSY = frozenset({"running", "queued"})
 JOB_STALE_SECONDS = 30 * 60
@@ -761,8 +766,10 @@ def _operator_error(raw: str) -> str:
         return "نسخهٔ قبلی سایت پیدا نشد؛ بگو «فروشگاه را از نو بساز»."
     if "Traceback" in text or ".py\", line" in text or '.py", line' in text:
         return SAFE_BUILD
+    if "هنوز هیچ کالایی در کاتالوگ نیست" in text:
+        return NO_PRODUCTS
     if "price_missing" in text or "بدون قیمت تومان" in text or "قیمت کالاها ثبت نشده" in text:
-        return PRICE_MISSING
+        return f"{PRICE_MISSING} {PRICE_HINT}"
     if "readiness failed: catalog" in text:
         return "کاتالوگ سایت خالی رسید؛ اول کالا اضافه کن، بعد دوباره بساز."
     if "readiness failed: http" in text:
@@ -1417,9 +1424,18 @@ def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) 
         _emit_build(result, shop, rebuild=rebuild)
         return result
     if _missing_sellable_price(shop):
+        from app.services import storefront_service
+
+        empty = not (storefront_service.list_products().get("products") or [])
         shop["error"] = PRICE_MISSING
         _save_shop(shop)
-        result = {"ok": False, "code": "price_missing", "error": PRICE_MISSING}
+        # an empty catalog is not «prices missing»: the seller must hear what to do, not be asked for prices that do not exist yet
+        result = {
+            "ok": False,
+            "code": "price_missing",
+            "reason": "no_products" if empty else "price_missing",
+            "error": NO_PRODUCTS if empty else f"{PRICE_MISSING} {PRICE_HINT}",
+        }
         _emit_build(result, shop, rebuild=rebuild)
         return result
     full_rebuild = _wants_full_rebuild(prompt)
@@ -1965,6 +1981,27 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
         _append_assistant(rows, assistant)
         return _pack(shop, rows, assistant)
     live = _shop_is_live(shop)
+    if not media_only and not live and _wants_hide_prices(raw) and not re.search(r"[؟?]", raw) and not shop.get("hidePrices"):
+        # «بدون قیمت بساز»: the seller chose an inquiry-only storefront, the build gate lets it through
+        shop = _save_shop({**shop, "hidePrices": True})
+        if not _explicit_build(raw):
+            plain = "باشه؛ ویترین بدون قیمت ساخته می‌شود و مشتری برای هر کالا استعلام می‌گیرد. وقتی آماده بودی بگو بساز."
+            reply = await shop_voice_service.say("prices_hidden", [plain], seller_text=raw, fallback=plain)
+            assistant = {"id": str(uuid4()), "role": "assistant", "text": reply, "at": int(time.time())}
+            _append_assistant(rows, assistant)
+            return _pack(shop, rows, assistant)
+    page = "" if media_only or live else channel_scan_service.handle_in_text(raw)
+    if page:
+        # the seller named their page: read it now instead of asking again (and never promise prices from a page we have not read)
+        channel_scan_service.start_scan([{"platform": "instagram", "handle": page}])
+        plain = (
+            f"پیج {page} را از اینستاگرام می‌خوانم. چند دقیقهٔ دیگر بپرس «اسکن چی شد» تا بگویم چند کالا و با چه قیمتی آمد؛ "
+            "اگر چیزی نیامد، کالا را با عکس و قیمت خودت وارد می‌کنی یا ویترین را بدون قیمت می‌سازیم."
+        )
+        reply = await shop_voice_service.say("scan_started", [plain, f"پیج: {page}"], seller_text=raw, fallback=plain)
+        assistant = {"id": str(uuid4()), "role": "assistant", "text": reply, "at": int(time.time())}
+        _append_assistant(rows, assistant)
+        return _pack(shop, rows, assistant)
     if not media_only and not live:
         catalog_reply = _catalog_add_reply(raw)
         if catalog_reply is not None:

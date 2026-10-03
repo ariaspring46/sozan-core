@@ -543,6 +543,8 @@ def _fact_reply(spoken: str) -> str:
     if topic == "price":
         from app.services.storefront_service import list_products
 
+        if router_voice.asks_about_itself(text):
+            return ""
         needle = text
         for drop in ("قیمت", "چنده", "چقدر است", "چقدر", "؟", "?"):
             needle = needle.replace(drop, "")
@@ -693,7 +695,7 @@ def _direct_reply(spoken: str) -> str:
         quick = router_text.social_reply(spoken) or router_text.redirect_reply(spoken)
         if quick:
             return quick
-    fact = _fact_reply(spoken)
+    fact = router_voice.page_prices_reply(spoken) or _fact_reply(spoken)
     if fact:
         return fact
     text = (spoken or "").strip()
@@ -868,6 +870,7 @@ def _system_prompt() -> str:
         _data_line(voice.get("toneId"), 16),
     ]
     text = " · ".join(item for item in bits if item)
+    text = router_voice.with_scan(text, shop)
     last = _last_content_line()
     if last:
         text = f"{text} · {last}" if text else last
@@ -1011,7 +1014,7 @@ def _force_shop_build(spoken: str) -> bool:
     text = spoken or ""
     if any(mark in text for mark in _NOT_A_BUILD) or router_text.is_content_request(text) or router_voice.is_hostile(text):
         return False
-    if _BUILD_SIGNAL.search(text) is None:
+    if _BUILD_SIGNAL.search(text) is None and not router_voice.names_a_page(text):
         return False
     from app.services.shop_service import current_shop as _shop
 
@@ -1262,7 +1265,7 @@ def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = ""
         label = _PUBLISH_FA.get(platform, "کانال")
         return f"این پست در {label} فرستاده شود؟{tail}"
     if name == "shop_chat":
-        return "فروشگاه از نو ساخته شود؟"
+        return router_voice.build_card(spoken, bool(_shop_public()))
     return "این تغییر اعمال شود؟"
 
 

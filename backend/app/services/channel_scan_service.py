@@ -1237,6 +1237,42 @@ async def scan_accounts(accounts: list[dict]) -> dict:
     return _save_scan(payload)
 
 
+_HANDLE_FULL = re.compile(r"(?:https?://)?(?:www\.)?(?:instagram\.com/)?(@?)([A-Za-z0-9._]{3,30})/?")
+_HANDLE_IN_SENTENCE = re.compile(r"(?:پیج|صفحه|اینستا(?:گرام)?|instagram)\s*(?:من|م|ام|ـم)?\s*(?:[:=]|اسمش|اسم|آیدی|ایدی|هست|است)?\s*@?([A-Za-z][A-Za-z0-9._]{2,29})(?![A-Za-z0-9._])", re.I)
+
+
+def handle_in_text(text: str) -> str:
+    """The Instagram page a seller names in the chat: a lone @handle / instagram.com link / handle with _ . or digits,
+    or «پیج من pinkshop_x». A bare English word is not a handle."""
+    value = (text or "").strip()
+    lone = _HANDLE_FULL.fullmatch(value)
+    if lone and (lone.group(1) or "instagram.com" in value.lower() or re.search(r"[_.\d]", lone.group(2))):
+        return lone.group(2).strip(".")
+    inside = _HANDLE_IN_SENTENCE.search(value)
+    if inside and re.search(r"[_.\d]", inside.group(1)):
+        return inside.group(1).strip(".")
+    return ""
+
+
+def scan_outcome() -> str:
+    """One honest line about what the page scan found. The model must not say prices come from a page that gave nothing."""
+    status = scan_status()
+    accounts = [row for row in (get_scan().get("accounts") or []) if isinstance(row, dict)]
+    handles = "، ".join(str(row.get("handle") or "") for row in accounts if row.get("handle")) or "، ".join(status["handles"])
+    if status["status"] == "running":
+        return f"اسکن پیج {'، '.join(status['handles']) or handles} هنوز در جریان است؛ نتیجه‌اش را بعد بپرس."
+    scanned = [row for row in storefront_service.list_products().get("products") or [] if row.get("source")]
+    if scanned:
+        return f"اسکن پیج {handles} {len(scanned)} کالا آورد."
+    if not accounts and status["status"] == "idle":
+        return "هنوز هیچ پیجی اسکن نشده؛ هیچ کالا یا قیمتی از پیج در دست نیست."
+    return (
+        f"اسکن پیج {handles or 'ثبت‌شده'} نتیجه‌ای نداشت (اینستاگرام خالی داد یا پیج خوانده نشد)؛ هیچ کالا و قیمتی از پیج نخوانده‌ام "
+        "و قیمت را نمی‌شود از پیج برداشت. راه‌ها: اسم درست پیجت را بده تا دوباره اسکن کنم، یا کالا را با عکس و قیمت از «بیشتر ← انبار» "
+        "اضافه کن، یا بگو «بدون قیمت بساز» تا ویترین فقط استعلام بگیرد."
+    )
+
+
 def brief_for_shop() -> str:
     scan = get_scan()
     products = storefront_service.list_products().get("products") or []
@@ -1274,13 +1310,19 @@ def brief_for_shop() -> str:
     categories = "، ".join(cats) or "هنوز دسته اسکن نشده"
     catalog = "\n".join(f"- {line}" for line in lines) or "هنوز کالایی از کانال نیامده"
     page = "، ".join(handles) or "هنوز پیج اسکن نشده"
+    found = bool(scanned)
     return (
+        f"نتیجهٔ اسکن: {scan_outcome()}\n"
         f"پیج اسکن‌شده: {page}\n"
         f"اسکن شبکه‌ها: {scan.get('about') or '—'}\n"
         f"رنگ‌های دیده‌شده: {colors}\n"
         f"دسته‌بندی کانال: {categories}\n"
         f"کالاهای پیدا شده:\n{catalog}\n"
-        f"همین کاتالوگ را استفاده کن. نگو به پیج یا اینستاگرام دسترسی نداری. از همین عکس‌های کانال برای کارت کالا استفاده کن. تصویر ساختگی نساز."
+        + (
+            "همین کاتالوگ را استفاده کن. نگو به پیج یا اینستاگرام دسترسی نداری. از همین عکس‌های کانال برای کارت کالا استفاده کن. تصویر ساختگی نساز."
+            if found
+            else "از پیج چیزی نخوانده‌ای: نگو قیمت‌ها را از پیج برمی‌داری و قول اسکن نده؛ صادقانه بگو اسکن نتیجه نداشت و راه‌های بالا را بگو. تصویر ساختگی نساز."
+        )
     )
 
 # ---- Public API for other roles (docs/agents). Wrappers call the private names at call time, so tests that patch those still work.

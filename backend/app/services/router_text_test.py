@@ -74,6 +74,16 @@ class ModelTextTests(unittest.TestCase):
         for text in ("یه فروشگاه بساز", "فروشگاه بساز، ارسال با پست پیشتاز", "سایت فروشگاهی برام درست کن و پست هم بزن", "حس گرم و رنگ قهوه‌ای می‌خوام"):
             self.assertFalse(router_text.is_content_request(text), text)
 
+    def test_a_poster_logo_or_picture_request_is_content_not_a_shop_build(self) -> None:
+        for text in ("سلام. برای فروشگاهم یک پوستر بساز", "برای فروشگاهم یک عکس بساز", "یه لوگو برای فروشگاهم طراحی کن", "یک ویدیو تبلیغاتی برای فروشگاهم بساز"):
+            self.assertTrue(router_text.is_content_request(text), text)
+        for text in ("یه فروشگاه با عکس بزرگ بساز", "فروشگاهم را بساز با رنگ صورتی"):
+            self.assertFalse(router_text.is_content_request(text), text)
+
+    def test_a_page_name_with_underscores_survives_markdown_cleaning(self) -> None:
+        self.assertEqual(router_text.strip_markdown("پیج mahsoo__beauty و pinkshop528_sirjan را خواندم"), "پیج mahsoo__beauty و pinkshop528_sirjan را خواندم")
+        self.assertEqual(router_text.strip_markdown("**مهم** است"), "مهم است")
+
     def test_only_a_real_answer_continues_the_question_before_it(self) -> None:
         self.assertTrue(router_text.answers_ask("کدام صفحه را بسازم؟", "درباره ما"))
         self.assertTrue(router_text.answers_ask("قیمت گردنبند فیروزه چند تومان باشد؟", "۸۵۰ هزار"))
