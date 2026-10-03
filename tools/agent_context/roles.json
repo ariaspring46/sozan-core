@@ -705,6 +705,7 @@
         "tools/ui_chat_probe.mjs",
         "tools/ui_shop_probe.mjs",
         "tools/ui_shop_mobile_probe.mjs",
+        "tools/ui_menu_probe.mjs",
         "tools/ui_studio_probe.mjs",
         "tools/ui_mobile_audit.mjs",
         "docs/ui-audit-live/**"
