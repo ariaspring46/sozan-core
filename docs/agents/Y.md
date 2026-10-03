@@ -308,7 +308,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `backend/app/api/inbox.py`: `router` (changed 2026-09-18) ← X5
 - `backend/app/services/claims_guard.py`: `check` (changed 2026-09-27) ← X2
 - `backend/app/services/inbox_service.py`: `expire_stale_sending` (changed 2026-09-18) ← X5; `handle_inbound` (changed 2026-09-18) ← X3; `list_publish_audience` (changed 2026-09-21) ← X1, X2; `list_threads` (changed 2026-09-18) ← X1; `rearm_pending_auto_replies` (changed 2026-09-26) ← X5; `save_auto_reply` (changed 2026-09-18) ← X1; `unread_count` (changed 2026-09-18) ← X1
-- `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X1, X5
+- `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X1, X4, X5
 - `backend/app/services/sales_policy_service.py`: `public_policy` (changed 2026-09-27) ← X5; `save_policy` (changed 2026-09-27) ← X5
 - `backend/app/services/training_log.py`: `log_example` (changed 2026-09-28) ← X1, X2, X4; `log_label` (changed 2026-09-28) ← X5
 - `backend/app/services/voice_service.py`: `apply_tone` (changed 2026-09-18) ← X1, X3; `get_voice` (changed 2026-09-18) ← X3, X5; `learn` (changed 2026-09-18) ← X3; `merge_summary` (changed 2026-09-18) ← X3

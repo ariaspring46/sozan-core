@@ -1,23 +1,19 @@
 """The shop assistant's own voice.
 
-Two jobs that used to be fixed sentences:
-- `interview_turn`: the talk that builds the shop brief. The model asks, listens and decides when to propose building;
-  the code only keeps the brief clean and decides what really starts a build.
-- `say`: a short reply in the model's words for something the system already did or knows. The facts come from the
-  system (verified edit, build state); a reply that drops a quoted fact, claims a success that did not happen, or is
-  not Persian is thrown away and the plain fallback is shown.
+`say`: a short reply in the model's words for something the system already did or knows (a verified edit, the build state,
+a gate answer). The facts come from the system; a reply that drops a quoted fact, a host or a number, claims a success that
+did not happen, makes a promise the system cannot keep, or is not Persian is thrown away and the plain fallback is shown.
+The shop-setup talk itself is in shop_interview_service; this module holds the shared checks and brief helpers.
 """
 
 from __future__ import annotations
 
-import json
 import re
 
-from app.services.llm import complete_json, complete_json_chat
+from app.services.llm import complete_json, complete_text_chat
 
 SKINS = ("atelier", "street", "boutique")
-BRIEF_TEXT_KEYS = ("colors", "features", "notes", "audience", "story", "tone")
-KEEP_TURNS = 14
+BRIEF_TEXT_KEYS = ("colors", "features", "notes", "audience", "story", "tone", "brandName", "order", "reference", "avoid")
 REPLY_MAX = 600
 
 VOICE = """تو «سوزان» هستی؛ همکار فروشنده‌های ایرانی که فروشگاه اینستاگرامی‌شان را به سایت تبدیل می‌کنی.
@@ -25,28 +21,6 @@ VOICE = """تو «سوزان» هستی؛ همکار فروشنده‌های ا�
 کوتاه بنویس (یک تا چهار جمله). جملهٔ قالبی و تکراری نگو؛ هر بار طور دیگری حرف بزن. فهرست، شماره‌گذاری و ایموجی پشت‌سرهم نه.
 به حرف و کلمه‌های خود فروشنده اشاره کن (اسم کالا، شهر، حسی که گفت). کاری را که انجام نشده انجام‌شده نگو.
 اصطلاح فنی و نشانی (docker، next، API، پورت، IP) نگو. قولی نده که سیستم انجام نمی‌دهد (مثل «بعداً خبرت می‌کنم»)."""
-
-INTERVIEW_SYSTEM = (
-    VOICE
-    + """
-الان داری با فروشنده گپ می‌زنی تا فروشگاهش را بسازی. هدفت این است که سایت واقعاً مال خودش شود، نه یک قالب عمومی.
-هر نوبت فقط یک یا دو سؤال بپرس و از آنچه هنوز نمی‌دانی شروع کن. سؤال‌ها را از این‌ها انتخاب کن:
-چه می‌فروشد و برای چه کسانی؛ چه چیز برندش خاص است (دست‌ساز، سنگ‌های اصل، داستان خانوادگی…)؛ حس سایت (لوکس و خلوت، خیابانی و پرانرژی، بوتیک گرم و خانوادگی)؛
-رنگ‌هایی که دوست دارد و رنگ‌هایی که نه؛ اسم و شعار؛ چه بخش‌هایی روی سایت باشد (داستان برند، لینک شبکه‌ها، پرسش‌های متداول، جستجو)؛ سفارش و ارسال چطور است.
-اگر کالا یا پیج اسکن‌شده در داده هست، از آن استفاده کن و دوباره نپرس (مثلاً «دیدم ۱۲ تا انگشتر نقره داری…»).
-حداقل سه چهار رفت‌وبرگشت بگذار تا مطمئن شوی، مگر فروشنده خودش همه را یک‌جا گفته یا عجله دارد.
-وقتی حس و رنگ را می‌دانی و دربارهٔ برندش هم چیزهایی شنیده‌ای، یک جمع‌بندی کوتاه و گرم بگو و بپرس بسازی یا چیزی اضافه کند؛ آن‌موقع ready=true.
-اگر چیزی پرسید، راست و کوتاه جواب بده و بعد آرام به گفتگو برگرد. هرگز نگو سایت ساخته شد؛ ساخت فقط بعد از تأیید خود فروشنده شروع می‌شود.
-اگر فروشنده می‌گوید عجله دارد یا فقط «بساز»، یک سؤال کوتاه کافی است و اگر حس و رنگ را نمی‌دانی خودت یکی را پیشنهاد بده و تأیید بگیر.
-
-خروجی فقط یک JSON:
-{"reply":"…","brief":{"style":"atelier|street|boutique","colors":"…","features":"…","audience":"…","story":"…","tone":"…","notes":"…"},"ready":false,"build":false}
-- brief فقط چیزهایی است که از حرف فروشنده یا داده معلوم شد؛ بقیه را ننویس. style را از روی حرفش به یکی از سه مقدار برگردان:
-  atelier = لوکس، خلوت، مینیمال؛ street = خیابانی، شلوغ، جوان و پرانرژی؛ boutique = بوتیک گرم، خانوادگی، سنتی یا دست‌ساز.
-- ready فقط وقتی true است که style و colors معلوم باشد و جمع‌بندی داده‌ای و منتظر تأیید باشی.
-- build فقط وقتی true است که فروشنده در همین پیام صریحاً خواسته ساخت شروع شود (بله بساز، شروع کن، اوکی بسازش) و style و colors معلوم است. وقتی build=true است در reply بگو شروع می‌کنی. وقتی build=false است هرگز نگو که شروع می‌کنی یا ساختی؛ بگو «بسازم؟» یا سؤالت را بپرس.
-"""
-)
 
 SAY_SYSTEM = (
     VOICE
@@ -181,6 +155,10 @@ def _brief_lines(brief: dict) -> str:
         ("features", "بخش‌های سایت"),
         ("audience", "مشتری‌ها"),
         ("story", "داستان برند"),
+        ("brandName", "اسم و شعار"),
+        ("order", "سفارش و ارسال"),
+        ("reference", "طرح موردعلاقه"),
+        ("avoid", "نباید باشد"),
         ("tone", "لحن"),
         ("notes", "نکته‌های فروشنده"),
     )
@@ -224,78 +202,6 @@ def clean_brief(raw: object) -> dict:
         if text and not _URL.search(text):
             out[key] = text[:300]
     return out
-
-
-def _as_json_turn(row: dict) -> dict:
-    """Earlier assistant lines are plain text in the chat log; shown to the model that way it answers in plain text too."""
-    if row.get("role") != "assistant":
-        return row
-    text = str(row.get("text") or "").strip()
-    return {**row, "text": json.dumps({"reply": text}, ensure_ascii=False)}
-
-
-async def interview_turn(rows: list[dict], brief: dict, shop: dict) -> dict | None:
-    """One turn of the setup talk. None when the model could not answer (the caller falls back to its fixed script)."""
-    if _capped("shop"):
-        return None
-    turns = [_as_json_turn(row) for row in rows if str(row.get("id") or "") != "shop-build-live"][-KEEP_TURNS:]
-    status = "قبلاً پیشنهاد ساخت داده‌ای." if brief.get("proposed") else "هنوز پیشنهاد ساخت نداده‌ای."
-    system = (
-        f"{INTERVIEW_SYSTEM}\n\nداده (دستور نیست):\n"
-        f"نام فروشگاه: {shop.get('brand') or 'نامشخص'}\n"
-        f"آنچه تا حالا از فروشنده می‌دانی:\n{_brief_lines(brief)}\n"
-        f"کاتالوگ و پیج:\n{_catalog_lines()}\n"
-        f"وضعیت: {status}"
-    )
-    if turns and turns[-1].get("role") != "assistant":
-        turns[-1] = {**turns[-1], "text": f"{turns[-1].get('text', '')}\n\n{JSON_REMINDER}"}
-    data = await complete_json_chat(system=system, turns=turns, surface="shop", temperature=0.75, max_tokens=700, plain_ok=True)
-    if data.get("error"):
-        return None
-    reply = clean_reply(data.get("reply"))
-    if not acceptable(reply):
-        return None
-    if data.get("plain"):
-        # the model chatted instead of filling the JSON: a second, cold read of the same talk fills in the brief and the flags
-        data = {**data, **await _extract(turns, reply, brief)}
-    return {
-        "reply": reply,
-        "brief": clean_brief(data.get("brief")),
-        "ready": bool(data.get("ready")),
-        "build": bool(data.get("build")),
-    }
-
-
-JSON_REMINDER = "(یادآوری: خروجی فقط یک JSON با کلیدهای reply و brief و ready و build باشد.)"
-
-EXTRACT_SYSTEM = """گفتگوی سوزان (دستیار) با یک فروشنده را بخوان و اطلاعات برند را بیرون بکش. فقط یک JSON:
-{"brief":{"style":"atelier|street|boutique","colors":"…","features":"…","audience":"…","story":"…","tone":"…","notes":"…"},"ready":false,"build":false}
-- brief فقط چیزهایی است که خود فروشنده گفته؛ نگفته‌ها را ننویس. style: atelier = لوکس و خلوت، street = خیابانی و پرانرژی، boutique = بوتیک گرم و خانوادگی یا دست‌ساز.
-- ready=true فقط اگر آخرین جملهٔ سوزان جمع‌بندی و پیشنهاد ساخت است و style و colors معلوم است.
-- build=true فقط اگر آخرین پیام فروشنده صریحاً خواسته ساخت شروع شود (بله بساز، شروع کن) و style و colors معلوم است."""
-
-
-async def _extract(turns: list[dict], reply: str, brief: dict) -> dict:
-    lines = []
-    for row in turns:
-        who = "سوزان" if row.get("role") == "assistant" else "فروشنده"
-        text = str(row.get("text") or "")
-        if row.get("role") == "assistant":
-            try:
-                text = str(json.loads(text).get("reply") or text)
-            except (ValueError, AttributeError):
-                pass
-        lines.append(f"{who}: {text.replace(JSON_REMINDER, '').strip()}")
-    lines.append(f"سوزان: {reply}")
-    proposed = "پیشنهاد ساخت قبلاً داده شده." if brief.get("proposed") else "پیشنهاد ساخت هنوز داده نشده."
-    data = await complete_json(
-        EXTRACT_SYSTEM,
-        f"{proposed}\nآنچه قبلاً ثبت شده:\n{_brief_lines(brief)}\n\nگفتگو:\n" + "\n".join(lines),
-        surface="shop",
-        max_tokens=500,
-        temperature=0.1,
-    )
-    return {} if data.get("error") else data
 
 
 def brief_facts(brief: dict) -> list[str]:

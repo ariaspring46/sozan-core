@@ -1763,9 +1763,9 @@
    "Y"
   ]
  },
- "backend/app/services/llm.py::complete_json_chat": {
+ "backend/app/services/llm.py::complete_text_chat": {
   "owner": "X5",
-  "signature": "async def complete_json_chat(*, system: str, turns: list[dict], surface: str='shop', temperature: float=0.7, max_tokens: int=900, plain_ok: bool=False) -> dict",
+  "signature": "async def complete_text_chat(*, system: str, turns: list[dict], surface: str='shop', temperature: float=0.7, max_tokens: int=500) -> str | None",
   "since": "2026-10-03",
   "users": [
    "X4"
@@ -1996,6 +1996,7 @@
   "since": "2026-09-27",
   "users": [
    "X1",
+   "X4",
    "X5"
   ]
  },

@@ -1837,11 +1837,11 @@ def _interview_turn(text: str, brief: dict) -> str | None:
 
 
 async def _guided_turn(raw: str, rows: list[dict], brief: dict, shop: dict) -> str | None:
-    """The setup talk: the model interviews the seller and decides when to propose building; the fixed script is the fallback.
+    """The setup talk (shop_interview_service: assess, decide, speak); the fixed script is the fallback.
 
-    A build starts only when the seller asked for it in this message (the model's `build` flag, or typing «بساز» themselves)
-    and the brief has a style and colours."""
-    from app.services import onboard_service, shop_voice_service
+    A build starts only when the seller confirmed a proposal made on the previous turn (or typed «بساز» themselves
+    with a style and colours already known)."""
+    from app.services import onboard_service, shop_interview_service, shop_voice_service
 
     if str(shop.get("status") or "") in BUILD_BUSY:
         return None
@@ -1850,20 +1850,27 @@ async def _guided_turn(raw: str, rows: list[dict], brief: dict, shop: dict) -> s
         return None
     if _explicit_build(raw) and ready:
         return None
-    turn = await shop_voice_service.interview_turn(rows, brief, shop)
+    turn = await shop_interview_service.turn(rows, brief, shop)
     if turn is None:
         return _interview_turn(raw, brief)
-    patch = dict(turn["brief"])
-    patch["proposed"] = bool(turn["ready"])
-    saved = onboard_service.save_brief(patch)
-    if turn["build"] and onboard_service.brief_ready(saved) and not raw.rstrip().endswith(("؟", "?")):
-        result = start_build(prompt=raw, rebuild=bool(shop.get("slug")), revise_only=None)
-        if not (result.get("ok") or result.get("queued")):
-            detail = _operator_error(str(result.get("error") or result.get("message") or ""))
-            if detail and detail != SAFE_BUILD and "مشکل موقت" not in detail:
-                return f"ساخت شروع نشد: {detail}"
-            return "ساخت الان ممکن نیست، چند دقیقهٔ دیگر."
-    return str(turn["reply"])
+    if turn.get("skip"):
+        return None
+    if not turn["build"]:
+        return str(turn["reply"])
+    result = start_build(prompt=raw, rebuild=bool(shop.get("slug")), revise_only=None)
+    if not (result.get("ok") or result.get("queued")):
+        detail = _operator_error(str(result.get("error") or result.get("message") or ""))
+        if detail and detail != SAFE_BUILD and "مشکل موقت" not in detail:
+            return f"ساخت شروع نشد: {detail}"
+        return "ساخت الان ممکن نیست، چند دقیقهٔ دیگر."
+    plain = "ساخت فروشگاه شروع شد. مرحله‌ها را همین‌جا می‌بینی."
+    return await shop_voice_service.say(
+        "build_started",
+        [plain, *shop_voice_service.brief_facts(onboard_service.get_brief())],
+        seller_text=raw,
+        fallback=plain,
+        patched=True,
+    )
 
 
 def _pack(shop: dict, rows: list[dict], assistant: dict | None = None, extra: dict | None = None) -> dict:

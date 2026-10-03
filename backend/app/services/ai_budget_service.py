@@ -28,8 +28,9 @@ DEFAULTS: dict[str, Any] = {
     "company": {"dailyUsd": 10.0},
     # Owner-approved 2026-09-28: monthly cloud spend = 30% of the discounted
     # plan price; weekly = /4, daily = weekly/3, at ~230,000 toman per USD.
+    # Free plan raised by the owner on 2026-10-03 (0.002/0.006 allowed about six interview turns a day).
     "plans": {
-        "free": {"dailyUsd": 0.002, "weeklyUsd": 0.006},
+        "free": {"dailyUsd": 0.05, "weeklyUsd": 0.1},
         "pro": {"dailyUsd": 0.15, "weeklyUsd": 0.46},
         "promax": {"dailyUsd": 0.21, "weeklyUsd": 0.63},
         "ultra": {"dailyUsd": 0.29, "weeklyUsd": 0.88},
