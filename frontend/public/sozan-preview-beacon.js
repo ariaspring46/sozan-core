@@ -150,6 +150,19 @@
     }
   }
 
+  function undoPatches(to) {
+    var list = loadPatches().filter(function (patch) {
+      return !patch || typeof patch.seq !== "number" || patch.seq <= to;
+    });
+    savePatches(list);
+    try {
+      sessionStorage.removeItem(STORE + "-colors");
+    } catch (err) {
+      /* ignore */
+    }
+    report({ undone: true });
+  }
+
   function boxEl(kind) {
     var node = document.createElement("div");
     node.setAttribute("data-sozan-ui", "1");
@@ -208,7 +221,53 @@
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 80);
-    return { tag: tag, text: text };
+    var out = { tag: tag, text: text };
+    var src = imageSrc(el);
+    if (src) {
+      // a picture's name is its alt text, not the words of whatever sits on top of it
+      out.text = String(el.getAttribute("alt") || el.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim().slice(0, 80);
+      out.kind = "image";
+      out.src = src.slice(0, 1000);
+      out.alt = String(el.getAttribute("alt") || "").slice(0, 80);
+    } else {
+      out.kind = ownText(el) ? "text" : "block";
+    }
+    return out;
+  }
+
+  function imageSrc(el) {
+    if (!el || el.nodeType !== 1) return "";
+    var tag = String(el.tagName || "").toLowerCase();
+    if (tag === "img") return el.currentSrc || el.getAttribute("src") || "";
+    try {
+      var bg = window.getComputedStyle(el).backgroundImage || "";
+      var match = /url\((['"]?)(.*?)\1\)/.exec(bg);
+      return match ? match[2] : "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  var FORM_TAGS = { input: 1, textarea: 1, select: 1, option: 1 };
+
+  /** What a finger at (x, y) means: text if the top element carries text, else the picture under it. */
+  function targetAt(x, y) {
+    var stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [document.elementFromPoint(x, y)];
+    var top = null;
+    var image = null;
+    for (var i = 0; i < stack.length; i++) {
+      var el = stack[i];
+      if (!el || el.nodeType !== 1) continue;
+      if (el.getAttribute && el.getAttribute("data-sozan-ui")) continue;
+      var tag = String(el.tagName || "").toLowerCase();
+      if (tag === "html" || tag === "body") continue;
+      if (!top) top = el;
+      if (!image && imageSrc(el)) image = el;
+    }
+    if (!top) return null;
+    if (FORM_TAGS[String(top.tagName || "").toLowerCase()]) return null;
+    if (ownText(top)) return meaningful(top);
+    return meaningful(image || top);
   }
 
   function showLabel(el) {
@@ -248,15 +307,130 @@
       applyPatch({ reset: true }, false);
       return;
     }
+    if (data.type === "undo") {
+      undoPatches(typeof data.to === "number" ? data.to : 0);
+      return;
+    }
+    if (data.type === "clear") {
+      selected = null;
+      if (selectBox) selectBox.style.display = "none";
+      if (hoverBox) hoverBox.style.display = "none";
+      if (tagLabel) tagLabel.style.display = "none";
+      return;
+    }
     if (data.type === "apply") applyPatch(data.patch || {}, true);
   });
 
+  hoverBox = boxEl("hover");
+  selectBox = boxEl("select");
+
+  function selectEl(el, extra) {
+    selected = el;
+    place(selectBox, el);
+    place(hoverBox, null);
+    showLabel(el);
+    var payload = { pick: describe(el) };
+    if (extra) for (var key in extra) payload[key] = extra[key];
+    report(payload);
+  }
+
+  // A finger held on any part of the page (also while browsing) picks it for editing.
+  var LONG_MS = 480;
+  var MOVE_PX = 10;
+  var press = null;
+  var swallowUntil = 0;
+
+  function cancelPress() {
+    if (!press) return;
+    window.clearTimeout(press.timer);
+    window.clearTimeout(press.hint);
+    press = null;
+    place(hoverBox, null);
+  }
+
+  var guard = document.createElement("style");
+  guard.setAttribute("data-sozan-ui", "1");
+  guard.textContent =
+    "html,body{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}" +
+    "input,textarea{-webkit-user-select:text;user-select:text}";
+  document.documentElement.appendChild(guard);
+
+  document.addEventListener(
+    "pointerdown",
+    function (event) {
+      cancelPress();
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      if (event.target && event.target.closest && event.target.closest("[data-sozan-ui]")) return;
+      var x = event.clientX;
+      var y = event.clientY;
+      var el = targetAt(x, y);
+      if (!el) return;
+      press = { x: x, y: y, el: el, timer: 0, hint: 0 };
+      press.hint = window.setTimeout(function () {
+        if (press) place(hoverBox, press.el);
+      }, 160);
+      press.timer = window.setTimeout(function () {
+        var held = press;
+        press = null;
+        place(hoverBox, null);
+        if (!held) return;
+        swallowUntil = Date.now() + 900;
+        try {
+          if (navigator.vibrate) navigator.vibrate(14);
+        } catch (err) {
+          /* ignore */
+        }
+        selectEl(held.el, { longPress: true });
+      }, LONG_MS);
+    },
+    true,
+  );
+  document.addEventListener(
+    "pointermove",
+    function (event) {
+      if (!press) return;
+      if (Math.abs(event.clientX - press.x) > MOVE_PX || Math.abs(event.clientY - press.y) > MOVE_PX) cancelPress();
+    },
+    true,
+  );
+  ["pointerup", "pointercancel", "dragstart"].forEach(function (name) {
+    document.addEventListener(name, cancelPress, true);
+  });
+  document.addEventListener(
+    "contextmenu",
+    function (event) {
+      if (press || Date.now() < swallowUntil || event.pointerType === "touch") event.preventDefault();
+    },
+    true,
+  );
+  document.addEventListener(
+    "click",
+    function (event) {
+      if (Date.now() < swallowUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+    },
+    true,
+  );
+  window.addEventListener(
+    "scroll",
+    function () {
+      cancelPress();
+      if (selected) {
+        place(selectBox, selected);
+        showLabel(selected);
+      }
+    },
+    true,
+  );
+
   if (!browse) {
-    hoverBox = boxEl("hover");
-    selectBox = boxEl("select");
     document.addEventListener(
       "mousemove",
       function (event) {
+        if (event.pointerType === "touch") return;
         var el = meaningful(event.target);
         if (!el || el === selected) {
           place(hoverBox, null);
@@ -273,20 +447,10 @@
         if (!el) return;
         event.preventDefault();
         event.stopPropagation();
-        selected = el;
-        place(selectBox, el);
-        place(hoverBox, null);
-        showLabel(el);
-        report({ pick: describe(el) });
+        selectEl(el);
       },
       true,
     );
-    window.addEventListener("scroll", function () {
-      if (selected) {
-        place(selectBox, selected);
-        showLabel(selected);
-      }
-    }, true);
   }
 
   function boot() {

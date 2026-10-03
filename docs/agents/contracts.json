@@ -1745,8 +1745,8 @@
  },
  "backend/app/services/llm.py::complete_json": {
   "owner": "X5",
-  "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict",
-  "since": "2026-09-18",
+  "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700, temperature: float=0.2) -> dict",
+  "since": "2026-10-03",
   "users": [
    "X2",
    "X3",
@@ -2971,9 +2971,9 @@
  },
  "frontend/components/domain-menu.tsx::ShopState": {
   "owner": "C",
-  "shape": "export type ShopState = { brand: string; slug: string; port: number; domain: string; jobId: string; status: string; url: string; urlOk?: boolean; error?: string; publicHost?: string; cnameTarget?: string; cnameOk?: boolean; cnameCheck?: { detail?: string; status?: string }; cnameSetup?: { ok?: boolean; error?: string }; pendingBuild?: number; hidePrices?: boolean; priceBlocked?: boolean; }",
+  "shape": "export type ShopState = { brand: string; slug: string; port: number; domain: string; jobId: string; status: string; url: string; urlOk?: boolean; error?: string; publicHost?: string; cnameTarget?: string; cnameOk?: boolean; cnameCheck?: { detail?: string; status?: string }; cnameSetup?: { ok?: boolean; error?: string }; pendingBuild?: number; /** چند تغییر هنوز با «برگشت» پس گرفتنی است؛ بعد از هر بیلد ۰ می‌شود. */ undoDepth?: number; hidePrices?: boolean; priceBlocked?: boolean; }",
   "signature": "export type ShopState =",
-  "since": "2026-09-19",
+  "since": "2026-10-03",
   "users": [
    "X4"
   ]

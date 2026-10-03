@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from app.api.chat_payload import read_chat_payload
 from app.security import require_permission
 from app.services import idempotency_service, onboard_service, shop_service
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 router = APIRouter(prefix="/shop", tags=["shop"])
 
@@ -74,3 +74,28 @@ async def shop_build(request: Request, body: BuildIn, _user=Depends(require_perm
     out = {"result": result, **(await asyncio.to_thread(shop_service.snapshot))}
     idempotency_service.put("shop-build", key, out, stamp)
     return out
+
+
+@router.post("/undo")
+async def shop_undo(request: Request, _user=Depends(require_permission("campaigns:write"))):
+    key = _idempotency_key(request)
+    stamp = idempotency_service.body_stamp(await request.body())
+    cached = idempotency_service.recall("shop-undo", key, stamp)
+    if cached is not None:
+        return cached
+    out = await asyncio.to_thread(shop_service.undo_edit)
+    idempotency_service.put("shop-undo", key, out, stamp)
+    return out
+
+
+@router.post("/image")
+async def shop_image(
+    file: UploadFile = File(...),
+    src: str = Form("", max_length=2000),
+    _user=Depends(require_permission("campaigns:write")),
+):
+    data = await file.read()
+    try:
+        return await asyncio.to_thread(shop_service.replace_image, data, file.content_type or "", file.filename or "photo.jpg", src)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

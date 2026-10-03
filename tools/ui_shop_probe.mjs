@@ -2,7 +2,7 @@
 // (SOZAN_EDGE_DRY=1, a COPY of the lab tenant, SITE_BUILDER_DIR read-only). Reads are real; every write to the
 // shop (/shop/build, /shop/chat) is stubbed in the browser; PATCH /shop/domain is real (state of the copy only).
 //   PANEL=http://127.0.0.1:3998 API=http://127.0.0.1:8014 TOKEN_FILE=~/shop-lab/token OUT=./shop-shots \
-//   [ONLY=ready,states,editor,loadfail,preview,pick,stale,keyboard,domain] node tools/ui_shop_probe.mjs
+//   [ONLY=ready,states,editor,loadfail,preview,pick,stale,domain] node tools/ui_shop_probe.mjs
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
@@ -71,7 +71,7 @@ async function open(browser, { w = 390, h = 844, dark = false, shopStub = null, 
       return route.fulfill({
         status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" },
         body: JSON.stringify({ ...real, shop: { ...real.shop, pendingBuild: 1 }, patched: true, preview: { colors: { primary: "#7A1F2B" } },
-          messages: [...(real.messages || []), { id: "u1", role: "user", text }, { id: "a1", role: "assistant", text: "رنگ اصلی زرشکی شد. تغییر در کادر است؛ هر وقت آماده بودی «انتشار تغییرات» را بزن." }] }),
+          messages: [...(real.messages || []), { id: "u1", role: "user", text }, { id: "a1", role: "assistant", text: "رنگ اصلی زرشکی شد. تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «بیلد» را بزن." }] }),
       });
     }
     if (stubWrites && url.startsWith(API) && req.method() === "POST" && isPathname(url, "/shop/build")) {
@@ -187,7 +187,7 @@ async function main() {
 
   if (want("editor")) {
     for (const mode of ["ok", "502", "abort"]) {
-      const { ctx, page, calls } = await open(browser, { chatMode: mode, waitMs: 4500 });
+      const { ctx, page, calls } = await open(browser, { chatMode: mode, waitMs: 4500, w: 1280, h: 800 });
       const input = page.locator("#shop-command");
       await input.click();
       const hiddenNav = await page.evaluate(() => getComputedStyle(document.querySelector("nav[aria-label]")).display);
@@ -242,8 +242,10 @@ async function main() {
     }
   }
 
+  // The editor, the page chips and the design/browse toggle exist on desktop only; on a phone the tab is just the
+  // preview (tools/ui_shop_mobile_probe.mjs covers it).
   if (want("preview")) {
-    const { ctx, page } = await open(browser, { waitMs: 7000 });
+    const { ctx, page } = await open(browser, { waitMs: 7000, w: 1280, h: 800 });
     const src0 = await page.locator("iframe").getAttribute("src");
     await page.getByRole("button", { name: "کالاها", exact: true }).click();
     await sleep(1500);
@@ -270,7 +272,7 @@ async function main() {
   }
 
   if (want("pick")) {
-    const { ctx, page } = await open(browser, { waitMs: 9000 });
+    const { ctx, page } = await open(browser, { waitMs: 9000, w: 1280, h: 800 });
     const frame = page.frameLocator("iframe");
     try {
       await frame.locator("h1, h2").first().click({ timeout: 8000 });
@@ -297,22 +299,6 @@ async function main() {
     const txt = await p2.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
     rec("stale.frame-failure-is-explained", /پیش‌نمایش بار نشد/.test(txt), txt.slice(0, 140));
     await ctx2.close();
-  }
-
-  if (want("keyboard")) {
-    const { ctx, page } = await open(browser, { waitMs: 6000 });
-    await page.locator("#shop-command").click();
-    await page.setViewportSize({ width: 390, height: 470 });
-    await sleep(900);
-    await shot(page, "08-keyboard-open");
-    const k = await page.evaluate(() => {
-      const input = document.querySelector("#shop-command").getBoundingClientRect();
-      const frame = document.querySelector("iframe")?.getBoundingClientRect();
-      return { vh: window.innerHeight, inputBottom: Math.round(input.bottom), frameH: frame ? Math.round(frame.height) : 0 };
-    });
-    rec("keyboard.input-visible", k.inputBottom <= k.vh, JSON.stringify(k));
-    rec("keyboard.preview-still-usable", k.frameH >= 120, `preview ${k.frameH}px while the keyboard is open`);
-    await ctx.close();
   }
 
   if (want("domain")) {

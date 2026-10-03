@@ -959,7 +959,7 @@ def spoken_reply(prompt: str, reply: str, patched: bool, kind: str, detail: str 
             return EDIT_FAIL_ONE
         return unify_edit_fail(text)
     if kind == "revert":
-        return "به ویرایش قبلی برگشت."
+        return "به حالت قبل برگشت."
     if too_thin:
         if kind == "color":
             return "رنگ‌های اصلی فروشگاه عوض شد."
@@ -1027,7 +1027,7 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
         label = action.get("label") or "صفحه"
         text = f"صفحهٔ {label} در سایت باز است." if ok else "صفحه ساخته نشد."
     elif kind == "revert":
-        text = "به ویرایش قبلی برگشت." if ok else "ویرایش قبلی برای برگشت ذخیره نشده."
+        text = "به حالت قبل برگشت." if ok else "چیزی برای برگشت نیست؛ بعد از هر بیلد تغییرهای قبلی قفل می‌شوند."
     elif kind == "reject_foreign":
         text = "این پیام ویرایش فروشگاه نیست."
     elif kind == "ask_clarify":
@@ -1037,7 +1037,7 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
     else:
         text = "تغییر روی همین صفحه اعمال شد." if ok else "این تغییر روی این صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
     if ok and frame_only and "کادر" not in text:
-        text = f"{text} تغییر در کادر است؛ هر وقت آماده بودی «انتشار تغییرات» را بزن."
+        text = f"{text} تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «بیلد» را بزن."
     return unify_edit_fail(text)
 
 
@@ -1278,6 +1278,7 @@ async def _run_actions_in_turn(
     published_rels: list[str] = []
     overlay = has_runtime_overlay(root)
     chrome = has_runtime_chrome(root)
+    hide_start = bool(shop.get("hidePrices"))
     mutating = {
         "set_colors",
         "set_brand",
@@ -1315,13 +1316,14 @@ async def _run_actions_in_turn(
                 hero_mtime_before=hero_mtime,
             )
         elif kind == "revert":
-            patched = restore_edit_files(root, PREV_DIR)
+            from app.services import shop_undo_service
+
+            undone = shop_undo_service.undo_last(shop)
+            patched = bool(undone.get("patched"))
             files = ["lib/brand.ts", "public/brand-vars.css", "public/storefront-flags.json", "public/catalog.json"]
-            preview = _preview_payload(reset=True)
-            publish_shop_runtime(shop, root, files)
-            published_rels.extend(files)
+            preview = undone.get("preview") or {}
             verified = verify_action(action=action, root=root, shop=shop, files_touched=files)
-            verified["ok"] = bool(patched)
+            verified["ok"] = patched
         else:
             executed = _execute_action(shop, root, action, page)
             files = executed.get("files") or []
@@ -1391,12 +1393,21 @@ async def _run_actions_in_turn(
         }
     if any_ok:
         if not any(str(item.get("type") or "") == "revert" for item in actions):
-            prev = root / PREV_DIR
+            from app.services import shop_undo_service
+
             snap = root / turn_snap
             if snap.is_dir():
-                if prev.exists():
-                    shutil.rmtree(prev)
-                shutil.copytree(snap, prev)
+                shop_undo_service.push(
+                    root,
+                    snap,
+                    {
+                        "pending": pending_before,
+                        "tree": sorted(tree_before),
+                        "hero": hero_before is not None,
+                        "hidePrices": hide_start,
+                        "published": published_rels,
+                    },
+                )
         return _finish_edit(
             shop,
             reply,
@@ -1561,7 +1572,7 @@ def _finish_edit(
     needs_rebuild: bool = True,
 ) -> dict:
     from app.services.shop_service import _save_shop
-    from app.services import shop_workspace_service
+    from app.services import shop_undo_service, shop_workspace_service
 
     if needs_rebuild:
         shop["pendingBuild"] = int(shop.get("pendingBuild") or 0) + 1
@@ -1574,5 +1585,6 @@ def _finish_edit(
         "reply": reply,
         "preview": preview or {},
         "pendingBuild": int(shop.get("pendingBuild") or 0),
+        "undoDepth": shop_undo_service.depth(root),
         "needsRebuild": needs_rebuild,
     }

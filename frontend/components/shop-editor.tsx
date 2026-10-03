@@ -19,10 +19,10 @@ import { Button } from "@/components/ui/button";
 import { LinkText } from "@/components/link-text";
 
 export type ShopMsg = { id: string; role: "user" | "assistant"; text: string; at?: number };
-export type ShopSelection = { text: string; tag: string };
+export type ShopSelection = { text: string; tag: string; kind?: "image" | "text" | "block"; src?: string; alt?: string };
 
 /** سقف متن اشاره‌شده در سرور (`viewTarget` تا ۸۰ نویسه). */
-const TARGET_MAX = 80;
+export const TARGET_MAX = 80;
 
 /** همان رنگ‌های نام‌داری که سرور می‌شناسد (`NAMED_COLORS` در ویرایشگر فروشگاه). */
 const SWATCHES: { name: string; hex: string }[] = [
@@ -43,6 +43,10 @@ const PAGES = ["درباره ما", "تماس با ما", "داستان برند
 
 type Tool = "" | "colors" | "name" | "cta" | "pages" | "history";
 
+export function selectionLabel(selection: ShopSelection) {
+  return selection.kind === "image" ? "عکس" : tagLabel(selection.tag);
+}
+
 function tagLabel(tag: string) {
   const t = tag.toLowerCase();
   if (/^h[1-3]$/.test(t)) return "تیتر";
@@ -53,12 +57,11 @@ function tagLabel(tag: string) {
   return "بخش";
 }
 
-/** متن‌های سرور را برای فروشنده روان کن (اصطلاح «بیلد» در پنل نیست). */
+/** پاسخ سرور را برای فروشنده روان کن: نشانی داخلی نمی‌ماند و دکمه همان «بیلد» نام دارد. */
 export function friendlyReply(text: string) {
   return String(text || "")
     .replace(/\s*https?:\/\/(?:localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?\S*/g, "")
-    .replace(/وقتی آماده بودی بیلد بزن\.?/g, "هر وقت آماده بودی «انتشار تغییرات» را بزن.")
-    .replace(/بیلد/g, "انتشار");
+    .replace(/«?انتشار تغییرات»?/g, "«بیلد»");
 }
 
 function cleanQuote(text: string) {
@@ -111,7 +114,7 @@ export function ShopEditor({
   );
   const lastReply = [...recent].reverse().find((row) => row.role === "assistant");
 
-  const isImage = selection ? tagLabel(selection.tag) === "عکس" : false;
+  const isImage = selection ? selectionLabel(selection) === "عکس" : false;
   const target = selection && !isImage ? selection.text.slice(0, TARGET_MAX) : "";
   const tooLong = Boolean(selection && selection.text.length > TARGET_MAX);
   const canRewrite = Boolean(target && !tooLong && cleanQuote(selText) && cleanQuote(selText) !== selection?.text);
@@ -142,7 +145,7 @@ export function ShopEditor({
     { id: "hero", label: "عکس بالای سایت", icon: ImageIcon },
     { id: "prices", label: hidePrices ? "نمایش قیمت‌ها" : "پنهان کردن قیمت‌ها", icon: Tag },
     { id: "pages", label: "صفحهٔ تازه", icon: FilePlus2 },
-    { id: "undo", label: "برگرد به قبل", icon: Undo2 },
+    { id: "undo", label: "برگشت", icon: Undo2 },
     { id: "history", label: "گفتگو", icon: History },
   ];
 
@@ -167,10 +170,10 @@ export function ShopEditor({
       {pending > 0 ? (
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2">
           <p className="min-w-0 text-sm leading-6 text-ink">
-            <span className="font-bold">{pending.toLocaleString("fa-IR")} تغییر</span> در پیش‌نمایش است و هنوز روی سایت نرفته.
+            <span className="font-bold">{pending.toLocaleString("fa-IR")} تغییر</span> در پیش‌نمایش است؛ با «بیلد» روی سایت می‌رود.
           </p>
           <Button type="button" className="shrink-0 px-3 text-sm" disabled={buildBusy} onClick={onPublish}>
-            انتشار تغییرات
+            بیلد
           </Button>
         </div>
       ) : null}
@@ -179,7 +182,7 @@ export function ShopEditor({
         <section aria-label="بخش انتخاب‌شده" className="rounded-2xl border border-line bg-canvas p-3 shadow-card">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted">
-              انتخاب‌شده: <span className="font-bold text-warm">{tagLabel(selection.tag)}</span>
+              انتخاب‌شده: <span className="font-bold text-warm">{selectionLabel(selection)}</span>
             </p>
             <button type="button" aria-label="لغو انتخاب" className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-paper" onClick={onClearSelection}>
               <X size={16} />
@@ -389,7 +392,7 @@ export function ShopEditor({
         {busy ? (
           <span className="text-warm">در حال اعمال…</span>
         ) : buildBusy ? (
-          <span className="text-warm">سایت در حال انتشار است؛ کمی صبر کن.</span>
+          <span className="text-warm">سایت در حال بیلد است؛ کمی صبر کن.</span>
         ) : lastReply ? (
           <span className="line-clamp-1 text-muted sm:line-clamp-2">
             سوزان: <LinkText text={friendlyReply(lastReply.text)} />

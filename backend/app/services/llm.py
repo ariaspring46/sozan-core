@@ -825,14 +825,16 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
         raise last_exc or RuntimeError("llm")
 
 
-async def complete_json(system: str, user: str, *, surface: str = "llm", max_tokens: int = 700) -> dict:
+async def complete_json(
+    system: str, user: str, *, surface: str = "llm", max_tokens: int = 700, temperature: float = 0.2
+) -> dict:
     try:
         text = await _chat_completion(
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            temperature=0.2,
+            temperature=temperature,
             max_tokens=max_tokens,
             surface=surface,
         )
@@ -874,6 +876,41 @@ def visible_chat_turns(turns: list[dict], *, limit: int = 12, keep_links: bool =
             continue
         messages.append({"role": role, "content": text[:800]})
     return messages
+
+
+async def complete_json_chat(
+    *,
+    system: str,
+    turns: list[dict],
+    surface: str = "shop",
+    temperature: float = 0.7,
+    max_tokens: int = 900,
+    plain_ok: bool = False,
+) -> dict:
+    """The whole conversation goes to the model and one JSON object comes back; a failure is {"error": …} like complete_json.
+
+    `plain_ok`: a model that answers in plain Persian instead of JSON still gives {"reply": text, "plain": True}."""
+    messages = [{"role": "system", "content": system}, *visible_chat_turns(turns)]
+    if len(messages) < 2:
+        return dict(LLM_UNREACHABLE)
+    try:
+        text = await _chat_completion(messages=messages, temperature=temperature, max_tokens=max_tokens, surface=surface)
+    except Exception:
+        return dict(LLM_UNREACHABLE)
+    data = parse_json_object(text)
+    if not data:
+        if plain_ok:
+            cleaned = FENCE.sub("", THINK_BLOCK.sub("", text or "")).strip()
+            if _persian_enough(cleaned):
+                return {"reply": cleaned[:2000], "plain": True}
+        report_llm_fail(
+            surface=surface,
+            error_class="bad-json",
+            detail="unreadable chat json",
+            prompt=_last_user_prompt(messages),
+        )
+        return dict(LLM_BAD_JSON)
+    return data
 
 
 async def complete_chat(*, system: str, turns: list[dict], surface: str = "shop") -> str:

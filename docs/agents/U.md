@@ -72,7 +72,7 @@ Done when: every P0/P1 is fixed or has an acknowledged request in its owner's re
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.1k tokens. Your core files total 12.2k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.1k tokens. Your core files total 12.3k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -84,16 +84,16 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 12.2k | the files most tasks touch; read the relevant one first |
-| active | 52.6k | yours to edit; read only what the task needs |
-| rare | 29.8k | yours; read only when the task names it |
+| core | 12.3k | the files most tasks touch; read the relevant one first |
+| active | 52.5k | yours to edit; read only what the task needs |
+| rare | 31.4k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
 **Core:**
 
 - `frontend/app/globals.css` (5.6k)
 - `frontend/tailwind.config.js` (0.4k)
-- `frontend/components/app-shell.tsx` (3.4k)
+- `frontend/components/app-shell.tsx` (3.5k)
 - `frontend/lib/api.ts` (1.9k)
 - `frontend/components/ui/button.tsx` (0.2k)
 - `frontend/lib/use-app-viewport.ts` (0.7k)
@@ -103,10 +103,10 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `./`: `talk-u.md` (5.8k)
 - `frontend/`: `tailwind.config.js` (0.4k), `package.json` (0.2k), `tsconfig.json` (0.2k), `next.config.ts` (0.0k)
 - `frontend/app/`: `globals.css` (5.6k), `page.tsx` (0.5k), `layout.tsx` (0.4k)
-- `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (3.4k), `getting-started.tsx` (2.3k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
+- `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (3.5k), `getting-started.tsx` (2.3k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
 - `frontend/components/ui/`: `button.tsx` (0.2k), `textarea.tsx` (0.1k), `select.tsx` (0.1k), `input.tsx` (0.1k), `card.tsx` (0.1k)
 - `frontend/lib/`: `api.ts` (1.9k), `theme.ts` (0.7k), `use-app-viewport.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.4k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
-- `tools/`: `ui_shop_probe.mjs` (6.7k), `ui_chat_probe.mjs` (6.1k), `ui_check.py` (1.4k)
+- `tools/`: `ui_shop_probe.mjs` (6.5k), `ui_chat_probe.mjs` (6.1k), `ui_check.py` (1.4k)
 
 **Rare (yours; only when the task names it):**
 
@@ -118,7 +118,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/app/refund/`: `page.tsx` (0.2k)
 - `frontend/app/terms/`: `page.tsx` (0.4k)
 - `frontend/components/`: `auth-image.tsx` (0.5k), `auth-media.tsx` (0.6k), `landing-slogan-rotator.tsx` (0.4k), `legal-page.tsx` (0.8k), `login-coder-scene.tsx` (1.1k)
-- `frontend/public/`: `2326207.txt` (0.0k), `sozan-mark-256.webp` (0.0k), `sozan-mark-legacy.png` (0.0k), `sozan-mark.png` (0.0k), `sozan-preview-beacon.js` (2.9k)
+- `frontend/public/`: `2326207.txt` (0.0k), `sozan-mark-256.webp` (0.0k), `sozan-mark-legacy.png` (0.0k), `sozan-mark.png` (0.0k), `sozan-preview-beacon.js` (4.5k)
 - `frontend/public/fonts/`: `OFL-vazirmatn.txt` (1.4k), `OFL.txt` (1.4k), `estedad-arabic.woff2` (0.0k), `estedad-latin.woff2` (0.0k), `vazirmatn-var.woff2` (0.0k)
 - `tools/`: `ui_live_audit.mjs` (2.6k), `ui_mobile_audit.mjs` (8.5k)
 

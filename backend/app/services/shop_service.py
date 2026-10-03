@@ -51,7 +51,9 @@ SHOP_DENY = re.compile(r"seed phrase|bitcoin|private key|mnemonic|Traceback|FAIL
 EDIT_FAIL_ONE = "این تغییر روی صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
 EDIT_FAIL_MARKERS = ("صفحه ساخته نشد", "روی این صفحه پیدا نشد", "تیتر روی این صفحه پیدا نشد", "دوباره بفرست")
 
-SHOP_SYSTEM = """تو دستیار فروشگاه سوزان هستی. جواب را JSON بده: {"reply":"متن فارسی کوتاه"}
+SHOP_SYSTEM = """تو دستیار فروشگاه سوزان هستی. جواب را JSON بده: {"reply":"متن فارسی"}
+مثل یک همکار خودمانی و دلسوز حرف بزن: با «تو»، روان و محاوره‌ای، کوتاه (یک تا چهار جمله)، بدون جملهٔ قالبی و بدون فهرست.
+اگر فروشنده نظر یا پیشنهاد می‌خواهد، واقعاً نظر بده و از داده (کالاها، رنگ‌ها، متن صفحه) مثال بزن؛ اگر چیزی مبهم است یک سؤال دقیق بپرس.
 به سؤال‌های فروشنده جواب بده. نگو پیام ویرایش فروشگاه نیست.
 خودت سایت را نساز و نگو ساخته شد مگر دادهٔ بیلد بگوید آماده است.
 کار انجام‌نشده را موفق نگو: تصویر، رنگ، برند یا کالا را ساخته‌شده اعلام نکن مگر دادهٔ سیستم همان را تأیید کند.
@@ -392,7 +394,20 @@ def _public_shop(shop: dict) -> dict:
     out = dict(shop)
     out.pop("paySecret", None)
     out["priceBlocked"] = _missing_sellable_price(shop)
+    out["undoDepth"] = _undo_depth(shop)
     return out
+
+
+def _undo_depth(shop: dict) -> int:
+    """How many edits «برگشت» can still take back (0 after a build)."""
+    from app.services import shop_edit_service, shop_undo_service
+
+    if not str(shop.get("slug") or "").strip():
+        return 0
+    try:
+        return shop_undo_service.depth(shop_edit_service.build_dir_for(shop))
+    except OSError:
+        return 0
 
 
 def _opening_text(shop: dict) -> str:
@@ -935,7 +950,7 @@ _INTERNAL_URL_IN_TEXT = re.compile(
 def _seller_words(text: str, public_url: str = "") -> str:
     """The model sometimes repeats what it was given: an internal address or «بیلد: ready». The seller reads neither."""
     value = _INTERNAL_URL_IN_TEXT.sub(public_url, str(text or ""))
-    value = value.replace("بیلد", "ساخت")
+    value = re.sub(r"(وضعیت\s*)بیلد", r"\1ساخت", value)  # «بیلد» is the name of a panel button; only the status label is jargon
     return re.sub(r"\b(ready|done|running|queued|failed|idle)\b", lambda m: _STATUS_WORD[m.group(1).lower()], value, flags=re.I)
 
 
@@ -1038,6 +1053,9 @@ def _refresh_job(shop: dict) -> dict:
             saved = _publish_dns(saved)
             saved["pendingBuild"] = 0
             saved = _save_shop(saved)
+            from app.services import shop_undo_service
+
+            shop_undo_service.clear_for(saved)
     if now_status != prev_status and now_status in {"ready", "failed"}:
         emit_later(
             kind="factory",
@@ -1818,6 +1836,36 @@ def _interview_turn(text: str, brief: dict) -> str | None:
     return None
 
 
+async def _guided_turn(raw: str, rows: list[dict], brief: dict, shop: dict) -> str | None:
+    """The setup talk: the model interviews the seller and decides when to propose building; the fixed script is the fallback.
+
+    A build starts only when the seller asked for it in this message (the model's `build` flag, or typing «بساز» themselves)
+    and the brief has a style and colours."""
+    from app.services import onboard_service, shop_voice_service
+
+    if str(shop.get("status") or "") in BUILD_BUSY:
+        return None
+    ready = onboard_service.brief_ready(brief)
+    if shop.get("slug") and ready:
+        return None
+    if _explicit_build(raw) and ready:
+        return None
+    turn = await shop_voice_service.interview_turn(rows, brief, shop)
+    if turn is None:
+        return _interview_turn(raw, brief)
+    patch = dict(turn["brief"])
+    patch["proposed"] = bool(turn["ready"])
+    saved = onboard_service.save_brief(patch)
+    if turn["build"] and onboard_service.brief_ready(saved) and not raw.rstrip().endswith(("؟", "?")):
+        result = start_build(prompt=raw, rebuild=bool(shop.get("slug")), revise_only=None)
+        if not (result.get("ok") or result.get("queued")):
+            detail = _operator_error(str(result.get("error") or result.get("message") or ""))
+            if detail and detail != SAFE_BUILD and "مشکل موقت" not in detail:
+                return f"ساخت شروع نشد: {detail}"
+            return "ساخت الان ممکن نیست، چند دقیقهٔ دیگر."
+    return str(turn["reply"])
+
+
 def _pack(shop: dict, rows: list[dict], assistant: dict | None = None, extra: dict | None = None) -> dict:
     from app.services import channel_scan_service
 
@@ -1846,12 +1894,35 @@ def _pack(shop: dict, rows: list[dict], assistant: dict | None = None, extra: di
     return payload
 
 
+def undo_edit() -> dict:
+    """«برگشت»: take back the newest edit that has not been built yet."""
+    from app.services import shop_undo_service
+
+    shop = _refresh_job(_shop())
+    if str(shop.get("status") or "") in BUILD_BUSY:
+        return {**snapshot(), "patched": False, "reply": "سایت در حال بیلد است؛ بعد از تمام شدن می‌شود برگشت."}
+    out = shop_undo_service.undo_last(shop)
+    return {**snapshot(), "patched": bool(out.get("patched")), "reply": out.get("reply") or "", "preview": out.get("preview") or {}}
+
+
+def replace_image(data: bytes, content_type: str, filename: str, src: str) -> dict:
+    """Put a photo the seller uploaded in place of the picture they held a finger on."""
+    from app.services import shop_image_service
+
+    shop = _refresh_job(_shop())
+    if str(shop.get("status") or "") in BUILD_BUSY:
+        raise ValueError("سایت در حال بیلد است؛ بعد از تمام شدن عکس را عوض کن.")
+    out = shop_image_service.replace_image(shop, data, content_type, filename, src)
+    return {**snapshot(), "patched": True, "reply": out.get("reply") or "", "preview": out.get("preview") or {}, "kind": out.get("kind") or ""}
+
+
 async def chat(text: str, media: dict | None = None, view_path: str = "", view_target: str = "") -> dict:
     from app.services import (
         channel_scan_service,
         chat_media_service,
         onboard_service,
         shop_edit_service,
+        shop_voice_service,
         shop_workspace_service,
     )
 
@@ -1873,7 +1944,8 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
     if not media_only and _wants_progress(raw) and not _explicit_build(raw):
         shop = _refresh_job(_shop())
         build = _factory_status(shop)
-        reply = _persian_build_text(build) or "هنوز بیلدی شروع نشده. اگر آماده بودی بگو بساز."
+        plain = _persian_build_text(build) or "هنوز ساختی شروع نشده. اگر آماده بودی بگو بساز."
+        reply = await shop_voice_service.say("build_status", [plain], seller_text=raw, fallback=plain)
         assistant = {
             "id": str(uuid4()),
             "role": "assistant",
@@ -1894,7 +1966,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
             }
             _append_assistant(rows, assistant)
             return _pack(shop, rows, assistant)
-        guided = _interview_turn(raw, brief)
+        guided = await _guided_turn(raw, rows, brief, shop)
         if guided is not None:
             assistant = {
                 "id": str(uuid4()),
@@ -1937,6 +2009,14 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
                 reply = f"ساخت شروع نشد: {detail}"
             else:
                 reply = "ساخت الان ممکن نیست، چند دقیقهٔ دیگر."
+        started = bool(result.get("ok") or result.get("queued"))
+        reply = await shop_voice_service.say(
+            "build_started" if started else "build_not_started",
+            [reply, *shop_voice_service.brief_facts(onboard_service.get_brief())],
+            seller_text=raw,
+            fallback=reply,
+            patched=started,
+        )
         assistant = {
             "id": str(uuid4()),
             "role": "assistant",
@@ -1986,8 +2066,15 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
                 )
                 shop = _refresh_job(_shop())
                 reply = str(result.get("reply") or "").strip() or "تغییر را روی همین صفحه اعمال می‌کنم."
+                reply = await shop_voice_service.say(
+                    "edit_result" if result.get("patched") else "edit_not_done",
+                    [reply],
+                    seller_text=raw,
+                    fallback=reply,
+                    patched=bool(result.get("patched")),
+                )
                 if result.get("patched") and result.get("needsRebuild", True) and "بیلد" not in reply:
-                    reply = reply.rstrip(". ") + " تغییر در کادر است؛ هر وقت آماده بودی «انتشار تغییرات» را بزن."
+                    reply = reply.rstrip(". ") + " تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «بیلد» را بزن."
             assistant = {
                 "id": str(uuid4()),
                 "role": "assistant",

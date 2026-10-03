@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, ExternalLink, Monitor, RefreshCw, Smartphone, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shopHostLabel } from "@/components/domain-menu";
+import type { ShopSelection } from "@/components/shop-editor";
 
 export type BuildStep = { id: string; label: string; state: "done" | "active" | "wait" | "fail" };
 
@@ -29,10 +30,16 @@ export type PreviewPatch = {
   colors?: Record<string, string>;
   reload?: boolean;
   reset?: boolean;
+  undo?: boolean;
+  /** با `undo`: تعداد ویرایش‌هایی که هنوز باقی است؛ پیش‌نمایش بقیه را دوباره می‌چیند. */
+  to?: number;
+  /** شمارهٔ ویرایش در پشتهٔ «برگشت»؛ beacon با آن می‌داند کدام تکه را بردارد. */
+  seq?: number;
   viewPath?: string;
 };
 
 const OPEN_KEY = "sozan-preview-open";
+const HOLD_HINT_KEY = "sozan-shop-hold-hint";
 const PAGES = [
   { path: "/", label: "خانه" },
   { path: "/products", label: "کالاها" },
@@ -211,9 +218,10 @@ function ShopLivePreview({
   onBuild,
   onRetry,
   onViewPath,
-  onViewTarget,
+  onPick,
   seekPath,
   clearPick = 0,
+  compact = false,
 }: {
   href: string;
   build: BuildLive | null;
@@ -226,20 +234,25 @@ function ShopLivePreview({
   onBuild?: () => void;
   onRetry?: () => void;
   onViewPath?: (path: string) => void;
-  onViewTarget?: (text: string, tag?: string) => void;
+  onPick?: (selection: ShopSelection, longPress: boolean) => void;
   seekPath?: string;
   clearPick?: number;
+  /** موبایل: فقط خود سایت (در اندازهٔ واقعی گوشی)، بدون نوار و تب؛ ویرایش با نگه داشتن انگشت. */
+  compact?: boolean;
 }) {
   const host = shopHostLabel(href);
   const [path, setPath] = useState("/");
   const [open, setOpen] = useState(true);
   const [phone, setPhone] = useState(false);
-  const [mode, setMode] = useState<"design" | "browse">("design");
+  const [designMode, setMode] = useState<"design" | "browse">("design");
+  const mode = compact ? "browse" : designMode;
   const [reload, setReload] = useState(0);
   const [pick, setPick] = useState("");
   const [frameLoaded, setFrameLoaded] = useState(false);
   const [frameStale, setFrameStale] = useState(false);
   const [frameDead, setFrameDead] = useState(false);
+  const [holdHint, setHoldHint] = useState(false);
+  const undoTimer = useRef(0);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const src = useMemo(() => frameUrl(href, path, bust + reload, mode), [href, path, bust, reload, mode]);
 
@@ -277,6 +290,28 @@ function ShopLivePreview({
     setOpen(readOpen());
   }, []);
 
+  // یک بار برای هر گوشی: می‌گوید ویرایش با نگه داشتن انگشت است؛ بعد از اولین نگه داشتن یا چند ثانیه محو می‌شود.
+  useEffect(() => {
+    if (!compact) return;
+    try {
+      if (localStorage.getItem(HOLD_HINT_KEY)) return;
+    } catch {
+      /* ignore */
+    }
+    setHoldHint(true);
+    const timer = window.setTimeout(() => dismissHint(), 9000);
+    return () => window.clearTimeout(timer);
+  }, [compact]);
+
+  function dismissHint() {
+    setHoldHint(false);
+    try {
+      localStorage.setItem(HOLD_HINT_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+  }
+
   useEffect(() => {
     if (overlay) setOpen(true);
   }, [overlay]);
@@ -301,24 +336,38 @@ function ShopLivePreview({
       } catch {
         return;
       }
+      if (data.undone) {
+        window.clearTimeout(undoTimer.current);
+        setReload((value) => value + 1);
+        return;
+      }
       const next = normalizeViewPath(String(data.path || "/"));
       setPath(next);
       onViewPath?.(next);
-      const picked = data.pick && typeof data.pick.text === "string" ? data.pick.text.trim() : "";
-      const tag = data.pick && typeof data.pick.tag === "string" ? data.pick.tag : "";
-      if (picked || tag) {
+      const raw = data.pick && typeof data.pick === "object" ? data.pick : null;
+      const picked = raw && typeof raw.text === "string" ? raw.text.trim() : "";
+      const tag = raw && typeof raw.tag === "string" ? raw.tag : "";
+      const src = raw && typeof raw.src === "string" ? raw.src : "";
+      const kind = raw && (raw.kind === "image" || raw.kind === "text" || raw.kind === "block") ? raw.kind : undefined;
+      if (picked || tag || src) {
         const label = picked ? (tag ? `${tag} · ${picked}` : picked) : tag;
         setPick(label);
-        onViewTarget?.(picked || tag, tag);
+        if (data.longPress) dismissHint();
+        onPick?.(
+          { text: picked || (src ? "" : tag), tag, kind, src: src || undefined, alt: raw && typeof raw.alt === "string" ? raw.alt : undefined },
+          Boolean(data.longPress),
+        );
       }
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [href, onViewPath, onViewTarget]);
+  }, [href, onViewPath, onPick]);
 
   useEffect(() => {
-    if (clearPick) setPick("");
-  }, [clearPick]);
+    if (!clearPick) return;
+    setPick("");
+    postToPreview(frameRef.current?.contentWindow, href, { source: "sozan-panel", type: "clear" });
+  }, [clearPick, href]);
 
   useEffect(() => {
     if (!seekPath || seekPath === "/" || pendingBuild > 0) return;
@@ -330,6 +379,13 @@ function ShopLivePreview({
   useEffect(() => {
     if (!applyPatch) return;
     const win = frameRef.current?.contentWindow;
+    if (applyPatch.undo) {
+      postToPreview(win, href, { source: "sozan-panel", type: "undo", to: Number(applyPatch.to || 0) });
+      // beacon بعد از برداشتن تکه‌ها خبر می‌دهد و پیش‌نمایش تازه می‌شود؛ اگر خبری نیامد، خودمان تازه می‌کنیم.
+      window.clearTimeout(undoTimer.current);
+      undoTimer.current = window.setTimeout(() => setReload((value) => value + 1), 1500);
+      return;
+    }
     if (applyPatch.reset) {
       postToPreview(win, href, { source: "sozan-panel", type: "reset" });
       setReload((value) => value + 1);
@@ -372,8 +428,7 @@ function ShopLivePreview({
             >
               {failed ? "ساخت دوباره" : (
                 <>
-                  <span className="sm:hidden">انتشار</span>
-                  <span className="hidden sm:inline">انتشار تغییرات</span>
+                  <span>بیلد</span>
                 </>
               )}
               {pendingBuild > 0 ? ` (${pendingBuild.toLocaleString("fa-IR")})` : ""}
@@ -420,47 +475,58 @@ function ShopLivePreview({
     </div>
   );
 
-  if (!open) {
+  if (!compact && !open) {
     return <section className="shrink-0 overflow-hidden rounded-2xl border border-accent/25 bg-paper shadow-card">{bar}</section>;
   }
 
   return (
-    <section className="relative flex min-h-[10rem] flex-1 flex-col sm:min-h-[14rem] overflow-hidden rounded-2xl border border-accent/25 bg-paper shadow-card">
-      {bar}
-      <div className="flex shrink-0 gap-1 border-b border-line/60 px-2 py-1">
-        {PAGES.map((page) => (
-          <button
-            key={page.path}
-            type="button"
-            onClick={() => go(page.path)}
-            className={cn(
-              "tap rounded-lg px-3 py-2 text-[13px]",
-              (page.path === "/" ? path === "/" : path.startsWith(page.path)) ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas",
-            )}
-          >
-            {page.label}
-          </button>
-        ))}
-        {pick ? (
-          <span className="ms-auto max-w-[45%] truncate rounded-lg bg-accent/10 px-2 py-1 text-xs text-warm">
-            {pick}
-          </span>
-        ) : (
-          <span className="ms-auto px-2 py-1 text-xs text-muted">
-            {mode === "design" ? "روی هر بخش سایت بزن" : "در حال مرور"}
-          </span>
-        )}
-      </div>
+    <section
+      className={cn(
+        "relative flex flex-1 flex-col overflow-hidden bg-paper",
+        compact ? "min-h-0" : "min-h-[10rem] rounded-2xl border border-accent/25 shadow-card sm:min-h-[14rem]",
+      )}
+    >
+      {compact ? null : bar}
+      {compact ? null : (
+        <div className="flex shrink-0 gap-1 border-b border-line/60 px-2 py-1">
+          {PAGES.map((page) => (
+            <button
+              key={page.path}
+              type="button"
+              onClick={() => go(page.path)}
+              className={cn(
+                "tap rounded-lg px-3 py-2 text-[13px]",
+                (page.path === "/" ? path === "/" : path.startsWith(page.path)) ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas",
+              )}
+            >
+              {page.label}
+            </button>
+          ))}
+          {pick ? (
+            <span className="ms-auto max-w-[45%] truncate rounded-lg bg-accent/10 px-2 py-1 text-xs text-warm">
+              {pick}
+            </span>
+          ) : (
+            <span className="ms-auto px-2 py-1 text-xs text-muted">
+              {mode === "design" ? "روی هر بخش سایت بزن" : "در حال مرور"}
+            </span>
+          )}
+        </div>
+      )}
       <div className="relative min-h-0 w-full flex-1 overflow-hidden bg-canvas">
         <div
-          className={cn("absolute", phone ? "origin-top" : "origin-top-right")}
-          style={{
-            width: "133.333%",
-            height: "133.333%",
-            transform: "scale(0.75)",
-            top: 0,
-            ...(phone ? { left: "-16.666%" } : { right: 0 }),
-          }}
+          className={cn("absolute", compact ? "inset-0" : phone ? "origin-top" : "origin-top-right")}
+          style={
+            compact
+              ? undefined
+              : {
+                  width: "133.333%",
+                  height: "133.333%",
+                  transform: "scale(0.75)",
+                  top: 0,
+                  ...(phone ? { left: "-16.666%" } : { right: 0 }),
+                }
+          }
         >
           <iframe
             ref={frameRef}
@@ -469,11 +535,11 @@ function ShopLivePreview({
             src={src}
             width="100%"
             height="100%"
-            className={cn("h-full border-0 bg-white", phone ? "mx-auto w-full max-w-[430px]" : "w-full min-w-full")}
+            className={cn("h-full border-0 bg-white", phone && !compact ? "mx-auto w-full max-w-[430px]" : "w-full min-w-full")}
             onLoad={() => {
               setFrameLoaded(true);
               setFrameStale(false);
-              if (!applyPatch || applyPatch.reload || applyPatch.reset) return;
+              if (!applyPatch || applyPatch.reload || applyPatch.reset || applyPatch.undo) return;
               postToPreview(frameRef.current?.contentWindow, href, {
                 source: "sozan-panel",
                 type: "apply",
@@ -482,7 +548,15 @@ function ShopLivePreview({
             }}
           />
         </div>
-        {pendingBuild > 0 && !overlay ? (
+        {compact && holdHint && !overlay ? (
+          <p
+            role="status"
+            className="pointer-events-none absolute inset-x-3 bottom-3 z-10 rounded-2xl border border-accent/30 bg-paper/95 px-3 py-2 text-center text-sm leading-6 text-warm shadow-card"
+          >
+            هر جای سایت را بخواهی ویرایش کنی، انگشتت را رویش نگه دار.
+          </p>
+        ) : null}
+        {pendingBuild > 0 && !overlay && !compact ? (
           <button
             type="button"
             onClick={() => setReload((value) => value + 1)}
@@ -606,9 +680,10 @@ export function ShopLiveBuild({
   onBuild,
   onRetry,
   onViewPath,
-  onViewTarget,
+  onPick,
   seekPath,
   clearPick = 0,
+  compact = false,
 }: {
   build: BuildLive | null;
   href?: string;
@@ -619,9 +694,10 @@ export function ShopLiveBuild({
   onBuild?: () => void;
   onRetry?: () => void;
   onViewPath?: (path: string) => void;
-  onViewTarget?: (text: string, tag?: string) => void;
+  onPick?: (selection: ShopSelection, longPress: boolean) => void;
   seekPath?: string;
   clearPick?: number;
+  compact?: boolean;
 }) {
   const status = build?.status || "";
   const live = status === "running" || status === "queued";
@@ -652,9 +728,10 @@ export function ShopLiveBuild({
         onBuild={onBuild}
         onRetry={onRetry}
         onViewPath={onViewPath}
-        onViewTarget={onViewTarget}
+        onPick={onPick}
         seekPath={seekPath}
         clearPick={clearPick}
+        compact={compact}
       />
     );
   }

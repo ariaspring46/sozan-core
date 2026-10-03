@@ -22,6 +22,8 @@ export type ShopState = {
   cnameCheck?: { detail?: string; status?: string };
   cnameSetup?: { ok?: boolean; error?: string };
   pendingBuild?: number;
+  /** چند تغییر هنوز با «برگشت» پس گرفتنی است؛ بعد از هر بیلد ۰ می‌شود. */
+  undoDepth?: number;
   hidePrices?: boolean;
   priceBlocked?: boolean;
 };
