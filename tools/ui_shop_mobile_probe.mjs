@@ -35,12 +35,13 @@ const PAGE = (body) => `<!doctype html><html lang="fa" dir="rtl"><head><meta cha
 <style>body{margin:0;font-family:sans-serif;background:#faf7f2}header{display:flex;gap:8px;padding:6px 12px;background:#fff}header a{padding:14px 10px;color:#333}
 .hero{position:relative;height:260px;background:url(/images/hero.png) center/cover}.veil{position:absolute;inset:0;background:linear-gradient(transparent,rgba(0,0,0,.35))}
 .hero h1{position:absolute;bottom:20px;right:16px;margin:0;color:#fff}.card{padding:16px}.card img{width:100%;height:200px;object-fit:cover}button{padding:14px 22px}</style></head><body>${body}
-<div style="height:1400px"></div><script src="/sozan-preview-beacon.js?v=live2" defer></script></body></html>`;
+<div style="height:1400px"></div><script src="/sozan-preview-beacon.js?v=live3" defer></script></body></html>`;
 const HOME_HTML = PAGE(`<header><a href="/products" id="nav-products">کالاها</a><a href="/cart">سبد</a></header>
 <section class="hero" id="hero"><div class="veil" id="veil"></div><p id="hero-copy" style="position:absolute;top:24px;right:16px;margin:0;color:#fff">مد و کفش</p><h1 id="title">زیورآلات دست‌ساز نیشابور</h1></section>
 <p id="lede" style="padding:0 16px">هر قطعه با دست ساخته می‌شود.</p>
 <a class="card" id="nophoto" href="/products/p1" style="display:block;text-decoration:none;color:#222"><h3 id="nph">کیف چرمی</h3><span>۹۰۰٬۰۰۰ تومان</span></a>
-<div class="card"><img id="prod" src="/_next/image?url=%2Fproducts%2Fa1.jpg&w=640&q=75" alt="انگشتر نقره"><h3 id="ptitle">انگشتر نقره</h3><button id="cta">مشاهده محصولات</button></div>`);
+<div class="card"><img id="prod" src="/_next/image?url=%2Fproducts%2Fa1.jpg&w=640&q=75" alt="انگشتر نقره"><h3 id="ptitle">انگشتر نقره</h3><button id="cta">مشاهده محصولات</button></div>
+<section id="hero2" style="position:relative;overflow:hidden;padding:48px 24px;color:#fff;background:#223"><div style="position:absolute;inset:0;pointer-events:none;opacity:.35" aria-hidden="true"><img id="hero2-img" src="/images/hero.png" alt="" style="width:100%;height:100%;object-fit:cover"></div><div style="position:relative;z-index:10"><h2 id="hero2-title" style="margin:0 0 8px">ویترین پنل</h2><p id="hero2-copy" style="margin:0">مد و کفش دست‌دوز</p></div></section>`);
 const PRODUCTS_HTML = PAGE(`<header><a href="/" id="nav-home">خانه</a></header><h1 id="all" style="padding:16px">همه کالاها</h1>`);
 
 async function realShop() {
@@ -167,7 +168,11 @@ async function framePoint(page, selector, dx = 0.5, dy = 0.5) {
   const box = await page.locator("iframe").boundingBox();
   const inner = await frame.evaluate((sel) => {
     const el = document.querySelector(sel);
-    const r = el.getBoundingClientRect();
+    let r = el.getBoundingClientRect();
+    if (r.top < 40 || r.bottom > innerHeight - 40) {
+      el.scrollIntoView({ block: "center", behavior: "instant" });
+      r = el.getBoundingClientRect();
+    }
     return { x: r.left, y: r.top, w: r.width, h: r.height };
   }, selector);
   return { x: box.x + inner.x + inner.w * dx, y: box.y + inner.y + inner.h * dy };
@@ -331,6 +336,14 @@ async function main() {
   const overText = (await sheet(page).count()) ? await sheet(page).innerText() : "";
   await shot(page, "05b-sheet-text-over-image");
   rec("hold.text-over-image-offers-both", /ثبت متن/.test(overText) && /عکس از گوشی/.test(overText) && /با هوش مصنوعی/.test(overText), overText.replace(/\s+/g, " ").slice(0, 110));
+  await closeSheet(page);
+  await sleep(300);
+
+  // 7c) the real hero: the picture sits in a pointer-events:none wrapper behind the words, so the browser never lists it under the finger
+  await hold(cdp, await framePoint(page, "#hero2-copy"));
+  const realHero = (await sheet(page).count()) ? await sheet(page).innerText() : "";
+  await shot(page, "05c-sheet-hero-without-pointer-events");
+  rec("hold.text-over-pointer-less-image-offers-photo", /ثبت متن/.test(realHero) && /عکس از گوشی/.test(realHero), realHero.replace(/\s+/g, " ").slice(0, 110));
   let beforeCount = S.images.length;
   await page.locator('input[type="file"]').setInputFiles({ name: "x.png", mimeType: "image/png", buffer: PNG });
   await sleep(1500);
