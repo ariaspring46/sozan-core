@@ -6,7 +6,7 @@ import Link from "next/link";
 import { api, Campaign, getApiBase } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
 import { StudioNav } from "@/components/studio-nav";
-import { AuthMedia } from "@/components/auth-media";
+import { AuthMedia, MEDIA_RATIO } from "@/components/auth-media";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,6 +35,8 @@ export default function CampaignDetailPage() {
   const id = params.id;
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [busy, setBusy] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
   const ig = useMemo(
@@ -56,8 +58,14 @@ export default function CampaignDetailPage() {
   const [telegram, setTelegram] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
 
+  /** پاسخ ناقص سرور صفحه را نمی‌شکند؛ دوباره از سرور خوانده می‌شود. */
+  function usable(data: Campaign | null): data is Campaign {
+    return Boolean(data && Array.isArray(data.copies) && Array.isArray(data.assets));
+  }
+
   async function load() {
     const data = await api<Campaign>(`/campaigns/${id}`);
+    if (!usable(data)) throw new Error("کمپین درست خوانده نشد. دوباره امتحان کن.");
     setCampaign(data);
     setTitle(data.title);
     setSubtitle(data.subtitle);
@@ -71,9 +79,16 @@ export default function CampaignDetailPage() {
     void load().catch((err) => setError(err.message));
   }, [id]);
 
+  useEffect(() => {
+    if (!saved) return;
+    const timer = window.setTimeout(() => setSaved(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [saved]);
+
   async function save() {
     setBusy(true);
     setError("");
+    setSaved(false);
     try {
       const data = await api<Campaign>(`/campaigns/${id}`, {
         method: "PATCH",
@@ -86,7 +101,9 @@ export default function CampaignDetailPage() {
           whatsapp_caption: whatsapp,
         }),
       });
-      setCampaign(data);
+      if (usable(data)) setCampaign(data);
+      else await load();
+      setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
@@ -96,15 +113,18 @@ export default function CampaignDetailPage() {
 
   async function compose() {
     setBusy(true);
+    setComposing(true);
     setError("");
     try {
       await save();
       const data = await api<Campaign>(`/campaigns/${id}/compose`, { method: "POST" });
-      setCampaign(data);
+      if (usable(data)) setCampaign(data);
+      else await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
       setBusy(false);
+      setComposing(false);
     }
   }
 
@@ -135,7 +155,21 @@ export default function CampaignDetailPage() {
   if (!campaign) {
     return (
       <AppShell header={<h1 className="text-lg font-bold">کمپین</h1>}>
-        <p className="p-8 text-muted">{error || "در حال بارگذاری…"}</p>
+        <div className="space-y-3 p-8">
+          <p className={error ? "text-danger" : "text-muted"} role={error ? "alert" : "status"}>
+            {error || "در حال بارگذاری…"}
+          </p>
+          {error ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => void load().then(() => setError("")).catch((err) => setError(err.message))}>
+                دوباره امتحان کن
+              </Button>
+              <Link className="inline-flex min-h-11 items-center rounded-xl border border-line px-4 text-sm text-warm" href="/campaigns">
+                بازگشت به کمپین‌ها
+              </Link>
+            </div>
+          ) : null}
+        </div>
       </AppShell>
     );
   }
@@ -170,13 +204,13 @@ export default function CampaignDetailPage() {
         </Card>
         <Card className="space-y-3">
           <Field label="کپشن اینستاگرام">
-            <Textarea value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+            <Textarea value={instagram} maxLength={2200} onChange={(e) => setInstagram(e.target.value)} />
           </Field>
           <Field label="کپشن تلگرام">
-            <Textarea value={telegram} onChange={(e) => setTelegram(e.target.value)} />
+            <Textarea value={telegram} maxLength={2200} onChange={(e) => setTelegram(e.target.value)} />
           </Field>
           <Field label="پیام واتساپ">
-            <Textarea value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+            <Textarea value={whatsapp} maxLength={2200} onChange={(e) => setWhatsapp(e.target.value)} />
           </Field>
         </Card>
       </div>
@@ -185,12 +219,22 @@ export default function CampaignDetailPage() {
           ذخیره متن
         </Button>
         <Button disabled={busy} onClick={() => void compose()}>
-          ساخت ویدیو
+          {composing ? "در حال ساخت ویدیو…" : "ساخت ویدیو"}
         </Button>
         <Button variant="ghost" disabled={busy} onClick={() => void download()}>
           دانلود فایل‌ها
         </Button>
       </div>
+      {composing ? (
+        <p className="text-sm text-warm" role="status">
+          ویدیو چند دقیقه طول می‌کشد؛ این صفحه را باز نگه دار.
+        </p>
+      ) : null}
+      {saved ? (
+        <p className="text-sm text-warm" role="status">
+          ذخیره شد.
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
       <section className="grid gap-4 md:grid-cols-2">
         {overlays.map((asset) => (
@@ -206,6 +250,7 @@ export default function CampaignDetailPage() {
                 relPath={asset.rel_path}
                 kind={asset.kind}
                 alt={asset.format}
+                ratio={MEDIA_RATIO[asset.format] || "1 / 1"}
               />
             )}
           </Card>

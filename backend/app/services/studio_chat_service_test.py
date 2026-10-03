@@ -428,6 +428,20 @@ class StudioChatTests(unittest.TestCase):
         self.assertEqual(out["items"][0]["assets"][0]["name"], "still-image.png")
         self.assertEqual(out["drafts"], [])
 
+    def test_content_library_items_carry_the_time_they_were_last_touched(self) -> None:
+        rows = [
+            {"id": "m1", "role": "assistant", "campaignId": "c1", "text": "اول", "at": 1000, "captions": {"instagram": "الف"}},
+            {"id": "m2", "role": "assistant", "campaignId": "c1", "text": "دوم", "at": 2500, "captions": {"instagram": "ب"}},
+            {"id": "m3", "role": "assistant", "campaignId": "c2", "text": "سوم", "at": 1800, "captions": {"instagram": "ج"}},
+        ]
+        with patch("app.services.studio_chat_service.expire_stale_compose"), patch(
+            "app.services.studio_chat_service.read_json",
+            return_value=rows,
+        ):
+            out = studio_chat_service.content_library([])
+        times = {item["id"]: item["at"] for item in out["items"]}
+        self.assertEqual(times, {"c1": 2500, "c2": 1800})
+
     def test_content_library_empty(self) -> None:
         with patch("app.services.studio_chat_service.expire_stale_compose"), patch(
             "app.services.studio_chat_service.read_json",
