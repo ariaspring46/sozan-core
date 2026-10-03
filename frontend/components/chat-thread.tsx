@@ -132,6 +132,8 @@ export function ChatThread({
   }, [busy]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
+  /** آخرین جایی که خود برنامه گفتگو را به آن برد؛ رویداد scroll در همان‌جا کار کاربر نیست. */
+  const autoTop = useRef(-1);
   const waitLabel = useWaitLabel(busy, "دارم فکر می‌کنم…");
   const fresh = useFreshIds(
     messages.map((msg) => msg.id),
@@ -141,7 +143,9 @@ export function ChatThread({
   const stickToEnd = useCallback(() => {
     const el = scrollerRef.current;
     // چت خالی پایین نمی‌رود تا گوی و سلام خوشامد از بالا دیده شوند.
-    if (el && stickRef.current && el.querySelector("article")) el.scrollTop = el.scrollHeight;
+    if (!el || !stickRef.current || !el.querySelector("article")) return;
+    el.scrollTop = el.scrollHeight;
+    autoTop.current = el.scrollTop;
   }, []);
 
   // پیش از نقاشی: رویداد scroll مرورگر (جابه‌جایی محتوا) نباید «دنبال کردن گفتگو» را خاموش کند.
@@ -166,7 +170,7 @@ export function ChatThread({
         className="sozan-fade-top min-h-0 flex-1 overflow-y-auto"
         onScroll={() => {
           const el = scrollerRef.current;
-          if (!el) return;
+          if (!el || Math.abs(el.scrollTop - autoTop.current) < 2) return;
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
           setAway(!stickRef.current);
         }}
