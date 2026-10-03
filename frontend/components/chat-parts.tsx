@@ -1,12 +1,12 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, CheckCircle2, Hammer, ImageIcon, Megaphone, MessageSquareText, Package, PencilRuler, Send, Sparkles, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { SozanMark } from "@/components/sozan-mark";
+import { SozanOrb } from "@/components/sozan-orb";
 
 /** ساعت پیام: امروز فقط ساعت، قدیمی‌تر روز و ساعت. */
 export function shortWhen(at: number): string {
@@ -18,12 +18,11 @@ export function shortWhen(at: number): string {
   return `${date.toLocaleDateString("fa-IR", { day: "numeric", month: "long" })}، ${time}`;
 }
 
-/** آواتار سوزان کنار حباب؛ هنگام انتظار حلقهٔ نرمی دورش می‌چرخد. */
-export function Avatar({ live = false }: { live?: boolean }) {
+/** آواتار سوزان کنار حباب: همان گوی سوزان، کوچک و ساکن (یک بار کشیده می‌شود). */
+export function Avatar() {
   return (
     <span className="relative mb-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center">
-      {live ? <span aria-hidden className="sozan-ring absolute inset-0 rounded-full border-2 border-accent/50" /> : null}
-      <SozanMark className="h-7 w-7" glow={false} />
+      <SozanOrb size={34} still />
     </span>
   );
 }
@@ -34,29 +33,74 @@ export function AvatarSpacer() {
 }
 
 /**
- * وقتی مدل دارد می‌نویسد: همان‌جا که جواب می‌آید (سمت سوزان) یک حباب با نقطه‌های موجی و دو خط سایه‌ای که با رسیدن جواب جایش را می‌دهد.
+ * وقتی مدل دارد می‌نویسد: همان‌جا که جواب می‌آید (سمت سوزان) گوی سوزان تند می‌چرخد و کنارش متن درخشانی می‌گوید چه می‌کند.
  * هر چه انتظار طولانی‌تر شود متن صادقانه‌تر می‌شود تا کاربر فکر نکند برنامه قفل کرده.
  */
 export function TypingBubble({ label }: { label: string }) {
   return (
-    <div className="ms-auto flex w-fit max-w-[86%] flex-col gap-1" role="status" aria-live="polite">
-      <div className="flex items-end gap-2">
-        <div className="min-w-[8.5rem] rounded-2xl rounded-bl-md border border-line/70 bg-canvas px-4 py-3 shadow-card">
-          <span className="flex items-center gap-1.5" aria-hidden>
-            <span className="sozan-wave h-2 w-2 rounded-full bg-accent" />
-            <span className="sozan-wave h-2 w-2 rounded-full bg-accent" />
-            <span className="sozan-wave h-2 w-2 rounded-full bg-accent" />
-          </span>
-          <span className="mt-2.5 block space-y-1.5" aria-hidden>
-            <span className="sozan-shimmer block h-2.5 w-36 rounded-full" />
-            <span className="sozan-shimmer block h-2.5 w-24 rounded-full" />
-          </span>
-        </div>
-        <Avatar live />
-      </div>
-      <p className="me-10 text-xs text-muted">{label}</p>
+    <div className="ms-auto flex w-fit max-w-[90%] items-center gap-2" role="status" aria-live="polite" data-typing>
+      <span className="sozan-ai rounded-full px-4 py-2.5">
+        <span className="sozan-shine text-[14px] font-medium">{label}</span>
+      </span>
+      <span className="relative shrink-0">
+        <span aria-hidden className="sozan-halo absolute -inset-3 rounded-full" />
+        <SozanOrb size={44} busy className="relative" />
+      </span>
     </div>
   );
+}
+
+/**
+ * متن جواب تازهٔ سوزان مثل نوشته‌شدن زنده می‌آید: حباب از یک خط تا اندازهٔ کامل بزرگ می‌شود (زمان به نسبت طول متن)،
+ * خط آخر در لبه محو است و هر چه زیر متن است (پاسخ‌های سریع، کپشن) درست وقتی نوشتن تمام شد بالا می‌آید.
+ * متن از اول کامل در صفحه است (صفحه‌خوان).
+ */
+export function RevealText({ on, className, children }: { on: boolean; className?: string; children: ReactNode }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const played = useRef(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!on || played.current || !el || typeof el.animate !== "function") return;
+    played.current = true;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const full = el.scrollHeight;
+    const line = parseFloat(getComputedStyle(el).lineHeight) || 28;
+    if (full <= line * 1.5) return;
+    const ms = Math.round(Math.min(2400, (full / line) * 340));
+    const below: HTMLElement[] = [];
+    for (let node = el.nextElementSibling; node; node = node.nextElementSibling) below.push(node as HTMLElement);
+    below.forEach((node) => (node.style.display = "none"));
+    el.classList.add("sozan-writing");
+    const run = el.animate([{ height: `${line}px` }, { height: `${full}px` }], { duration: ms, easing: "cubic-bezier(0.3, 0.5, 0.45, 1)" });
+    run.onfinish = run.oncancel = () => {
+      el.classList.remove("sozan-writing");
+      below.forEach((node) => {
+        node.style.display = "";
+        node.animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 380, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" });
+      });
+    };
+  }, [on]);
+  return (
+    <p ref={ref} className={cn(className, on && "sozan-reveal")}>
+      {children}
+    </p>
+  );
+}
+
+/**
+ * پیام‌هایی که بعد از باز شدن گفتگو رسیده‌اند (نه تاریخچه): فقط این‌ها با نوشته‌شدن تدریجی نشان داده می‌شوند.
+ * رسیدن یک‌بارهٔ چند پیام (عوض کردن گفتگو) تاریخچه حساب می‌شود.
+ */
+export function useFreshIds(ids: string[], ready: boolean): Set<string> {
+  const known = useRef<Set<string> | null>(null);
+  const fresh = useRef(new Set<string>());
+  if (ready && !known.current) known.current = new Set(ids);
+  if (known.current) {
+    const added = ids.filter((id) => !known.current?.has(id));
+    added.forEach((id) => known.current?.add(id));
+    if (added.length <= 3) added.forEach((id) => fresh.current.add(id));
+  }
+  return fresh.current;
 }
 
 export function useWaitLabel(busy: boolean, base: string): string {
@@ -72,6 +116,7 @@ export function useWaitLabel(busy: boolean, base: string): string {
   }, [busy]);
   if (secs >= 25) return "کند شده؛ هنوز منتظر جواب هستم…";
   if (secs >= 8) return "کمی طول می‌کشد؛ هنوز دارم کار می‌کنم…";
+  if (secs >= 3) return "دارم جواب را می‌چینم…";
   return base;
 }
 
@@ -80,13 +125,14 @@ export function QuickReplies({ options, disabled, onPick }: { options: string[];
   return (
     <div className="mt-3" role="group" aria-label="پاسخ‌های پیشنهادی">
       <div className="flex flex-wrap gap-2">
-        {options.map((option) => (
+        {options.map((option, index) => (
           <button
             key={option}
             type="button"
             disabled={disabled}
+            style={{ animationDelay: `${200 + index * 60}ms` }}
             onClick={() => onPick(option)}
-            className="min-h-11 rounded-full border border-accent/40 bg-canvas px-4 text-[14px] text-ink shadow-sm transition active:scale-95 enabled:hover:border-accent enabled:hover:bg-accent/10 disabled:opacity-50"
+            className="sozan-rise min-h-11 rounded-full border border-accent/45 bg-accent/10 px-4 text-[14px] font-medium text-ink backdrop-blur transition active:scale-95 enabled:hover:border-accent enabled:hover:bg-accent/20 disabled:opacity-50"
           >
             {option}
           </button>
@@ -131,9 +177,9 @@ export function ConfirmCard({
   const live = open && !tapped;
   const head = tapped === "confirm" ? "در حال انجام…" : tapped === "cancel" ? "لغو شد" : open ? "منتظر تأیید توست" : "این کارت بسته شد";
   return (
-    <div className={cn("overflow-hidden rounded-2xl border bg-canvas shadow-card transition-opacity", live ? "border-accent/50" : "border-line/70", !live && tapped !== "confirm" && "opacity-80")}>
-      <div className={cn("flex items-center gap-3 border-b px-3.5 py-2.5", live || tapped === "confirm" ? "border-accent/20 bg-accent/10" : "border-line/60 bg-paper")}>
-        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", live || tapped === "confirm" ? "bg-accentStrong text-onAccent" : "bg-line text-muted")}>
+    <div className={cn("overflow-hidden rounded-[1.4rem] transition-opacity", live ? "sozan-card" : "sozan-ai", !live && tapped !== "confirm" && "opacity-80")}>
+      <div className={cn("flex items-center gap-3 border-b px-4 py-3", live || tapped === "confirm" ? "border-accent/20 bg-accent/10" : "border-line/40")}>
+        <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl", live || tapped === "confirm" ? "sozan-tile" : "bg-line/60 text-muted")}>
           <Icon size={18} aria-hidden />
         </span>
         <div className="min-w-0">
@@ -141,16 +187,16 @@ export function ConfirmCard({
           <p className="truncate text-[15px] font-bold text-ink">{spec.title}</p>
         </div>
       </div>
-      <p className="wrap-any px-3.5 py-3 text-[15px] leading-[1.9] text-ink">{text}</p>
+      <p className="wrap-any px-4 py-3 text-[15px] leading-[1.9] text-ink">{text}</p>
       {tapped === "confirm" ? <span aria-hidden className="sozan-shimmer block h-1" /> : null}
       {live ? (
-        <div className="grid grid-cols-5 gap-2 px-3.5 pb-3.5">
-          <Button type="button" className="col-span-3 gap-2" disabled={busy} onClick={onConfirm}>
+        <div className="grid grid-cols-5 gap-2 px-4 pb-4">
+          <Button type="button" className="sozan-send col-span-3 gap-2 rounded-2xl" disabled={busy} onClick={onConfirm}>
             <Check size={18} aria-hidden />
             تأیید
           </Button>
           {onCancel ? (
-            <Button type="button" variant="ghost" className="col-span-2" disabled={busy} onClick={onCancel}>
+            <Button type="button" variant="ghost" className="col-span-2 rounded-2xl border-line/60 bg-transparent" disabled={busy} onClick={onCancel}>
               انصراف
             </Button>
           ) : null}
@@ -165,9 +211,9 @@ export function BuildNote({ text }: { text: string }) {
   const running = /^در حال ساخت|در حال طراحی|در حال /.test(text);
   const failed = !running && /کامل نشد|ناموفق|نشد/.test(text);
   return (
-    <div className={cn("overflow-hidden rounded-2xl border bg-canvas shadow-card", failed ? "border-danger/40" : "border-accent/30")}>
-      <div className="flex items-start gap-3 px-3.5 py-3">
-        <span className={cn("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", failed ? "bg-danger/15 text-danger" : running ? "bg-accent/15 text-warm" : "bg-signal/20 text-signal")}>
+    <div className={cn("overflow-hidden rounded-[1.4rem]", failed ? "sozan-ai border-danger/40" : "sozan-card")}>
+      <div className="flex items-start gap-3 px-4 py-3">
+        <span className={cn("mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl", failed ? "bg-danger/15 text-danger" : running ? "sozan-tile" : "bg-signal/20 text-signal")}>
           {failed ? <XCircle size={18} aria-hidden /> : running ? <Hammer size={18} aria-hidden className="sozan-hammer" /> : <CheckCircle2 size={18} aria-hidden />}
         </span>
         <div className="min-w-0 flex-1">
@@ -176,7 +222,7 @@ export function BuildNote({ text }: { text: string }) {
         </div>
       </div>
       {running ? <span aria-hidden className="sozan-shimmer block h-1" /> : null}
-      <Link href="/shop" className="flex min-h-11 items-center justify-center border-t border-line/60 text-sm font-medium text-warm hover:bg-paper">
+      <Link href="/shop" className="flex min-h-11 items-center justify-center border-t border-line/40 text-sm font-medium text-warm hover:bg-accent/10">
         {running ? "دیدن مرحله‌ها در صفحهٔ فروشگاه" : "رفتن به فروشگاه"}
       </Link>
     </div>
@@ -186,11 +232,11 @@ export function BuildNote({ text }: { text: string }) {
 /** عکس یا ویدیویی که دارد ساخته می‌شود: همان جا که می‌آید یک قاب سایه‌ای زنده و متن مرحله. */
 export function ComposePlaceholder({ label }: { label: string }) {
   return (
-    <div className="mt-3 overflow-hidden rounded-2xl border border-line/70 bg-canvas" role="status">
+    <div className="sozan-card mt-3 overflow-hidden rounded-2xl" role="status">
       <div className="sozan-shimmer relative flex aspect-[4/3] max-h-60 w-full items-center justify-center">
-        <Sparkles size={26} aria-hidden className="sozan-hammer text-warm" />
+        <SozanOrb size={96} busy />
       </div>
-      <p className="px-3.5 py-2.5 text-sm leading-7 text-warm">{label}</p>
+      <p className="px-4 py-2.5 text-sm leading-7 text-warm">{label}</p>
     </div>
   );
 }

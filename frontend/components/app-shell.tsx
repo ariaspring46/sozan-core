@@ -72,9 +72,12 @@ function Badge({ count }: { count: number }) {
 export function AppShell({
   children,
   header,
+  scene = false,
 }: {
   children: React.ReactNode;
   header?: React.ReactNode;
+  /** صحنهٔ چت: زمینهٔ «درخشش مسی» زیر سربرگ شفاف و محتوا ادامه پیدا می‌کند. */
+  scene?: boolean;
 }) {
   const pathname = usePathname();
   useAppViewport();
@@ -140,10 +143,10 @@ export function AppShell({
   const label = (tab: Tab) => (tab.href === "/inbox" && unread > 0 ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label);
 
   return (
-    <div className="sozan-app-shell flex w-full overflow-hidden bg-canvas">
+    <div className={cn("sozan-app-shell flex w-full overflow-hidden", scene ? "sozan-chat" : "bg-canvas")}>
       <nav
         aria-label="ناوبری"
-        className="hidden w-52 shrink-0 flex-col gap-1 border-e border-line bg-canvas px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:flex"
+        className="hidden w-52 shrink-0 flex-col gap-1 border-e border-line bg-canvas/90 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:flex"
       >
         <div className="mb-3 flex items-center gap-2 px-2">
           <SozanMark className="h-9 w-9" />
@@ -160,7 +163,7 @@ export function AppShell({
               aria-label={label(tab)}
               className={cn(
                 "relative flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm",
-                active ? "bg-paper font-bold text-warm" : "text-muted hover:bg-paper/60 hover:text-ink",
+                active ? "bg-accent/10 font-bold text-warm" : "text-muted hover:bg-paper/60 hover:text-ink",
               )}
             >
               {active ? <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-accent" /> : null}
@@ -187,7 +190,7 @@ export function AppShell({
       </nav>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0px)]">
-        <header className="relative z-20 flex shrink-0 items-center gap-2 bg-paper/80 px-3 py-2.5 backdrop-blur-md sm:px-4 sm:py-3">
+        <header className={cn("relative z-20 flex shrink-0 items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3", scene ? "bg-transparent" : "bg-paper/80 backdrop-blur-md")}>
           <button
             ref={menuButton}
             type="button"
@@ -196,7 +199,7 @@ export function AppShell({
             aria-expanded={menuOpen}
             aria-controls="app-menu"
             onClick={() => setMenuOpen(true)}
-            className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-ink hover:bg-canvas md:hidden"
+            className={cn("relative inline-flex h-11 w-11 shrink-0 items-center justify-center text-ink md:hidden", scene ? "sozan-glass rounded-full" : "rounded-xl hover:bg-canvas")}
           >
             <Menu size={24} aria-hidden />
             {unread > 0 ? <span aria-hidden className="absolute end-2 top-2 h-2.5 w-2.5 rounded-full bg-accentStrong ring-2 ring-paper" /> : null}
@@ -213,18 +216,18 @@ export function AppShell({
             ) : null}
           </div>
         ) : null}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper">{children}</div>
+        <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", !scene && "bg-paper")}>{children}</div>
       </div>
 
       {menuOpen ? (
         <div className="absolute inset-0 z-50 md:hidden">
-          <button type="button" aria-label="بستن منو" tabIndex={-1} className="absolute inset-0 cursor-default bg-black/55" onClick={() => setMenuOpen(false)} />
+          <button type="button" aria-label="بستن منو" tabIndex={-1} className="absolute inset-0 cursor-default bg-black/55 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
           <nav
             id="app-menu"
             role="dialog"
             aria-modal="true"
             aria-label="منوی سوزان"
-            className="absolute inset-y-0 start-0 flex w-[min(19rem,86%)] flex-col gap-1 overflow-y-auto overscroll-contain border-e border-line bg-canvas px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-card"
+            className="sozan-chat sozan-rise absolute inset-y-0 start-0 flex w-[min(19rem,86%)] flex-col gap-1 overflow-y-auto overscroll-contain border-e border-line/50 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-card"
           >
             <div className="mb-2 flex items-center justify-between gap-2 px-1">
               <span className="flex items-center gap-2">
@@ -252,8 +255,8 @@ export function AppShell({
                   aria-label={label(tab)}
                   onClick={() => setMenuOpen(false)}
                   className={cn(
-                    "relative flex min-h-12 items-center gap-3 rounded-xl px-3 text-[15px]",
-                    active ? "bg-paper font-bold text-warm" : "text-ink hover:bg-paper/60",
+                    "relative flex min-h-12 items-center gap-3 rounded-2xl px-3 text-[15px]",
+                    active ? "sozan-glass font-bold text-warm" : "text-ink hover:bg-ink/5",
                   )}
                 >
                   {active ? <span className="absolute inset-y-2 start-0 w-0.5 rounded-full bg-accent" /> : null}

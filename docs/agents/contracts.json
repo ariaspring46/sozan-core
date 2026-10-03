@@ -2962,9 +2962,9 @@
  },
  "frontend/components/app-shell.tsx::AppShell": {
   "owner": "U",
-  "shape": "export function AppShell({ children, header, }: { children: React.ReactNode; header?: React.ReactNode; })",
+  "shape": "export function AppShell({ children, header, scene = false, }: { children: React.ReactNode; header?: React.ReactNode; /** صحنهٔ چت: زمینهٔ «درخشش مسی» زیر سربرگ شفاف و محتوا ادامه پیدا می‌کند. */ scene?: boolean; })",
   "signature": "export function AppShell(",
-  "since": "2026-09-18",
+  "since": "2026-10-03",
   "users": [
    "C",
    "X1",
@@ -3029,6 +3029,14 @@
    "X4"
   ]
  },
+ "frontend/components/chat-parts.tsx::RevealText": {
+  "owner": "X1",
+  "signature": "export function RevealText({ on, className, children }: { on: boolean; className?: string; children: ReactNode })",
+  "since": "2026-10-03",
+  "users": [
+   "U"
+  ]
+ },
  "frontend/components/chat-thread.tsx::ChatMsg": {
   "owner": "X1",
   "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; /** ابزاری که کارت تأیید برایش آمده (عنوان و نماد کارت از روی آن). */ tool?: string; confirmId?: string; options?: string[]; campaignId?: string; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
@@ -3040,9 +3048,9 @@
  },
  "frontend/components/chat-thread.tsx::ChatThread": {
   "owner": "X1",
-  "shape": "export function ChatThread({ messages, busy, placeholder, onSend, livePanel, pendingText, tone = \"default\", allowMedia = true, publishTargets, onPublish, onRegenerate, onApproveDraft, onDiscardFailed, onSaveCaptions, onEditDraft, showTime = false, sanitize = false, welcome = false, welcomeLines, hints, confirmId = \"\", onConfirm, onCancel, persona = \"\", aspects, loading = false, banner, }: { messages: ChatMsg[]; busy: boolean; placeholder: string; onSend: (payload: ChatSend) => Promise<void> | void; livePanel?: ReactNode; pendingText?: string; tone?: \"default\" | \"future\"; allowMedia?: boolean; publishTargets?: PublishTarget[]; onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>; onRegenerate?: (payload: { messageId: string; campaignId?: string; part: \"image\" | \"caption\"; file?: File }) => Promise<void>; onApproveDraft?: (payload: { messageId: string; text: string }) => Promise<void>; onDiscardFailed?: (payload: { messageId: string }) => Promise<void>; onSaveCaptions?: (payload: { messageId: string; captions: StudioCaptions }) => void | Promise<void>; onEditDraft?: (payload: { messageId: string; text: string }) => void; sanitize?: boolean; welcome?: boolean; welcomeLines?: string[]; /** جمله‌های راهنما که در چت خالی تایپ می‌شوند و باد می‌بردشان. */ hints?: string[]; confirmId?: string; onConfirm?: (confirmId: string) => void; onCancel?: (confirmId: string) => void; persona?: string; showTime?: boolean; /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */ aspects?: readonly { id: string; label: string; word: string }[]; /** تا تاریخچه نرسیده، صفحهٔ خوشامد نشان داده نمی‌شود (سوسوی «سلام، من سوزانم» در بازدید دوباره). */ loading?: boolean; /** خطا یا اعلان؛ بالای کادر نوشتن می‌نشیند تا کنار جایی باشد که کاربر دست دارد. */ banner?: ReactNode; })",
+  "shape": "export function ChatThread({ messages, busy, placeholder, onSend, pendingText, allowMedia = true, publishTargets, onPublish, onRegenerate, onApproveDraft, onDiscardFailed, onSaveCaptions, onEditDraft, showTime = false, sanitize = false, welcome = false, welcomeLines, starters, confirmId = \"\", onConfirm, onCancel, persona = \"\", aspects, loading = false, banner, }: { messages: ChatMsg[]; busy: boolean; placeholder: string; onSend: (payload: ChatSend) => Promise<void> | void; pendingText?: string; allowMedia?: boolean; publishTargets?: PublishTarget[]; onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>; onRegenerate?: (payload: { messageId: string; campaignId?: string; part: \"image\" | \"caption\"; file?: File }) => Promise<void>; onApproveDraft?: (payload: { messageId: string; text: string }) => Promise<void>; onDiscardFailed?: (payload: { messageId: string }) => Promise<void>; onSaveCaptions?: (payload: { messageId: string; captions: StudioCaptions }) => void | Promise<void>; onEditDraft?: (payload: { messageId: string; text: string }) => void; sanitize?: boolean; welcome?: boolean; welcomeLines?: string[]; /** کارت‌های شروع در چت خالی؛ لمس، جملهٔ شروع را در کادر می‌گذارد. */ starters?: readonly ChatStarter[]; confirmId?: string; onConfirm?: (confirmId: string) => void; onCancel?: (confirmId: string) => void; persona?: string; showTime?: boolean; /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */ aspects?: readonly Aspect[]; /** تا تاریخچه نرسیده، صفحهٔ خوشامد نشان داده نمی‌شود (سوسوی «سلام، من سوزانم» در بازدید دوباره). */ loading?: boolean; /** خطا یا اعلان؛ بالای کادر نوشتن می‌نشیند تا کنار جایی باشد که کاربر دست دارد. */ banner?: ReactNode; })",
   "signature": "export function ChatThread(",
-  "since": "2026-10-02",
+  "since": "2026-10-03",
   "users": [
    "Y"
   ]
@@ -3109,8 +3117,8 @@
  },
  "frontend/components/getting-started.tsx::GettingStarted": {
   "owner": "U",
-  "signature": "export function GettingStarted()",
-  "since": "2026-09-27",
+  "signature": "export function GettingStarted({ compact = false }: { compact?: boolean })",
+  "since": "2026-10-03",
   "users": [
    "X1"
   ]
@@ -3162,10 +3170,18 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X1",
    "X3",
    "X4",
    "X5"
+  ]
+ },
+ "frontend/components/sozan-orb.tsx::SozanOrb": {
+  "owner": "X1",
+  "shape": "export function SozanOrb({ size = 120, busy = false, still = false, level, className, }: { size?: number; busy?: boolean; /** فقط یک بار کشیده شود (آواتار کنار پیام‌ها): بی‌حلقهٔ انیمیشن. */ still?: boolean; level?: MutableRefObject<number>; className?: string; })",
+  "signature": "export function SozanOrb(",
+  "since": "2026-10-03",
+  "users": [
+   "U"
   ]
  },
  "frontend/components/studio-publish.tsx::PublishPayload": {

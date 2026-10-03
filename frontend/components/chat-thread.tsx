@@ -1,12 +1,12 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mic, Paperclip, SendHorizontal, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChatAttach } from "@/components/chat-attach";
-import { SozanMark } from "@/components/sozan-mark";
+import { ChatWelcome, type ChatStarter } from "@/components/chat-welcome";
+import { ChatComposer, type Aspect, type ChatSend, type ComposerHandle } from "@/components/chat-composer";
 import {
   Avatar,
   AvatarSpacer,
@@ -14,13 +14,14 @@ import {
   ComposeWait,
   ConfirmCard,
   QuickReplies,
+  RevealText,
   shortWhen,
   TypingBubble,
+  useFreshIds,
   useWaitLabel,
   VoteButtons,
 } from "@/components/chat-parts";
 import { StudioPublishCard, type PublishPayload, type PublishTarget, type StudioAttachment, type StudioCaptions } from "@/components/studio-publish";
-import { TypingHints } from "@/components/typing-hints";
 import { LinkText } from "@/components/link-text";
 
 export type ChatMsg = {
@@ -49,7 +50,7 @@ export type ChatMsg = {
   error?: string;
 };
 
-export type ChatSend = { text: string; file?: File };
+export type { ChatSend };
 
 const SHOP_DENY = /seed phrase|bitcoin|private key|mnemonic|Traceback|FAIL:/i;
 const SHOP_WELCOME = [
@@ -64,17 +65,12 @@ export function sanitizeShopText(text: string, enabled?: boolean) {
   return text;
 }
 
-const STUDIO_WORDS = /پست|استوری|ریلز|ریل|عکس|تصویر|کمپین|بنر|کپشن/;
-const WAIT_LINES = ["دارم فکر می‌کنم…", "یک لحظه…", "جواب را می‌چینم…"];
-
 export function ChatThread({
   messages,
   busy,
   placeholder,
   onSend,
-  livePanel,
   pendingText,
-  tone = "default",
   allowMedia = true,
   publishTargets,
   onPublish,
@@ -87,7 +83,7 @@ export function ChatThread({
   sanitize = false,
   welcome = false,
   welcomeLines,
-  hints,
+  starters,
   confirmId = "",
   onConfirm,
   onCancel,
@@ -100,9 +96,7 @@ export function ChatThread({
   busy: boolean;
   placeholder: string;
   onSend: (payload: ChatSend) => Promise<void> | void;
-  livePanel?: ReactNode;
   pendingText?: string;
-  tone?: "default" | "future";
   allowMedia?: boolean;
   publishTargets?: PublishTarget[];
   onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>;
@@ -114,25 +108,23 @@ export function ChatThread({
   sanitize?: boolean;
   welcome?: boolean;
   welcomeLines?: string[];
-  /** جمله‌های راهنما که در چت خالی تایپ می‌شوند و باد می‌بردشان. */
-  hints?: string[];
+  /** کارت‌های شروع در چت خالی؛ لمس، جملهٔ شروع را در کادر می‌گذارد. */
+  starters?: readonly ChatStarter[];
   confirmId?: string;
   onConfirm?: (confirmId: string) => void;
   onCancel?: (confirmId: string) => void;
   persona?: string;
   showTime?: boolean;
   /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */
-  aspects?: readonly { id: string; label: string; word: string }[];
+  aspects?: readonly Aspect[];
   /** تا تاریخچه نرسیده، صفحهٔ خوشامد نشان داده نمی‌شود (سوسوی «سلام، من سوزانم» در بازدید دوباره). */
   loading?: boolean;
   /** خطا یا اعلان؛ بالای کادر نوشتن می‌نشیند تا کنار جایی باشد که کاربر دست دارد. */
   banner?: ReactNode;
 }) {
-  const [draft, setDraft] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [micError, setMicError] = useState("");
-  const [waitLine, setWaitLine] = useState(WAIT_LINES[0]);
+  const composer = useRef<ComposerHandle>(null);
+  const [typing, setTyping] = useState(false);
+  const [away, setAway] = useState(false);
   /** کارتی که فروشنده همین حالا لمسش کرد: تا آمدن جواب مدل (چند ثانیه) بسته یا «در حال انجام» می‌ماند؛ اگر درخواست شکست خورد دوباره باز می‌شود. */
   const [tapped, setTapped] = useState<Record<string, "confirm" | "cancel">>({});
   useEffect(() => {
@@ -140,127 +132,50 @@ export function ChatThread({
   }, [busy]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const draftRef = useRef<HTMLTextAreaElement>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const future = tone === "future";
-  const waitLabel = useWaitLabel(busy, future ? waitLine : "در حال نوشتن…");
-  const canSend = Boolean((draft.trim() || (allowMedia && file)) && !busy);
+  /** آخرین جایی که خود برنامه گفتگو را به آن برد؛ رویداد scroll در همان‌جا کار کاربر نیست. */
+  const autoTop = useRef(-1);
+  const waitLabel = useWaitLabel(busy, "دارم فکر می‌کنم…");
+  const fresh = useFreshIds(
+    messages.map((msg) => msg.id),
+    Boolean(persona) && !loading,
+  );
 
-  const fitDraft = () => {
-    const el = draftRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 112)}px`;
-  };
-
-  const stickToEnd = () => {
-    if (!stickRef.current) return;
+  const stickToEnd = useCallback(() => {
     const el = scrollerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
+    // چت خالی پایین نمی‌رود تا گوی و سلام خوشامد از بالا دیده شوند.
+    if (!el || !stickRef.current || !el.querySelector("article")) return;
+    el.scrollTop = el.scrollHeight;
+    autoTop.current = el.scrollTop;
+  }, []);
 
-  useEffect(() => {
+  // پیش از نقاشی: رویداد scroll مرورگر (جابه‌جایی محتوا) نباید «دنبال کردن گفتگو» را خاموش کند.
+  useLayoutEffect(() => {
     stickToEnd();
-  }, [messages, busy, pendingText, file]);
+  }, [messages, busy, pendingText, stickToEnd]);
 
+  // بزرگ و کوچک شدن محتوا یا قاب (اعلان، پیوست، کیبورد) گفتگو را پایین نگه می‌دارد.
   useEffect(() => {
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", stickToEnd);
-    return () => vv?.removeEventListener("resize", stickToEnd);
-  }, []);
-
-  useEffect(() => {
-    fitDraft();
-  }, [draft]);
-
-  useEffect(() => {
-    if (!busy || !future) return;
-    let index = 0;
-    const timer = window.setInterval(() => {
-      index = (index + 1) % WAIT_LINES.length;
-      setWaitLine(WAIT_LINES[index]);
-    }, 2200);
-    return () => window.clearInterval(timer);
-  }, [busy, future]);
-
-  useEffect(() => {
-    return () => {
-      recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
-    };
-  }, []);
-
-  async function toggleVoice() {
-    setMicError("");
-    if (recording) {
-      recorderRef.current?.stop();
-      return;
-    }
-    if (typeof MediaRecorder === "undefined") {
-      setMicError("ضبط صدا در این مرورگر نیست.");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      chunksRef.current = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size) chunksRef.current.push(event.data);
-      };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        const ext = blob.type.includes("ogg") ? "ogg" : "webm";
-        setFile(new File([blob], `voice.${ext}`, { type: blob.type || "audio/webm" }));
-        setRecording(false);
-        recorderRef.current = null;
-      };
-      recorderRef.current = recorder;
-      recorder.start();
-      setRecording(true);
-    } catch {
-      setMicError("میکروفون در دسترس نیست.");
-    }
-  }
-
-  const [aspect, setAspect] = useState("");
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!canSend) return;
-    let text = draft.trim();
-    const chosen = (aspects || []).find((row) => row.id === aspect);
-    if (chosen && chosen.word && !text.includes(chosen.word)) text = `${text} (${chosen.word})`.trim();
-    const attached = file || undefined;
-    const keepKeyboard = document.activeElement === draftRef.current;
-    stickRef.current = true;
-    // مثل هر چت دیگر: کادر همان لحظه خالی می‌شود و متن در حباب «در حال ارسال» دیده می‌شود.
-    setDraft("");
-    setFile(null);
-    try {
-      await onSend({ text, file: attached });
-    } catch {
-      // ارسال نشد: متن برمی‌گردد (اگر در این فاصله چیز تازه‌ای نوشته، متن قبلی بالای آن می‌نشیند).
-      setDraft((current) => (current.trim() ? `${text}\n${current}` : text));
-      setFile((current) => current || attached || null);
-    }
-    if (keepKeyboard) window.requestAnimationFrame(() => draftRef.current?.focus());
-  }
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(stickToEnd);
+    watch.observe(el);
+    if (el.firstElementChild) watch.observe(el.firstElementChild);
+    return () => watch.disconnect();
+  }, [stickToEnd]);
 
   return (
     <div className="flex h-full flex-col bg-transparent">
-      {livePanel}
       <div
         ref={scrollerRef}
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="sozan-fade-top min-h-0 flex-1 overflow-y-auto"
         onScroll={() => {
           const el = scrollerRef.current;
-          if (!el) return;
+          if (!el || Math.abs(el.scrollTop - autoTop.current) < 2) return;
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+          setAway(!stickRef.current);
         }}
       >
-        <div className="space-y-3 px-4 py-5" role="log" aria-live="polite" aria-relevant="additions text" aria-label="گفتگو">
+        <div className="sozan-log mx-auto max-w-3xl space-y-3 px-4 pb-8 pt-5" role="log" aria-live="polite" aria-relevant="additions text" aria-label="گفتگو">
           {loading && messages.length === 0 ? (
             <div className="space-y-3 pt-4" aria-hidden="true">
               <div className="h-12 w-3/5 animate-pulse rounded-2xl bg-line/40" />
@@ -269,23 +184,7 @@ export function ChatThread({
             </div>
           ) : messages.length === 0 && !pendingText ? (
             welcome || welcomeLines ? (
-              <div className="flex min-h-[min(60dvh,28rem)] flex-col items-center justify-center gap-6 pt-6">
-                <SozanMark className="h-16 w-16" />
-                <div className="space-y-1 text-center text-[15px] leading-8 text-muted">
-                  {(welcomeLines || SHOP_WELCOME).map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
-                {hints?.length && !draft.trim() && !busy ? (
-                  <TypingHints
-                    hints={hints}
-                    onPick={(text) => {
-                      setDraft(text);
-                      window.requestAnimationFrame(() => draftRef.current?.focus());
-                    }}
-                  />
-                ) : null}
-              </div>
+              <ChatWelcome lines={welcomeLines || SHOP_WELCOME} starters={starters} excited={typing} onPick={(text) => composer.current?.fill(text)} />
             ) : (
               <p className="pt-10 text-center text-sm leading-7 text-muted">پیام را پایین بنویس.</p>
             )
@@ -297,7 +196,6 @@ export function ChatThread({
               const special = (row?: ChatMsg) => Boolean(row && (row.kind === "confirm" || row.kind === "build"));
               const together = (a?: ChatMsg, b?: ChatMsg) =>
                 Boolean(a && b && a.role === b.role && !special(a) && !special(b) && Math.abs((b.at || 0) - (a.at || 0)) < 300);
-              const firstInGroup = !together(prev, msg);
               const lastInGroup = !together(msg, next);
               const wide = Boolean(
                 msg.campaignId || msg.compose || msg.captions || msg.attachments?.length || (msg.mediaKind && msg.mediaName),
@@ -328,7 +226,7 @@ export function ChatThread({
                             : undefined
                         }
                       />
-                      {showTime && msg.at ? <p className="mt-1 px-1 text-[11px] text-muted">{shortWhen(msg.at)}</p> : null}
+                      {showTime && msg.at ? <p className="mt-1 px-1 text-[11px] text-muted/80">{shortWhen(msg.at)}</p> : null}
                     </article>
                   </div>
                 );
@@ -346,27 +244,22 @@ export function ChatThread({
               const bubble = (
                 <article
                   className={cn(
-                    "px-3.5 py-2.5 text-[15px] leading-[1.9]",
+                    "px-4 py-2.5 text-[15px] leading-[1.9]",
                     wide ? "w-full max-w-full" : "w-fit max-w-full",
                     msg.role === "user"
-                      ? cn("rounded-2xl bg-accentStrong text-onAccent", lastInGroup && "rounded-br-md")
-                      : cn(
-                          "rounded-2xl border border-line/60 bg-canvas text-ink shadow-sm",
-                          lastInGroup && "rounded-bl-md",
-                          msg.kind === "ask" && "border-s-4 border-s-accent",
-                        ),
+                      ? cn("sozan-me rounded-[1.4rem] bg-accentStrong text-onAccent", lastInGroup && "rounded-br-md")
+                      : cn("sozan-ai rounded-[1.4rem] text-ink", lastInGroup && "rounded-bl-md", msg.kind === "ask" && "ring-1 ring-accent/35"),
                   )}
                 >
-                  {assistantPersona && firstInGroup ? <p className="mb-0.5 text-xs font-medium text-warm">{persona}</p> : null}
                   {msg.platformLabel || msg.platform || msg.sender ? (
                     <p className={cn("mb-1 text-xs", msg.role === "user" ? "text-onAccent/90" : "text-warm")}>
                       {[msg.platformLabel || msg.platform, msg.sender].filter(Boolean).join(" · ")}
                     </p>
                   ) : null}
                   {msg.text ? (
-                    <p className="wrap-any whitespace-pre-wrap">
+                    <RevealText className="wrap-any whitespace-pre-wrap" on={msg.role === "assistant" && fresh.has(msg.id)}>
                       {msg.role === "assistant" ? <LinkText text={sanitizeShopText(msg.text, sanitize)} /> : sanitizeShopText(msg.text, sanitize)}
-                    </p>
+                    </RevealText>
                   ) : null}
                   {msg.captions && !onPublish ? (
                     <div className="wrap-any mt-2 space-y-1 text-xs leading-6 text-muted">
@@ -399,7 +292,7 @@ export function ChatThread({
                             className="h-auto py-1 text-xs"
                             disabled={busy}
                             onClick={() => {
-                              setDraft(msg.text);
+                              composer.current?.fill(msg.text);
                               onEditDraft?.({ messageId: msg.id, text: msg.text });
                             }}
                           >
@@ -497,7 +390,7 @@ export function ChatThread({
               );
               const stamp =
                 showTime && msg.at && lastInGroup ? (
-                  <p className="mt-1 px-1 text-[11px] text-muted">
+                  <p className="mt-1 px-2 text-[11px] text-muted/80">
                     {shortWhen(msg.at)}
                     {msg.status === "sending"
                       ? " · در حال ارسال…"
@@ -527,7 +420,7 @@ export function ChatThread({
           )}
           {pendingText ? (
             <div className="flex flex-col items-start">
-              <article className="w-fit max-w-[86%] rounded-2xl rounded-br-md bg-accentStrong px-3.5 py-2.5 text-[15px] leading-[1.9] text-onAccent opacity-80">
+              <article className="sozan-me w-fit max-w-[86%] rounded-[1.4rem] rounded-br-md bg-accentStrong px-4 py-2.5 text-[15px] leading-[1.9] text-onAccent opacity-80">
                 <p className="wrap-any whitespace-pre-wrap">{pendingText}</p>
               </article>
             </div>
@@ -539,105 +432,25 @@ export function ChatThread({
           ) : null}
         </div>
       </div>
-      <form className="shrink-0 space-y-2 border-t border-line/70 bg-paper px-3 pb-2 pt-2" onSubmit={(event) => void submit(event)}>
-        {banner}
-        {file ? (
-          <div className="flex items-center justify-between gap-2 rounded-2xl border border-line/70 bg-paper px-3 text-sm text-muted">
-            <span className="truncate">{file.type.startsWith("image/") ? "تصویر" : file.type.startsWith("video/") ? "ویدیو" : "صدا"} · {file.name}</span>
-            <button type="button" className="inline-flex min-h-11 shrink-0 items-center px-2 text-warm" onClick={() => setFile(null)}>
-              حذف
-            </button>
-          </div>
-        ) : null}
-        {recording ? <p className="text-sm text-warm" role="status">در حال ضبط صدا…</p> : null}
-        {micError ? <p className="text-sm text-danger" role="alert">{micError}</p> : null}
-        {aspects?.length && STUDIO_WORDS.test(draft) ? (
-          <div className="flex items-center gap-2 px-1" role="group" aria-label="نسبت تصویر">
-            {aspects.map((row) => {
-              const on = aspect === row.id || (!aspect && row.id === "post");
-              return (
-                <button
-                  key={row.id}
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => setAspect((value) => (value === row.id ? "" : row.id))}
-                  className={cn(
-                    "tap min-h-9 rounded-xl px-3 text-[13px] font-medium",
-                    on ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted",
-                  )}
-                >
-                  {row.label}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-        <div className="flex items-end gap-1 rounded-3xl border border-line/80 bg-canvas py-1.5 pe-1.5 ps-2 shadow-sm focus-within:border-accent">
-          {allowMedia ? (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                className="hidden"
-                accept="image/*,video/mp4,video/webm,audio/*"
-                onChange={(event) => {
-                  setFile(event.target.files?.[0] || null);
-                  event.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-paper"
-                aria-label="پیوست تصویر یا ویدیو"
-                disabled={busy}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Paperclip size={18} />
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-paper",
-                  recording ? "text-danger" : "text-muted",
-                )}
-                aria-label={recording ? "پایان ضبط" : "ضبط صدا"}
-                disabled={busy}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void toggleVoice()}
-              >
-                {recording ? <Square size={16} /> : <Mic size={18} />}
-              </button>
-            </>
-          ) : null}
-          <textarea
-            ref={draftRef}
-            className="max-h-28 min-h-11 flex-1 resize-none bg-transparent px-1 py-2.5 text-[16px] leading-6 outline-none"
-            rows={1}
-            value={draft}
-            enterKeyHint="send"
-            placeholder={placeholder}
-            aria-label={placeholder}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-              // روی گوشی Enter خط تازه است و دکمهٔ «بفرست» می‌فرستد؛ روی کامپیوتر Enter می‌فرستد.
-              if (window.matchMedia("(pointer: coarse)").matches) return;
-              event.preventDefault();
-              if (canSend) event.currentTarget.form?.requestSubmit();
-            }}
-          />
-          <Button
-            type="submit"
-            aria-label="بفرست"
-            className="h-11 w-11 shrink-0 rounded-full p-0"
-            disabled={!canSend}
-            onMouseDown={(event) => event.preventDefault()}
-          >
-            <SendHorizontal size={19} className="-scale-x-100" aria-hidden />
-          </Button>
-        </div>
-      </form>
+      <ChatComposer
+        handle={composer}
+        busy={busy}
+        placeholder={placeholder}
+        allowMedia={allowMedia}
+        aspects={aspects}
+        banner={banner}
+        away={away && messages.length > 0}
+        onJump={() => {
+          stickRef.current = true;
+          setAway(false);
+          scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
+        }}
+        onSend={(payload) => {
+          stickRef.current = true;
+          return onSend(payload);
+        }}
+        onTyping={setTyping}
+      />
     </div>
   );
 }

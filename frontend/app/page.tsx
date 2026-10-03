@@ -14,7 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const origin = "https://sozan-core.ir";
   const title = "سوزان — بگو، بساز، بفروش";
   const description =
-    "سوزان فروشگاهت را از دل کانال‌هایت می‌سازد، محتوا را می‌نویسد و جواب پیام‌هایت را در همه‌ی شبکه‌های اجتماعی می‌دهد.";
+    "سوزان دستیار فروش فروشنده‌های ایرانی است: در چت فروشگاه اینترنتی می‌سازی، پست و کپشن می‌گیری و پیام مشتری‌های اینستاگرام و تلگرام را یک‌جا جواب می‌دهی.";
   const image = `${origin}/sozan-mark.png`;
   return {
     metadataBase: new URL(origin),

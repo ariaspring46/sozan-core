@@ -104,7 +104,7 @@ Every other file in the repo belongs to another role (see `docs/agents/README.md
 
 **`frontend/components/app-shell.tsx`** — owner U
 ```
-export function AppShell(  # changed 2026-09-18
+export function AppShell(  # changed 2026-10-03
 ```
 **`frontend/components/auth-image.tsx`** — owner U
 ```

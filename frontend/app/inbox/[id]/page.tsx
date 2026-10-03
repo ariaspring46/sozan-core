@@ -113,6 +113,7 @@ export default function InboxThreadPage() {
 
   return (
     <AppShell
+      scene
       header={
         <div className="flex min-w-0 items-center gap-1">
           <Link
@@ -134,7 +135,7 @@ export default function InboxThreadPage() {
         </div>
       }
     >
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line/60 bg-canvas px-4 py-1.5">
+      <div className="sozan-glass mx-3 flex shrink-0 items-center justify-between gap-3 rounded-2xl px-4 py-1.5">
         <p className="min-w-0 text-sm leading-6 text-muted">
           {thread?.paused ? "پاسخ خودکار این گفتگو خاموش است." : "پاسخ خودکار این گفتگو روشن است."}
         </p>
