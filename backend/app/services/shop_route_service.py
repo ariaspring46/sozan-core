@@ -49,7 +49,7 @@ def classify_turn(prompt: str, view_target: str = "", view_path: str = "") -> di
     actions = classify_actions(prompt, view_target, view_path)
     first = actions[0] if actions else {"type": "answer"}
     kind = str(first.get("type") or "answer")
-    if kind == "reject_foreign":
+    if kind in {"reject_foreign", "reply_only"}:
         route = "reject"
     elif kind in {"greet", "answer"}:
         route = "answer"

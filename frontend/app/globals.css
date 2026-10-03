@@ -613,6 +613,84 @@ html:has(.sozan-landing) {
   animation: sozan-glow 2.8s ease-in-out infinite;
 }
 
+/* انتظار پاسخ مدل: نقطه‌های موجی، سایهٔ متن در حال آمدن، حلقهٔ آواتار، چکش ساخت. با «کاهش حرکت» ثابت می‌ماند. */
+@keyframes sozan-wave {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+@keyframes sozan-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@keyframes sozan-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+@keyframes sozan-hammer {
+  0%,
+  100% {
+    transform: rotate(-14deg);
+  }
+  50% {
+    transform: rotate(12deg);
+  }
+}
+
+.sozan-wave {
+  animation: sozan-wave 1.15s ease-in-out infinite;
+}
+.sozan-wave:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.sozan-wave:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+.sozan-shimmer {
+  background: linear-gradient(100deg, rgb(var(--c-line) / 0.55) 30%, rgb(var(--c-accent) / 0.28) 50%, rgb(var(--c-line) / 0.55) 70%);
+  background-size: 240% 100%;
+  animation: sozan-shimmer 1.6s linear infinite;
+}
+
+.sozan-ring {
+  animation: sozan-ring 1.6s ease-out infinite;
+}
+
+.sozan-hammer {
+  transform-origin: 70% 80%;
+  animation: sozan-hammer 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sozan-wave,
+  .sozan-shimmer,
+  .sozan-ring,
+  .sozan-hammer {
+    animation: none;
+  }
+}
+
 .sozan-dot:nth-child(1) {
   animation: sozan-dot 1.2s ease-in-out infinite;
 }

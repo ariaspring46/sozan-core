@@ -60,11 +60,31 @@ class ModelTextTests(unittest.TestCase):
             "میدانم": "می‌دانم",
             "کیفها": "کیف‌ها",
             "قیمتگذاری": "قیمت‌گذاری",
+            "به فروشگاهت نمیکنه؛ ولی": "به فروشگاهت نمی‌کنه؛ ولی",
+            "کیفها، کفشها؟": "کیف‌ها، کفش‌ها؟",
         }
         for wrong, right in fixed.items():
             self.assertEqual(router_text.fix_halfspace(wrong), right)
         for word in ("میز", "میوه", "میدان", "میگو", "میدیا", "میگرن", "کالاها", "بها", "آنها", "ممنون"):
             self.assertEqual(router_text.fix_halfspace(word), word)
+
+    def test_a_post_request_is_content_but_a_store_with_post_shipping_is_not(self) -> None:
+        for text in ("برای انگشتر نقره یک پست اینستاگرام بساز", "<script>alert(1)</script> برای من پست بساز", "یه کپشن برای گردنبند بنویس", "برای فروشگاهم یه استوری بساز"):
+            self.assertTrue(router_text.is_content_request(text), text)
+        for text in ("یه فروشگاه بساز", "فروشگاه بساز، ارسال با پست پیشتاز", "سایت فروشگاهی برام درست کن و پست هم بزن", "حس گرم و رنگ قهوه‌ای می‌خوام"):
+            self.assertFalse(router_text.is_content_request(text), text)
+
+    def test_only_a_real_answer_continues_the_question_before_it(self) -> None:
+        self.assertTrue(router_text.answers_ask("کدام صفحه را بسازم؟", "درباره ما"))
+        self.assertTrue(router_text.answers_ask("قیمت گردنبند فیروزه چند تومان باشد؟", "۸۵۰ هزار"))
+        self.assertFalse(router_text.answers_ask("قیمت گردنبند فیروزه چند تومان باشد؟", "فکر کنم گرونه"))
+        for noise in ("بله", "نه", "آره؟", "خیلی بدی، هیچ کاری نمی‌کنی", "چرا اینجوریه"):
+            self.assertFalse(router_text.answers_ask("کدام دکمه و چه تغییری؟", noise), noise)
+
+    def test_tap_answers_are_answers_not_commands(self) -> None:
+        question = "قیمت گردنبند فیروزه چند تومان باشد؟"
+        self.assertEqual(router_text.clean_options(question, ["۱٬۲۰۰٬۰۰۰ تومان", "قیمت را پنهان کن", "بعداً می‌گویم", "۱٬۲۰۰٬۰۰۰ تومان", "۲٬۵۰۰٬۰۰۰ تومان"]), ["۱٬۲۰۰٬۰۰۰ تومان", "۲٬۵۰۰٬۰۰۰ تومان"])
+        self.assertEqual(router_text.clean_options("کدام صفحه؟", ["درباره ما", "تماس", "صفحه را حذف کن", "یک گزینهٔ بسیار بسیار بسیار طولانی که کسی نمی‌خواند"]), ["درباره ما", "تماس"])
 
     def test_markdown_is_flattened_for_a_plain_text_bubble(self) -> None:
         out = router_text.strip_markdown("**وضعیت** را بگم\n- یکی\n- دو\n\n\n\n## عنوان\n`x`")

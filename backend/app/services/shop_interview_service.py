@@ -15,6 +15,7 @@ reopens the loop. What the seller wished for is kept as `wishes` and reaches the
 from __future__ import annotations
 
 import re
+import time
 
 from app.services import onboard_service, shop_voice_service as voice
 from app.services.pii_mask import mask_pii
@@ -28,6 +29,7 @@ MIN_CONFIDENCE = 30  # the model's own score is only a veto («I am lost»); wha
 ENOUGH_OPTIONAL = 3  # besides style and colours: audience, story, name, sections, order, tone, reference
 OPTIONAL_KEYS = ("audience", "story", "brandName", "features", "order", "tone", "reference")
 MAX_ASKED = 40
+PROPOSAL_TTL = 30 * 60  # seconds a proposal stays open; a «آره» an hour later is not an answer to it
 MAX_STALLS = 2  # seller turns in a row that taught nothing: stop asking and propose
 
 SKIN_FA = {"atelier": "لوکس و خلوت", "street": "خیابانی و پرانرژی", "boutique": "بوتیک گرم و خانوادگی"}
@@ -76,7 +78,8 @@ SPEAK_SYSTEM = (
 )
 
 ASK_TASK = """کار این نوبت: از سؤال‌های «کم‌ترین‌های مهم» یکی یا دو تا را (نه بیشتر) با لحن خودت بپرس. سؤال‌ها فقط پیشنهادند؛ بازنویسی‌شان کن و به حرف‌های خود فروشنده وصلشان کن.
-اگر فروشنده چیزی خواسته، اول کوتاه نشان بده که شنیده‌ای. چیزی که قبلاً پرسیده‌ای و جواب گرفته را دوباره نپرس."""
+اگر فروشنده چیزی خواسته، اول کوتاه نشان بده که شنیده‌ای. چیزی که قبلاً پرسیده‌ای و جواب گرفته را دوباره نپرس.
+اگر فروشنده سؤالی پرسیده (مثل قیمت پلن) و جوابش را در داده نداری، همین را صادقانه بگو و بگو کجا باید نگاه کند («بیشتر ← پرداخت و پیامک» برای پلن)؛ سؤالش را بی‌جواب نگذار. جای خالی مثل «[نام شما]» ننویس؛ اگر اسم نمی‌دانی، خودت یک اسم مشخص پیشنهاد بده."""
 
 PROPOSE_TASK = """کار این نوبت: یک طرح پیشنهادی مشخص بده (نه کلی)؛ هر چه فروشنده گفته را همان‌طور رعایت کن و پیشنهادهای خودت را فقط برای جاهای خالی بیاور: حس سایت، پالت رنگ (اگر فروشنده نگفته خودت پیشنهاد بده و بگو پیشنهاد توست)،
 بخش‌های سایت، اسم و شعار، لحن، و هر «خواستهٔ ویژه»ای که فروشنده گفته و می‌گذاری. کوتاه و گرم، یک تا شش جمله.
@@ -113,6 +116,25 @@ def _state() -> dict:
 
 def _save_state(state: dict) -> None:
     write_json(STATE_FILE, state)
+
+
+def _squash(text: object) -> str:
+    return re.sub(r"[\s\u200c]+", "", str(text or ""))
+
+
+def proposal_open(state: dict, rows: list[dict]) -> bool:
+    """A proposal is only answered by the very next seller message: still fresh, and Sozan's last line in this talk is that proposal
+    (a reload hours later, or other messages in between, make a bare «آره» an ordinary line)."""
+    if state.get("mode") != "propose":
+        return False
+    at = float(state.get("at") or 0)
+    if at and time.time() - at > PROPOSAL_TTL:
+        return False
+    said = _squash(state.get("said"))
+    if not said:
+        return True
+    earlier = [row for row in rows[:-1] if row.get("role") == "assistant" and str(row.get("id") or "") != "shop-build-live"]
+    return bool(earlier) and said in _squash(earlier[-1].get("text"))
 
 
 def _transcript(rows: list[dict]) -> str:
@@ -233,6 +255,10 @@ def _speak_context(brief: dict, assessment: dict, shop: dict, mode: str) -> str:
     )
 
 
+# nothing is being built while the seller has not said yes
+_CLAIMS_BUILD = re.compile(r"می.?سازم|شروع\s*(?:کردم|شد)|ساخته\s*شد|ساختم|در\s*حال\s*ساخت")
+
+
 async def speak(rows: list[dict], brief: dict, assessment: dict, shop: dict, mode: str) -> str | None:
     task = ASK_TASK if mode == "ask" else PROPOSE_TASK
     system = SPEAK_SYSTEM + "\n\n" + task + _speak_context(brief, assessment, shop, mode)
@@ -245,9 +271,27 @@ async def speak(rows: list[dict], brief: dict, assessment: dict, shop: dict, mod
         )
         for name, fa in SKIN_FA.items():
             reply = re.sub(name, fa, reply, flags=re.I)
-        if voice.acceptable(reply) and (mode == "ask" or "بساز" in reply):
+        if voice.acceptable(reply) and not _CLAIMS_BUILD.search(reply) and (mode == "ask" or "بساز" in reply):
             return reply
     return None
+
+
+QUICK_ANSWERS: dict[str, list[str]] = {
+    "style": list(SKIN_FA.values()),
+    "colors": ["کرم و قهوه‌ای", "سفید و مینیمال", "مشکی و طلایی", "رنگارنگ و شاد"],
+    "sections": ["فقط کالاها", "کالاها و داستان برند", "همه‌چیز: داستان، پرسش‌های متداول و تماس"],
+    "order": ["از دایرکت اینستاگرام", "پرداخت آنلاین در سایت", "از واتساپ"],
+}
+DELEGATE_ANSWER = "هرچی خودت صلاح می‌دانی"
+
+
+def quick_answers(mode: str, assessment: dict) -> list[str]:
+    """Taps under the model's message: a few likely answers to the question just asked, and always a way to hand the choice over."""
+    if mode == "propose":
+        return ["آره، بساز", "چیزی را عوض کنم"]
+    first = assessment["missing"][0]["slot"] if assessment["missing"] else ""
+    options = QUICK_ANSWERS.get(first)
+    return [*options, DELEGATE_ANSWER] if options else []
 
 
 def _fallback_reply(brief: dict, assessment: dict, mode: str) -> str | None:
@@ -269,6 +313,8 @@ async def turn(rows: list[dict], brief: dict, shop: dict) -> dict | None:
     if state.get("mode") == "build":
         return {"reply": "", "build": False, "mode": "build", "skip": True}  # the build was started from here; the rest is the shop chat
     seller_turns = int(state.get("turns") or 0) + 1
+    if state.get("mode") == "propose" and not proposal_open(state, rows):
+        state = {**state, "mode": "ask"}  # stale proposal: nothing to confirm any more
     assessment = await assess(rows, brief, state)
     if assessment is None:
         return None
@@ -313,13 +359,16 @@ async def turn(rows: list[dict], brief: dict, shop: dict) -> dict | None:
         "stalls": 0 if mode == "propose" else state["stalls"],
         "asked": asked,
         "proposal": assessment["suggest"] if mode == "propose" else state.get("proposal") or {},
+        "at": time.time(),
     }
     _save_state(new_state)
     onboard_service.save_brief({"proposed": mode == "propose"})
     reply = await speak(rows, merged, assessment, shop, mode) or _fallback_reply(merged, assessment, mode)
     if not reply:
         return None
-    return {"reply": reply, "build": False, "mode": mode, "assessment": assessment}
+    if mode == "propose":
+        _save_state({**new_state, "said": _squash(reply)[:24]})
+    return {"reply": reply, "build": False, "mode": mode, "assessment": assessment, "options": quick_answers(mode, assessment)}
 
 
 def reset() -> None:

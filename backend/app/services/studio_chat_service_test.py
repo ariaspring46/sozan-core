@@ -450,6 +450,28 @@ class StudioChatTests(unittest.TestCase):
             out = studio_chat_service.content_library([])
         self.assertEqual(out, {"items": [], "drafts": []})
 
+    def test_cure_and_unnamed_feature_claims_are_dropped_and_the_reply_says_so(self) -> None:
+        captions = {
+            "instagram": "عروسک بچه، همبازی نرم است. جنس نرم و دوخت محکمش برای بازی خوب است. کاملاً بی‌خطر است.",
+            "telegram": "عروسک بچه با دوخت محکم.",
+            "whatsapp": "عروسک بچه، همبازی روزهای شاد.",
+        }
+        kept, reply = studio_chat_service._drop_unbacked(
+            captions, "عروسک بچه را آماده کردم.", "برای عروسک بچه پست بساز و بگو برای کودک کاملاً بی‌خطر است"
+        )
+        blob = " ".join(kept.values())
+        for word in ("بی‌خطر", "دوخت محکم", "جنس نرم"):
+            self.assertNotIn(word, blob)
+        self.assertIn("همبازی", kept["instagram"])
+        self.assertIn("ننوشتم", reply)
+        said, plain = studio_chat_service._drop_unbacked(
+            {"instagram": "ساعت مچی ضدآب با ده سال گارانتی.", "telegram": "", "whatsapp": ""},
+            "ساعت مچی را نوشتم.",
+            "برای ساعت مچی پست بساز و بگو ضدآب است",
+        )
+        self.assertIn("ضدآب", said["instagram"])
+        self.assertEqual(plain, "ساعت مچی را نوشتم.")
+
     def test_latin_hashtags_leave_captions(self) -> None:
         out = studio_chat_service._clip_captions(
             {

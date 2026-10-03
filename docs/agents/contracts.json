@@ -2166,6 +2166,14 @@
    "X2"
   ]
  },
+ "backend/app/services/router_text.py::fix_halfspace": {
+  "owner": "X1",
+  "signature": "def fix_halfspace(text: str) -> str",
+  "since": "2026-10-03",
+  "users": [
+   "X4"
+  ]
+ },
  "backend/app/services/sales_policy_service.py::public_policy": {
   "owner": "Y",
   "signature": "def public_policy() -> dict",
@@ -2359,8 +2367,8 @@
  },
  "backend/app/services/shop_service.py::chat": {
   "owner": "X4",
-  "signature": "async def chat(text: str, media: dict | None=None, view_path: str='', view_target: str='') -> dict",
-  "since": "2026-09-18",
+  "signature": "async def chat(text: str, media: dict | None=None, view_path: str='', view_target: str='', confirmed: bool=False) -> dict",
+  "since": "2026-10-03",
   "users": [
    "X1"
   ]
@@ -2995,11 +3003,20 @@
    "Y"
   ]
  },
+ "frontend/components/chat-parts.tsx::ConfirmCard": {
+  "owner": "X1",
+  "shape": "export function ConfirmCard({ tool, text, open, busy, tapped, onConfirm, onCancel, }: { tool?: string; text: string; open: boolean; busy: boolean; /** فروشنده همین حالا یکی از دکمه‌ها را لمس کرده و جواب هنوز نرسیده. */ tapped?: \"confirm\" | \"cancel\"; onConfirm: () => void; onCancel?: () => void; })",
+  "signature": "export function ConfirmCard(",
+  "since": "2026-10-03",
+  "users": [
+   "X4"
+  ]
+ },
  "frontend/components/chat-thread.tsx::ChatMsg": {
   "owner": "X1",
-  "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; confirmId?: string; options?: string[]; campaignId?: string; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
+  "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; /** ابزاری که کارت تأیید برایش آمده (عنوان و نماد کارت از روی آن). */ tool?: string; confirmId?: string; options?: string[]; campaignId?: string; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
   "signature": "export type ChatMsg =",
-  "since": "2026-09-29",
+  "since": "2026-10-03",
   "users": [
    "Y"
   ]
@@ -3130,6 +3147,7 @@
    "C",
    "X1",
    "X3",
+   "X4",
    "X5"
   ]
  },
@@ -3385,7 +3403,6 @@
   "signature": "export function formatWhen(at: number): string",
   "since": "2026-09-18",
   "users": [
-   "X1",
    "X2",
    "X5",
    "Y"

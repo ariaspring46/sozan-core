@@ -4,18 +4,18 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { ImagePlus, Sparkles, SendHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LinkText } from "@/components/link-text";
-import { friendlyReply, selectionLabel, TARGET_MAX, type ShopSelection } from "@/components/shop-editor";
+import { friendlyReply, selectionLabel, selectionPhoto, TARGET_MAX, type ShopSelection } from "@/components/shop-editor";
 
 function cleanQuote(text: string) {
   return text.replace(/[«»"]/g, "").replace(/\s+/g, " ").trim();
 }
 
-/** نشانی عکس انتخاب‌شده اگر از همان فروشگاه است؛ برای پیش‌نمایش کوچک در برگه. */
-function thumbSrc(selection: ShopSelection, href: string) {
-  if (!selection.src) return "";
+/** نشانی عکس اگر از همان فروشگاه است؛ برای پیش‌نمایش کوچک در برگه. */
+function thumbSrc(src: string, href: string) {
+  if (!src) return "";
   try {
     const base = new URL(href);
-    const url = new URL(selection.src, base);
+    const url = new URL(src, base);
     if ((url.protocol === "http:" || url.protocol === "https:") && url.host === base.host) return url.href;
   } catch {
     /* ignore */
@@ -23,9 +23,77 @@ function thumbSrc(selection: ShopSelection, href: string) {
   return "";
 }
 
+/** عوض‌کردن عکس این بخش: عکس از گوشی، و برای عکس بالای سایت ساختن با هوش مصنوعی. */
+function PhotoActions({
+  src,
+  href,
+  isHero,
+  isProduct,
+  disabled,
+  draft,
+  onImage,
+  onRun,
+}: {
+  src: string;
+  href: string;
+  isHero: boolean;
+  isProduct: boolean;
+  disabled: boolean;
+  draft: string;
+  onImage: (file: File) => Promise<boolean>;
+  onRun: (text: string, opts?: { target?: string }) => Promise<boolean>;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const thumb = thumbSrc(src, href);
+  const add = !src && isProduct;
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-line bg-canvas p-2">
+      {thumb ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={thumb} alt="" referrerPolicy="no-referrer" className="h-14 w-14 shrink-0 rounded-xl border border-line object-cover" />
+      ) : (
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-dashed border-line text-muted">
+          <ImagePlus size={22} aria-hidden />
+        </span>
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          tabIndex={-1}
+          aria-label="عکس تازه"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void onImage(file);
+          }}
+        />
+        <Button type="button" className="min-h-11 gap-2 text-sm" disabled={disabled} onClick={() => fileRef.current?.click()}>
+          <ImagePlus size={17} aria-hidden />
+          {add ? "افزودن عکس برای این کالا" : "عکس از گوشی"}
+        </Button>
+        {isHero ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-11 gap-2 text-sm"
+            disabled={disabled}
+            onClick={() => void onRun(draft.trim() ? `یک عکس تازه برای بالای سایت بساز: ${draft.trim()}` : "یک عکس تازه برای بالای سایت بساز")}
+          >
+            <Sparkles size={17} aria-hidden />
+            با هوش مصنوعی بساز
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 /**
  * برگهٔ پایین موبایل: بعد از نگه داشتن انگشت روی یک بخش سایت باز می‌شود. فقط همین بخش را ویرایش می‌کند:
- * دستور آزاد، متن تازه، یا عکس از گوشی. چت جداگانه‌ای در صفحه نیست.
+ * دستور آزاد، متن تازه، یا عکس از گوشی (هم خود عکس، هم عکسِ زیر یک نوشته یا داخل یک بخش). چت جداگانه‌ای در صفحه نیست.
  */
 export function ShopEditSheet({
   selection,
@@ -50,15 +118,14 @@ export function ShopEditSheet({
   onClose: () => void;
 }) {
   const isImage = selection.kind === "image";
-  const isHero = isImage && /hero/i.test(selection.src || "");
+  const photo = selectionPhoto(selection);
+  const isHero = Boolean(photo && /hero/i.test(photo.src));
   const target = !isImage ? selection.text.slice(0, TARGET_MAX) : "";
   const tooLong = !isImage && selection.text.length > TARGET_MAX;
   const [draft, setDraft] = useState("");
   const [selText, setSelText] = useState(selection.text);
-  const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const disabled = busy || locked;
-  const thumb = isImage ? thumbSrc(selection, href) : "";
 
   useEffect(() => {
     setSelText(selection.text);
@@ -93,22 +160,16 @@ export function ShopEditSheet({
     >
       <div className="mx-auto h-1 w-10 shrink-0 rounded-full bg-line" aria-hidden />
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-3">
-          {thumb ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumb} alt="" referrerPolicy="no-referrer" className="h-12 w-12 shrink-0 rounded-lg border border-line object-cover" />
-          ) : null}
-          <div className="min-w-0">
-            <p className="text-xs text-muted">
-              انتخاب‌شده: <span className="font-bold text-warm">{selectionLabel(selection)}</span>
+        <div className="min-w-0">
+          <p className="text-xs text-muted">
+            انتخاب‌شده: <span className="font-bold text-warm">{selectionLabel(selection)}</span>
+          </p>
+          {!isImage && selection.text ? (
+            <p dir="auto" className="line-clamp-2 text-sm leading-6 text-ink">
+              «{selection.text}»
             </p>
-            {!isImage && selection.text ? (
-              <p dir="auto" className="line-clamp-2 text-sm leading-6 text-ink">
-                «{selection.text}»
-              </p>
-            ) : null}
-            {isImage && selection.alt ? <p dir="auto" className="line-clamp-1 text-sm text-ink">{selection.alt}</p> : null}
-          </div>
+          ) : null}
+          {isImage && selection.alt ? <p dir="auto" className="line-clamp-1 text-sm text-ink">{selection.alt}</p> : null}
         </div>
         <button
           type="button"
@@ -120,39 +181,7 @@ export function ShopEditSheet({
         </button>
       </div>
 
-      {isImage ? (
-        <div className="flex flex-wrap gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            tabIndex={-1}
-            aria-label="عکس تازه"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) void onImage(file);
-            }}
-          />
-          <Button type="button" className="flex-1 gap-2" disabled={disabled} onClick={() => fileRef.current?.click()}>
-            <ImagePlus size={17} aria-hidden />
-            عکس از گوشی
-          </Button>
-          {isHero ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="flex-1 gap-2"
-              disabled={disabled}
-              onClick={() => void onRun(draft.trim() ? `یک عکس تازه برای بالای سایت بساز: ${draft.trim()}` : "یک عکس تازه برای بالای سایت بساز")}
-            >
-              <Sparkles size={17} aria-hidden />
-              با هوش مصنوعی بساز
-            </Button>
-          ) : null}
-        </div>
-      ) : target && !tooLong ? (
+      {target && !tooLong ? (
         <form
           className="space-y-2"
           onSubmit={(event) => {
@@ -191,7 +220,35 @@ export function ShopEditSheet({
         <p className="text-xs leading-6 text-muted">این بخش بلند است؛ پایین بنویس چه تغییری بدهم.</p>
       ) : null}
 
-      <form onSubmit={(event) => void submit(event)} className="flex items-center gap-2 rounded-2xl border border-field bg-canvas p-1.5 ps-3 focus-within:border-accent">
+      {photo ? (
+        <PhotoActions
+          src={photo.src}
+          href={href}
+          isHero={isHero}
+          isProduct={Boolean(selection.product)}
+          disabled={disabled}
+          draft={draft}
+          onImage={onImage}
+          onRun={onRun}
+        />
+      ) : null}
+
+      <p className="min-h-6 text-sm leading-7" role="status" aria-live="polite">
+        {busy ? (
+          <span className="text-warm">در حال اعمال…</span>
+        ) : locked ? (
+          <span className="text-warm">سایت در حال بیلد است؛ کمی صبر کن.</span>
+        ) : error ? (
+          <span className="text-danger" role="alert">
+            {error}
+          </span>
+        ) : reply ? (
+          <span className="text-ink">
+            <LinkText text={friendlyReply(reply)} />
+          </span>
+        ) : null}
+      </p>
+      <form onSubmit={(event) => void submit(event)} className="sticky bottom-0 z-10 -mx-1 flex items-center gap-2 rounded-2xl border border-field bg-canvas p-1.5 ps-3 shadow-card focus-within:border-accent">
         <label className="sr-only" htmlFor="shop-sheet-command">
           دستور برای این بخش
         </label>
@@ -216,21 +273,6 @@ export function ShopEditSheet({
         </Button>
       </form>
 
-      <p className="min-h-6 text-sm leading-7" role="status" aria-live="polite">
-        {busy ? (
-          <span className="text-warm">در حال اعمال…</span>
-        ) : locked ? (
-          <span className="text-warm">سایت در حال بیلد است؛ کمی صبر کن.</span>
-        ) : error ? (
-          <span className="text-danger" role="alert">
-            {error}
-          </span>
-        ) : reply ? (
-          <span className="text-ink">
-            <LinkText text={friendlyReply(reply)} />
-          </span>
-        ) : null}
-      </p>
     </section>
   );
 }

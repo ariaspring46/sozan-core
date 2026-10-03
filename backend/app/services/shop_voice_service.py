@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 
 from app.services.llm import complete_json, complete_text_chat
+from app.services.router_text import fix_halfspace
 
 SKINS = ("atelier", "street", "boutique")
 BRIEF_TEXT_KEYS = ("colors", "features", "notes", "audience", "story", "tone", "brandName", "order", "reference", "avoid")
@@ -56,6 +57,14 @@ def _hard_tokens(text: str) -> set[str]:
     return found
 
 
+# markup and code words are the model's inner vocabulary («تیتر h1»); the seller never sees them
+_TECH = re.compile(r"\b(?:h[1-6]|div|span|css|html|tsx|jsx|json|className|href|src)\b", re.I)
+
+
+# a template slot the model left unfilled: «بوتیک [نام شما]»، «{brand}»
+_PLACEHOLDER = re.compile(r"\[[^\]\n]{1,24}\]|\{[^}\n]{1,24}\}|<[^>\n]{1,24}>|\bxxx+\b|\.{4,}", re.I)
+
+
 def _persian(text: str) -> bool:
     fa = len(_FA.findall(text))
     return fa >= 4 and fa >= len(_LATIN.findall(text))
@@ -67,13 +76,13 @@ def clean_reply(text: object) -> str:
     value = re.sub(r"[*_`#>]+", "", value)
     value = re.sub(r"\s*\n\s*", " ", value)
     value = re.sub(r"\s{2,}", " ", value)
-    return value.strip(" \"'")[:REPLY_MAX]
+    return fix_halfspace(value.strip(" \"'"))[:REPLY_MAX]
 
 
 def acceptable(
     reply: str, *, must_keep: list[str] | None = None, patched: bool | None = None, facts: str | None = None
 ) -> bool:
-    if not reply or len(reply) < 8 or not _persian(reply) or _URL.search(reply):
+    if not reply or len(reply) < 8 or not _persian(reply) or _URL.search(reply) or _TECH.search(reply) or _PLACEHOLDER.search(reply):
         return False
     if patched is not False:
         # a done thing keeps its quoted result («نقره»); a thing not done may only paraphrase its example sentences

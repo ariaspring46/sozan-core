@@ -592,7 +592,7 @@ def _merge_followup(spoken: str) -> str:
     asked, before = rows[-1], rows[-2]
     if asked.get("role") != "assistant" or asked.get("kind") != "ask" or before.get("role") != "user":
         return spoken
-    if len(spoken.split()) > 5 or _FRESH_COMMAND.search(spoken):
+    if len(spoken.split()) > 5 or _FRESH_COMMAND.search(spoken) or not router_text.answers_ask(str(asked.get("text") or ""), spoken):
         return spoken
     base = router_text.squeeze(str(before.get("text") or ""))
     return f"{base}. {spoken}"[:800] if base else spoken
@@ -996,7 +996,7 @@ def _mutation(actions: list[dict]) -> dict | None:
     return None
 
 
-_BUILD_SIGNAL = re.compile(r"فروشگاه|ویترین|سبک|رنگ|حس|بساز")
+_BUILD_SIGNAL = re.compile(r"فروشگاه|ویترین|(?<![\u0621-\u064A])(?:سبک|حس)|رنگ|بساز")
 _NOT_A_BUILD = ("وضعیت", "صندوق", "خوانده")
 
 
@@ -1009,7 +1009,7 @@ def _live_root():
 
 def _force_shop_build(spoken: str) -> bool:
     text = spoken or ""
-    if any(mark in text for mark in _NOT_A_BUILD):
+    if any(mark in text for mark in _NOT_A_BUILD) or router_text.is_content_request(text) or router_voice.is_hostile(text):
         return False
     if _BUILD_SIGNAL.search(text) is None:
         return False
@@ -1444,6 +1444,7 @@ async def _run_tool(
     media=None,
     view_path: str = "",
     view_target: str = "",
+    confirmed: bool = False,
 ) -> tuple[str, dict]:
     if name == "status":
         return _format_status(await _status_payload()), {}
@@ -1509,9 +1510,10 @@ async def _run_tool(
     if name == "shop_chat":
         from app.services import shop_service
 
-        out = await shop_service.chat(spoken, media, view_path, view_target)
+        out = await shop_service.chat(spoken, media, view_path, view_target, confirmed=confirmed)
         picked = out.get("assistant") if isinstance(out.get("assistant"), dict) else _last_assistant(out)
-        return str(picked.get("text") or "فروشگاه به‌روز شد."), {}
+        quick = {key: picked[key] for key in ("kind", "options") if picked.get(key)}  # quick answers of the setup interview
+        return str(picked.get("text") or "فروشگاه به‌روز شد."), quick
     if name == "studio_chat":
         from app.services import studio_chat_service
 
@@ -1717,7 +1719,7 @@ def _choose_call(calls: list[dict]) -> tuple[dict | None, list[str]]:
 
 def _ask_message(args: dict) -> tuple[str, list[str]]:
     question = str(args.get("question") or "").strip() or "کدام را می‌خواهی؟"
-    options = [str(item).strip() for item in (args.get("options") or []) if str(item).strip()][:6]
+    options = router_text.clean_options(question, [str(item) for item in (args.get("options") or [])])
     return question, options
 
 
@@ -1896,6 +1898,7 @@ async def _execute(
                 media=pending.get("media") if isinstance(pending.get("media"), dict) else media,
                 view_path=str(pending.get("viewPath") or ""),
                 view_target=str(pending.get("viewTarget") or ""),
+                confirmed=True,
             )
         except Exception as exc:
             await _say("", _tool_error(name, exc), "tool_failed")
@@ -2057,7 +2060,7 @@ async def _execute(
         }
         if isinstance(media, dict):
             stored["media"] = {"kind": media.get("kind"), "name": media.get("name")}
-        _commit("assistant", summary, set_pending=stored, kind="confirm", confirmId=pending_id)
+        _commit("assistant", summary, set_pending=stored, kind="confirm", confirmId=pending_id, tool=name)
         _emit("router-confirm", {"tool": name, "level": "write"})
         return snapshot()
     if name == "ask_user":

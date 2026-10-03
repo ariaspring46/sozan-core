@@ -112,6 +112,31 @@ class ImageSwapTests(unittest.TestCase):
         self.assertEqual(classify("/products/../../etc/passwd", products)[0], "")
         self.assertEqual(classify("", products)[0], "")
 
+    def test_a_product_card_without_a_photo_gets_one_and_undo_takes_it_away(self) -> None:
+        products = [{"id": "p1", "title": "کیف چرمی", "image": "", "images": []}]
+        self.assertEqual(shop_image_service.classify("/images/placeholder.svg", products, "/products/p1")[0], "product")
+        self.assertEqual(shop_image_service.classify("", products, "/products/p1")[0], "product")
+        self.assertEqual(shop_image_service.classify("", products, "/products/other")[0], "")
+        self.assertEqual(shop_image_service.classify("", products, "/cart")[0], "")
+        self.assertEqual(shop_image_service.classify("/images/hero.png", products, "/products/p1")[0], "hero")  # an explicit picture wins
+        with tempfile.TemporaryDirectory() as raw:
+            root = _flow_root(Path(raw))
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                shop = shop_service._save_shop({**shop_service._shop(), "slug": "zafran-test", "status": "ready", "jobId": "j1"})
+                storefront_service.add_product(title="کیف چرمی", price=900000, stock=2, sku="B-1")
+                row = storefront_service.list_products()["products"][0]
+                self.assertFalse(row["image"])
+                with patch("app.services.shop_edit_service.build_dir_for", return_value=root), patch(
+                    "app.services.shop_edit_service.publish_shop_runtime"
+                ), patch("app.services.shop_service.shop_is_live", return_value=True):
+                    out = shop_image_service.replace_image(shop, _png((90, 40, 10)), "image/png", "n.png", "", f"/products/{row['id']}")
+                    self.assertEqual(out["kind"], "product")
+                    self.assertIn("گذاشته شد", out["reply"])
+                    self.assertTrue(storefront_service.list_products()["products"][0]["image"])
+                    undone = shop_undo_service.undo_last(shop_service._shop())
+                self.assertTrue(undone["patched"])
+                self.assertFalse(storefront_service.list_products()["products"][0]["image"])
+
     def test_hero_swap_is_one_undo_step(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = _flow_root(Path(raw))

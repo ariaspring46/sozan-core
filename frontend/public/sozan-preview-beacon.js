@@ -215,7 +215,7 @@
     return bits.join(" ").trim();
   }
 
-  function describe(el) {
+  function describe(el, behindEl) {
     var tag = String(el.tagName || "").toLowerCase();
     var text = String(el.getAttribute("aria-label") || el.getAttribute("alt") || ownText(el) || el.innerText || "")
       .replace(/\s+/g, " ")
@@ -223,6 +223,8 @@
       .slice(0, 80);
     var out = { tag: tag, text: text };
     var src = imageSrc(el);
+    var near = anchorPath(el);
+    if (near) out.product = near;
     if (src) {
       // a picture's name is its alt text, not the words of whatever sits on top of it
       out.text = String(el.getAttribute("alt") || el.getAttribute("aria-label") || "").replace(/\s+/g, " ").trim().slice(0, 80);
@@ -231,8 +233,44 @@
       out.alt = String(el.getAttribute("alt") || "").slice(0, 80);
     } else {
       out.kind = ownText(el) ? "text" : "block";
+      // words on top of a picture, or a section that holds one: the picture can be swapped too
+      var behind = behindEl || bestImageIn(el);
+      var behindSrc = behind ? imageSrc(behind) : "";
+      if (behindSrc) {
+        out.image = { src: behindSrc.slice(0, 1000), alt: String(behind.getAttribute("alt") || "").slice(0, 80) };
+        if (!out.product) out.product = anchorPath(behind);
+      }
     }
     return out;
+  }
+
+  /** /products/<id> of the card the element sits in, so a product without any photo can still get one. */
+  function anchorPath(el) {
+    var node = el && el.closest ? el.closest("a[href]") : null;
+    if (!node) return "";
+    try {
+      var path = new URL(node.getAttribute("href"), location.href).pathname;
+      return /^\/products\/[^/]+$/.test(path) ? path : "";
+    } catch (err) {
+      return "";
+    }
+  }
+
+  /** The biggest visible picture inside an element (an <img>, or a box with a background image). */
+  function bestImageIn(el) {
+    var best = null;
+    var area = 3600;
+    var nodes = el.querySelectorAll ? el.querySelectorAll("img, *") : [];
+    for (var i = 0; i < nodes.length && i < 400; i++) {
+      var node = nodes[i];
+      if (!imageSrc(node)) continue;
+      var r = node.getBoundingClientRect();
+      if (r.width * r.height > area) {
+        area = r.width * r.height;
+        best = node;
+      }
+    }
+    return best;
   }
 
   function imageSrc(el) {
@@ -266,8 +304,8 @@
     }
     if (!top) return null;
     if (FORM_TAGS[String(top.tagName || "").toLowerCase()]) return null;
-    if (ownText(top)) return meaningful(top);
-    return meaningful(image || top);
+    if (ownText(top)) return { el: meaningful(top), image: image };
+    return { el: meaningful(image || top), image: image };
   }
 
   function showLabel(el) {
@@ -324,12 +362,12 @@
   hoverBox = boxEl("hover");
   selectBox = boxEl("select");
 
-  function selectEl(el, extra) {
+  function selectEl(el, extra, behindEl) {
     selected = el;
     place(selectBox, el);
     place(hoverBox, null);
     showLabel(el);
-    var payload = { pick: describe(el) };
+    var payload = { pick: describe(el, behindEl) };
     if (extra) for (var key in extra) payload[key] = extra[key];
     report(payload);
   }
@@ -363,9 +401,10 @@
       if (event.target && event.target.closest && event.target.closest("[data-sozan-ui]")) return;
       var x = event.clientX;
       var y = event.clientY;
-      var el = targetAt(x, y);
-      if (!el) return;
-      press = { x: x, y: y, el: el, timer: 0, hint: 0 };
+      var hit = targetAt(x, y);
+      if (!hit || !hit.el) return;
+      var el = hit.el;
+      press = { x: x, y: y, el: el, image: hit.image, timer: 0, hint: 0 };
       press.hint = window.setTimeout(function () {
         if (press) place(hoverBox, press.el);
       }, 160);
@@ -380,7 +419,7 @@
         } catch (err) {
           /* ignore */
         }
-        selectEl(held.el, { longPress: true });
+        selectEl(held.el, { longPress: true }, held.image);
       }, LONG_MS);
     },
     true,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, Request, status
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from starlette.datastructures import UploadFile
 
 from app.services import chat_media_service
@@ -11,6 +11,13 @@ class ChatIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     viewPath: str = Field(default="", max_length=200)
     viewTarget: str = Field(default="", max_length=80)
+
+    @field_validator("text")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("blank")
+        return value
 
 
 def _upload(value: object) -> UploadFile | None:

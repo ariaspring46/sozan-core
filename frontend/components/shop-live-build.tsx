@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, Copy, ExternalLink, Monitor, RefreshCw, Smartphone, X } from "lucide-react";
+import { Copy, ExternalLink, Monitor, RefreshCw, Smartphone, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { shopHostLabel } from "@/components/domain-menu";
+import { BuildProgress, type ProgressStep } from "@/components/build-progress";
 import type { ShopSelection } from "@/components/shop-editor";
 
-export type BuildStep = { id: string; label: string; state: "done" | "active" | "wait" | "fail" };
+export type BuildStep = ProgressStep;
 
 export type BuildLive = {
   status?: string;
@@ -45,34 +46,6 @@ const PAGES = [
   { path: "/products", label: "کالاها" },
   { path: "/cart", label: "سبد" },
 ] as const;
-
-const STEP_FA: Record<BuildStep["state"], string> = { done: "انجام شد", active: "در حال انجام", wait: "منتظر", fail: "ناموفق" };
-
-/** نشانک مرحله با شکل (✓، نقطهٔ زنده، ✕، حلقهٔ خالی) و متن برای صفحه‌خوان؛ فقط رنگ نیست. */
-function StepMark({ state }: { state: BuildStep["state"] }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
-        state === "done" && "bg-accent text-onAccent",
-        state === "active" && "bg-signal/20",
-        state === "fail" && "bg-danger text-onAccent",
-        state === "wait" && "border border-line",
-      )}
-    >
-      {state === "done" ? <Check size={10} strokeWidth={3} /> : null}
-      {state === "fail" ? <X size={10} strokeWidth={3} /> : null}
-      {state === "active" ? <span className="sozan-breathe h-1.5 w-1.5 rounded-full bg-signal" /> : null}
-    </span>
-  );
-}
-
-function clock(sec: number) {
-  const m = Math.floor(sec / 60).toLocaleString("fa-IR");
-  const s = (sec % 60).toLocaleString("fa-IR").padStart(2, "۰");
-  return `${m}:${s}`;
-}
 
 function elapsedFrom(startedAt?: string, elapsedSec?: number | null, live?: boolean) {
   if (!live && typeof elapsedSec === "number") return elapsedSec;
@@ -353,8 +326,17 @@ function ShopLivePreview({
         const label = picked ? (tag ? `${tag} · ${picked}` : picked) : tag;
         setPick(label);
         if (data.longPress) dismissHint();
+        const behind = raw && raw.image && typeof raw.image.src === "string" ? raw.image : null;
         onPick?.(
-          { text: picked || (src ? "" : tag), tag, kind, src: src || undefined, alt: raw && typeof raw.alt === "string" ? raw.alt : undefined },
+          {
+            text: picked || (src ? "" : tag),
+            tag,
+            kind,
+            src: src || undefined,
+            alt: raw && typeof raw.alt === "string" ? raw.alt : undefined,
+            image: behind ? { src: String(behind.src), alt: typeof behind.alt === "string" ? behind.alt : undefined } : undefined,
+            product: raw && typeof raw.product === "string" && raw.product ? raw.product : undefined,
+          },
           Boolean(data.longPress),
         );
       }
@@ -573,31 +555,7 @@ function ShopLivePreview({
             </button>
           </div>
         ) : null}
-        {overlay ? (
-          <div className="absolute inset-x-3 bottom-3 rounded-2xl border border-accent/25 bg-paper/95 px-3 py-2 shadow-card">
-            <p className="text-xs text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
-            <p className={cn("mt-0.5 text-sm", failed ? "text-danger" : "text-ink")}>{title}</p>
-            {live ? <p className="text-xs text-muted">{`زمان ساخت ${clock(seconds)}`}</p> : null}
-            {failed && onRetry ? (
-              <button type="button" className="mt-1 inline-flex min-h-11 items-center text-sm text-warm underline" onClick={onRetry}>
-                دوباره بساز
-              </button>
-            ) : null}
-            {pipeline.length ? (
-              <ol className="mt-2 space-y-1">
-                {pipeline.map((step) => (
-                  <li key={step.id} className="flex items-center gap-2 text-xs">
-                    <StepMark state={step.state} />
-                    <span className={cn(step.state === "wait" && "text-muted", step.state === "fail" && "text-danger")}>
-                      {step.label}
-                      <span className="sr-only"> — {STEP_FA[step.state]}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            ) : null}
-          </div>
-        ) : null}
+        {overlay ? <BuildProgress cover steps={pipeline} title={title} seconds={seconds} live={live} failed={failed} onRetry={onRetry} /> : null}
       </div>
     </section>
   );
@@ -616,58 +574,8 @@ function ShopPipeline({
   seconds: number;
   onRetry?: () => void;
 }) {
-  const pipeline = build.pipeline || [];
   const title = live ? build.stepLabel || "سوزان در حال ساخت سایت است…" : build.error || "ساخت کامل نشد";
-  return (
-    <section
-      className={cn(
-        "relative overflow-hidden rounded-3xl border bg-paper px-4 py-4 shadow-card",
-        live ? "border-accent/30" : "border-danger/40",
-      )}
-    >
-      <div className="relative flex items-center gap-4">
-        <div className="relative h-14 w-14 shrink-0">
-          <span className={cn("absolute inset-1 rounded-full", live ? "sozan-glow bg-accent/15" : "bg-danger/10")} />
-          <span
-            className={cn(
-              "absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
-              live ? "sozan-breathe bg-signal" : "bg-danger",
-            )}
-          />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-warm">{live ? "در حال ساخت فروشگاه…" : "آخرین ساخت"}</p>
-          <p className="mt-1 text-sm font-medium leading-6 text-ink">{title}</p>
-          {live ? <p className="mt-0.5 text-xs text-muted">{`زمان ساخت ${clock(seconds)}`}</p> : null}
-          {failed && onRetry ? (
-            <button type="button" className="mt-1 inline-flex min-h-11 items-center text-sm text-warm underline" onClick={onRetry}>
-              دوباره بساز
-            </button>
-          ) : null}
-        </div>
-      </div>
-      {pipeline.length ? (
-        <ol className="relative mt-4 space-y-2">
-          {pipeline.map((step) => (
-            <li key={step.id} className="flex items-center gap-3 text-sm">
-              <StepMark state={step.state} />
-              <span
-                className={cn(
-                  "leading-6",
-                  step.state === "wait" && "text-muted",
-                  step.state === "fail" && "text-danger",
-                  step.state === "active" && "text-warm",
-                )}
-              >
-                {step.label}
-                <span className="sr-only"> — {STEP_FA[step.state]}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-    </section>
-  );
+  return <BuildProgress steps={build.pipeline || []} title={title} seconds={seconds} live={live} failed={failed} onRetry={onRetry} />;
 }
 
 export function ShopLiveBuild({

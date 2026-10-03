@@ -938,7 +938,7 @@ async def apply_hero_image(shop: dict, root: Path, prompt: str) -> dict:
 
 
 EDIT_FAIL_ONE = "این تغییر روی صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
-CLARIFY_EDIT = "نفهمیدم چه چیزی عوض شود. مثلاً بگو «رنگ دکمه‌ها را زرشکی کن» یا روی یک متن در پیش‌نمایش بزن."
+CLARIFY_EDIT = "نفهمیدم چه چیزی عوض شود. بگو کدام بخش و به چه شکل، یا روی همان بخش در پیش‌نمایش بزن."
 EDIT_FAIL_MARKERS = ("صفحه ساخته نشد", "روی این صفحه پیدا نشد", "تیتر روی این صفحه پیدا نشد", "دوباره بفرست")
 
 
@@ -969,6 +969,14 @@ def spoken_reply(prompt: str, reply: str, patched: bool, kind: str, detail: str 
     return text
 
 
+_EDIT_KINDS = frozenset(
+    {
+        "set_colors", "set_brand", "replace_text", "delete_text", "hero_image", "hide_prices", "show_prices",
+        "add_product", "remove_product", "set_header", "add_nav_link", "create_page",
+    }
+)
+
+
 def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False) -> str:
     kind = str(action.get("type") or "")
     ok = bool(verified.get("ok"))
@@ -985,8 +993,9 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
     elif kind == "replace_text":
         text = f"متن به «{action.get('replace')}» تغییر کرد." if ok else "تیتر روی این صفحه پیدا نشد."
     elif kind == "delete_text":
-        target = action.get("target") or ""
-        text = f"متن «{target}» از این صفحه حذف شد." if ok else f"متن «{target}» حذف نشد."
+        target = str(action.get("target") or "")
+        shown = f"«{target}»" if re.search(r"[\u0600-\u06FF]", target) else "این بخش"  # a tag name from the planner («h1») is not for the seller
+        text = f"متن {shown} از این صفحه حذف شد." if ok else f"متن {shown} حذف نشد."
     elif kind == "hero_image":
         text = "تصویر پس‌زمینه ساخته شد. در کادر دیده می‌شود." if ok else "ساخت تصویر الان ممکن نشد. پیام را دوباره بفرست."
     elif kind == "hide_prices":
@@ -1030,13 +1039,15 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
         text = "به حالت قبل برگشت." if ok else "چیزی برای برگشت نیست؛ بعد از هر بیلد تغییرهای قبلی قفل می‌شوند."
     elif kind == "reject_foreign":
         text = "این پیام ویرایش فروشگاه نیست."
+    elif kind == "reply_only":
+        text = str(action.get("reply") or "این را نمی‌سازم.")
     elif kind == "ask_clarify":
         text = str(action.get("reply") or CLARIFY_EDIT)
     elif kind == "greet":
         text = "خواهش می‌کنم! هر چه خواستی عوض شود بگو." if action.get("thanks") else "فروشگاه زنده‌ست. صفحه را همین‌جا ببین و بگو چه عوض شود."
     else:
         text = "تغییر روی همین صفحه اعمال شد." if ok else "این تغییر روی این صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
-    if ok and frame_only and "کادر" not in text:
+    if ok and frame_only and kind in _EDIT_KINDS and "کادر" not in text:
         text = f"{text} تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «بیلد» را بزن."
     return unify_edit_fail(text)
 
@@ -1367,6 +1378,8 @@ async def _run_actions_in_turn(
         )
         lines.append(reply_line)
         if verified.get("ok"):
+            if kind in {"ask_clarify", "greet", "answer", "reply_only"}:
+                continue  # a question is not an edit: no pending change, no undo step, no «بیلد» hint
             any_ok = True
             if kind in mutating:
                 if kind in {"create_page", "add_nav_link"} or kind not in RUNTIME_VERIFY_KINDS or not live:
@@ -1468,7 +1481,7 @@ async def apply_live_edit(
             action_index=0,
         )
         return {"ok": True, "patched": False, "reply": reply, "preview": {}}
-    if actions[0].get("type") in {"greet", "ask_clarify"}:
+    if actions[0].get("type") in {"greet", "ask_clarify", "reply_only"}:
         verified = verify_action(action=actions[0], root=root, shop=shop, files_touched=[])
         reply = _reply_for_verify(actions[0], verified)
         shop_workspace_service.record_trace(

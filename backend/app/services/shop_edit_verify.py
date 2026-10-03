@@ -351,7 +351,7 @@ def verify_action(
         ok = files_touched == [] and (
             pending_before is None or pending_after is None or pending_after == pending_before
         )
-    elif kind in {"ask_clarify", "greet", "progress", "answer"}:
+    elif kind in {"ask_clarify", "greet", "progress", "answer", "reply_only"}:
         expected = {"files": []}
         observed = {"files": files_touched}
         ok = files_touched == []

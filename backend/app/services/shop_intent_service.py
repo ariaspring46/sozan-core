@@ -23,7 +23,7 @@ PAGE_HINTS = (
     ("contact", ("تماس با ما", "تماس", "ارتباط", "contact")),
     ("story", ("داستان برند", "قصه ما", "داستان", "قصه", "story")),
 )
-SHOW_PRICE_RE = re.compile(r"قیمت(?:‌?ها|ا)?\s*(?:را\s*|رو\s*)?(?:نشان|نشون|نمایش|بذار|بگذار|بزن)|با\s*قیمت")
+SHOW_PRICE_RE = re.compile(r"قیمت(?:‌?ها|ا)?\s*(?:را\s*|رو\s*)?(?:نشان|نشون|نمایش|بذار|بگذار|بزن)|با\s*قیمت(?!\s*[\d۰-۹٠-٩])")
 _HIDE_WORDS = r"(?:مخفی|پنهان|پنهون|قایم|نمایش\s*نده|نشان\s*نده|نشون\s*نده)"
 HIDE_PRICE_RE = re.compile(
     r"قیمت\s*نزن|بدون قیمت|قیمت\s*نذار|قیمت\s*نگذار|" + _HIDE_WORDS + r".{0,16}قیمت|قیمت.{0,16}" + _HIDE_WORDS
@@ -60,6 +60,15 @@ GREET = frozenset(
 )
 CONTINUE = frozenset({"خب", "باشه", "باشه خب", "اوکی", "ok", "okay", "ادامه", "ادامه بده", "بیشتر بگو", "بعدی"})
 ADVICE = ("پیشنهاد", "توضیح", "چطور", "چگونه", "به چه شکل")
+FAKE_PROOF_RE = re.compile(
+    r"(?:نظر(?:ات|ها)?|دیدگاه|کامنت|بازخورد)\s*(?:های)?\s*(?:مشتری|کاربر|خریدار).{0,40}(?:بساز|بنویس|اضافه|درست\s*کن|بذار|بگذار)"
+    r"|(?:بساز|بنویس|اضافه|درست\s*کن|بذار|بگذار).{0,40}(?:نظر(?:ات|ها)?|دیدگاه|کامنت)\s*(?:های)?\s*(?:مشتری|کاربر|خریدار)"
+    r"|(?:نظر(?:ات|ها)?|دیدگاه(?:ها)?|امتیاز(?:ها)?|کامنت(?:ها)?)\s*(?:های)?\s*(?:جعلی|ساختگی|الکی|فیک|فرضی)|گواهی(?:نامه)?\s*جعلی|نماد\s*اعتماد\s*(?:بذار|بزن|بگذار)"
+)
+FAKE_PROOF_REPLY = "نظر و امتیاز مشتری را از خودم نمی‌سازم؛ فقط حرف واقعی مشتری‌ها روی سایت می‌نشیند. اگر نظر واقعی داری، متنش را بگو تا بگذارم."
+PRICE_CHANGE_RE = re.compile(r"قیمت.{0,60}(?:بکن|کن|عوض|بذار|بگذار|بشه|بشود|شود|کنید|تغییر)")
+PRICE_CHANGE_REPLY = "قیمت هر کالا را از «بیشتر ← انبار» عوض کن؛ همان لحظه روی سایت هم می‌نشیند. از این چت فقط کالای تازه اضافه می‌شود."
+PAGE_PLACE_RE = re.compile(r"(?:بالا|پایین|وسط|داخل|توی|تو|اول|آخر|همین|این|بخش)\s*(?:ی|ِ)?\s*صفحه|صفحه\s*(?:ی|ٔ|‌ی)?\s*(?:اصلی|اول|خانه)")
 CLARIFY_PAGE = "کدام صفحه را بسازم: درباره ما، تماس، داستان برند، یا پرسش‌های متداول؟"
 
 
@@ -246,6 +255,8 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
     if looks_like_foreign_payload(text):
         reason = "url" if re.search(r"https?://", text) else "token"
         return [{"type": "reject_foreign", "reason": reason}]
+    if FAKE_PROOF_RE.search(text):
+        return [{"type": "reply_only", "reply": FAKE_PROOF_REPLY}]
     compact = text.replace("؟", "").replace("?", "").strip()
     if compact in GREET or compact.lower() in CONTINUE:
         return [{"type": "greet", "thanks": any(word in compact for word in ("مرسی", "ممنون", "تشکر"))}]
@@ -262,7 +273,7 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
     if any(token in text for token in FROM_PAGE):
         actions.append({"type": "catalog_from_page"})
     page_kind = page_kind_from_text(text)
-    if CREATE_PAGE_RE.search(text) or (page_kind and any(mark in text for mark in ("بساز", "اضافه"))):
+    if (CREATE_PAGE_RE.search(text) and not PAGE_PLACE_RE.search(text)) or (page_kind and any(mark in text for mark in ("بساز", "اضافه"))):
         kind = page_kind
         if kind:
             actions.append({"type": "create_page", "kind": kind, "label": PAGE_LABELS[kind]})
@@ -277,6 +288,8 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
         else:
             actions.append({"type": "ask_clarify", "reply": CLARIFY_PAGE})
     added = catalog_add(text)
+    if added is None and PRICE_CHANGE_RE.search(text) and re.search(r"[\d۰-۹٠-٩]", text) and "اضافه" not in text:
+        return [{"type": "reply_only", "reply": PRICE_CHANGE_REPLY}]
     if added is not None:
         title = str(added.get("title") or "")
         price = int(added.get("price") or 0)
@@ -362,7 +375,7 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
         return actions
     if _is_question(text) and not target:
         return [{"type": "answer"}]
-    if "صفحه" in text and not page_kind_from_text(text):
+    if "صفحه" in text and not page_kind_from_text(text) and not PAGE_PLACE_RE.search(text):
         return [{"type": "ask_clarify", "reply": CLARIFY_PAGE}]
     if compact.lower() in CONTINUE:
         return [{"type": "answer"}]

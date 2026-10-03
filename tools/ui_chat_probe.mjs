@@ -86,11 +86,9 @@ async function say(page, text, { waitMs = 0 } = {}) {
 }
 
 async function waitIdle(page, timeout = 60000) {
-  // busy ends when the textarea is enabled again
-  await page.waitForFunction(() => {
-    const t = document.querySelector("textarea");
-    return t && !t.disabled;
-  }, null, { timeout });
+  // the composer stays enabled while the model works (the keyboard stays open): busy ends when Sozan's typing bubble is gone
+  await sleep(300);
+  await page.waitForFunction(() => !document.querySelector(".sozan-wave"), null, { timeout });
   await sleep(300);
 }
 
@@ -184,7 +182,7 @@ async function main() {
   // F3 confirm card + typed "yes" + cancel
   if (want("card")) {
     const { ctx, page } = await open(browser);
-    await say(page, "قیمت‌ها را مخفی کن");
+    await say(page, "برای انگشتر نقره یک پست اینستاگرام بساز");
     await waitIdle(page);
     await sleep(500);
     await shot(page, "04-card");
@@ -248,7 +246,7 @@ async function main() {
         if (mode === "502") return route.fulfill({ status: 502, contentType: "text/html", body: "<html><body>Bad Gateway</body></html>" });
         return route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ detail: "متن خیلی بلند است." }) });
       });
-      const draft = "قیمت‌ها را مخفی کن لطفاً";
+      const draft = "برای انگشتر نقره یک پست اینستاگرام بساز لطفاً";
       await say(page, draft);
       await sleep(1200);
       const st = await page.evaluate(() => ({
@@ -365,7 +363,7 @@ async function main() {
   // F9 dark card
   if (want("dark")) {
     const { ctx, page } = await open(browser, { dark: true });
-    await say(page, "قیمت‌ها را مخفی کن");
+    await say(page, "برای انگشتر نقره یک پست اینستاگرام بساز");
     await waitIdle(page);
     await sleep(500);
     await shot(page, "09-dark-card");

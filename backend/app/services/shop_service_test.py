@@ -78,6 +78,25 @@ def tearDownModule() -> None:
         _VOICE_PATCHES.pop().stop()
 
 class LiveShopChatRouteTests(unittest.TestCase):
+    def test_a_typed_full_rebuild_asks_first_and_builds_only_when_confirmed(self) -> None:
+        with _live_shop_chat():
+            with patch.object(shop_service, "start_build", return_value={"ok": True}) as build:
+                asked = asyncio.run(shop_service.chat("فروشگاه را از نو بساز"))
+                build.assert_not_called()
+                self.assertTrue(asked["needsConfirm"])
+                self.assertEqual(asked["assistant"]["kind"], "ask")
+                self.assertIn("برگشت", asked["assistant"]["text"])
+                done = asyncio.run(shop_service.chat("فروشگاه را از نو بساز", confirmed=True))
+                build.assert_called_once()
+                self.assertNotIn("needsConfirm", done)
+
+    def test_an_ordinary_build_press_does_not_ask(self) -> None:
+        with _live_shop_chat():
+            with patch.object(shop_service, "start_build", return_value={"ok": True}) as build:
+                out = asyncio.run(shop_service.chat("بیلد کن"))
+                build.assert_called_once()
+                self.assertNotIn("needsConfirm", out)
+
     def test_homepage_advice_question_answers_instead_of_editing(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
