@@ -1,0 +1,61 @@
+<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8">
+<style>
+@font-face{font-family:Estedad;src:url(../../../frontend/public/fonts/estedad-arabic.woff2);font-weight:100 900}
+@font-face{font-family:Estedad;src:url(../../../frontend/public/fonts/estedad-latin.woff2);font-weight:100 900;unicode-range:U+0000-00FF}
+:root{--char:#1F1B18;--ash:#34302C;--cu:#C45C26;--dcu:#A24517;--ember:#E8A87C;--cream:#F6EFE6;--ink:#2A2622}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#555;font-family:Estedad,sans-serif;display:flex;flex-wrap:wrap;gap:30px;padding:30px}
+.s{position:relative;width:1080px;height:1920px;overflow:hidden;color:var(--cream);
+ background:radial-gradient(ellipse 820px 760px at 50% 46%,rgba(232,168,124,.15),rgba(196,92,38,.05) 55%,transparent 78%),var(--char)}
+.cover{display:flex;align-items:center;justify-content:center}
+.disc{width:860px;height:860px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#D76A30,var(--cu) 55%,var(--dcu));display:flex;align-items:center;justify-content:center;box-shadow:0 0 120px rgba(196,92,38,.35)}
+.disc svg{width:420px;height:420px;stroke:var(--cream);fill:none;stroke-width:4.5;stroke-linecap:round;stroke-linejoin:round}
+.in{position:absolute;inset:270px 84px 360px;display:flex;flex-direction:column}
+.hd{display:flex;align-items:center;gap:16px;font-weight:800;font-size:40px}
+.hd .chip{margin-inline-start:auto;font-size:30px;font-weight:600;color:var(--ember);border:2px solid var(--ember);border-radius:999px;padding:8px 26px}
+.ic{margin-top:auto;width:150px;height:150px;border-radius:44px;background:var(--ash);display:flex;align-items:center;justify-content:center}
+.ic svg{width:92px;height:92px;stroke:var(--ember);fill:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+.step{margin-top:56px;font-size:34px;font-weight:700;color:var(--ember)}
+h1{font-size:84px;line-height:1.28;font-weight:900;margin-top:14px}
+.body{font-size:46px;line-height:1.8;margin-top:36px;opacity:.9}
+.tip{margin-top:48px;background:var(--ash);border-inline-start:8px solid var(--cu);border-radius:24px;padding:28px 34px;font-size:38px;line-height:1.65;color:var(--cream)}
+.tip b{color:var(--ember);font-weight:700}
+.ft{margin-top:auto;display:flex;align-items:center;justify-content:space-between}
+.dots{display:flex;gap:12px}.dots i{width:18px;height:18px;border-radius:50%;background:var(--ash)}.dots i.on{background:var(--cu);width:46px;border-radius:9px}
+.u{direction:ltr;font-size:30px;opacity:.6;letter-spacing:1px}
+.end .cta{margin-top:56px;align-self:flex-start;background:var(--cu);color:#fff;font-size:40px;font-weight:800;padding:22px 56px;border-radius:999px}
+</style><body><div id="root"></div>
+<script>
+const ICONS={
+start:'<rect x="34" y="12" width="32" height="76" rx="7"/><path d="M45 20h10M47 78h6"/><path d="M42 50l6 6 12-14"/>',
+shop:'<path d="M18 40l6-22h52l6 22"/><path d="M18 40c0 7 6 11 12 11s11-4 11-11c0 7 4 11 9 11s9-4 9-11c0 7 5 11 11 11s12-4 12-11"/><path d="M24 51v33h52V51"/><path d="M42 84V66h16v18"/>',
+products:'<path d="M50 14l34 16v40L50 86 16 70V30z"/><path d="M16 30l34 16 34-16M50 46v40"/><path d="M33 22l34 16"/>',
+studio:'<rect x="14" y="20" width="72" height="60" rx="10"/><circle cx="36" cy="40" r="7"/><path d="M14 68l20-18 16 14 12-10 24 20"/>',
+inbox:'<path d="M14 24a8 8 0 018-8h40a8 8 0 018 8v24a8 8 0 01-8 8H36l-14 12V56a8 8 0 01-8-8z"/><path d="M78 36h2a6 6 0 016 6v22a6 6 0 01-6 6v10l-12-10H50a6 6 0 01-6-6v-2"/>',
+pay:'<rect x="12" y="24" width="76" height="52" rx="9"/><path d="M12 40h76M24 62h18"/>',
+channels:'<circle cx="26" cy="50" r="10"/><circle cx="74" cy="24" r="10"/><circle cx="74" cy="76" r="10"/><path d="M35 45l30-16M35 55l30 16"/>'};
+const FA=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+const MP='M120 112C126 128 146 138 146 160C146 176 134 186 120 186C106 186 94 176 94 162C94 150 102 144 106 136C109 143 113 147 117 148C120 136 116 124 120 112Z';
+let mk=0;const mark=s=>{const id='m'+(mk++);return `<svg viewBox="0 0 240 240" width="${s}" height="${s}"><defs><mask id="${id}"><rect width="240" height="240" fill="#fff"/><path fill="#000" transform="translate(-18 -69.4) scale(1.15)" d="${MP}"/></mask></defs><g mask="url(#${id})" fill="#C45C26"><rect x="16" y="20" width="208" height="164" rx="56"/><path d="M142 170C146 200 166 216 198 224C186 208 184 190 190 170Z"/></g></svg>`};
+const icon=id=>`<svg viewBox="0 0 100 100">${ICONS[id]||''}</svg>`;
+const esc=t=>String(t||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function render(data){
+ const root=document.getElementById('root');let html='';
+ for(const h of data.highlights){
+  html+=`<section class="s cover" data-name="${h.id}-0-cover"><div class="disc">${icon(h.id)}</div></section>`;
+  const n=h.slides.length;
+  h.slides.forEach((sl,i)=>{const last=i===n-1;
+   html+=`<section class="s${last?' end':''}" data-name="${h.id}-${i+1}"><div class="in">
+   <div class="hd">${mark(58)}سوزان<span class="chip">${esc(h.name)}</span></div>
+   <div class="ic">${icon(h.id)}</div>
+   <div class="step">${FA(i+1)} از ${FA(n)}</div>
+   <h1>${esc(sl.title)}</h1><div class="body">${esc(sl.body)}</div>
+   ${sl.tip?`<div class="tip"><b>نکته: </b>${esc(sl.tip)}</div>`:''}
+   ${last?'<div class="cta">رایگان شروع کن</div>':''}
+   <div class="ft"><div class="dots">${Array.from({length:n},(_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div><span class="u">sozan-core.ir</span></div>
+   </div></section>`});
+ }
+ root.outerHTML=html;
+}
+render(window.DATA);
+</script></body></html>
