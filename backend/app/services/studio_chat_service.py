@@ -199,6 +199,23 @@ def _drop_sales_claims(text: str, spoken: str, allowed: str = "") -> str:
     return re.sub(r"\s{2,}", " ", cleaned).strip(" ،")
 
 
+_REGULATED = ("درمان", "شفابخش", "بی‌خطر", "بیخطر", "بدون عارضه", "ضدسرطان")  # never written, even when the seller asks
+_FEATURES = ("دوخت محکم", "جنس نرم", "بادوام", "ضدحساسیت", "ضد حساسیت", "ضدآب")  # written only when the seller said them
+
+
+def _drop_unbacked(captions: dict, reply: str, spoken: str, allowed: str = "") -> tuple[dict, str]:
+    """A cure or «completely safe» claim is dropped from every caption and a feature the seller never named too (the model-based
+    claim check misses these now and then). When the seller asked for a regulated claim the reply says it was left out."""
+    blob = "\n".join(str(value or "") for value in captions.values())
+    source = _claim_source(spoken, allowed)
+    bad = [word for word in _REGULATED if word in blob] + [word for word in _FEATURES if word in blob and word not in source]
+    if bad:
+        captions = {key: _settle_caption(_drop_claim_sentences(str(value or ""), bad)) for key, value in captions.items()}
+    if any(word in spoken for word in _REGULATED) and not re.search(r"ننوشت|نمی.?نویس|ادعا", reply):
+        reply = f"{reply} ادعای درمان یا بی‌خطر بودن کامل را ننوشتم چون نمی‌شود تضمینش کرد.".strip()
+    return captions, reply
+
+
 def _thin_caption(text: str) -> bool:
     value = (text or "").strip()
     if not value:
@@ -1337,6 +1354,7 @@ async def chat(text: str, campaigns: CampaignService, media: dict | None = None,
         if _caption_backstage(captions):
             captions = {key: _settle_caption(_drop_backstage(str(value or ""))) for key, value in captions.items()}
         captions = _repair_rewrite(captions, subject_name)
+        captions, reply = _drop_unbacked(captions, reply, spoken, allowed)
         has_copy = bool(captions["instagram"] or captions["telegram"] or captions["whatsapp"])
     if not has_copy and not want_compose:
         assistant = {

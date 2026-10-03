@@ -292,9 +292,9 @@ async def run_studio() -> None:
         said = text.translate(DIGITS)
         blob = blob.translate(DIGITS)
         for word in CLAIM_WORDS:
-            if word in blob and word not in said:
-                at = blob.index(word)
-                extra.append(f"invented-claim:{word}@«{blob[max(0, at - 18):at + 18]}»")
+            hit = re.search(rf"(?<![ء-يٰ-ۓ]){re.escape(word)}(?![ء-يٰ-ۓ])", blob)  # «طلا» is not «اطلاع»
+            if hit and word not in said:
+                extra.append(f"invented-claim:{word}@«{blob[max(0, hit.start() - 18):hit.start() + 18]}»")
         for key, limit in (("instagram", 2200), ("telegram", 1024), ("whatsapp", 1024)):
             if len(str(captions.get(key) or "")) > limit:
                 extra.append(f"over-limit:{key}")

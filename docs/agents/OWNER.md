@@ -26,7 +26,7 @@ You are programmer **OWNER** on Sozan (`ariaspring46/sozan-core`). This file is 
 - `.impeccable/review/u-galri-products-390.png` (0.0k)
 - `.zcodeignore` (0.0k)
 - `AGENTS.md` (0.2k)
-- `CHANGELOG.md` (11.3k)
+- `CHANGELOG.md` (11.4k)
 - `CLAUDE.md` (0.0k)
 - `README.md` (0.4k)
 - `docs/agents/C.md` (10.6k)

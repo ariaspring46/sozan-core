@@ -67,9 +67,9 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 32.5k | the files most tasks touch; read the relevant one first |
-| active | 65.5k | yours to edit; read only what the task needs |
+| active | 65.8k | yours to edit; read only what the task needs |
 | rare | 19.8k | yours; read only when the task names it |
-| tests | 35.7k | read only the test of the module you change |
+| tests | 36.0k | read only the test of the module you change |
 
 **Core:**
 
@@ -80,7 +80,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 **Active (you may edit):**
 
 - `backend/app/api/`: `inbox.py` (1.6k)
-- `backend/app/services/`: `inbox_agent_service.py` (16.5k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (2.8k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (0.6k), `pii_mask.py` (0.5k)
+- `backend/app/services/`: `inbox_agent_service.py` (16.5k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (2.8k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (0.8k), `pii_mask.py` (0.5k)
 - `frontend/app/inbox/`: `page.tsx` (4.4k)
 - `frontend/app/inbox/[id]/`: `page.tsx` (2.3k)
 - `frontend/app/sales/`: `page.tsx` (3.2k)

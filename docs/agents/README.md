@@ -7,11 +7,11 @@ Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Eac
 | role | area | harness | core | active | rare | tests | report file |
 |---|---|---|---|---|---|---|---|
 | X1 | Router and panel chat | [X1.md](X1.md) (9.5k) | 44.9k | 105.4k | 9.8k | 34.8k | `talk-x1.md` |
-| X2 | Studio, images and brand content | [X2.md](X2.md) (10.2k) | 40.9k | 82.1k | 53.6k | 32.0k | `talk-x2.md` |
+| X2 | Studio, images and brand content | [X2.md](X2.md) (10.2k) | 41.3k | 82.5k | 53.6k | 32.5k | `talk-x2.md` |
 | X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (10.3k) | 15.5k | 73.2k | 1.2k | 33.8k | `talk-x3.md` |
 | X4 | Shop build and live editing | [X4.md](X4.md) (9.7k) | 31.1k | 104.2k | 2.3k | 45.4k | `talk-x4.md` |
 | X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (12.0k) | 21.8k | 77.2k | 19.2k | 48.9k | `talk-x5.md` |
-| Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (9.7k) | 32.5k | 65.5k | 19.8k | 35.7k | `sales-agent-talk.md` |
+| Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (9.7k) | 32.5k | 65.8k | 19.8k | 36.0k | `sales-agent-talk.md` |
 | Z | Phone voice agent | [Z.md](Z.md) (4.9k) | 33.4k | 79.1k | 29.4k | 14.8k | `voice-agent-talk.md` |
 | C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (10.6k) | 19.8k | 57.6k | 11.6k | 16.2k | `storefront-talk.md` |
 | U | UI/UX: design system and frontend platform | [U.md](U.md) (9.1k) | 13.1k | 74.1k | 33.0k | 0.0k | `talk-u.md` |
