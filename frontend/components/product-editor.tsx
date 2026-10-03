@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api, catalogImageUrl } from "@/lib/api";
+import { useBackClose } from "@/lib/back-stack";
 import { money, parseNonNegativeInt } from "@/lib/digits";
 
 export type Product = {
@@ -138,6 +139,7 @@ export function ProductEditor({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+  useBackClose(true, requestClose);
 
   useEffect(() => {
     initial.current = snapshot({
@@ -207,8 +209,9 @@ export function ProductEditor({
   }
 
   function requestClose() {
-    if (dirty && !window.confirm("تغییرات ذخیره نشده؛ ببندم؟")) return;
+    if (dirty && !window.confirm("تغییرات ذخیره نشده؛ ببندم؟")) return false;
     onClose();
+    return true;
   }
 
   async function upload(file: File) {
@@ -287,6 +290,9 @@ export function ProductEditor({
   const sheet = (
     <div className="fixed inset-0 z-[80] flex items-end bg-black/55 backdrop-blur-[2px] sm:items-center sm:p-4" onClick={requestClose}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={product ? "ویرایش کالا" : "افزودن کالا"}
         className="flex max-h-[92dvh] w-full flex-col rounded-t-3xl border border-line bg-paper shadow-card sm:mx-auto sm:max-w-lg sm:rounded-3xl"
         onClick={(event) => event.stopPropagation()}
         dir="rtl"

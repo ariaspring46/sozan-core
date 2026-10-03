@@ -15,13 +15,18 @@ export function useAppViewport() {
     root.style.overflow = "hidden";
     body.style.overflow = "hidden";
 
+    // بلندترین ارتفاع دیده‌شده برای هر عرض: در اندروید (resizes-content) کیبورد خود
+    // innerHeight را هم کم می‌کند، پس باز بودنش را با همین مقایسه می‌فهمیم.
+    const tallest = new Map<number, number>();
     const sync = () => {
       const vv = window.visualViewport;
       const height = Math.round(vv?.height ?? window.innerHeight);
       const offsetTop = Math.round(vv?.offsetTop ?? 0);
       const offsetLeft = Math.round(vv?.offsetLeft ?? 0);
       const width = Math.round(vv?.width ?? window.innerWidth);
-      const inset = Math.max(0, window.innerHeight - height - offsetTop);
+      const full = Math.max(tallest.get(width) ?? 0, window.innerHeight, height);
+      tallest.set(width, full);
+      const inset = Math.max(0, full - height - offsetTop);
       const open = inset > KEYBOARD_PX;
       root.style.setProperty("--app-height", `${height}px`);
       root.style.setProperty("--vv-top", `${offsetTop}px`);

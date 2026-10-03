@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, MessageCircle, SquarePen, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useBackClose } from "@/lib/back-stack";
 import { SozanOrb } from "@/components/sozan-orb";
 
 export type ThreadRow = { id: string; title: string; at?: number };
@@ -40,6 +41,7 @@ export function ChatHeader({
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const current = threads.find((row) => row.id === threadId);
+  useBackClose(open, () => setOpen(false));
 
   useEffect(() => {
     if (!open) return;

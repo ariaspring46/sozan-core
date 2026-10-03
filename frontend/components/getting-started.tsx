@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import { api } from "@/lib/api";
+import { useBackClose } from "@/lib/back-stack";
 
 type Step = { id: string; title: string; hint: string; href: string; done: boolean };
 
@@ -40,6 +41,7 @@ export function GettingStarted({ compact = false }: { compact?: boolean }) {
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [hidden, setHidden] = useState(true);
   const [open, setOpen] = useState(false);
+  useBackClose(compact && open && !hidden, () => setOpen(false));
 
   useEffect(() => {
     setHidden(readHidden());

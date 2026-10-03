@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, api, setOnboarded, setToken } from "@/lib/api";
+import { ApiError, api, getOnboarded, getToken, setOnboarded, setToken } from "@/lib/api";
 import { toLatinDigits } from "@/lib/digits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
+  const [entering, setEntering] = useState(false);
   const [captcha, setCaptcha] = useState<{ token: string; question: string } | null>(null);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const autoTried = useRef("");
@@ -59,6 +60,13 @@ export default function LoginPage() {
   const cleanPhone = normalizePhone(phone);
   const phoneOk = /^09\d{9}$/.test(cleanPhone);
   const cleanCode = normalizeCode(code);
+
+  // قبلاً وارد شده (لینک «ورود» لندینگ، میان‌بر صفحهٔ اصلی گوشی): مستقیم به پنل؛ اگر نشست باطل باشد، پنل خودش برمی‌گرداند.
+  useEffect(() => {
+    if (!getToken()) return;
+    setEntering(true);
+    router.replace(getOnboarded() ? "/chat" : "/onboard");
+  }, [router]);
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -143,7 +151,8 @@ export default function LoginPage() {
       });
       setToken(data.access_token);
       setOnboarded(Boolean(data.onboarded));
-      router.push(data.onboarded ? "/chat" : "/onboard");
+      // replace: «برگشت» از چت به فرم ورود برنگردد.
+      router.replace(data.onboarded ? "/chat" : "/onboard");
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "کد درست نبود. دوباره بنویس.");
     } finally {
@@ -165,6 +174,14 @@ export default function LoginPage() {
   }, [cleanCode, sent]);
 
   const hintText = phoneHint(phone);
+
+  if (entering) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-canvas px-6">
+        <p className="text-sm text-muted">در حال ورود…</p>
+      </main>
+    );
+  }
 
   return (
     <main className="sozan-lamp relative flex min-h-dvh items-end justify-center overflow-hidden sm:items-center">

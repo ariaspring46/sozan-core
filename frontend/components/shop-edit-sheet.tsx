@@ -5,6 +5,7 @@ import { ImagePlus, Sparkles, SendHorizontal, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LinkText } from "@/components/link-text";
 import { friendlyReply, selectionLabel, selectionPhoto, TARGET_MAX, type ShopSelection } from "@/components/shop-editor";
+import { useBackClose } from "@/lib/back-stack";
 
 function cleanQuote(text: string) {
   return text.replace(/[«»"]/g, "").replace(/\s+/g, " ").trim();
@@ -139,6 +140,7 @@ export function ShopEditSheet({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+  useBackClose(true, onClose);
 
   const canRewrite = Boolean(target && !tooLong && cleanQuote(selText) && cleanQuote(selText) !== selection.text);
 

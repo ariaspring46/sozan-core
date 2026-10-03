@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ApiError, api, getOnboarded, getToken, setOnboarded, timeoutSignal } from "@/lib/api";
+import { ApiError, api, getOnboarded, getToken, refreshSession, setOnboarded, timeoutSignal } from "@/lib/api";
 
 const PUBLIC = new Set(["/login", "/onboard", "/", "/about", "/contact", "/terms", "/refund"]);
 
@@ -49,6 +49,7 @@ export function OnboardGate({ children }: { children: React.ReactNode }) {
         }
         setOnboarded(true);
         setOk(true);
+        void refreshSession();
       })
       .catch((err) => {
         // فقط نشست نامعتبر (۴۰۱) یعنی خروج؛ خطای موقت شبکه یا سرور کاربر را بیرون نمی‌اندازد.

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Clapperboard, Inbox, MessageCircle, Menu, MoreHorizontal, ShoppingBag, Store, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SozanMark } from "@/components/sozan-mark";
 import { api } from "@/lib/api";
 import { useAppViewport } from "@/lib/use-app-viewport";
+import { useBackClose, useBackGuard } from "@/lib/back-stack";
 import { usePlan } from "@/lib/use-plan";
 import { useAiBudget } from "@/lib/use-ai-budget";
 import { applyTheme, readTheme } from "@/lib/theme";
@@ -80,6 +81,7 @@ export function AppShell({
   scene?: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   useAppViewport();
   const [unread, setUnread] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -87,6 +89,8 @@ export function AppShell({
   const closeButton = useRef<HTMLButtonElement>(null);
   const plan = usePlan();
   const aiBudget = useAiBudget();
+  const exitHint = useBackGuard(() => router.replace("/chat"));
+  useBackClose(menuOpen, () => setMenuOpen(false));
 
   useEffect(() => {
     const hit = PAGE_TITLES.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -253,7 +257,11 @@ export function AppShell({
                   href={tab.href}
                   aria-current={active ? "page" : undefined}
                   aria-label={label(tab)}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={(event) => {
+                    // همین صفحه: فقط منو بسته شود (رفتن دوباره به همین نشانی ورودی کهنه در تاریخچه می‌گذاشت).
+                    if (pathname === tab.href) event.preventDefault();
+                    setMenuOpen(false);
+                  }}
                   className={cn(
                     "relative flex min-h-12 items-center gap-3 rounded-2xl px-3 text-[15px]",
                     active ? "sozan-glass font-bold text-warm" : "text-ink hover:bg-ink/5",
@@ -287,6 +295,10 @@ export function AppShell({
           </nav>
         </div>
       ) : null}
+
+      <div aria-live="polite" className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] z-[60] flex justify-center px-4">
+        {exitHint ? <p className="sozan-glass sozan-rise rounded-full px-4 py-2.5 text-sm font-medium text-ink shadow-card">برای خروج، دوباره «برگشت» را بزن</p> : null}
+      </div>
     </div>
   );
 }
