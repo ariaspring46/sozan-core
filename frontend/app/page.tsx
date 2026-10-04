@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = "سوزان — بگو، بساز، بفروش";
   const description =
     "سوزان دستیار فروش فروشنده‌های ایرانی است: در چت فروشگاه اینترنتی می‌سازی، پست و کپشن می‌گیری و پیام مشتری‌های اینستاگرام و تلگرام را یک‌جا جواب می‌دهی.";
-  const image = `${origin}/sozan-mark.png`;
+  const image = `${origin}/og-image.jpg`;
   return {
     metadataBase: new URL(origin),
     title,
@@ -28,10 +28,10 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "سوزان",
       locale: "fa_IR",
       type: "website",
-      images: [{ url: image, width: 512, height: 512, alt: "سوزان" }],
+      images: [{ url: image, width: 1200, height: 630, alt: "سوزان — بگو، بساز، بفروش" }],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title,
       description,
       images: [image],

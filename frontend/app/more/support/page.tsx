@@ -154,7 +154,7 @@ export default function SupportPage() {
         </div>
       }
     >
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         {error ? (
           <p className="text-sm text-danger" role="alert">
             {error}

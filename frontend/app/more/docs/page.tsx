@@ -16,7 +16,7 @@ export default function MoreDocsPage() {
         </div>
       }
     >
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         <p className="text-sm leading-7 text-muted">از ورود تا دامنه و ویرایش فروشگاه؛ هر کارت یک راهنمای کوتاه است.</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {SELLER_GUIDES.map((item) => (

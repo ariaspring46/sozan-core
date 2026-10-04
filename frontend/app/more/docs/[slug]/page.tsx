@@ -24,7 +24,7 @@ export default async function MoreDocsArticlePage({ params }: { params: Promise<
         </div>
       }
     >
-      <article className="h-full space-y-5 overflow-y-auto p-4">
+      <article className="h-full space-y-5 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         {guide.sections.map((section, index) => (
           <section key={section.heading || String(index)} className="rounded-2xl bg-canvas p-4 shadow-card">
             {section.heading ? <h2 className="mb-2 font-bold">{section.heading}</h2> : null}

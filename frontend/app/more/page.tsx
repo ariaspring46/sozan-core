@@ -29,7 +29,7 @@ export default function MorePage() {
         </div>
       }
     >
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         {plan ? (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-canvas p-4 shadow-card">
             <div>

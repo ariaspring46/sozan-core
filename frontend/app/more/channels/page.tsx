@@ -261,7 +261,7 @@ export default function ChannelsPage() {
         </div>
       }
     >
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         <p className="text-sm text-muted">
           اینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.
         </p>

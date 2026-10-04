@@ -185,7 +185,7 @@ export default function CampaignDetailPage() {
         </div>
       }
     >
-    <main className="h-full space-y-4 overflow-y-auto p-4">
+    <main className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
       <StudioNav current="campaigns" />
       <Link className="inline-flex min-h-11 items-center text-sm text-warm" href="/campaigns">
         بازگشت به کمپین‌ها

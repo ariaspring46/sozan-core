@@ -185,7 +185,7 @@ export function AppShell({
             <p className="text-xs text-muted">پلن فعلی</p>
             <p className="font-bold text-ink">{plan.label}</p>
             {plan.canUpgrade ? (
-              <Link href="/more/settings#plans" className="mt-2 flex min-h-9 items-center justify-center rounded-xl bg-accentStrong px-3 text-xs font-bold text-onAccent">
+              <Link href="/more/settings#plans" className="mt-2 flex min-h-11 items-center justify-center rounded-xl bg-accentStrong px-3 text-xs font-bold text-onAccent mouse:min-h-9">
                 ارتقای پلن
               </Link>
             ) : null}
