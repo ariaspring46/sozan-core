@@ -13,7 +13,9 @@ from app.services.llm import (
     _chat_completion,
     _choice_text,
     _classify_llm_error,
+    _decorate_cloud_body,
     _ensure_gpu1,
+    _tool_result,
     complete_tools,
     factory_holds_gpu1,
     parse_json_object,
@@ -71,6 +73,38 @@ class SpokenReplyTests(unittest.TestCase):
         self.assertEqual(text, "رنگ دکمه عوض شد.")
         self.assertNotIn("Chain of thought", text)
         self.assertEqual(spoken_model_reply(text), "رنگ دکمه عوض شد.")
+
+    @staticmethod
+    def _msg(content: str = "", reasoning: str = "") -> dict:
+        return {"choices": [{"message": {"content": content, "reasoning_content": reasoning}, "finish_reason": "length"}]}
+
+    def test_out_of_tokens_thinking_is_never_the_answer(self) -> None:
+        # seen live 2026-10-04: Arvan GPT-OSS with the router's 150 tokens, content empty, the thinking went to the seller
+        payload = self._msg("", 'The user wrote in Persian: "فروشگاهم کی آماده میشه". We need to answer briefly.')
+        self.assertEqual(_choice_text(payload), "")
+
+    def test_misplaced_persian_answer_in_reasoning_is_kept(self) -> None:
+        self.assertEqual(_choice_text(self._msg("", "فروشگاهت تا چند دقیقهٔ دیگر آماده است.")), "فروشگاهت تا چند دقیقهٔ دیگر آماده است.")
+
+    def test_raw_channel_format_keeps_only_the_final_answer(self) -> None:
+        raw = (
+            "<|channel|>analysis<|message|>User asks when the shop is ready.<|end|>"
+            '<|start|>assistant<|channel|>final<|message|>{"reply":"تا چند دقیقهٔ دیگر آماده است."}<|return|>'
+        )
+        self.assertEqual(_choice_text(self._msg(raw)), '{"reply":"تا چند دقیقهٔ دیگر آماده است."}')
+        self.assertEqual(_choice_text(self._msg("<|start|>assistant<|channel|>")), "")
+        self.assertEqual(_choice_text(self._msg("<|channel|>analysis<|message|>Thinking only")), "")
+        tool = _tool_result({"model": "GPT-OSS-120B"}, self._msg(raw), {})
+        self.assertEqual(tool["text"], '{"reply":"تا چند دقیقهٔ دیگر آماده است."}')
+
+    def test_gpt_oss_thinks_briefly_with_room_to_answer(self) -> None:
+        body = {"model": "GPT-OSS-120B", "max_tokens": 150}
+        _decorate_cloud_body(body, {"kind": "cloud", "url": "https://ai.sozan-core.ir/v1", "model": "GPT-OSS-120B"})
+        self.assertEqual(body["reasoning_effort"], "low")
+        self.assertGreaterEqual(body["max_tokens"], 800)
+        other = {"model": "deepseek/deepseek-v4.1-flash", "max_tokens": 150}
+        _decorate_cloud_body(other, {"kind": "cloud", "url": "https://ai.sozan-core.ir/v1", "model": "deepseek/deepseek-v4.1-flash"})
+        self.assertEqual(other, {"model": "deepseek/deepseek-v4.1-flash", "max_tokens": 150})
 
 
 class ChatHistoryTests(unittest.TestCase):

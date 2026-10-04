@@ -17,6 +17,9 @@ from app.services.observe_client import emit_later, llm_headers, safe_text
 log = logging.getLogger("sozan.llm")
 
 THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+HARMONY_FINAL = re.compile(r"<\|channel\|>\s*final\s*<\|message\|>(.*?)(?=<\|(?:end|return|call|start)\|>|$)", re.DOTALL)
+HARMONY_TOKEN = re.compile(r"<\|[a-z_]+\|>")
+REASONING_MODEL_MIN_TOKENS = 800
 FENCE = re.compile(r"^\s*```(?:json)?|```\s*$", re.MULTILINE)
 FA_CHAR = re.compile(r"[\u0600-\u06FF]")
 LATIN_CHAR = re.compile(r"[A-Za-z]")
@@ -196,6 +199,11 @@ def _decorate_cloud_body(body: dict, route: dict) -> None:
         body["think"] = False
     if route.get("kind") != "cloud":
         return
+    if "gpt-oss" in str(route.get("model") or "").lower():
+        # GPT-OSS (the Arvan fallback) always reasons first and that counts against max_tokens: with the router's 150
+        # it spent them all thinking and sent no answer. Short thinking and room for the answer.
+        body.setdefault("reasoning_effort", "low")
+        body["max_tokens"] = max(int(body.get("max_tokens") or 0), REASONING_MODEL_MIN_TOKENS)
     for key, value in _openrouter_extra_body(url).items():
         if key == "think":
             continue
@@ -432,12 +440,26 @@ def _routing_override(surface: str) -> dict | None:
     }
 
 
+def _strip_harmony(text: str) -> str:
+    """GPT-OSS behind Arvan sometimes returns its raw channel format; keep only the final answer, never the thinking."""
+    if "<|" not in text:
+        return text.strip()
+    finals = HARMONY_FINAL.findall(text)
+    if finals:
+        return HARMONY_TOKEN.sub("", finals[-1]).strip()
+    if "<|channel|>" in text or "<|start|>" in text:
+        return ""  # only thinking, or a header cut off by max_tokens
+    return HARMONY_TOKEN.sub("", text).strip()
+
+
 def _choice_text(payload: dict) -> str:
     msg = ((payload.get("choices") or [{}])[0].get("message") or {})
-    content = str(msg.get("content") or "").strip()
+    content = _strip_harmony(str(msg.get("content") or ""))
     if content:
         return content
-    return str(msg.get("reasoning_content") or msg.get("reasoning") or "").strip()
+    # A reasoning model that ran out of tokens leaves only its thinking, usually English: never the seller's answer.
+    thought = _strip_harmony(str(msg.get("reasoning_content") or msg.get("reasoning") or ""))
+    return thought if _persian_enough(thought) else ""
 
 
 async def _running_models() -> set[str] | None:
@@ -936,7 +958,7 @@ def _tool_result(route: dict, payload: dict, counts: dict) -> dict:
             args = parsed if isinstance(parsed, dict) else {}
         calls.append({"id": str(raw.get("id") or ""), "name": name, "arguments": args})
     return {
-        "text": str(msg.get("content") or "").strip(),
+        "text": _strip_harmony(str(msg.get("content") or "")),
         "tool_calls": calls,
         "usage": counts,
         "finish_reason": finish,
