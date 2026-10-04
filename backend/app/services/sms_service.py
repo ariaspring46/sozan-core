@@ -3,6 +3,7 @@ from __future__ import annotations
 import httpx
 
 from app.phone import normalize_phone
+from app import egress
 
 PROVIDERS = (
     {
@@ -42,7 +43,7 @@ async def send_otp(*, provider: str, api_key: str, template_id: str, token_name:
 async def _kavenegar(*, key: str, template: str, receptor: str, code: str) -> None:
     # Official Verify Lookup: https://kavenegar.com/rest.html
     url = f"https://api.kavenegar.com/v1/{key}/verify/lookup.json"
-    async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
+    async with httpx.AsyncClient(timeout=20, trust_env=False, **egress.client_kwargs()) as client:
         response = await client.post(
             url,
             data={"receptor": receptor, "token": code, "template": template},
@@ -93,7 +94,7 @@ async def _smsir(*, key: str, template: str, token_name: str, mobile: str, code:
     except ValueError as exc:
         raise ValueError("شناسهٔ قالب پیامک باید عدد باشد.") from exc
     payload_mobile = smsir_mobile(mobile)
-    async with httpx.AsyncClient(timeout=20, trust_env=False) as client:
+    async with httpx.AsyncClient(timeout=20, trust_env=False, **egress.client_kwargs()) as client:
         response = await client.post(
             "https://api.sms.ir/v1/send/verify",
             headers={"x-api-key": key, "Accept": "application/json"},
