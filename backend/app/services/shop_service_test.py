@@ -607,87 +607,85 @@ class LiveShopChatRouteTests(unittest.TestCase):
 
 
 class PriceMissingBuildTests(unittest.TestCase):
-    def test_start_build_blocks_when_all_prices_missing(self) -> None:
+    """A storefront is built without prices too (unpriced products show «استعلام قیمت»); only an empty catalog stops it."""
+
+    @staticmethod
+    def _factory_ok():
+        from contextlib import ExitStack
+
+        stack = ExitStack()
+        factory = stack.enter_context(
+            patch.object(shop_service, "_run_factory", return_value={"ok": True, "jobId": "j", "status": "running"})
+        )
+        stack.enter_context(patch.object(shop_service, "_emit_build"))
+        stack.enter_context(patch.object(shop_service, "_publish_dns", side_effect=lambda shop: shop))
+        stack.enter_context(patch("app.services.shop_service.get_settings", return_value={"storeName": "دمو"}))
+        stack.enter_context(patch("app.services.shop_service.record_site"))
+        return stack, factory
+
+    def test_builds_when_no_product_has_a_price(self) -> None:
+        # seen 2026-10-03 (09145642532): «بساز» four times, always «اول قیمت‌ها رو بفرست», never a build
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-                from app.services import storefront_service
-
-                storefront_service.add_product(title="جلد زیپی", price=0, stock=1, sku="z", category="جلد زیپی")
-                shop_service._save_shop({**shop_service._shop(), "slug": "demo", "status": "ready", "hidePrices": False})
-                with patch.object(shop_service, "_run_factory") as factory, patch.object(shop_service, "_emit_build"):
-                    result = shop_service.start_build(prompt="از نو بساز", rebuild=True)
-                factory.assert_not_called()
-                self.assertFalse(result["ok"])
-                self.assertEqual(result["code"], "price_missing")
-                self.assertIn("قیمت", result["error"])
-
-    def test_contact_and_direct_notes_still_block(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
-            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-                from app.services import storefront_service
-
-                storefront_service.add_product(
-                    title="جلد زیپی",
-                    price=0,
-                    stock=1,
-                    sku="z",
-                    category="جلد زیپی",
-                    priceNote="تماس بگیرید",
-                )
-                shop_service._save_shop({**shop_service._shop(), "slug": "demo", "status": "ready", "jobId": "j1"})
-                with (
-                    patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
-                    patch.object(shop_service, "_run_factory") as factory,
-                    patch.object(shop_service, "_emit_build"),
-                ):
-                    result = shop_service.start_build(prompt="بیلد کن", rebuild=True, revise_only=True)
-                spawn.assert_not_called()
-                factory.assert_not_called()
-                self.assertFalse(result["ok"])
-                self.assertEqual(result["code"], "price_missing")
-                self.assertIn("استعلام", result["error"])
-
-                storefront_service.update_product(
-                    storefront_service.list_products()["products"][0]["id"],
-                    {"priceNote": "دایرکت"},
-                )
-                with (
-                    patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
-                    patch.object(shop_service, "_run_factory") as factory,
-                    patch.object(shop_service, "_emit_build"),
-                ):
-                    result = shop_service.start_build(prompt="از نو بساز", rebuild=True)
-                spawn.assert_not_called()
-                factory.assert_not_called()
-                self.assertEqual(result["code"], "price_missing")
-
-    def test_an_empty_catalog_is_told_apart_from_missing_prices_and_offers_the_way_out(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
-            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-                with patch.object(shop_service, "_run_factory") as factory, patch.object(shop_service, "_emit_build"):
-                    empty = shop_service.start_build(prompt="بساز", rebuild=False)
-                    factory.assert_not_called()
-                self.assertEqual(empty["code"], "price_missing")
-                self.assertEqual(empty["reason"], "no_products")
-                self.assertIn("هیچ کالایی", empty["error"])
-                self.assertIn("بدون قیمت بساز", empty["error"])
                 from app.services import storefront_service
 
                 storefront_service.add_product(title="رژ لب", price=0, stock=1, sku="r", category="آرایشی")
-                with patch.object(shop_service, "_run_factory"), patch.object(shop_service, "_emit_build"):
-                    unpriced = shop_service.start_build(prompt="بساز", rebuild=False)
-                self.assertEqual(unpriced["reason"], "price_missing")
-                self.assertIn("بدون قیمت بساز", unpriced["error"])
-                self.assertEqual(shop_service._operator_error(empty["error"]), shop_service.NO_PRODUCTS)
+                shop_service._save_shop({**shop_service._shop(), "error": "بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام."})
+                stack, factory = self._factory_ok()
+                with stack:
+                    result = shop_service.start_build(prompt="بساز", rebuild=False)
+                factory.assert_called_once()
+                self.assertTrue(result.get("ok"))
+                self.assertEqual(shop_service._shop().get("error"), "")
+                self.assertFalse(shop_service._shop().get("hidePrices"))
 
-    def test_empty_catalog_blocks_unless_hide_prices(self) -> None:
+    def test_price_notes_do_not_block_either(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
-                shop_service._save_shop({**shop_service._shop(), "slug": "demo", "status": "ready", "hidePrices": False})
-                with patch.object(shop_service, "_run_factory") as factory, patch.object(shop_service, "_emit_build"):
-                    result = shop_service.start_build(prompt="از نو بساز", rebuild=True)
-                factory.assert_not_called()
-                self.assertEqual(result["code"], "price_missing")
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="جلد زیپی", price=0, stock=1, sku="z", category="جلد", priceNote="دایرکت")
+                stack, factory = self._factory_ok()
+                with stack:
+                    result = shop_service.start_build(prompt="بساز", rebuild=False)
+                factory.assert_called_once()
+                self.assertTrue(result.get("ok"))
+
+    def test_an_empty_catalog_still_stops_the_build(self) -> None:
+        # the factory needs one product; hiding prices does not change that
+        for hide in (False, True):
+            with tempfile.TemporaryDirectory() as raw:
+                with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                    shop_service._save_shop({**shop_service._shop(), "hidePrices": hide})
+                    with patch.object(shop_service, "_run_factory") as factory, patch.object(shop_service, "_emit_build"):
+                        result = shop_service.start_build(prompt="بساز", rebuild=False)
+                    factory.assert_not_called()
+                    self.assertEqual(result["code"], "no_products")
+                    self.assertIn("هیچ کالایی", result["error"])
+                    self.assertIn("قیمت اختیاری", result["error"])
+
+    def test_panel_and_ready_text_tell_unpriced_items_apart(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="کیف", price=900000, stock=1, sku="k", category="کیف")
+                storefront_service.add_product(title="کیف دوم", price=0, stock=1, sku="k2", category="کیف")
+                public = shop_service._public_shop(shop_service._shop())
+                self.assertFalse(public["priceBlocked"])
+                self.assertFalse(public["catalogEmpty"])
+                self.assertEqual(public["unpriced"], 1)
+                text = shop_service._persian_build_text({"status": "ready", "url": "https://kif.sozan-core.ir", "urlOk": True})
+                self.assertIn("sozan-core.ir", text)
+                self.assertIn("استعلام قیمت", text)
+                hidden = shop_service._public_shop({**shop_service._shop(), "hidePrices": True})
+                self.assertEqual(hidden["unpriced"], 0)
+
+    def test_old_stored_price_error_is_not_shown(self) -> None:
+        stale = shop_service._public_shop({"error": "بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام."})
+        self.assertEqual(stale["error"], "")
+        self.assertEqual(shop_service._operator_error("بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام."), "")
+        self.assertEqual(shop_service._operator_error("price_missing"), "")
 
     def test_inquiry_url_from_instagram_handle(self) -> None:
         self.assertEqual(

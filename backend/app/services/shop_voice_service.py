@@ -190,7 +190,17 @@ def _catalog_lines() -> str:
             cats.append(cat)
     prices = [int(row.get("price") or 0) for row in rows if int(row.get("price") or 0) > 0]
     titles = "، ".join(str(row.get("title") or "") for row in rows[:8] if row.get("title"))
-    spread = f" قیمت‌ها از {min(prices):,} تا {max(prices):,} تومان." if prices else " قیمتی ثبت نشده."
+    unpriced = len(rows) - len(prices)
+    # building never waits for prices: say so, or the model keeps asking for them before it builds
+    if not prices:
+        spread = (
+            " قیمتی ثبت نشده. ساختن ویترین بدون قیمت مجاز است و منتظر قیمت نمی‌ماند: هر کالای بی‌قیمت «استعلام قیمت» "
+            "نشان می‌دهد و خرید نمی‌رود. قیمت را شرط ساختن نکن."
+        )
+    elif unpriced:
+        spread = f" قیمت‌ها از {min(prices):,} تا {max(prices):,} تومان؛ {unpriced} کالا بی‌قیمت است و «استعلام قیمت» نشان می‌دهد."
+    else:
+        spread = f" قیمت‌ها از {min(prices):,} تا {max(prices):,} تومان."
     return (
         f"{len(rows)} کالا در کاتالوگ: {titles}. دسته‌ها: {'، '.join(cats[:6]) or '—'}.{spread}\n"
         + channel_scan_service.brief_for_shop()

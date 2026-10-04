@@ -26,7 +26,12 @@ export type ShopState = {
   /** چند تغییر هنوز با «برگشت» پس گرفتنی است؛ بعد از هر بیلد ۰ می‌شود. */
   undoDepth?: number;
   hidePrices?: boolean;
+  /** Old panels only: building no longer waits for prices. */
   priceBlocked?: boolean;
+  /** No product at all: the factory needs one, so «بساز» waits. */
+  catalogEmpty?: boolean;
+  /** Products without a toman price; the storefront shows them as «استعلام قیمت». */
+  unpriced?: number;
 };
 
 function personalDomainValue(shop: ShopState | null) {
@@ -277,7 +282,7 @@ export function DomainMenu({
             <Button
               type="button"
               variant="ghost"
-              disabled={busy || running || Boolean(shop?.priceBlocked)}
+              disabled={busy || running || Boolean(shop?.catalogEmpty)}
               onClick={() => void onBuild(Boolean(shop?.slug)).then(() => setOpen(false))}
             >
               بساز
@@ -287,16 +292,23 @@ export function DomainMenu({
         {confirmRebuild && live ? (
           <p className="text-sm text-warm">ساخت دوباره سایت زنده را از نو می‌سازد و چند دقیقه طول می‌کشد.</p>
         ) : null}
-        {shop?.priceBlocked ? (
+        {!shop?.catalogEmpty && Number(shop?.unpriced || 0) > 0 ? (
+          <p className="text-sm text-muted">
+            {Number(shop?.unpriced).toLocaleString("fa-IR")} کالا بی‌قیمت است و در ویترین «استعلام قیمت» نشان می‌دهد؛ ساختن منتظر قیمت
+            نمی‌ماند.{" "}
+            <a href="/more/inventory?focus=price" className="inline-flex min-h-11 items-center text-warm underline">
+              ثبت قیمت
+            </a>
+          </p>
+        ) : null}
+        {shop?.catalogEmpty ? (
           <div className="space-y-2">
-            <p className="text-sm text-warm">
-              هنوز کالایی بدون قیمت تومان مانده؛ کالای بی‌قیمت در ویترین فقط «استعلام» می‌شود و خرید نمی‌رود. قیمت‌ها را در انبار بگذار و دوباره بساز.
-            </p>
+            <p className="text-sm text-warm">هنوز کالایی در کاتالوگ نیست؛ برای ساختن دست‌کم یک کالا لازم است (قیمت اختیاری است).</p>
             <a
-              href="/more/inventory?focus=price"
+              href="/more/inventory"
               className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm font-bold text-onAccent"
             >
-              انبار و قیمت‌گذاری
+              افزودن کالا در انبار
             </a>
           </div>
         ) : running ? (

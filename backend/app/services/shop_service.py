@@ -41,7 +41,7 @@ COLOR_Q = "رنگ‌های اصلی سایت چه باشد؟ مثلاً کرم �
 FEATURE_Q = "چه چیزهایی روی سایت باشد؟ جستجو، داستان برند، لینک شبکه‌ها، سبد خرید."
 READY_Q = "سبک و رنگ ثبت شد. اگر ویژگی دیگری نیست، بگو بساز تا سایت را با کالاهای کانال‌هایت بسازم."
 
-OPENING = "برای ساخت فروشگاه سه قدم است: ۱) حس فروشگاه ۲) کالا و قیمت تومان ۳) بنویس بساز."
+OPENING = "برای ساخت فروشگاه سه قدم است: ۱) حس فروشگاه ۲) کالاها (قیمت اختیاری است) ۳) بنویس بساز."
 LIVE_OPENING = "فروشگاه زنده‌ست. صفحه را همین‌جا ببین و بگو چه عوض شود."
 LIVE_OPENING_INCOMPLETE = "سایت بالا آمد؛ قیمت تومان و عکس را کامل کن."
 CHECKLIST_ID = "shop-ready-check"
@@ -67,11 +67,12 @@ SHOP_LIVE_HINT = """فروشگاه همین الان زنده است. مصاحب
 درخواست تغییر متن، رنگ یا تصویر همان صفحهٔ پیش‌نمایش است نه ساخت سایت جدید. تغییر همان لحظه در کادر دیده می‌شود؛ کارخانه را راه نینداز.
 سلام را کوتاه جواب بده. دکمهٔ بیلد فقط سایت را با next build تازه می‌کند. کارخانهٔ کامل فقط اگر صریح گفت از نو بساز."""
 
-PRICE_MISSING = "بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام."
-PRICE_HINT = "اگر قیمت نداری بگو «بدون قیمت بساز» تا ویترین فقط استعلام بگیرد."
+# A storefront is built without prices too: an unpriced product shows «استعلام قیمت» and cannot go in the cart
+# (the templates' canSell), priced ones sell. Only an empty catalog stops a build (the factory needs one product).
+UNPRICED_NOTE = "کالای بی‌قیمت در ویترین «استعلام قیمت» نشان می‌دهد و خرید نمی‌رود؛ هر وقت قیمت گذاشتی همان‌جا فروشی می‌شود."
 NO_PRODUCTS = (
-    "هنوز هیچ کالایی در کاتالوگ نیست. کالا را با عکس و قیمت از «بیشتر ← انبار» اضافه کن، یا اسم درست پیجت را بگو تا اسکن کنم، "
-    "یا بگو «بدون قیمت بساز» تا ویترین فقط استعلام بگیرد."
+    "هنوز هیچ کالایی در کاتالوگ نیست. کالا را از «بیشتر ← انبار» اضافه کن (قیمت اختیاری است)، "
+    "یا اسم درست پیجت را بگو تا اسکن کنم."
 )
 BUILD_MSG_ID = "shop-build-live"
 BUILD_BUSY = frozenset({"running", "queued"})
@@ -398,7 +399,11 @@ def _shop_is_live(shop: dict) -> bool:
 def _public_shop(shop: dict) -> dict:
     out = dict(shop)
     out.pop("paySecret", None)
-    out["priceBlocked"] = _missing_sellable_price(shop)
+    if "بدون قیمت تومان" in str(out.get("error") or ""):
+        out["error"] = ""  # saved by the old price gate; not an error any more
+    out["priceBlocked"] = False  # kept for panels still open on the old code
+    out["catalogEmpty"] = not _catalog_rows()
+    out["unpriced"] = 0 if bool(shop.get("hidePrices")) else _unpriced_count()
     out["undoDepth"] = _undo_depth(shop)
     return out
 
@@ -769,7 +774,7 @@ def _operator_error(raw: str) -> str:
     if "هنوز هیچ کالایی در کاتالوگ نیست" in text:
         return NO_PRODUCTS
     if "price_missing" in text or "بدون قیمت تومان" in text or "قیمت کالاها ثبت نشده" in text:
-        return f"{PRICE_MISSING} {PRICE_HINT}"
+        return ""  # the old price gate; a build without prices is allowed now
     if "readiness failed: catalog" in text:
         return "کاتالوگ سایت خالی رسید؛ اول کالا اضافه کن، بعد دوباره بساز."
     if "readiness failed: http" in text:
@@ -982,11 +987,10 @@ def _persian_build_text(build: dict) -> str:
         label = str(build.get("stepLabel") or "") or "سوزان در حال ساخت سایت است…"
         return f"در حال ساخت فروشگاه. {label}"
     if status == "ready":
-        if _missing_sellable_price(_shop()):
-            return LIVE_OPENING_INCOMPLETE
         url = _seller_url(str(build.get("url") or ""))
         live = "سایت زنده است." if build.get("urlOk") or url else "ساخت تمام شد."
-        return f"{live} {url}".strip()
+        note = f" {UNPRICED_NOTE}" if _unpriced_count() and not _shop().get("hidePrices") else ""
+        return f"{live} {url}{note}".strip()
     if status == "failed":
         hint = _operator_error(str(build.get("error") or "")) or "ساخت سایت کامل نشد."
         done = STEP_DONE_FA.get(str(build.get("step") or ""), "")
@@ -1394,23 +1398,30 @@ PROTECTED_SHOP_SLUGS = frozenset({"joahr-froshi", "cahrm-srai-pars"})
 PROTECTED_TENANTS = frozenset({"09120007777"})
 
 
-def _missing_sellable_price(shop: dict) -> bool:
-    if bool(shop.get("hidePrices")):
-        return False
+def _catalog_rows() -> list[dict]:
     from app.services import storefront_service
 
-    products = storefront_service.list_products().get("products") or []
-    for row in products:
-        if not isinstance(row, dict):
-            continue
-        try:
-            price = int(row.get("price") or 0)
-        except (TypeError, ValueError):
-            price = 0
-        note = str(row.get("priceNote") or "").strip()
-        if price > 0 and not note:
-            return False
-    return True
+    return [row for row in storefront_service.list_products().get("products") or [] if isinstance(row, dict)]
+
+
+def _sellable(row: dict) -> bool:
+    try:
+        price = int(row.get("price") or 0)
+    except (TypeError, ValueError):
+        price = 0
+    return price > 0 and not str(row.get("priceNote") or "").strip()
+
+
+def _unpriced_count() -> int:
+    """Products a customer cannot buy yet (no toman price, or a price note); they show «استعلام قیمت»."""
+    return sum(1 for row in _catalog_rows() if not _sellable(row))
+
+
+def _missing_sellable_price(shop: dict) -> bool:
+    """No product can be bought yet (a nudge for the live opening, never a build block)."""
+    if bool(shop.get("hidePrices")):
+        return False
+    return not any(_sellable(row) for row in _catalog_rows())
 
 
 def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) -> dict:
@@ -1423,19 +1434,9 @@ def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None = None) 
         result = {"ok": False, "error": "ساخت قبلی هنوز تمام نشده", "queued": True}
         _emit_build(result, shop, rebuild=rebuild)
         return result
-    if _missing_sellable_price(shop):
-        from app.services import storefront_service
-
-        empty = not (storefront_service.list_products().get("products") or [])
-        shop["error"] = PRICE_MISSING
-        _save_shop(shop)
-        # an empty catalog is not «prices missing»: the seller must hear what to do, not be asked for prices that do not exist yet
-        result = {
-            "ok": False,
-            "code": "price_missing",
-            "reason": "no_products" if empty else "price_missing",
-            "error": NO_PRODUCTS if empty else f"{PRICE_MISSING} {PRICE_HINT}",
-        }
+    if not _catalog_rows():
+        # the factory needs at least one product; prices are optional (unpriced ones show «استعلام قیمت»)
+        result = {"ok": False, "code": "no_products", "reason": "no_products", "error": NO_PRODUCTS}
         _emit_build(result, shop, rebuild=rebuild)
         return result
     full_rebuild = _wants_full_rebuild(prompt)
@@ -1982,7 +1983,7 @@ async def chat(text: str, media: dict | None = None, view_path: str = "", view_t
         return _pack(shop, rows, assistant)
     live = _shop_is_live(shop)
     if not media_only and not live and _wants_hide_prices(raw) and not re.search(r"[؟?]", raw) and not shop.get("hidePrices"):
-        # «بدون قیمت بساز»: the seller chose an inquiry-only storefront, the build gate lets it through
+        # «قیمت نزن / بدون قیمت»: hide every price on the storefront, even the ones that exist (show_prices undoes it)
         shop = _save_shop({**shop, "hidePrices": True})
         if not _explicit_build(raw):
             plain = "باشه؛ ویترین بدون قیمت ساخته می‌شود و مشتری برای هر کالا استعلام می‌گیرد. وقتی آماده بودی بگو بساز."

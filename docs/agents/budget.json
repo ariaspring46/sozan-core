@@ -23,7 +23,7 @@
    "tests": 32469
   },
   {
-   "active": 74521,
+   "active": 74519,
    "core": 15497,
    "core_pct": 34,
    "id": "X3",
@@ -33,14 +33,14 @@
    "tests": 35048
   },
   {
-   "active": 105241,
+   "active": 105634,
    "core": 31145,
    "core_pct": 69,
    "id": "X4",
    "loose_contracts": 12,
    "manifest": 9779,
    "rare": 2323,
-   "tests": 46530
+   "tests": 46561
   },
   {
    "active": 88488,
@@ -73,7 +73,7 @@
    "tests": 14831
   },
   {
-   "active": 57807,
+   "active": 58026,
    "core": 19799,
    "core_pct": 44,
    "id": "C",
