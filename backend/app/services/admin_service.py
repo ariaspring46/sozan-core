@@ -82,6 +82,40 @@ def _ai_spend(tenant: str) -> dict:
         return {"today": 0, "week": 0}
 
 
+def _profile(tenant: str) -> dict:
+    try:
+        from app.services import profile_service
+
+        found = profile_service.for_session(tenant)
+        return found if isinstance(found, dict) else {}
+    except Exception:
+        return {}
+
+
+def _pages(channels, scan, scanned) -> list[str]:
+    """The seller's pages as "platform:@handle": connected channels first, then handles from the page scan.
+    Only platform and handle are read from a channel row (the rest holds tokens)."""
+    out: list[str] = []
+
+    def add(platform: str, handle: str) -> None:
+        handle = str(handle or "").strip().lstrip("@")
+        if not handle:
+            return
+        label = f"{platform}:@{handle}" if platform else f"@{handle}"
+        if all(handle.lower() != x.split("@", 1)[-1].lower() for x in out):
+            out.append(label)
+
+    for row in channels if isinstance(channels, list) else []:
+        if isinstance(row, dict):
+            add(str(row.get("platform") or ""), row.get("handle") or "")
+    for item in (scanned.get("accounts") if isinstance(scanned, dict) else None) or []:
+        if isinstance(item, dict):
+            add(str(item.get("platform") or "instagram"), item.get("handle") or "")
+    for handle in (scan.get("handles") if isinstance(scan, dict) else None) or []:
+        add("instagram", str(handle))
+    return out[:6]
+
+
 def _user_row(tenant: str, user=None) -> dict:
     from app.services import plan_service
     from app.state_store import current_tenant, reset_tenant, set_tenant
@@ -93,6 +127,8 @@ def _user_row(tenant: str, user=None) -> dict:
         channels = read_json("channels.json", [])
         inbox = read_json("inbox.json", {})
         billing = read_json("billing.json", [])
+        scan = read_json("scan-status.json", {})
+        scanned = read_json("channel-scan.json", {})
     finally:
         reset_tenant(token)
 
@@ -110,6 +146,7 @@ def _user_row(tenant: str, user=None) -> dict:
         last_activity = max(int(t.get("lastAt") or 0) for t in threads if isinstance(t, dict))
 
     ai = _ai_spend(tenant)
+    profile = _profile(tenant)
 
     return {
         "phone": tenant,
@@ -123,6 +160,10 @@ def _user_row(tenant: str, user=None) -> dict:
         "aiWeek": round(ai["week"], 4),
         "lastActivity": last_activity,
         "joinedAt": int(billing[0].get("at") or 0) if isinstance(billing, list) and billing else 0,
+        "name": " ".join(x for x in (profile.get("firstName"), profile.get("lastName")) if x).strip(),
+        "brand": str(profile.get("brandName") or shop.get("brand") or ""),
+        "pages": _pages(channels, scan, scanned),
+        "shopHost": str(shop.get("publicHost") or ""),
     }
 
 

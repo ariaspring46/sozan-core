@@ -21,6 +21,10 @@ type UserRow = {
   aiWeek: number;
   lastActivity: number;
   blocked?: boolean;
+  name?: string;
+  brand?: string;
+  pages?: string[];
+  shopHost?: string;
 };
 
 type UserDetail = UserRow & {
@@ -127,7 +131,12 @@ export default function AdminPage() {
     }
   }
 
-  const filtered = users.filter((u) => !search || u.phone.includes(search) || u.plan.includes(search));
+  const needle = search.trim().toLowerCase();
+  const filtered = users.filter(
+    (u) =>
+      !needle ||
+      [u.phone, u.plan, u.name, u.brand, u.shopHost, ...(u.pages || [])].some((v) => String(v || "").toLowerCase().includes(needle)),
+  );
 
   if (/فقط برای مدیر/.test(error)) {
     return (
@@ -184,7 +193,7 @@ export default function AdminPage() {
         {tab === "users" ? (
           <>
             <Input
-              placeholder="جستجو: شماره یا پلن"
+              placeholder="جستجو: نام، برند، پیج، شماره یا پلن"
               aria-label="جستجوی کاربر"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -195,7 +204,8 @@ export default function AdminPage() {
                   <li key={u.phone} className="rounded-xl border border-line bg-canvas p-3">
                     <button type="button" className="min-h-11 w-full text-start" onClick={() => void openDetail(u.phone)}>
                       <p className="text-sm font-bold">
-                        <bdo dir="ltr">{u.phone}</bdo>
+                        {u.name || u.brand ? <span className="me-2">{u.name || "بی‌نام"}{u.brand ? ` · ${u.brand}` : ""}</span> : null}
+                        <bdo dir="ltr" className="text-muted">{u.phone}</bdo>
                         <span className={`ms-2 text-xs ${u.status === "active" ? "text-signal" : "text-danger"}`}>
                           · {STATUS_LABEL[u.status] || u.status}
                         </span>
@@ -206,6 +216,14 @@ export default function AdminPage() {
                         {` · ${fa(u.sites)} سایت · ${fa(u.channels)} کانال`}
                         {` · ابر: $${u.aiToday?.toFixed(3) || 0} امروز`}
                       </p>
+                      {u.pages?.length || u.shopHost ? (
+                        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs" dir="ltr">
+                          {(u.pages || []).map((pg) => (
+                            <span key={pg} className="text-warm">{pg.replace(/^instagram:/, "IG ").replace(/^telegram:/, "TG ")}</span>
+                          ))}
+                          {u.shopHost ? <span className="text-muted">{u.shopHost}</span> : null}
+                        </p>
+                      ) : null}
                     </button>
                     {detail?.phone === u.phone ? (
                       <div className="mt-3 space-y-3 border-t border-line pt-3">

@@ -318,7 +318,7 @@ POST /settings/support/seller-ticket  (body: SellerTicketIn)  # owner X5, change
 
 **Shared runtime state files** (other roles depend on these keys; changing a key is a contract change):
 
-- `channel-scan.json`: writers: X3; readers: C — top-level keys per role: C: {categories}
+- `channel-scan.json`: writers: X3; readers: C, X5 — top-level keys per role: C: {categories}
 - `pay-orders.json`: writers: C; readers: X5
 - `shop.json`: writers: C, X4, X5; readers: X1 — top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, slug, status, url}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}
 - `support-tickets.json`: writers: C; readers: X5
@@ -509,7 +509,7 @@ cd frontend && npm run build 2>&1 | tail -15
 
 | file | writers | readers | your rule |
 |---|---|---|---|
-| `channel-scan.json` | X3 | C | read-only for you; never write it |
+| `channel-scan.json` | X3 | C, X5 | read-only for you; never write it |
 | `pay-orders.json` | C | X5 | you are the only writer; keep the shape stable for the readers |
 | `shop.json` | C, X4, X5 | X1 | write only with `update_json(..., lock=...)` or inside `tenant_file_lock` |
 | `support-tickets.json` | C | X5 | you are the only writer; keep the shape stable for the readers |
