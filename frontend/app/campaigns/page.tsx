@@ -56,7 +56,7 @@ export default function CampaignsPage() {
         </div>
       }
     >
-    <main className="h-full space-y-4 overflow-y-auto p-4">
+    <main className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
       <StudioNav current="campaigns" />
       {isAdmin ? (
       <details className="rounded-2xl bg-canvas px-4 py-3 text-sm shadow-card">

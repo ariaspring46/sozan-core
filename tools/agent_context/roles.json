@@ -668,6 +668,9 @@
       ],
       "owns": [
         "frontend/app/layout.tsx",
+        "frontend/app/robots.ts",
+        "frontend/app/sitemap.ts",
+        "frontend/app/manifest.ts",
         "frontend/app/globals.css",
         "frontend/components/app-shell.tsx",
         "frontend/components/panel-home.tsx",

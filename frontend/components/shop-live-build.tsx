@@ -169,7 +169,7 @@ function IconBtn({
       title={label}
       onClick={onClick}
       className={cn(
-        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warm sm:h-9 sm:w-9",
+        "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warm mouse:h-9 mouse:w-9",
         active ? "bg-accent/15" : "hover:bg-canvas",
         className,
       )}
@@ -392,7 +392,7 @@ function ShopLivePreview({
             type="button"
             onClick={() => setMode((value) => (value === "design" ? "browse" : "design"))}
             className={cn(
-              "inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm sm:min-h-9",
+              "inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm mouse:min-h-9",
               mode === "design" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas",
             )}
           >
@@ -404,7 +404,7 @@ function ShopLivePreview({
               onClick={() => onBuild()}
               disabled={buildBusy || (overlay && !failed) || (pendingBuild < 1 && !failed)}
               className={cn(
-                "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 text-sm sm:min-h-9",
+                "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 text-sm mouse:min-h-9",
                 (pendingBuild > 0 || failed) && !(overlay && !failed) ? "bg-accentStrong text-onAccent" : "text-muted",
               )}
             >
@@ -437,7 +437,7 @@ function ShopLivePreview({
             rel="noreferrer"
             aria-label="باز کردن ویترین در تب جدید"
             title="باز کردن ویترین در تب جدید"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warm hover:bg-canvas sm:h-9 sm:w-9"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-warm hover:bg-canvas mouse:h-9 mouse:w-9"
           >
             <ExternalLink size={16} />
           </a>

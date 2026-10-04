@@ -5,6 +5,7 @@
   "signature": "GET /auth/me  ()",
   "since": "2026-10-02",
   "users": [
+   "C",
    "U",
    "X2",
    "X3"

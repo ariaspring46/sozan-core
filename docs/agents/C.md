@@ -67,7 +67,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 19.8k | the files most tasks touch; read the relevant one first |
-| active | 57.7k | yours to edit; read only what the task needs |
+| active | 57.8k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
 | tests | 16.2k | read only the test of the module you change |
 
@@ -83,9 +83,9 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `backend/app/api/`: `pay.py` (3.7k), `storefront.py` (2.9k)
 - `backend/app/services/`: `pay_service.py` (7.7k), `storefront_service.py` (5.5k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `shop_otp_service.py` (1.8k), `support_service.py` (1.6k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
-- `frontend/app/more/support/`: `page.tsx` (4.3k)
+- `frontend/app/more/support/`: `page.tsx` (4.4k)
 - `frontend/app/p/[id]/`: `page.tsx` (0.8k)
-- `frontend/components/`: `shop-settings-form.tsx` (8.7k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.3k), `domain-menu.tsx` (4.3k)
+- `frontend/components/`: `shop-settings-form.tsx` (8.7k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.4k), `domain-menu.tsx` (4.3k)
 - `frontend/lib/`: `site-host.ts` (0.1k)
 
 **Rare (yours; only when the task names it):**
@@ -292,6 +292,8 @@ def write_json(name: str, payload: Any, *, shared: bool=False) -> None  # change
 **HTTP routes you call** (contract: method, path, parameters, response):
 
 ```
+GET /auth/me  ()  # owner X5, changed 2026-10-02
+    backend/app/api/auth.py: returns keys {id, isAdmin, onboarded, phone, role}
 GET /settings  ()  # owner X5, changed 2026-10-02
     backend/app/api/settings.py: response untyped
 GET /settings/support/hub  ()  # owner X5, changed 2026-10-02

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { api, catalogImageUrl } from "@/lib/api";
 import { money, priceText } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
+import { ImageOff } from "lucide-react";
 
 function missingPhoto(product: Product) {
   const thumb = product.images?.[0] || product.image || "";
@@ -122,7 +123,7 @@ export function InventoryCatalog() {
 
   return (
     <>
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         {shop?.needsBuild ? (
           <p className="rounded-xl border border-line px-3 py-2 text-sm leading-7">
@@ -236,8 +237,8 @@ export function InventoryCatalog() {
                         className="h-16 w-16 shrink-0 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-canvas text-center text-xs leading-5 text-muted">
-                        بدون عکس
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-canvas text-muted">
+                        <ImageOff size={22} aria-hidden />
                       </div>
                     )}
                     <div className="min-w-0 flex-1">

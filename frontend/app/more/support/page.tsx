@@ -58,7 +58,10 @@ export default function SupportPage() {
         api<{ tickets: Ticket[] }>("/support/tickets"),
         api<{ receipts: Receipt[] }>("/pay/receipts"),
         api<{ tickets: Ticket[] }>("/settings/support/my-tickets").catch(() => ({ tickets: [] })),
-        api<{ tickets: Ticket[] }>("/settings/support/hub").catch(() => null),
+        // only the hub admin may read every seller's tickets; asking as a seller logged a 403 on every visit
+        api<{ isAdmin?: boolean }>("/auth/me")
+          .then((me) => (me.isAdmin ? api<{ tickets: Ticket[] }>("/settings/support/hub") : null))
+          .catch(() => null),
       ]);
       setTickets(t.tickets || []);
       setReceipts(r.receipts || []);
@@ -151,7 +154,7 @@ export default function SupportPage() {
         </div>
       }
     >
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         {error ? (
           <p className="text-sm text-danger" role="alert">
             {error}

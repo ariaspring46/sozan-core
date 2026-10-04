@@ -182,7 +182,7 @@ export default function InboxPage() {
         </div>
       }
     >
-      <div className="h-full space-y-3 overflow-y-auto p-4">
+      <div className="h-full space-y-3 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         <ChannelAlert inset={false} />
         <section aria-label="پاسخ به دایرکت" className="space-y-2 rounded-2xl border border-line/70 bg-paper p-3">
           <div className="flex items-center justify-between gap-2">
