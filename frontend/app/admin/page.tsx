@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
+import { AdminHealth } from "@/components/admin-health";
 import { api } from "@/lib/api";
 
 type UserRow = {
@@ -47,7 +48,7 @@ function faDate(ts: number) {
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"users" | "payments" | "audit">("users");
+  const [tab, setTab] = useState<"health" | "users" | "payments" | "audit">("health");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [payments, setPayments] = useState<PaymentsData | null>(null);
   const [audit, setAudit] = useState<{ action: string; target: string; reason: string; at: number }[]>([]);
@@ -165,18 +166,20 @@ export default function AdminPage() {
       <div className="h-full space-y-4 overflow-y-auto p-4">
         {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
 
-        <div className="flex gap-2">
-          {(["users", "payments", "audit"] as const).map((t) => (
+        <div className="flex flex-wrap gap-2">
+          {(["health", "users", "payments", "audit"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={`min-h-11 rounded-xl px-4 text-sm ${tab === t ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted"}`}
             >
-              {t === "users" ? "کاربران" : t === "payments" ? "پرداخت‌ها" : "اقدامات"}
+              {t === "health" ? "سلامت" : t === "users" ? "کاربران" : t === "payments" ? "پرداخت‌ها" : "اقدامات"}
             </button>
           ))}
         </div>
+
+        {tab === "health" ? <AdminHealth /> : null}
 
         {tab === "users" ? (
           <>

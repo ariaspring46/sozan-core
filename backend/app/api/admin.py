@@ -87,3 +87,14 @@ async def payments(_user=Depends(require_permission("campaigns:read"))):
 async def audit(_user=Depends(require_permission("campaigns:read"))):
     _require_admin(_user)
     return {"actions": admin_service.audit_trail()}
+
+
+@router.get("/health")
+async def health(_user=Depends(require_permission("campaigns:read"))):
+    """Hub snapshot for the admin panel (read-only; the probes block, so they run in a thread)."""
+    _require_admin(_user)
+    import asyncio
+
+    from app.services import admin_health_service
+
+    return await asyncio.to_thread(admin_health_service.snapshot)
