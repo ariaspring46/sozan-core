@@ -939,6 +939,15 @@
    "X2"
   ]
  },
+ "backend/app/egress.py::client_kwargs": {
+  "owner": "X5",
+  "signature": "def client_kwargs(*, sync: bool=False) -> dict",
+  "since": "2026-10-04",
+  "users": [
+   "C",
+   "X3"
+  ]
+ },
  "backend/app/models/user.py::Asset": {
   "owner": "X5",
   "shape": "__tablename__ = 'assets'; id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4); campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id')); kind: Mapped[str] = mapped_column(String(24)); channel: Mapped[str] = mapped_column(String(24)); format: Mapped[str] = mapped_column(String(32)); rel_path: Mapped[str] = mapped_column(String(400)); campaign: Mapped[Campaign] = relationship(back_populates='assets')",

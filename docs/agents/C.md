@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.7k tokens. Your core files total 19.8k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.8k tokens. Your core files total 19.8k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -223,6 +223,10 @@ Settings.panel_url: str = 'https://app.sozan-core.ir'  # changed 2026-09-18
 Settings.payment_sign_secret: str = ''  # changed 2026-09-18
 Settings.public_api_url: str = 'https://api.sozan-core.ir'  # changed 2026-09-18
 Settings.shop_otp_daily_cap: int = 200  # changed 2026-09-18
+```
+**`backend/app/egress.py`** — owner X5
+```
+def client_kwargs(*, sync: bool=False) -> dict  # Extra httpx client arguments: a transport bound to the hub's own IP, or nothing off the hub.  # changed 2026-10-04
 ```
 **`backend/app/phone.py`** — owner X5
 ```

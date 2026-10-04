@@ -23,12 +23,12 @@
    "tests": 32469
   },
   {
-   "active": 74482,
+   "active": 74521,
    "core": 15497,
    "core_pct": 34,
    "id": "X3",
    "loose_contracts": 19,
-   "manifest": 10345,
+   "manifest": 10412,
    "rare": 1208,
    "tests": 35048
   },
@@ -43,14 +43,14 @@
    "tests": 46530
   },
   {
-   "active": 81228,
-   "core": 22207,
+   "active": 81802,
+   "core": 22248,
    "core_pct": 49,
    "id": "X5",
-   "loose_contracts": 29,
-   "manifest": 12191,
+   "loose_contracts": 30,
+   "manifest": 12236,
    "rare": 20369,
-   "tests": 53209
+   "tests": 53637
   },
   {
    "active": 65794,
@@ -73,12 +73,12 @@
    "tests": 14831
   },
   {
-   "active": 57788,
+   "active": 57807,
    "core": 19799,
    "core_pct": 44,
    "id": "C",
    "loose_contracts": 15,
-   "manifest": 10723,
+   "manifest": 10789,
    "rare": 11609,
    "tests": 16166
   },
@@ -93,7 +93,7 @@
    "tests": 0
   },
   {
-   "active": 214718,
+   "active": 214728,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",

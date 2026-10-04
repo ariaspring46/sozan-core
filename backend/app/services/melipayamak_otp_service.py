@@ -15,6 +15,7 @@ import httpx
 
 from app.config import settings
 from app.services.observe_client import emit_later
+from app import egress
 
 log = logging.getLogger("sozan.sms")
 
@@ -73,7 +74,7 @@ async def send_otp(phone: str, code: str) -> str:
         _emit_failure("config", "")
         raise OtpSendError("config")
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT, trust_env=False) as client:
+        async with httpx.AsyncClient(timeout=TIMEOUT, trust_env=False, **egress.client_kwargs()) as client:
             response = await client.post(
                 f"{base}/SendByBaseNumber2",
                 json={

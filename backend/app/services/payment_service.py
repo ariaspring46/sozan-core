@@ -5,6 +5,7 @@ import re
 import httpx
 
 from app.config import settings as env
+from app import egress
 
 GATEWAYS = (
     {
@@ -81,7 +82,7 @@ async def zarinpal_request(
     }
     if mobile:
         payload["metadata"] = {"mobile": mobile}
-    async with httpx.AsyncClient(timeout=25, trust_env=False) as client:
+    async with httpx.AsyncClient(timeout=25, trust_env=False, **egress.client_kwargs()) as client:
         response = await client.post(
             "https://payment.zarinpal.com/pg/v4/payment/request.json",
             headers={"content-type": "application/json", "accept": "application/json"},
@@ -99,7 +100,7 @@ async def zarinpal_verify(*, amount_toman: int, authority: str, merchant: str = 
     merchant = (merchant or merchant_id()).strip()
     if not merchant:
         raise ValueError("مرچنت‌آیدی زرین‌پال روی هاب تنظیم نشده.")
-    async with httpx.AsyncClient(timeout=25, trust_env=False) as client:
+    async with httpx.AsyncClient(timeout=25, trust_env=False, **egress.client_kwargs()) as client:
         response = await client.post(
             "https://payment.zarinpal.com/pg/v4/payment/verify.json",
             headers={"content-type": "application/json", "accept": "application/json"},
@@ -144,7 +145,7 @@ async def idpay_request(
         payload["name"] = name[:255]
     if phone:
         payload["phone"] = phone
-    async with httpx.AsyncClient(timeout=25, trust_env=False) as client:
+    async with httpx.AsyncClient(timeout=25, trust_env=False, **egress.client_kwargs()) as client:
         response = await client.post("https://api.idpay.ir/v1.1/payment", headers=headers, json=payload)
     body = _json(response)
     pay_id = str(body.get("id") or "").strip()
@@ -169,7 +170,7 @@ async def idpay_verify(
     headers = {"X-API-KEY": key, "Content-Type": "application/json", "Accept": "application/json"}
     if sandbox:
         headers["X-SANDBOX"] = "1"
-    async with httpx.AsyncClient(timeout=25, trust_env=False) as client:
+    async with httpx.AsyncClient(timeout=25, trust_env=False, **egress.client_kwargs()) as client:
         response = await client.post(
             "https://api.idpay.ir/v1.1/payment/verify",
             headers=headers,

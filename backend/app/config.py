@@ -94,6 +94,8 @@ class Settings(BaseSettings):
     arvan_zone: str = "sozan-core.ir"
     arvan_origin_ip: str = ""
     arvan_origin_port: int = 80
+    # SMS, payment and Arvan calls leave from this address (app/egress.py); empty = ARVAN_ORIGIN_IP
+    egress_source_ip: str = ""
     gateway_sozan_url: str = ""
     channel_proxy: str = ""
     sozan_npm_proxy: str = ""

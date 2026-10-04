@@ -345,6 +345,7 @@
         "backend/app/schemas.py",
         "backend/app/phone.py",
         "backend/app/client_ip.py",
+        "backend/app/egress.py",
         "backend/app/hub_admin.py",
         "backend/app/lab_account.py",
         "backend/app/models/**",
