@@ -24,6 +24,18 @@ h1{font-size:84px;line-height:1.28;font-weight:900;margin-top:14px}
 .dots{display:flex;gap:12px}.dots i{width:18px;height:18px;border-radius:50%;background:var(--ash)}.dots i.on{background:var(--cu);width:46px;border-radius:9px}
 .u{direction:ltr;font-size:30px;opacity:.6;letter-spacing:1px}
 .end .cta{margin-top:56px;align-self:flex-start;background:var(--cu);color:#fff;font-size:40px;font-weight:800;padding:22px 56px;border-radius:999px}
+.s.has-shot .in{inset:220px 80px 0}
+.s.has-shot .step{margin-top:40px;font-size:30px}
+.s.has-shot h1{font-size:68px;line-height:1.3;margin-top:10px}
+.s.has-shot .body{font-size:38px;line-height:1.7;margin-top:20px}
+.s.has-shot .tip{margin-top:26px;font-size:32px;padding:20px 28px;line-height:1.55}
+.phone{position:relative;align-self:center;margin-top:48px;margin-bottom:250px;width:660px;flex:1;min-height:0;border-radius:80px;padding:16px;background:#0E0C0B;
+ box-shadow:0 0 0 3px #4A433D,0 40px 120px rgba(0,0,0,.55),0 0 160px rgba(196,92,38,.18)}
+.s.end .phone{margin-bottom:330px}
+.phone img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 0;border-radius:64px}
+.phone:before{content:"";position:absolute;top:32px;left:50%;width:150px;height:42px;margin-left:-75px;border-radius:21px;background:#0E0C0B;z-index:2}
+.s.has-shot .ft{position:absolute;left:0;right:0;bottom:150px}
+.s.has-shot.end .cta{position:absolute;bottom:230px;left:50%;transform:translateX(-50%);margin:0;white-space:nowrap}
 </style><body><div id="root"></div>
 <script>
 const ICONS={
@@ -37,6 +49,7 @@ channels:'<circle cx="26" cy="50" r="10"/><circle cx="74" cy="24" r="10"/><circl
 const FA=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
 const MP='M120 112C126 128 146 138 146 160C146 176 134 186 120 186C106 186 94 176 94 162C94 150 102 144 106 136C109 143 113 147 117 148C120 136 116 124 120 112Z';
 let mk=0;const mark=s=>{const id='m'+(mk++);return `<svg viewBox="0 0 240 240" width="${s}" height="${s}"><defs><mask id="${id}"><rect width="240" height="240" fill="#fff"/><path fill="#000" transform="translate(-18 -69.4) scale(1.15)" d="${MP}"/></mask></defs><g mask="url(#${id})" fill="#C45C26"><rect x="16" y="20" width="208" height="164" rx="56"/><path d="M142 170C146 200 166 216 198 224C186 208 184 190 190 170Z"/></g></svg>`};
+const POS={login:'50% 100%',onboard:'50% 100%',order:'50% 50%'};
 const icon=id=>`<svg viewBox="0 0 100 100">${ICONS[id]||''}</svg>`;
 const esc=t=>String(t||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function render(data){
@@ -45,12 +58,14 @@ function render(data){
   html+=`<section class="s cover" data-name="${h.id}-0-cover"><div class="disc">${icon(h.id)}</div></section>`;
   const n=h.slides.length;
   h.slides.forEach((sl,i)=>{const last=i===n-1;
-   html+=`<section class="s${last?' end':''}" data-name="${h.id}-${i+1}"><div class="in">
+   const shot=sl.shot?`shots/${encodeURIComponent(sl.shot)}.png`:'';
+   html+=`<section class="s${last?' end':''}${shot?' has-shot':''}" data-name="${h.id}-${i+1}"><div class="in">
    <div class="hd">${mark(58)}سوزان<span class="chip">${esc(h.name)}</span></div>
-   <div class="ic">${icon(h.id)}</div>
+   ${shot?'':`<div class="ic">${icon(h.id)}</div>`}
    <div class="step">${FA(i+1)} از ${FA(n)}</div>
    <h1>${esc(sl.title)}</h1><div class="body">${esc(sl.body)}</div>
    ${sl.tip?`<div class="tip"><b>نکته: </b>${esc(sl.tip)}</div>`:''}
+   ${shot?`<div class="phone"><img src="${shot}" alt="" style="object-position:${POS[sl.shot]||'50% 0'}"></div>`:''}
    ${last?'<div class="cta">رایگان شروع کن</div>':''}
    <div class="ft"><div class="dots">${Array.from({length:n},(_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div><span class="u">sozan-core.ir</span></div>
    </div></section>`});

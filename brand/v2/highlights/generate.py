@@ -70,11 +70,11 @@ def problems(slides: object) -> list[str]:
             continue
         title, body, tip = (str(s.get(k) or "").strip() for k in ("title", "body", "tip"))
         if not title or len(title) > 28:
-            out.append(f"اسلاید {i}: عنوان خالی یا بیش از ۲۸ نویسه")
+            out.append(f"اسلاید {i}: عنوان خالی یا بیش از ۲۸ نویسه (الان {len(title)})")
         if not body or len(body) > 130:
-            out.append(f"اسلاید {i}: متن خالی یا بیش از ۱۳۰ نویسه")
+            out.append(f"اسلاید {i}: متن خالی یا بیش از ۱۳۰ نویسه (الان {len(body)})")
         if len(tip) > 60:
-            out.append(f"اسلاید {i}: نکته بیش از ۶۰ نویسه")
+            out.append(f"اسلاید {i}: نکته بیش از ۶۰ نویسه (الان {len(tip)}؛ کوتاه‌ترش کن)")
         bad = BANNED.findall(title + body + tip)
         if bad:
             out.append(f"اسلاید {i}: واژه یا نویسهٔ ممنوع {sorted(set(bad))}")
@@ -91,7 +91,7 @@ def main() -> None:
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": f"واقعیت‌ها:\n{facts}\n\nهایلایت «{name}». موضوع: {topic}"},
         ]
-        for attempt in range(3):
+        for attempt in range(5):
             raw = ask(messages)
             try:
                 slides = json.loads(raw).get("slides")
@@ -102,7 +102,7 @@ def main() -> None:
                 break
             messages += [{"role": "assistant", "content": raw}, {"role": "user", "content": "درست کن: " + "؛ ".join(issues)}]
         else:
-            sys.exit(f"{name}: بعد از ۳ بار هنوز مشکل دارد: {issues}")
+            sys.exit(f"{name}: بعد از ۵ بار هنوز مشکل دارد: {issues}")
         result["highlights"].append({"id": sid, "name": name, "slides": slides})
         print(f"✓ {name}")
     (HERE / "content.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
