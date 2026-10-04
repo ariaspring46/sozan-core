@@ -51,6 +51,21 @@ if [ "$MODE" = "public" ] && [ -f "$BEACON_FILE" ]; then
   fi
 fi
 
+# nginx trusts ar-real-ip only from the edges in deploy/arvan-ips.conf; a new Arvan edge missing there would put all of
+# its visitors behind one IP for the OTP limits
+IPS_FILE="$(dirname "$0")/../deploy/arvan-ips.conf"
+if [ "$MODE" = "public" ] && [ -f "$IPS_FILE" ]; then
+  live="$(curl -s -m 15 https://www.arvancloud.ir/fa/ips.txt | tr -d '\r' | grep -E '^[0-9a-f.:]+/[0-9]+$' | sort)"
+  mine="$(grep -oE '^[0-9a-f.:]+/[0-9]+' "$IPS_FILE" | sort)"
+  if [ -z "$live" ]; then
+    printf 'SKIP Arvan edge list unreachable\n'
+  elif [ "$live" = "$mine" ]; then
+    ok "Arvan edge list matches deploy/arvan-ips.conf"
+  else
+    bad "Arvan edge list changed: update deploy/arvan-ips.conf and run deploy/nginx-apply.sh"
+  fi
+fi
+
 if [ "$MODE" = "local" ]; then
   check_code "unknown shop host" nosuchshop.sozan-core.ir / "404|503"
   fetch app.sozan-core.ir /login >/dev/null

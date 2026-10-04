@@ -918,7 +918,9 @@ class InboxHopTests(unittest.TestCase):
         self.assertEqual(len(chats), 1)
         self.assertIn("ai.example", chats[0]["url"])
         self.assertEqual(chats[0]["model"], "GPT-OSS-120B")
-        self.assertEqual(chats[0]["timeout"], 15)
+        # the route has a proxy: 15 s overall, and only a few of them to connect through it (proxy_health)
+        self.assertEqual(chats[0]["timeout"].read, 15)
+        self.assertEqual(chats[0]["timeout"].connect, 4.0)
         self.assertNotIn("9292", chats[0]["url"])
 
     def test_inbox_uses_the_local_model_only_after_the_cloud_fails(self) -> None:

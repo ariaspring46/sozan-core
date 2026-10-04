@@ -103,7 +103,7 @@ class RouterEmbedClientTests(unittest.TestCase):
             "proxy": None,
         }
         with patch("app.services.router_embed.route_for_surface", return_value=route), patch(
-            "app.services.router_embed.httpx.AsyncClient", FakeClient
+            "app.services.proxy_health.httpx.AsyncClient", FakeClient
         ), patch("app.services.router_embed._emit_usage", return_value={}):
             rows = asyncio.run(router_embed.embed_texts(["اول", "دوم"]))
         self.assertFalse(seen["trust_env"])

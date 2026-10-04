@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import httpx
 from PIL import Image, ImageDraw, ImageFilter
 
+from app.services import proxy_health
 from app.services.observe_client import emit_later, observe_base
 
 log = logging.getLogger("sozan.image")
@@ -809,14 +810,15 @@ def _body(model: str, prompt: str, size: tuple[int, int], source: bytes) -> dict
 
 
 def _post(url: str, token: str, body: dict, timeout: float = 120.0) -> dict:
-    proxy = _proxy_for(url)
     try:
-        with httpx.Client(timeout=httpx.Timeout(timeout, connect=8.0), trust_env=False, proxy=proxy) as client:
-            res = client.post(
-                f"{url.rstrip('/')}/chat/completions",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json=body,
-            )
+        res = proxy_health.post_sync(
+            f"{url.rstrip('/')}/chat/completions",
+            proxy=_proxy_for(url),
+            total=timeout,
+            connect=8.0,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json=body,
+        )
     except httpx.TimeoutException as exc:
         raise ImageHttpError(0) from exc
     if res.status_code >= 400:

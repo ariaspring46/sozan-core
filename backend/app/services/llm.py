@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx
 
 from app.config import settings
-from app.services import ai_budget_service
+from app.services import ai_budget_service, proxy_health
 from app.services.observe_client import emit_later, llm_headers, safe_text
 
 log = logging.getLogger("sozan.llm")
@@ -718,18 +718,19 @@ async def _complete_with_route(
     started = time.perf_counter()
     for attempt in range(1, max(1, attempts) + 1):
         try:
-            async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route["proxy"]) as client:
-                res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
-                res.raise_for_status()
-                data = res.json()
-                latency_ms = (time.perf_counter() - started) * 1000
-                _emit_usage(
-                    surface=surface,
-                    model=str(route.get("model") or ""),
-                    payload=data if isinstance(data, dict) else {},
-                    latency_ms=latency_ms,
-                )
-                return _choice_text(data)
+            res = await proxy_health.post(
+                f"{route['url']}/chat/completions", proxy=route["proxy"], total=timeout, json=body, headers=headers
+            )
+            res.raise_for_status()
+            data = res.json()
+            latency_ms = (time.perf_counter() - started) * 1000
+            _emit_usage(
+                surface=surface,
+                model=str(route.get("model") or ""),
+                payload=data if isinstance(data, dict) else {},
+                latency_ms=latency_ms,
+            )
+            return _choice_text(data)
         except Exception as exc:
             last_exc = exc
             klass = _classify_llm_error(exc)
@@ -977,10 +978,11 @@ async def _tools_once(
         headers["Authorization"] = f"{scheme} {route['token']}"
         headers["User-Agent"] = CLOUD_UA
     started = time.perf_counter()
-    async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route.get("proxy")) as client:
-        res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
-        res.raise_for_status()
-        payload = res.json()
+    res = await proxy_health.post(
+        f"{route['url']}/chat/completions", proxy=route.get("proxy"), total=timeout, json=body, headers=headers
+    )
+    res.raise_for_status()
+    payload = res.json()
     counts = _emit_usage(
         surface=surface,
         model=str(body.get("model") or route.get("model") or ""),
