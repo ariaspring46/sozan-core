@@ -200,7 +200,7 @@ export default function ShopPage() {
               ? `چیزی تازه خوانده نشد؛ ${scan.kept} کالای قبلی سر جایش است.`
               : "چیزی از این صفحه خوانده نشد."
           : "";
-  const priceBlocked = Boolean(shop?.priceBlocked && !shop?.hidePrices);
+  const unpriced = shop?.hidePrices ? 0 : Number(shop?.unpriced || 0);
   const shopPublic = shopPublicUrl(shop, build?.url);
   const live = Boolean(
     shop && (shop.status === "ready" || (shop.slug && (shop.url || shop.publicHost || shop.port))),
@@ -407,9 +407,9 @@ export default function ShopPage() {
               {error}
             </p>
           ) : null}
-          {priceBlocked ? (
-            <p className="relative px-3 pt-2 text-sm text-danger">
-              بدون قیمت تومان ویترین فروش نمی‌شود.{" "}
+          {unpriced > 0 ? (
+            <p className="relative px-3 pt-2 text-sm text-muted">
+              {unpriced.toLocaleString("fa-IR")} کالا بی‌قیمت است و در ویترین «استعلام قیمت» نشان می‌دهد.{" "}
               <Link href="/more/inventory?focus=price" className="inline-flex min-h-11 items-center text-warm underline">
                 ثبت قیمت
               </Link>
