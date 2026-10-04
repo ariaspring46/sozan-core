@@ -315,10 +315,11 @@
  "STATE channel-scan.json": {
   "owner": "X3",
   "shape": "top-level keys per role: C: {categories}",
-  "signature": "state channel-scan.json  writers: X3; readers: C",
-  "since": "2026-10-02",
+  "signature": "state channel-scan.json  writers: X3; readers: C, X5",
+  "since": "2026-10-04",
   "users": [
-   "C"
+   "C",
+   "X5"
   ]
  },
  "STATE channels.json": {
@@ -342,6 +343,15 @@
   "owner": "C",
   "signature": "state pay-orders.json  writers: C; readers: X5",
   "since": "2026-10-02",
+  "users": [
+   "X5"
+  ]
+ },
+ "STATE scan-status.json": {
+  "owner": "X3",
+  "shape": "top-level keys per role: X3: {error, errorClass, handles, imported, kept, needsReview, noImage, noPrice, productCount, rejected, startedAt, status}",
+  "signature": "state scan-status.json  writers: X3; readers: X5",
+  "since": "2026-10-04",
   "users": [
    "X5"
   ]
