@@ -43,14 +43,14 @@
    "tests": 46530
   },
   {
-   "active": 80816,
-   "core": 21795,
-   "core_pct": 48,
+   "active": 81228,
+   "core": 22207,
+   "core_pct": 49,
    "id": "X5",
    "loose_contracts": 29,
    "manifest": 12191,
    "rare": 20369,
-   "tests": 52450
+   "tests": 53209
   },
   {
    "active": 65794,
