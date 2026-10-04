@@ -21,6 +21,9 @@ rollback() {
   sudo nginx -t && sudo systemctl reload nginx
 }
 
+# the Arvan edge list the config includes travels with it (the old config does not read it, so a rollback leaves it be)
+sudo mkdir -p /etc/nginx/snippets
+sudo cp "$ROOT/deploy/arvan-ips.conf" /etc/nginx/snippets/sozan-arvan-ips.conf
 sudo cp "$SRC" "$LIVE"
 if ! sudo nginx -t; then
   rollback

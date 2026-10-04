@@ -2145,6 +2145,22 @@
    "X3"
   ]
  },
+ "backend/app/services/proxy_health.py::post": {
+  "owner": "X5",
+  "signature": "async def post(url: str, *, proxy: str | None, total: float, connect: float | None=None, **kwargs) -> httpx.Response",
+  "since": "2026-10-04",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/proxy_health.py::post_sync": {
+  "owner": "X5",
+  "signature": "def post_sync(url: str, *, proxy: str | None, total: float, connect: float | None=None, **kwargs) -> httpx.Response",
+  "since": "2026-10-04",
+  "users": [
+   "X2"
+  ]
+ },
  "backend/app/services/public_media_service.py::public_url": {
   "owner": "X3",
   "signature": "def public_url(*, name: str, ttl: int=3600) -> str",

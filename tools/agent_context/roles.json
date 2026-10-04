@@ -360,6 +360,7 @@
         "backend/app/services/__init__.py",
         "backend/app/services/llm.py",
         "backend/app/services/llm_routing_service.py",
+        "backend/app/services/proxy_health.py",
         "backend/app/services/ai_budget_service.py",
         "backend/app/services/observe_client.py",
         "backend/app/services/pipeline_release.py",
