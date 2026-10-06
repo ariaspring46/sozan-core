@@ -28,6 +28,8 @@ _HUB_FILES = tuple(
         "number_span.py",
         "turn_clock.py",
         "channel_tool.py",
+        "decider_service.py",
+        "router_context.py",
         "llm.py",
         "inbox_agent_service.py",
         "studio_chat_service.py",

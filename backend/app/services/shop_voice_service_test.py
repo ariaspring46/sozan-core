@@ -163,6 +163,27 @@ class SayTests(unittest.TestCase):
         with patch.object(voice, "complete_json", new=AsyncMock(return_value=lie)):
             self.assertEqual(_run(voice.say("edit_not_done", ["رنگ پیدا نشد."], fallback="F", patched=False)), "F")
 
+    def test_a_slow_model_returns_the_plain_sentence_for_budget(self) -> None:
+        from app.services import turn_clock
+
+        seen: list[dict] = []
+
+        async def slow(*_args, **_kwargs):
+            await asyncio.sleep(1)
+            return {"reply": "این دیر است و نباید دیده شود همین‌جا."}
+
+        def emit_later(**kwargs):
+            seen.append(kwargs)
+
+        clock = turn_clock.arm("budget-turn", 0.05)
+        try:
+            with patch.object(voice, "complete_json", new=slow), patch("app.services.observe_client.emit_later", emit_later):
+                out = _run(voice.say("tool_result", ["کالا اضافه شد."], fallback="کالا اضافه شد."))
+        finally:
+            turn_clock.disarm(clock)
+        self.assertEqual(out, "کالا اضافه شد.")
+        self.assertEqual(seen[-1]["payload"]["reason"], "budget")
+
 
 if __name__ == "__main__":
     unittest.main()

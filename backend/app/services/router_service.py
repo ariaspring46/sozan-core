@@ -1127,6 +1127,21 @@ def _build_busy() -> bool:
     return str((shop or {}).get("status") or "") in BUILD_BUSY
 
 
+def _busy_build_sentence(spoken: str) -> bool:
+    """A shop-build sentence while a build is already running. Checked on the merged utterance, before the model.
+
+    `_force_shop_build` is false once the shop has a slug, so a live shop never reached this. A post request
+    («یه پست بساز») is studio, and «نساز» / «نکن» are already outside explicit_build.
+    """
+    if not _build_busy():
+        return False
+    if router_text.is_content_request(spoken):
+        return False
+    from app.services.shop_service import explicit_build
+
+    return explicit_build(spoken)
+
+
 def _live_root():
     from app.services.shop_edit_service import build_dir_for
     from app.services.shop_service import current_shop as _shop
@@ -2108,6 +2123,17 @@ def _shadow_after(out: dict, media: dict | None, *, decider) -> None:
     decider_service.schedule_shadow(state)
 
 
+_TURN_ID = re.compile(r"^[A-Za-z0-9-]{1,64}$")
+
+
+def _turn_id_for(key: str) -> str:
+    """The observe id is the idempotency key only when it is a short token. Anything else becomes a random id."""
+    token = (key or "").strip()
+    if _TURN_ID.fullmatch(token):
+        return token
+    return uuid4().hex
+
+
 async def turn(
     text: str,
     *,
@@ -2133,7 +2159,7 @@ async def turn(
     beater = asyncio.create_task(_heartbeat(token))
     clock = None
     try:
-        clock = turn_clock.arm((idempotency_key or "").strip() or uuid4().hex, SELLER_TURN_BUDGET)
+        clock = turn_clock.arm(_turn_id_for(idempotency_key), SELLER_TURN_BUDGET)
         out = await _execute(
             text,
             confirm_id=confirm_id,
@@ -2236,6 +2262,12 @@ async def _execute(
         return snapshot()
     _append_user(original, media if isinstance(media, dict) else None)
     spoken = _merge_followup(spoken)
+    if _busy_build_sentence(spoken):
+        # before decide: a color thread otherwise makes the decider ask which job, and «بساز» never hits the busy line
+        _trace(path="gate", tool="shop_chat")
+        _append("assistant", "ساخت در جریان است.")
+        _emit("router-build-busy", {"tool": "shop_chat"})
+        return snapshot()
     from app.services import decider_service
     from app.state_store import current_tenant
 
@@ -2250,8 +2282,9 @@ async def _execute(
         return snapshot()
     if card_ask or (pending_open and router_text.is_confirmish(spoken)):
         # the card itself comes back under the answer, buttons and all («the card above» sent a seller hunting for hours)
+        # the button guide stays verbatim: voicing it turned «تأیید را بزن» into a promise that the edit was done
         _trace(path="gate")
-        await _say(spoken, HOLD_PENDING, "card_waiting")
+        _append("assistant", HOLD_PENDING)
         _append(
             "assistant",
             str(pending.get("summary") or "این کار منتظر تأیید توست."),

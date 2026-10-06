@@ -55,16 +55,16 @@ class ChannelHttpTests(unittest.TestCase):
             patch.object(settings, "channel_proxy_fallback", "socks5h://127.0.0.1:10890"),
         ):
             client = channel_http.async_client()
-        try:
-            foreign = client._transport_for_url(httpx.URL("https://www.instagram.com/sozan_core/"))
-            direct = client._transport_for_url(httpx.URL("https://api.sendbox.chat/api/v1/service/info"))
-            self.assertIsInstance(foreign, channel_http.FailoverProxyTransport)
-            self.assertNotIsInstance(direct, channel_http.FailoverProxyTransport)
             self.assertEqual(channel_http.proxies_for("https://t.me/s/telegram"), [
                 "socks5h://127.0.0.1:10891",
                 "socks5h://127.0.0.1:10890",
             ])
             self.assertEqual(channel_http.proxies_for("https://boxapi.ir/api"), [])
+        try:
+            foreign = client._transport_for_url(httpx.URL("https://www.instagram.com/sozan_core/"))
+            direct = client._transport_for_url(httpx.URL("https://api.sendbox.chat/api/v1/service/info"))
+            self.assertIsInstance(foreign, channel_http.FailoverProxyTransport)
+            self.assertNotIsInstance(direct, channel_http.FailoverProxyTransport)
         finally:
             asyncio.run(client.aclose())
 

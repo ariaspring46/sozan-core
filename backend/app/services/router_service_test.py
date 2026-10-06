@@ -457,10 +457,14 @@ class RouterServiceTests(unittest.TestCase):
 
         first = self._turn("پیش‌نویس کن", opening)
         cid = first["pendingConfirm"]["id"]
-        out = self._turn("بله", complete)
+        with patch("app.services.shop_voice_service.say", new=AsyncMock(side_effect=AssertionError("voice"))):
+            out = self._turn("بله", complete)
+            asked = self._turn("دکمهٔ تأیید کجاست", complete)
         self.assertEqual(out["pendingConfirm"]["id"], cid)
-        self.assertIn("تأیید", out["messages"][-2]["text"])
+        self.assertEqual(out["messages"][-2]["text"], router_service.HOLD_PENDING)
         self.assertEqual(out["messages"][-1].get("confirmId"), cid)
+        self.assertEqual(asked["pendingConfirm"]["id"], cid)
+        self.assertEqual(asked["messages"][-2]["text"], router_service.HOLD_PENDING)
 
     def test_read_passes_while_card_is_open(self) -> None:
         async def opening(_messages, _tools):
@@ -1557,6 +1561,12 @@ class HarnessSliceTests(unittest.TestCase):
         with tenant_scope("09129900001"):
             return asyncio.run(router_service.turn(text, complete=complete or unused, **kwargs))
 
+    def _boom(self):
+        async def complete(_messages, _tools):
+            raise AssertionError("model")
+
+        return complete
+
     def test_a_busy_build_does_not_open_a_card(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {}}]}
@@ -1569,6 +1579,57 @@ class HarnessSliceTests(unittest.TestCase):
         chat.assert_not_called()
         self.assertIsNone(out.get("pendingConfirm"))
         self.assertIn("ساخت در جریان است", out["messages"][-1]["text"])
+
+    def test_busy_build_answers_before_the_model_even_after_a_color(self) -> None:
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "ready"})
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")):
+            opened = self._turn("رنگ دکمه‌ها رو آبی کن", self._boom())
+        card = opened["pendingConfirm"]["id"]
+        router_service._bind_thread(opened["threadId"])
+        with tenant_scope("09129900001"):
+            self.assertEqual(router_service._merge_followup("بساز"), "بساز")
+            shop = json.loads((Path(self.tmp.name) / "tenants" / "09129900001" / "shop.json").read_text(encoding="utf-8"))
+            shop["status"] = "running"
+            write_json("shop.json", shop)
+        with patch("app.services.decider_service.live_for", return_value=True), patch.object(
+            router_service, "_decider_result", new=AsyncMock(side_effect=AssertionError("decider"))
+        ):
+            out = self._turn("بساز", self._boom(), thread_id=opened["threadId"])
+        self.assertEqual(out["messages"][-1]["text"], "ساخت در جریان است.")
+        self.assertEqual(out["pendingConfirm"]["id"], card)
+        self.assertEqual(out["pendingConfirm"]["tool"], "edit_shop")
+
+    def test_a_post_request_during_a_build_still_opens_studio(self) -> None:
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "running"})
+        out = self._turn("یه پست بساز", self._boom())
+        self.assertEqual(out["pendingConfirm"]["tool"], "studio_chat")
+        self.assertNotIn("ساخت در جریان است", out["messages"][-1]["text"])
+
+    def test_a_refusal_to_build_does_not_use_the_busy_gate(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "باشد، نمی‌سازم.", "tool_calls": []}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "running"})
+        for text in ("نساز", "بیلد نکن"):
+            out = self._turn(text, complete)
+            self.assertNotIn("ساخت در جریان است", out["messages"][-1]["text"])
+            self.assertIn("نمی‌سازم", out["messages"][-1]["text"])
+
+    def test_a_bad_idempotency_key_is_not_the_turn_id(self) -> None:
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "ready"})
+        out = self._turn("وضعیت فروشگاه", self._boom(), idempotency_key="not a key")
+        from app.state_store import tenant_dir
+
+        with tenant_scope("09129900001"):
+            trace = (tenant_dir() / "router-turns.jsonl").read_text(encoding="utf-8").strip().splitlines()
+        row = json.loads(trace[-1])
+        self.assertRegex(row["turnId"], r"^[0-9a-f]{32}$")
+        self.assertNotIn("not a key", trace[-1])
+        self.assertIsNotNone(out)
 
     def test_a_failed_shop_with_a_slug_can_still_be_edited(self) -> None:
         async def complete(_messages, _tools):

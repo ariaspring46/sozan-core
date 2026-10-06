@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Awaitable, Callable
 
@@ -68,13 +69,20 @@ async def check(
         return []
     if complete is None:
         from app.services.llm import complete_json as complete
+    from app.services import turn_clock
+
     try:
-        parsed = await complete(
-            PROMPT,
-            f"facts:\n{facts}\n\nمتن:\n{text}",
-            surface="studio",
-            max_tokens=400,
+        parsed = await asyncio.wait_for(
+            complete(
+                PROMPT,
+                f"facts:\n{facts}\n\nمتن:\n{text}",
+                surface="studio",
+                max_tokens=400,
+            ),
+            timeout=turn_clock.remaining(),
         )
+    except TimeoutError:
+        raise
     except Exception:
         return []
     claims = parsed.get("claims") if isinstance(parsed, dict) else None

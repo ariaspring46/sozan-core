@@ -8,6 +8,7 @@ The shop-setup talk itself is in shop_interview_service; this module holds the s
 
 from __future__ import annotations
 
+import asyncio
 import re
 
 from app.services.llm import complete_json, complete_text_chat
@@ -217,9 +218,16 @@ async def say(
     )
     if situation == "about_self":
         user += "\nاین معرفی است: فروشگاه، استودیو، صندوق و پرداخت را در جواب نام ببر."
-    parsed = await complete_json(
-        SAY_SYSTEM, user, surface=surface, max_tokens=420 if situation == "about_self" else 260, temperature=0.7
-    )
+    try:
+        parsed = await asyncio.wait_for(
+            complete_json(
+                SAY_SYSTEM, user, surface=surface, max_tokens=420 if situation == "about_self" else 260, temperature=0.7
+            ),
+            timeout=turn_clock.remaining(),
+        )
+    except TimeoutError:
+        _note_plain("budget")
+        return fallback
     reply = clean_reply(parsed.get("reply")) if not parsed.get("error") else ""
     reason = "error" if parsed.get("error") or not reply else ""
     if reply and not acceptable(reply, must_keep=must_keep, patched=patched, facts=facts_text, seller_text=seller):
@@ -238,7 +246,11 @@ async def say(
         if turn_clock.expired():
             _note_plain("budget")
             return fallback
-        hits = await check(reply, backed_by)
+        try:
+            hits = await asyncio.wait_for(check(reply, backed_by), timeout=turn_clock.remaining())
+        except TimeoutError:
+            _note_plain("budget")
+            return fallback
         if hits:
             _note_plain("claims")
             return fallback
