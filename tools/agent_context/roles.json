@@ -43,19 +43,34 @@
       "owns": [
         "backend/app/services/router_service.py",
         "backend/app/services/router_embed.py",
+        "backend/app/services/router_text.py",
+        "backend/app/services/router_voice.py",
+        "backend/app/services/router_text_test.py",
+        "backend/app/services/router_chat_behavior_test.py",
         "backend/app/services/turn_parse.py",
+        "backend/app/services/turn_subject.py",
         "backend/app/services/fallback_tally.py",
         "backend/app/services/persian_text.py",
         "backend/app/api/router_chat.py",
         "backend/app/api/chat_payload.py",
+        "backend/app/api/chat_payload_test.py",
         "backend/app/data/**",
         "backend/scripts/refresh_router_intents.py",
         "frontend/app/chat/**",
         "frontend/components/chat-thread.tsx",
         "frontend/components/chat-attach.tsx",
-        "frontend/components/typing-hints.tsx",
+        "frontend/components/chat-parts.tsx",
+        "frontend/components/link-text.tsx",
+        "frontend/components/chat-welcome.tsx",
+        "frontend/components/chat-composer.tsx",
+        "frontend/components/chat-header.tsx",
+        "frontend/components/chat-voice.tsx",
+        "frontend/components/sozan-orb.tsx",
         "tools/qa50_battery.json",
         "tools/qa50_battery.py",
+        "tools/chat_scenarios.json",
+        "tools/chat_scenarios.py",
+        "tools/stress_battery.py",
         "tools/qa_battery.py",
         "tools/agentic_probes/p_router.py",
         "tools/agentic_probes/p_router_lock.py",
@@ -263,6 +278,17 @@
         "frontend/app/shop/**",
         "frontend/components/shop-editor.tsx",
         "frontend/components/shop-live-build.tsx",
+        "frontend/components/build-progress.tsx",
+        "frontend/components/shop-edit-sheet.tsx",
+        "frontend/lib/image-shrink.ts",
+        "frontend/lib/use-media.ts",
+        "backend/app/services/shop_undo_service.py",
+        "backend/app/services/shop_undo_service_test.py",
+        "backend/app/services/shop_image_service.py",
+        "backend/app/services/shop_voice_service.py",
+        "backend/app/services/shop_interview_service.py",
+        "backend/app/services/shop_interview_service_test.py",
+        "backend/app/services/shop_voice_service_test.py",
         "tools/agentic_probes/p_shop_edit.py",
         "tools/agentic_probes/p_shop_create_page.py",
         "tools/agentic_probes/p_loop_block.py",
@@ -319,6 +345,7 @@
         "backend/app/schemas.py",
         "backend/app/phone.py",
         "backend/app/client_ip.py",
+        "backend/app/egress.py",
         "backend/app/hub_admin.py",
         "backend/app/lab_account.py",
         "backend/app/models/**",
@@ -326,6 +353,7 @@
         "backend/app/repositories/user_repository.py",
         "backend/app/api/__init__.py",
         "backend/app/api/auth.py",
+        "backend/app/api/auth_refresh_test.py",
         "backend/app/api/billing.py",
         "backend/app/api/wallet.py",
         "backend/app/api/admin.py",
@@ -333,6 +361,8 @@
         "backend/app/services/__init__.py",
         "backend/app/services/llm.py",
         "backend/app/services/llm_routing_service.py",
+        "backend/app/services/proxy_health.py",
+        "backend/app/services/admin_health_service.py",
         "backend/app/services/ai_budget_service.py",
         "backend/app/services/observe_client.py",
         "backend/app/services/pipeline_release.py",
@@ -356,6 +386,7 @@
         "backend/requirements.txt",
         "frontend/app/login/**",
         "frontend/app/admin/**",
+        "frontend/components/admin-health.tsx",
         "frontend/app/manage/**",
         "frontend/app/more/page.tsx",
         "frontend/app/more/settings/**",
@@ -371,6 +402,7 @@
         ".github/workflows/**",
         "scripts/**",
         "tools/lab_session.py",
+        "tools/smoke_prod.sh",
         "tools/remove_test_tenant.py",
         "tools/agentic_probes/run_all.sh",
         "tools/agentic_probes/p_outbox_chain.py",
@@ -623,7 +655,7 @@
       "title": "UI/UX: سیستم طراحی و پلتفرم فرانت",
       "title_en": "UI/UX: design system and frontend platform",
       "summary": "زبان بصری پنل و لندینگ: توکن‌های رنگ و تایپوگرافی، کامپوننت‌های پایه، قاب پنل، تم، راست‌به‌چپ و موبایل، لایهٔ fetch فرانت، پیکربندی Next، و صفحه‌های عمومی.",
-      "mission": "Own how Sozan looks and feels everywhere: design tokens (colours, type, spacing), shared UI components, the panel frame (app-shell, panel home, getting started), light/dark theme, RTL and Persian typography, mobile-first layout (390px) and accessibility, the frontend data layer (lib/api.ts, idempotency), Next/Tailwind/TypeScript config and dependencies, the public landing and legal pages, and the UI audit. Feature roles own their pages; you own the rules and building blocks they use.",
+      "mission": "Own how Sozan looks and feels everywhere: design tokens (colours, type, spacing), shared UI components, the panel frame (app-shell, panel home, getting started), light/dark theme, RTL and Persian typography, mobile-first layout (390px) and accessibility, the frontend data layer (lib/api.ts, idempotency), Next/Tailwind/TypeScript config and dependencies, the public landing and legal pages, and the UI audit: a recurring live mobile audit of app.sozan-core.ir (tools/ui_live_audit.mjs) whose findings you fix in your files or send as exact requests to the page's owner. Feature roles own their pages; you own the rules and building blocks they use.",
       "report": "talk-u.md",
       "branch": "u/<issue>-<slug>",
       "plan": [
@@ -635,10 +667,14 @@
         "frontend/tailwind.config.js",
         "frontend/components/app-shell.tsx",
         "frontend/lib/api.ts",
-        "frontend/components/ui/button.tsx"
+        "frontend/components/ui/button.tsx",
+        "frontend/lib/use-app-viewport.ts"
       ],
       "owns": [
         "frontend/app/layout.tsx",
+        "frontend/app/robots.ts",
+        "frontend/app/sitemap.ts",
+        "frontend/app/manifest.ts",
         "frontend/app/globals.css",
         "frontend/components/app-shell.tsx",
         "frontend/components/panel-home.tsx",
@@ -654,6 +690,7 @@
         "frontend/lib/utils.ts",
         "frontend/lib/digits.ts",
         "frontend/lib/use-app-viewport.ts",
+        "frontend/lib/back-stack.ts",
         "frontend/package.json",
         "frontend/next.config.ts",
         "frontend/next-env.d.ts",
@@ -670,6 +707,7 @@
         "frontend/app/terms/**",
         "frontend/app/refund/**",
         "frontend/components/landing-page.tsx",
+        "frontend/components/landing-phone.tsx",
         "frontend/components/landing-slogan-rotator.tsx",
         "frontend/components/legal-page.tsx",
         "frontend/components/brand-logo.tsx",
@@ -681,7 +719,18 @@
         "docs/ui-ux-audit.md",
         "docs/ui-audit-live.md",
         "tools/ui_check.py",
-        "talk-u.md"
+        "talk-u.md",
+        "tools/ui_live_audit.mjs",
+        "tools/ui_chat_probe.mjs",
+        "tools/ui_back_probe.mjs",
+        "tools/ui_shop_probe.mjs",
+        "tools/ui_shop_mobile_probe.mjs",
+        "tools/ui_menu_probe.mjs",
+        "tools/ui_chat_visual.mjs",
+        "tools/ui_chat_live.mjs",
+        "tools/ui_studio_probe.mjs",
+        "tools/ui_mobile_audit.mjs",
+        "docs/ui-audit-live/**"
       ],
       "rare": [
         "frontend/public/**",
@@ -700,23 +749,44 @@
         "frontend/components/legal-page.tsx",
         "frontend/components/landing-slogan-rotator.tsx",
         "docs/ui-ux-audit.md",
-        "docs/ui-audit-live.md"
+        "docs/ui-audit-live.md",
+        "tools/ui_live_audit.mjs",
+        "tools/ui_mobile_audit.mjs"
       ],
       "gates": [
         "`python3 tools/ui_check.py` prints 0 problems and `npm run build` passes.",
-        "Any visual change: screenshots at 390px and 1440px, light and dark, of every page whose look changed, attached to the PR (built-in Chromium + Playwright). No horizontal scroll at 390px."
+        "Any visual change: `BASE=http://localhost:3000 node tools/ui_live_audit.mjs --desktop` on your branch shows no new P0/P1 on the pages you touched; attach the changed screenshots (360/390/412 and 1440, light and dark) to the PR.",
+        "After any change to next.config.ts, package.json, layout.tsx or app-shell is deployed: `node tools/ui_live_audit.mjs` against production prints P0=0."
       ],
       "rules": [
         "Design tokens live only in app/globals.css (CSS variables) and tailwind.config.js. No hex colours elsewhere (ui_check U5); add a token instead.",
         "Shared components (components/ui/*, app-shell, empty-state, field) stay backward compatible: new props optional, no renamed exports. A breaking change needs an ack from every role listed in 'Your contract'.",
         "Every page is RTL (`<html lang=\"fa\" dir=\"rtl\">`), Persian copy, Persian digits for numbers shown to sellers, and works at 390px wide without horizontal scroll.",
-        "Accessibility floor: every <img> has alt, icon-only buttons have aria-label, focus is visible, text contrast >= 4.5:1, tap targets >= 40px.",
+        "Mobile floor (360, 390 and 412px; light and dark): no horizontal scroll; full-height layouts use dvh (min-h-dvh), never 100vh/h-screen; fixed bottom bars pad with env(safe-area-inset-bottom); inputs, selects and textareas use font-size >= 16px so iOS does not zoom; nothing depends on hover; the on-screen keyboard never covers the focused field or the send/submit button.",
+        "Accessibility floor: every <img> has alt, icon-only buttons have aria-label, focus is visible, text contrast >= 4.5:1, tap targets >= 44x44px (a smaller icon gets padding or a ::before hit area, not a smaller box).",
         "lib/api.ts is the only place that knows the API host and auth header; pages call api()/getApiBase(), never a hard-coded host (ui_check U6).",
         "Dependencies: you alone change frontend/package.json and the lockfile; keep the lockfile's registry as is (the hub builds through it).",
-        "You do not change a feature page's behaviour or data flow; for a visual fix inside another role's page, send the exact class/markup change to that role."
+        "You do not change a feature page's behaviour or data flow; for a visual fix inside another role's page, send the exact class/markup change to that role.",
+        "Severity for UI findings: P0 = page blank/stuck, a /_next chunk fails, horizontal scroll, or a flow cannot finish on a phone; P1 = control off-screen, broken image, input < 16px, unreadable contrast; P2 = tap target < 44px, clipped text, spacing/typography drift. P0 goes to the top of talk-u.md and to X5 (deploy) the same day."
       ],
       "external": [
         "UI rules you publish apply to every frontend role: they appear in each frontend harness under 'UI rules'. Changing them = edit roles.json (owner) and regenerate."
+      ],
+      "playbooks": [
+        {
+          "title": "Live mobile audit of app.sozan-core.ir",
+          "when": "the owner asks for an audit, after every panel deploy (X5 says so in talk-u.md), and at least weekly.",
+          "steps": [
+            "Ask X5 (request in talk-x5.md) for a lab-phone session file made with `tools/lab_session.py`; store it outside the repo (e.g. `~/.sozan-audit-token`, chmod 600). Never print it, never use a real seller's number, never type an OTP yourself. Without it, audit the public pages only and say so.",
+            "Run `SOZAN_AUDIT_TOKEN_FILE=~/.sozan-audit-token node tools/ui_live_audit.mjs 2>&1 | tail -3` (Playwright + the machine's Chromium). It opens every panel route at 360x800, 390x844 and 412x915 in light and dark and writes `docs/ui-audit-live/<date>/report.md`, `report.json` and one screenshot per page/size/theme.",
+            "Read only `report.md` (never the PNGs in bulk). Ignore anything about `10.10.34.35`: that is the Iranian ISP filter injecting a script, not our code.",
+            "Any P0: stop the audit, append `## U → X5: P0 panel <date>` to talk-x5.md with the failing URL and status (for example `502 /_next/static/chunks/...`), and put the same line at the top of your report.",
+            "Open 3-5 screenshots of the worst pages yourself and judge what the script cannot measure: visual hierarchy, spacing rhythm, Persian typography (line height, numerals), dark-mode contrast, empty/loading/error states, and whether the main action is reachable with one thumb.",
+            "For each finding decide the owner from the route: /chat X1; /studio, /brand, /campaigns X2; /onboard, /more/channels X3; /shop X4; /login, /more, /more/settings, /more/wallet, /more/docs, /admin, /manage X5; /inbox, /sales Y; /more/inventory, /more/support, /p/<id> C; landing, about, contact, terms, refund, app-shell, panel home and components/ui are yours. Fix yours on a `u/<issue>-mobile-audit` branch; for others append to their report file `## U → <ROLE>: mobile audit <route>` with the exact class/markup change and the measured evidence.",
+            "Append to talk-u.md: date, P0/P1/P2 counts, top 3 issues, what you fixed, which requests you sent. Commit `docs/ui-audit-live/<date>/report.md` and `report.json` only (screenshots stay local unless the PR needs them)."
+          ],
+          "done": "every P0/P1 is fixed or has an acknowledged request in its owner's report file, and the next audit shows the counts going down."
+        }
       ]
     },
     {
@@ -766,10 +836,12 @@
   "ui_rules": [
     "Use design tokens and components/ui/*; no new hex colours or one-off button styles (tools/ui_check.py).",
     "RTL and Persian: Persian copy, Persian digits for numbers sellers see, no left-aligned layouts.",
-    "Mobile first: the page works at 390px with no horizontal scroll; check 1440px too.",
+    "Mobile first: the page works at 360, 390 and 412px with no horizontal scroll (check 1440px too); use min-h-dvh, never h-screen/100vh; fixed bottom bars pad env(safe-area-inset-bottom); inputs >= 16px font.",
+    "Tap targets >= 44x44px; nothing depends on hover.",
     "Every async view has loading, empty and error states (use components/empty-state.tsx).",
     "Accessibility: <img alt>, aria-label on icon-only buttons, rel=\"noreferrer\" on target=_blank, visible focus.",
-    "Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host."
+    "Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host.",
+    "Before asking for review of a visual change: `BASE=http://localhost:3000 ROUTES=<your routes> node tools/ui_live_audit.mjs` shows no new P0/P1."
   ],
   "shared_files": [
     [
@@ -876,6 +948,9 @@
         "app.services.router_service_test",
         "app.api.router_chat_test",
         "app.services.turn_parse_test",
+        "app.services.router_text_test",
+        "app.services.router_chat_behavior_test",
+        "app.api.chat_payload_test",
         "app.services.router_embed_test"
       ]
     },

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { api, catalogImageUrl } from "@/lib/api";
 import { money, priceText } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
+import { ImageOff } from "lucide-react";
 
 function missingPhoto(product: Product) {
   const thumb = product.images?.[0] || product.image || "";
@@ -35,6 +36,14 @@ function applyCatalog(
   if (sync?.hint) setHint(sync.hint);
   else if (sync?.error) setHint(sync.error);
 }
+
+const SOURCE_FA: Record<string, string> = {
+  instagram: "اینستاگرام",
+  telegram: "تلگرام",
+  whatsapp: "واتساپ",
+  manual: "ثبت دستی",
+  scan: "خواندن صفحه",
+};
 
 export function InventoryCatalog() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -114,12 +123,12 @@ export function InventoryCatalog() {
 
   return (
     <>
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         {shop?.needsBuild ? (
           <p className="rounded-xl border border-line px-3 py-2 text-sm leading-7">
             برای نمایش کالاها روی سایت، تغییرات را منتشر کن{" "}
-            <Link href="/shop" className="text-warm">
+            <Link href="/shop" className="tap text-warm">
               رفتن به فروشگاه
             </Link>
           </p>
@@ -133,7 +142,7 @@ export function InventoryCatalog() {
         {hint ? (
           <p className="rounded-xl border border-line px-3 py-2 text-sm leading-7">
             {hint}{" "}
-            <Link href="/shop" className="text-warm">
+            <Link href="/shop" className="tap text-warm">
               رفتن به فروشگاه
             </Link>
           </p>
@@ -145,7 +154,7 @@ export function InventoryCatalog() {
             </span>
             <button
               type="button"
-              className="min-h-9 shrink-0 rounded-lg px-2 text-warm"
+              className="min-h-11 shrink-0 rounded-lg px-3 text-warm"
               aria-pressed={onlyUnpriced}
               onClick={() => setOnlyUnpriced((value) => !value)}
             >
@@ -168,7 +177,7 @@ export function InventoryCatalog() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className={`rounded-full border px-3 py-1 text-sm ${category ? "border-line" : "border-accentStrong bg-accentStrong text-onAccent"}`}
+              className={`inline-flex min-h-11 items-center rounded-full border px-4 text-sm ${category ? "border-line" : "border-accentStrong bg-accentStrong text-onAccent"}`}
               onClick={() => setCategory("")}
             >
               همه
@@ -228,14 +237,14 @@ export function InventoryCatalog() {
                         className="h-16 w-16 shrink-0 rounded-lg object-cover"
                       />
                     ) : (
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-canvas text-[11px] text-muted">
-                        بدون عکس
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-canvas text-muted">
+                        <ImageOff size={22} aria-hidden />
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium">{product.title}</p>
+                      <p className="wrap-any font-medium">{product.title}</p>
                       {noPhoto || noPrice ? (
-                        <p className="mt-0.5 flex flex-wrap gap-1 text-[11px]">
+                        <p className="mt-0.5 flex flex-wrap gap-1 text-xs">
                           {noPhoto ? (
                             <span className="rounded-full bg-danger/10 px-2 py-0.5 text-danger">بی‌عکس</span>
                           ) : null}
@@ -261,7 +270,7 @@ export function InventoryCatalog() {
                       )}
                       {product.source ? (
                         <p className="text-xs text-warm">
-                          از {product.source === "instagram" ? "اینستاگرام" : product.source} {product.sourceHandle || ""}
+                          از {SOURCE_FA[product.source] || product.source} {product.sourceHandle || ""}
                         </p>
                       ) : null}
                       <div className="mt-2 flex items-center justify-between gap-3" onClick={(event) => event.stopPropagation()}>
@@ -269,6 +278,7 @@ export function InventoryCatalog() {
                         <div className="flex gap-2">
                           <button
                             type="button"
+                            aria-label={`کم کردن موجودی ${product.title}`}
                             className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-paper text-lg"
                             disabled={busy || product.stock < 1}
                             onClick={() => void bump(product.id, -1)}
@@ -277,7 +287,8 @@ export function InventoryCatalog() {
                           </button>
                           <button
                             type="button"
-                            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-accent bg-accent text-lg text-onAccent"
+                            aria-label={`زیاد کردن موجودی ${product.title}`}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-accent bg-accentStrong text-lg text-onAccent"
                             disabled={busy}
                             onClick={() => void bump(product.id, 1)}
                           >

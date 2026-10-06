@@ -4,6 +4,10 @@ module.exports = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      /* گوشی کوتاه (مثلاً ۳۶۰×۶۴۰ یا کیبورد باز): صفحهٔ خوشامد چت جمع‌وجورتر می‌شود. */
+      screens: { short: { raw: "(max-height: 700px)" },
+        // a mouse (not a touchscreen, even at desktop widths like a tablet): small controls are fine only here
+        mouse: { raw: "(pointer: fine)" } },
       colors: {
         ink: "rgb(var(--c-ink) / <alpha-value>)",
         muted: "rgb(var(--c-muted) / <alpha-value>)",
@@ -20,7 +24,7 @@ module.exports = {
         danger: "rgb(var(--c-danger) / <alpha-value>)",
       },
       fontFamily: {
-        vazir: ["Vazirmatn", "sans-serif"],
+        vazir: ["Vazirmatn", "Tahoma", "sans-serif"],
         sozan: ["Estedad", "Tahoma", "sans-serif"],
       },
       boxShadow: {

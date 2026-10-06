@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.5k tokens. Your core files total 32.5k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.7k tokens. Your core files total 31.8k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -66,24 +66,24 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 32.5k | the files most tasks touch; read the relevant one first |
-| active | 64.9k | yours to edit; read only what the task needs |
+| core | 31.8k | the files most tasks touch; read the relevant one first |
+| active | 66.1k | yours to edit; read only what the task needs |
 | rare | 19.8k | yours; read only when the task names it |
-| tests | 35.7k | read only the test of the module you change |
+| tests | 36.7k | read only the test of the module you change |
 
 **Core:**
 
-- `backend/app/services/inbox_agent_service.py` (16.5k)
+- `backend/app/services/inbox_agent_service.py` (15.7k)
 - `backend/app/services/inbox_service.py` (10.5k)
 - `backend/app/services/sales_policy_service.py` (5.5k)
 
 **Active (you may edit):**
 
 - `backend/app/api/`: `inbox.py` (1.6k)
-- `backend/app/services/`: `inbox_agent_service.py` (16.5k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (2.8k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (0.5k), `pii_mask.py` (0.5k)
-- `frontend/app/inbox/`: `page.tsx` (4.3k)
-- `frontend/app/inbox/[id]/`: `page.tsx` (2.1k)
-- `frontend/app/sales/`: `page.tsx` (3.1k)
+- `backend/app/services/`: `inbox_agent_service.py` (15.7k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (3.5k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (1.2k), `pii_mask.py` (0.5k)
+- `frontend/app/inbox/`: `page.tsx` (4.4k)
+- `frontend/app/inbox/[id]/`: `page.tsx` (2.3k)
+- `frontend/app/sales/`: `page.tsx` (3.2k)
 - `frontend/components/`: `sales-policy-form.tsx` (1.3k), `training-choice.tsx` (0.5k)
 - `tools/`: `sales100_battery.py` (7.8k), `train_nightly.py` (3.4k)
 
@@ -117,7 +117,7 @@ def list_products() -> dict  # changed 2026-09-18
 ```
 **`frontend/components/app-shell.tsx`** — owner U
 ```
-export function AppShell(  # changed 2026-09-18
+export function AppShell(  # changed 2026-10-06
 ```
 **`frontend/components/empty-state.tsx`** — owner U
 ```
@@ -173,8 +173,8 @@ def cosine(left: list[float], right: list[float]) -> float  # changed 2026-09-22
 ```
 **`frontend/components/chat-thread.tsx`** — owner X1
 ```
-export type ChatMsg =  # changed 2026-09-29
-export function ChatThread(  # changed 2026-09-28
+export type ChatMsg =  # changed 2026-10-06
+export function ChatThread(  # changed 2026-10-06
 ```
 **`backend/app/services/channel_outbound_service.py`** — owner X3
 ```
@@ -228,7 +228,7 @@ def recall(scope: str, key: str, stamp: str) -> Any | None  # changed 2026-09-24
 ARVAN_HOST_SUFFIX = 'arvancloudai.ir'  # changed 2026-09-21
 INBOX_TURN_BUDGET = 30.0  # changed 2026-09-27
 LLM_BAD_JSON = {'reply': 'مدل پاسخ خوانا نداد. پیام را کوتاه\u200cتر دوباره بفرست.', 'error': 'llm_bad_json'}  # changed 2026-09-18
-async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict  # changed 2026-09-18
+async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700, temperature: float=0.2) -> dict  # changed 2026-10-06
 async def complete_tools(*, messages: list[dict], tools: list[dict], temperature: float=0.2, max_tokens: int=ROUTER_MAX_TOKENS, timeout: float | None=None, surface: str='router') -> dict  # Tool-call round. Router and inbox are cloud-first.  # changed 2026-09-27
 def spoken_model_reply(text: str) -> str  # changed 2026-09-18
 ```
@@ -238,7 +238,7 @@ def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, su
 ```
 **`backend/app/services/pipeline_release.py`** — owner X5
 ```
-BEHAVIOR_VERSION = '2026.09.16-pipeline'  # changed 2026-09-18
+BEHAVIOR_VERSION = '2026.10.06-harness'  # changed 2026-10-06
 def hub_release_id() -> str  # changed 2026-09-18
 ```
 **`backend/app/services/plan_service.py`** — owner X5
@@ -291,7 +291,6 @@ PUT /settings/sales-policy  (body: SalesPolicyIn)  # owner X5, changed 2026-10-0
 **Shared runtime state files** (other roles depend on these keys; changing a key is a contract change):
 
 - `inbox.json`: writers: Y; readers: X5 — top-level keys per role: X5: {threads}; Y: {threads}
-- `voice.json`: writers: Y; readers: X1 — top-level keys per role: X1: {toneId}
 
 ## 8. Contracts outside imports (HTTP, files, services)
 
@@ -306,10 +305,11 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 
 - `HTTP routes`: `GET /inbox/unread` (changed 2026-10-02) ← U; `GET /inbox/{thread_id}` (changed 2026-10-02) ← U; `GET /inbox` (changed 2026-10-02) ← U; `PATCH /inbox/{thread_id}` (changed 2026-10-02) ← U
 - `backend/app/api/inbox.py`: `router` (changed 2026-09-18) ← X5
-- `backend/app/services/claims_guard.py`: `check` (changed 2026-09-27) ← X2
+- `backend/app/services/claims_guard.py`: `check` (changed 2026-09-27) ← X2, X4; `needs_claims_model` (changed 2026-10-06) ← X4
 - `backend/app/services/inbox_service.py`: `expire_stale_sending` (changed 2026-09-18) ← X5; `handle_inbound` (changed 2026-09-18) ← X3; `list_publish_audience` (changed 2026-09-21) ← X1, X2; `list_threads` (changed 2026-09-18) ← X1; `rearm_pending_auto_replies` (changed 2026-09-26) ← X5; `save_auto_reply` (changed 2026-09-18) ← X1; `unread_count` (changed 2026-09-18) ← X1
-- `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X5
+- `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X1, X4, X5
 - `backend/app/services/sales_policy_service.py`: `public_policy` (changed 2026-09-27) ← X5; `save_policy` (changed 2026-09-27) ← X5
+- `backend/app/services/shop_memory_service.py`: `schedule_backfill` (changed 2026-10-06) ← C; `schedule_delete` (changed 2026-10-06) ← C
 - `backend/app/services/training_log.py`: `log_example` (changed 2026-09-28) ← X1, X2, X4; `log_label` (changed 2026-09-28) ← X5
 - `backend/app/services/voice_service.py`: `apply_tone` (changed 2026-09-18) ← X1, X3; `get_voice` (changed 2026-09-18) ← X3, X5; `learn` (changed 2026-09-18) ← X3; `merge_summary` (changed 2026-09-18) ← X3
 - `frontend/components/sales-policy-form.tsx`: `SalesPolicyForm` (changed 2026-09-27) ← X5
@@ -424,7 +424,7 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
 - X4/X2/X5/Y: the tool runs: edit_shop, studio_chat, settings, auto-reply ← **you**
 ```bash
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
-  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_embed_test 2>&1 | tail -3
+  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.api.chat_payload_test app.services.router_embed_test 2>&1 | tail -3
 ```
 
 **F9 — Shared core: tenant state, LLM, budget, events**
@@ -465,15 +465,16 @@ cd frontend && npm run build 2>&1 | tail -15
 | file | writers | readers | your rule |
 |---|---|---|---|
 | `inbox.json` | Y | X5 | you are the only writer; keep the shape stable for the readers |
-| `voice.json` | Y | X1 | you are the only writer; keep the shape stable for the readers |
 
 ## 18. UI rules (owner: U; checked by `tools/ui_check.py`)
 
 1. Use design tokens and components/ui/*; no new hex colours or one-off button styles (tools/ui_check.py).
 2. RTL and Persian: Persian copy, Persian digits for numbers sellers see, no left-aligned layouts.
-3. Mobile first: the page works at 390px with no horizontal scroll; check 1440px too.
-4. Every async view has loading, empty and error states (use components/empty-state.tsx).
-5. Accessibility: <img alt>, aria-label on icon-only buttons, rel="noreferrer" on target=_blank, visible focus.
-6. Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host.
+3. Mobile first: the page works at 360, 390 and 412px with no horizontal scroll (check 1440px too); use min-h-dvh, never h-screen/100vh; fixed bottom bars pad env(safe-area-inset-bottom); inputs >= 16px font.
+4. Tap targets >= 44x44px; nothing depends on hover.
+5. Every async view has loading, empty and error states (use components/empty-state.tsx).
+6. Accessibility: <img alt>, aria-label on icon-only buttons, rel="noreferrer" on target=_blank, visible focus.
+7. Call the backend only through lib/api.ts (api(), getApiBase()); never hard-code the API host.
+8. Before asking for review of a visual change: `BASE=http://localhost:3000 ROUTES=<your routes> node tools/ui_live_audit.mjs` shows no new P0/P1.
 
 Visual change to a shared component, token or the shell: request it from U in `talk-u.md`; do not copy and restyle a component inside your page.

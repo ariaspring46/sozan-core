@@ -5,6 +5,7 @@
   "signature": "GET /auth/me  ()",
   "since": "2026-10-02",
   "users": [
+   "C",
    "U",
    "X2",
    "X3"
@@ -185,6 +186,15 @@
    "X1"
   ]
  },
+ "HTTP POST /auth/refresh": {
+  "owner": "X5",
+  "shape": "backend/app/api/auth.py: returns keys {access_token, token_type}",
+  "signature": "POST /auth/refresh  ()",
+  "since": "2026-10-06",
+  "users": [
+   "U"
+  ]
+ },
  "HTTP POST /billing/coupon-preview": {
   "owner": "X5",
   "shape": "backend/app/api/billing.py: CouponPreviewIn {plan: str = Field(min_length=2, max_length=16); code: str = Field(min_length=1, max_length=40)}; response untyped",
@@ -305,10 +315,11 @@
  "STATE channel-scan.json": {
   "owner": "X3",
   "shape": "top-level keys per role: C: {categories}",
-  "signature": "state channel-scan.json  writers: X3; readers: C",
-  "since": "2026-10-02",
+  "signature": "state channel-scan.json  writers: X3; readers: C, X5",
+  "since": "2026-10-06",
   "users": [
-   "C"
+   "C",
+   "X5"
   ]
  },
  "STATE channels.json": {
@@ -336,13 +347,23 @@
    "X5"
   ]
  },
+ "STATE scan-status.json": {
+  "owner": "X3",
+  "shape": "top-level keys per role: X3: {error, errorClass, handles, imported, kept, needsReview, noImage, noPrice, productCount, rejected, startedAt, status}",
+  "signature": "state scan-status.json  writers: X3; readers: X5",
+  "since": "2026-10-06",
+  "users": [
+   "X5"
+  ]
+ },
  "STATE shop.json": {
   "owner": "C",
-  "shape": "top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, slug, status, url}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}",
-  "signature": "state shop.json  writers: C, X4, X5; readers: X1",
-  "since": "2026-10-02",
+  "shape": "top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, url}; X3: {brand, tagline, vertical}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}",
+  "signature": "state shop.json  writers: C, X4, X5; readers: X1, X3",
+  "since": "2026-10-06",
   "users": [
    "X1",
+   "X3",
    "X4",
    "X5"
   ]
@@ -353,15 +374,6 @@
   "since": "2026-10-02",
   "users": [
    "X5"
-  ]
- },
- "STATE voice.json": {
-  "owner": "Y",
-  "shape": "top-level keys per role: X1: {toneId}",
-  "signature": "state voice.json  writers: Y; readers: X1",
-  "since": "2026-10-02",
-  "users": [
-   "X1"
   ]
  },
  "backend/app/api/brand.py::router": {
@@ -552,8 +564,7 @@
   "since": "2026-09-18",
   "users": [
    "X2",
-   "X3",
-   "X4"
+   "X3"
   ]
  },
  "backend/app/config.py::settings.chat_llm_model": {
@@ -731,6 +742,14 @@
   "since": "2026-09-18",
   "users": [
    "X3"
+  ]
+ },
+ "backend/app/config.py::settings.open_router_api_token": {
+  "owner": "X5",
+  "signature": "Settings.open_router_api_token: str = ''",
+  "since": "2026-10-06",
+  "users": [
+   "X4"
   ]
  },
  "backend/app/config.py::settings.otp_dev": {
@@ -927,6 +946,15 @@
   "since": "2026-09-18",
   "users": [
    "X2"
+  ]
+ },
+ "backend/app/egress.py::client_kwargs": {
+  "owner": "X5",
+  "signature": "def client_kwargs(*, sync: bool=False) -> dict",
+  "since": "2026-10-06",
+  "users": [
+   "C",
+   "X3"
   ]
  },
  "backend/app/models/user.py::Asset": {
@@ -1346,6 +1374,15 @@
    "X4"
   ]
  },
+ "backend/app/services/channel_scan_service.py::handle_in_text": {
+  "owner": "X3",
+  "signature": "def handle_in_text(text: str) -> str",
+  "since": "2026-10-06",
+  "users": [
+   "X1",
+   "X4"
+  ]
+ },
  "backend/app/services/channel_scan_service.py::looks_like_product_title": {
   "owner": "X3",
   "signature": "def looks_like_product_title(title: str) -> bool",
@@ -1381,6 +1418,14 @@
    "X4"
   ]
  },
+ "backend/app/services/channel_scan_service.py::scan_outcome": {
+  "owner": "X3",
+  "signature": "def scan_outcome() -> str",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/channel_scan_service.py::scan_status": {
   "owner": "X3",
   "signature": "def scan_status() -> dict",
@@ -1399,8 +1444,8 @@
  },
  "backend/app/services/channel_scan_service.py::start_scan": {
   "owner": "X3",
-  "signature": "def start_scan(accounts: list[dict]) -> dict",
-  "since": "2026-09-18",
+  "signature": "def start_scan(accounts: list[dict], notify=None) -> dict",
+  "since": "2026-10-06",
   "users": [
    "X4"
   ]
@@ -1533,7 +1578,8 @@
   "signature": "def kind_of(content_type: str, filename: str) -> str | None",
   "since": "2026-09-18",
   "users": [
-   "X2"
+   "X2",
+   "X4"
   ]
  },
  "backend/app/services/chat_media_service.py::resolve": {
@@ -1569,7 +1615,16 @@
   "signature": "async def check(text: str, facts: str, complete: Callable[..., Awaitable[dict]] | None=None) -> list[str]",
   "since": "2026-09-27",
   "users": [
-   "X2"
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/services/claims_guard.py::needs_claims_model": {
+  "owner": "Y",
+  "signature": "def needs_claims_model(text: str, facts: str) -> bool",
+  "since": "2026-10-06",
+  "users": [
+   "X4"
   ]
  },
  "backend/app/services/idempotency_service.py::body_stamp": {
@@ -1719,6 +1774,14 @@
    "Y"
   ]
  },
+ "backend/app/services/llm.py::_budget_capped": {
+  "owner": "X5",
+  "signature": "def _budget_capped(surface: str) -> str | None",
+  "since": "2026-10-06",
+  "users": [
+   "X4"
+  ]
+ },
  "backend/app/services/llm.py::auth_scheme": {
   "owner": "X5",
   "signature": "def auth_scheme(value: object) -> str",
@@ -1745,13 +1808,21 @@
  },
  "backend/app/services/llm.py::complete_json": {
   "owner": "X5",
-  "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict",
-  "since": "2026-09-18",
+  "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700, temperature: float=0.2) -> dict",
+  "since": "2026-10-06",
   "users": [
    "X2",
    "X3",
    "X4",
    "Y"
+  ]
+ },
+ "backend/app/services/llm.py::complete_text_chat": {
+  "owner": "X5",
+  "signature": "async def complete_text_chat(*, system: str, turns: list[dict], surface: str='shop', temperature: float=0.7, max_tokens: int=500) -> str | None",
+  "since": "2026-10-06",
+  "users": [
+   "X4"
   ]
  },
  "backend/app/services/llm.py::complete_tools": {
@@ -1847,6 +1918,7 @@
   "signature": "def brief_ready(brief: dict | None=None) -> bool",
   "since": "2026-09-18",
   "users": [
+   "X1",
    "X4"
   ]
  },
@@ -1855,6 +1927,7 @@
   "signature": "def get_brief() -> dict",
   "since": "2026-09-18",
   "users": [
+   "X1",
    "X4"
   ]
  },
@@ -1978,13 +2051,15 @@
   "signature": "def mask_pii(text: str) -> str",
   "since": "2026-09-27",
   "users": [
+   "X1",
+   "X4",
    "X5"
   ]
  },
  "backend/app/services/pipeline_release.py::BEHAVIOR_VERSION": {
   "owner": "X5",
-  "signature": "BEHAVIOR_VERSION = '2026.09.16-pipeline'",
-  "since": "2026-09-18",
+  "signature": "BEHAVIOR_VERSION = '2026.10.06-harness'",
+  "since": "2026-10-06",
   "users": [
    "X4",
    "Y"
@@ -2061,7 +2136,8 @@
   "signature": "def store(data: bytes, content_type: str, filename: str) -> str",
   "since": "2026-09-18",
   "users": [
-   "C"
+   "C",
+   "X4"
   ]
  },
  "backend/app/services/profile_service.py::TONES": {
@@ -2096,6 +2172,30 @@
   "since": "2026-09-18",
   "users": [
    "X3"
+  ]
+ },
+ "backend/app/services/proxy_health.py::openrouter_fallback": {
+  "owner": "X5",
+  "signature": "def openrouter_fallback() -> str | None",
+  "since": "2026-10-06",
+  "users": [
+   "X2"
+  ]
+ },
+ "backend/app/services/proxy_health.py::post": {
+  "owner": "X5",
+  "signature": "async def post(url: str, *, proxy: str | None, total: float, connect: float | None=None, **kwargs) -> httpx.Response",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/proxy_health.py::post_sync": {
+  "owner": "X5",
+  "signature": "def post_sync(url: str, *, proxy: str | None, total: float, connect: float | None=None, **kwargs) -> httpx.Response",
+  "since": "2026-10-06",
+  "users": [
+   "X2"
   ]
  },
  "backend/app/services/public_media_service.py::public_url": {
@@ -2144,6 +2244,14 @@
   "since": "2026-09-25",
   "users": [
    "X2"
+  ]
+ },
+ "backend/app/services/router_text.py::fix_halfspace": {
+  "owner": "X1",
+  "signature": "def fix_halfspace(text: str) -> str",
+  "since": "2026-10-06",
+  "users": [
+   "X4"
   ]
  },
  "backend/app/services/sales_policy_service.py::public_policy": {
@@ -2196,6 +2304,15 @@
   "since": "2026-09-20",
   "users": [
    "X3"
+  ]
+ },
+ "backend/app/services/shop_edit_service.py::NAMED_COLORS": {
+  "owner": "X4",
+  "shape": "NAMED_COLORS = {'قرمز': 'str', 'سرخ': 'str', 'آبی': 'str', 'سبز': 'str', 'مسی': 'str', 'زرشکی': 'str', 'طلایی': 'str', 'کرم': 'str', 'صورتی': 'str', 'بنفش': 'str', 'زرد': 'str', 'نارنجی': 'str', 'مشکی': 'str', 'سیاه': 'str'}",
+  "signature": "NAMED_COLORS = {'قرمز': '#B42318', 'سرخ': '#B42318', 'آبی': '#1D4ED8', 'سبز': '#15803D', 'مسی': '#C45C26', 'زرشکی': '#7A1F2B', 'طلایی': '#C9A227', 'کرم': '#F...",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
   ]
  },
  "backend/app/services/shop_edit_service.py::apply_live_edit": {
@@ -2263,6 +2380,15 @@
    "X1"
   ]
  },
+ "backend/app/services/shop_intent_service.py::PAGE_LABELS": {
+  "owner": "X4",
+  "shape": "PAGE_LABELS = {'about': 'str', 'contact': 'str', 'story': 'str', 'faq': 'str'}",
+  "signature": "PAGE_LABELS = {'about': 'درباره ما', 'contact': 'تماس', 'story': 'داستان برند', 'faq': 'پرسش\\u200cهای متداول'}",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/shop_intent_service.py::catalog_add": {
   "owner": "X4",
   "signature": "def catalog_add(text: str) -> dict | None",
@@ -2287,12 +2413,60 @@
    "X1"
   ]
  },
+ "backend/app/services/shop_memory_service.py::schedule_backfill": {
+  "owner": "Y",
+  "signature": "def schedule_backfill(products: list[dict], *, phone: str | None=None) -> None",
+  "since": "2026-10-06",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_memory_service.py::schedule_delete": {
+  "owner": "Y",
+  "signature": "def schedule_delete(collection: str, doc_id: str, *, phone: str | None=None) -> None",
+  "since": "2026-10-06",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/shop_route_service.py::shop_state": {
+  "owner": "X4",
+  "signature": "def shop_state(shop: dict, *, brief_ready: bool) -> str",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_route_service.py::storefront_ready": {
+  "owner": "X4",
+  "signature": "def storefront_ready(shop: dict | None, *, brief_ready: bool) -> bool",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_service.py::BUILD_BUSY": {
+  "owner": "X4",
+  "signature": "BUILD_BUSY = frozenset({'running', 'queued'})",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/shop_service.py::PROTECTED_SHOP_SLUGS": {
   "owner": "X4",
   "signature": "PROTECTED_SHOP_SLUGS = frozenset({'joahr-froshi', 'cahrm-srai-pars'})",
   "since": "2026-09-18",
   "users": [
    "C"
+  ]
+ },
+ "backend/app/services/shop_service.py::_wants_full_rebuild": {
+  "owner": "X4",
+  "signature": "def _wants_full_rebuild(text: str) -> bool",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
   ]
  },
  "backend/app/services/shop_service.py::bump_pending": {
@@ -2321,8 +2495,8 @@
  },
  "backend/app/services/shop_service.py::chat": {
   "owner": "X4",
-  "signature": "async def chat(text: str, media: dict | None=None, view_path: str='', view_target: str='') -> dict",
-  "since": "2026-09-18",
+  "signature": "async def chat(text: str, media: dict | None=None, view_path: str='', view_target: str='', confirmed: bool=False) -> dict",
+  "since": "2026-10-06",
   "users": [
    "X1"
   ]
@@ -2410,6 +2584,31 @@
    "X1"
   ]
  },
+ "backend/app/services/shop_service.py::start_build": {
+  "owner": "X4",
+  "signature": "def start_build(*, prompt: str, rebuild: bool, revise_only: bool | None=None) -> dict",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::about_text": {
+  "owner": "X4",
+  "signature": "def about_text() -> str",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::say": {
+  "owner": "X4",
+  "signature": "async def say(situation: str, facts: list[str], *, seller_text: str='', fallback: str, patched: bool | None=None, surface: str='shop', recent: list[dict] | None=None) -> str",
+  "since": "2026-10-06",
+  "users": [
+   "X1",
+   "X2"
+  ]
+ },
  "backend/app/services/sms_service.py::PROVIDERS": {
   "owner": "X3",
   "shape": "PROVIDERS = ({'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'}, {'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'})",
@@ -2467,6 +2666,16 @@
   "since": "2026-09-19",
   "users": [
    "X3"
+  ]
+ },
+ "backend/app/services/storefront_service.py::is_placeholder_catalog": {
+  "owner": "C",
+  "signature": "def is_placeholder_catalog(title: str, description: str='') -> bool",
+  "since": "2026-10-06",
+  "users": [
+   "X2",
+   "X3",
+   "X4"
   ]
  },
  "backend/app/services/storefront_service.py::list_products": {
@@ -2530,6 +2739,14 @@
    "X5"
   ]
  },
+ "backend/app/services/storefront_service.py::update_product": {
+  "owner": "C",
+  "signature": "def update_product(product_id: str, patch: dict) -> dict",
+  "since": "2026-10-06",
+  "users": [
+   "X4"
+  ]
+ },
  "backend/app/services/storefront_service.py::upsert_scanned_product": {
   "owner": "C",
   "signature": "def upsert_scanned_product(*, title: str, price: int, description: str, sku: str, image: str, source: str, sourceHandle: str, category: str='', colors: list | None=None, sizes: str='', priceNote: str='', sourcePostId: str='', sourceCaption: str='', extractor: str='', confidence: float=0.0, priceStatus: str='', priceUnit: str='toman', stableKey: str='', stock: int | None=None) -> dict",
@@ -2576,6 +2793,14 @@
   "since": "2026-09-18",
   "users": [
    "X5"
+  ]
+ },
+ "backend/app/services/studio_publish_service.py::channel_block": {
+  "owner": "X2",
+  "signature": "def channel_block(platform: str) -> str",
+  "since": "2026-10-06",
+  "users": [
+   "X1"
   ]
  },
  "backend/app/services/studio_publish_service.py::publish": {
@@ -2882,9 +3107,9 @@
  },
  "frontend/components/app-shell.tsx::AppShell": {
   "owner": "U",
-  "shape": "export function AppShell({ children, header, }: { children: React.ReactNode; header?: React.ReactNode; })",
+  "shape": "export function AppShell({ children, header, scene = false, }: { children: React.ReactNode; header?: React.ReactNode; /** صحنهٔ چت: زمینهٔ «درخشش مسی» زیر سربرگ شفاف و محتوا ادامه پیدا می‌کند. */ scene?: boolean; })",
   "signature": "export function AppShell(",
-  "since": "2026-09-18",
+  "since": "2026-10-06",
   "users": [
    "C",
    "X1",
@@ -2907,9 +3132,26 @@
  },
  "frontend/components/auth-media.tsx::AuthMedia": {
   "owner": "U",
-  "shape": "export function AuthMedia({ campaignId, relPath, kind, alt, }: { campaignId: string; relPath: string; kind: string; alt: string; })",
+  "shape": "export function AuthMedia({ campaignId, relPath, kind, alt, ratio = \"1 / 1\", eager = false, }: { campaignId: string; relPath: string; kind: string; alt: string; ratio?: string; eager?: boolean; })",
   "signature": "export function AuthMedia(",
-  "since": "2026-09-18",
+  "since": "2026-10-06",
+  "users": [
+   "X2"
+  ]
+ },
+ "frontend/components/auth-media.tsx::MEDIA_RATIO": {
+  "owner": "U",
+  "shape": "export const MEDIA_RATIO: Record<string, string> = { feed: \"1 / 1\", channel_post: \"1 / 1\", still: \"1 / 1\", story: \"9 / 16\", reel: \"9 / 16\", wide: \"16 / 9\", }",
+  "signature": "export const MEDIA_RATIO: Record<string, string> =",
+  "since": "2026-10-06",
+  "users": [
+   "X2"
+  ]
+ },
+ "frontend/components/auth-media.tsx::downloadMedia": {
+  "owner": "U",
+  "signature": "export async function downloadMedia(campaignId: string, relPath: string, filename: string)",
+  "since": "2026-10-06",
   "users": [
    "X2"
   ]
@@ -2923,20 +3165,37 @@
    "Y"
   ]
  },
+ "frontend/components/chat-parts.tsx::ConfirmCard": {
+  "owner": "X1",
+  "shape": "export function ConfirmCard({ tool, text, open, busy, tapped, onConfirm, onCancel, }: { tool?: string; text: string; open: boolean; busy: boolean; /** فروشنده همین حالا یکی از دکمه‌ها را لمس کرده و جواب هنوز نرسیده. */ tapped?: \"confirm\" | \"cancel\"; onConfirm: () => void; onCancel?: () => void; })",
+  "signature": "export function ConfirmCard(",
+  "since": "2026-10-06",
+  "users": [
+   "X4"
+  ]
+ },
+ "frontend/components/chat-parts.tsx::RevealText": {
+  "owner": "X1",
+  "signature": "export function RevealText({ on, className, children }: { on: boolean; className?: string; children: ReactNode })",
+  "since": "2026-10-06",
+  "users": [
+   "U"
+  ]
+ },
  "frontend/components/chat-thread.tsx::ChatMsg": {
   "owner": "X1",
-  "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; confirmId?: string; options?: string[]; campaignId?: string; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
+  "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; /** ابزاری که کارت تأیید برایش آمده (عنوان و نماد کارت از روی آن). */ tool?: string; confirmId?: string; options?: string[]; campaignId?: string; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
   "signature": "export type ChatMsg =",
-  "since": "2026-09-29",
+  "since": "2026-10-06",
   "users": [
    "Y"
   ]
  },
  "frontend/components/chat-thread.tsx::ChatThread": {
   "owner": "X1",
-  "shape": "export function ChatThread({ messages, busy, placeholder, onSend, livePanel, pendingText, tone = \"default\", allowMedia = true, publishTargets, onPublish, onRegenerate, onApproveDraft, onDiscardFailed, onSaveCaptions, onEditDraft, showTime = false, sanitize = false, welcome = false, welcomeLines, hints, confirmId = \"\", onConfirm, onCancel, persona = \"\", aspects, }: { messages: ChatMsg[]; busy: boolean; placeholder: string; onSend: (payload: ChatSend) => Promise<void> | void; livePanel?: ReactNode; pendingText?: string; tone?: \"default\" | \"future\"; allowMedia?: boolean; publishTargets?: PublishTarget[]; onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>; onRegenerate?: (payload: { messageId: string; campaignId?: string; part: \"image\" | \"caption\"; file?: File }) => Promise<void>; onApproveDraft?: (payload: { messageId: string; text: string }) => Promise<void>; onDiscardFailed?: (payload: { messageId: string }) => Promise<void>; onSaveCaptions?: (payload: { messageId: string; captions: StudioCaptions }) => void | Promise<void>; onEditDraft?: (payload: { messageId: string; text: string }) => void; sanitize?: boolean; welcome?: boolean; welcomeLines?: string[]; /** جمله‌های راهنما که در چت خالی تایپ می‌شوند و باد می‌بردشان. */ hints?: string[]; confirmId?: string; onConfirm?: (confirmId: string) => void; onCancel?: (confirmId: string) => void; persona?: string; showTime?: boolean; /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */ aspects?: readonly { id: string; label: string; word: string }[]; })",
+  "shape": "export function ChatThread({ messages, busy, placeholder, onSend, pendingText, allowMedia = true, publishTargets, onPublish, onRegenerate, onApproveDraft, onDiscardFailed, onSaveCaptions, onEditDraft, showTime = false, sanitize = false, welcome = false, welcomeLines, starters, confirmId = \"\", onConfirm, onCancel, persona = \"\", aspects, loading = false, banner, }: { messages: ChatMsg[]; busy: boolean; placeholder: string; onSend: (payload: ChatSend) => Promise<void> | void; pendingText?: string; allowMedia?: boolean; publishTargets?: PublishTarget[]; onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>; onRegenerate?: (payload: { messageId: string; campaignId?: string; part: \"image\" | \"caption\"; file?: File }) => Promise<void>; onApproveDraft?: (payload: { messageId: string; text: string }) => Promise<void>; onDiscardFailed?: (payload: { messageId: string }) => Promise<void>; onSaveCaptions?: (payload: { messageId: string; captions: StudioCaptions }) => void | Promise<void>; onEditDraft?: (payload: { messageId: string; text: string }) => void; sanitize?: boolean; welcome?: boolean; welcomeLines?: string[]; /** کارت‌های شروع در چت خالی؛ لمس، جملهٔ شروع را در کادر می‌گذارد. */ starters?: readonly ChatStarter[]; confirmId?: string; onConfirm?: (confirmId: string) => void; onCancel?: (confirmId: string) => void; persona?: string; showTime?: boolean; /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */ aspects?: readonly Aspect[]; /** تا تاریخچه نرسیده، صفحهٔ خوشامد نشان داده نمی‌شود (سوسوی «سلام، من سوزانم» در بازدید دوباره). */ loading?: boolean; /** خطا یا اعلان؛ بالای کادر نوشتن می‌نشیند تا کنار جایی باشد که کاربر دست دارد. */ banner?: ReactNode; })",
   "signature": "export function ChatThread(",
-  "since": "2026-09-28",
+  "since": "2026-10-06",
   "users": [
    "Y"
   ]
@@ -2952,9 +3211,9 @@
  },
  "frontend/components/domain-menu.tsx::ShopState": {
   "owner": "C",
-  "shape": "export type ShopState = { brand: string; slug: string; port: number; domain: string; jobId: string; status: string; url: string; urlOk?: boolean; error?: string; publicHost?: string; cnameTarget?: string; cnameOk?: boolean; cnameCheck?: { detail?: string; status?: string }; cnameSetup?: { ok?: boolean; error?: string }; pendingBuild?: number; hidePrices?: boolean; priceBlocked?: boolean; }",
+  "shape": "export type ShopState = { brand: string; slug: string; port: number; domain: string; jobId: string; status: string; url: string; urlOk?: boolean; error?: string; publicHost?: string; cnameTarget?: string; cnameOk?: boolean; cnameCheck?: { detail?: string; status?: string }; cnameSetup?: { ok?: boolean; error?: string }; pendingBuild?: number; /** چند تغییر هنوز با «برگشت» پس گرفتنی است؛ بعد از هر بیلد ۰ می‌شود. */ undoDepth?: number; hidePrices?: boolean; priceBlocked?: boolean; }",
   "signature": "export type ShopState =",
-  "since": "2026-09-19",
+  "since": "2026-10-06",
   "users": [
    "X4"
   ]
@@ -3003,10 +3262,18 @@
  },
  "frontend/components/getting-started.tsx::GettingStarted": {
   "owner": "U",
-  "signature": "export function GettingStarted()",
-  "since": "2026-09-27",
+  "signature": "export function GettingStarted({ compact = false }: { compact?: boolean })",
+  "since": "2026-10-06",
   "users": [
    "X1"
+  ]
+ },
+ "frontend/components/link-text.tsx::LinkText": {
+  "owner": "X1",
+  "signature": "export function LinkText({ text }: { text: string })",
+  "since": "2026-10-06",
+  "users": [
+   "X4"
   ]
  },
  "frontend/components/login-coder-scene.tsx::LoginCoderScene": {
@@ -3048,9 +3315,18 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X1",
    "X3",
+   "X4",
    "X5"
+  ]
+ },
+ "frontend/components/sozan-orb.tsx::SozanOrb": {
+  "owner": "X1",
+  "shape": "export function SozanOrb({ size = 120, busy = false, still = false, level, className, }: { size?: number; busy?: boolean; /** فقط یک بار کشیده شود (آواتار کنار پیام‌ها): بی‌حلقهٔ انیمیشن. */ still?: boolean; level?: MutableRefObject<number>; className?: string; })",
+  "signature": "export function SozanOrb(",
+  "since": "2026-10-06",
+  "users": [
+   "U"
   ]
  },
  "frontend/components/studio-publish.tsx::PublishPayload": {
@@ -3261,7 +3537,8 @@
   "signature": "export function getOnboarded(): boolean",
   "since": "2026-09-18",
   "users": [
-   "X3"
+   "X3",
+   "X5"
   ]
  },
  "frontend/lib/api.ts::getToken": {
@@ -3271,6 +3548,15 @@
   "users": [
    "X1",
    "X2",
+   "X3",
+   "X5"
+  ]
+ },
+ "frontend/lib/api.ts::refreshSession": {
+  "owner": "U",
+  "signature": "export function refreshSession(): Promise<void>",
+  "since": "2026-10-06",
+  "users": [
    "X3"
   ]
  },
@@ -3291,12 +3577,31 @@
    "X5"
   ]
  },
+ "frontend/lib/api.ts::timeoutSignal": {
+  "owner": "U",
+  "signature": "export function timeoutSignal(ms: number): AbortSignal",
+  "since": "2026-10-06",
+  "users": [
+   "X1",
+   "X3"
+  ]
+ },
+ "frontend/lib/back-stack.ts::useBackClose": {
+  "owner": "U",
+  "signature": "export function useBackClose(open: boolean, onBack: () => boolean | void)",
+  "since": "2026-10-06",
+  "users": [
+   "C",
+   "X1",
+   "X4"
+  ]
+ },
  "frontend/lib/digits.ts::formatWhen": {
   "owner": "U",
   "signature": "export function formatWhen(at: number): string",
   "since": "2026-09-18",
   "users": [
-   "X1",
+   "X2",
    "X5",
    "Y"
   ]
@@ -3405,6 +3710,7 @@
   "since": "2026-09-18",
   "users": [
    "X1",
+   "X2",
    "X4",
    "Y"
   ]

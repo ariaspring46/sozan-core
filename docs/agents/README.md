@@ -6,15 +6,15 @@ Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Eac
 
 | role | area | harness | core | active | rare | tests | report file |
 |---|---|---|---|---|---|---|---|
-| X1 | Router and panel chat | [X1.md](X1.md) (8.8k) | 39.3k | 52.9k | 8.8k | 26.3k | `talk-x1.md` |
-| X2 | Studio, images and brand content | [X2.md](X2.md) (9.8k) | 39.8k | 76.0k | 45.2k | 30.4k | `talk-x2.md` |
-| X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (10.2k) | 15.5k | 73.5k | 1.2k | 33.8k | `talk-x3.md` |
-| X4 | Shop build and live editing | [X4.md](X4.md) (8.8k) | 29.0k | 73.6k | 2.3k | 26.4k | `talk-x4.md` |
-| X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (11.9k) | 21.2k | 77.3k | 18.6k | 47.9k | `talk-x5.md` |
-| Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (9.5k) | 32.5k | 64.9k | 19.8k | 35.7k | `sales-agent-talk.md` |
+| X1 | Router and panel chat | [X1.md](X1.md) (10.0k) | 47.8k | 121.2k | 9.9k | 45.8k | `talk-x1.md` |
+| X2 | Studio, images and brand content | [X2.md](X2.md) (10.3k) | 41.3k | 82.8k | 53.6k | 32.5k | `talk-x2.md` |
+| X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (10.7k) | 18.0k | 80.0k | 1.2k | 38.8k | `talk-x3.md` |
+| X4 | Shop build and live editing | [X4.md](X4.md) (10.1k) | 31.9k | 108.5k | 2.3k | 48.8k | `talk-x4.md` |
+| X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (12.5k) | 22.6k | 89.7k | 20.4k | 54.8k | `talk-x5.md` |
+| Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (9.7k) | 31.8k | 66.1k | 19.8k | 36.7k | `sales-agent-talk.md` |
 | Z | Phone voice agent | [Z.md](Z.md) (4.9k) | 33.4k | 79.1k | 29.4k | 14.8k | `voice-agent-talk.md` |
-| C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (10.4k) | 19.8k | 56.3k | 0.0k | 16.2k | `storefront-talk.md` |
-| U | UI/UX: design system and frontend platform | [U.md](U.md) (6.9k) | 9.7k | 36.8k | 15.9k | 0.0k | `talk-u.md` |
+| C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (10.9k) | 20.4k | 58.5k | 11.6k | 16.7k | `storefront-talk.md` |
+| U | UI/UX: design system and frontend platform | [U.md](U.md) (9.4k) | 15.6k | 90.3k | 34.5k | 0.0k | `talk-u.md` |
 
 Token counts are conservative estimates. Context 128.0k; 30.0k reserved for the agent's own prompt; core kept under 45.0k, active source under 80.0k.
 
@@ -74,13 +74,13 @@ If your agent tool loads a project instruction file automatically (CLAUDE.md, AG
 | file | writers | readers |
 |---|---|---|
 | `campaign-ids.json` | X2, X5 | - |
-| `channel-scan.json` | X3 | C |
+| `channel-scan.json` | X3 | C, X5 |
 | `channels.json` | X3 | X5 |
 | `inbox.json` | Y | X5 |
 | `pay-orders.json` | C | X5 |
-| `shop.json` | C, X4, X5 | X1 |
+| `scan-status.json` | X3 | X5 |
+| `shop.json` | C, X4, X5 | X1, X3 |
 | `support-tickets.json` | C | X5 |
-| `voice.json` | Y | X1 |
 
 ## Changing boundaries
 

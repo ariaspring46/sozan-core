@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, api, setOnboarded, setToken } from "@/lib/api";
+import { ApiError, api, getOnboarded, getToken, setOnboarded, setToken } from "@/lib/api";
 import { toLatinDigits } from "@/lib/digits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +52,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
+  const [entering, setEntering] = useState(false);
   const [captcha, setCaptcha] = useState<{ token: string; question: string } | null>(null);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const autoTried = useRef("");
@@ -59,6 +60,13 @@ export default function LoginPage() {
   const cleanPhone = normalizePhone(phone);
   const phoneOk = /^09\d{9}$/.test(cleanPhone);
   const cleanCode = normalizeCode(code);
+
+  // قبلاً وارد شده (لینک «ورود» لندینگ، میان‌بر صفحهٔ اصلی گوشی): مستقیم به پنل؛ اگر نشست باطل باشد، پنل خودش برمی‌گرداند.
+  useEffect(() => {
+    if (!getToken()) return;
+    setEntering(true);
+    router.replace(getOnboarded() ? "/chat" : "/onboard");
+  }, [router]);
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -143,7 +151,8 @@ export default function LoginPage() {
       });
       setToken(data.access_token);
       setOnboarded(Boolean(data.onboarded));
-      router.push(data.onboarded ? "/chat" : "/onboard");
+      // replace: «برگشت» از چت به فرم ورود برنگردد.
+      router.replace(data.onboarded ? "/chat" : "/onboard");
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : "کد درست نبود. دوباره بنویس.");
     } finally {
@@ -166,8 +175,16 @@ export default function LoginPage() {
 
   const hintText = phoneHint(phone);
 
+  if (entering) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-canvas px-6">
+        <p className="text-sm text-muted">در حال ورود…</p>
+      </main>
+    );
+  }
+
   return (
-    <main className="sozan-lamp relative flex min-h-screen items-end justify-center overflow-hidden sm:items-center">
+    <main className="sozan-lamp relative flex min-h-dvh items-end justify-center overflow-hidden sm:items-center">
       <LoginCoderScene />
       <div className="pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative z-10 mx-auto w-full max-w-md px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-40 sm:mt-24 sm:px-6 sm:pb-6 sm:pt-8">
@@ -175,8 +192,8 @@ export default function LoginPage() {
           <div className="flex items-center gap-3">
             <SozanMark className="h-20 w-20" />
             <div className="space-y-2">
-              <p className="text-[11px] tracking-[0.28em] text-warm">سوزان</p>
-              <h1 className="text-2xl font-bold tracking-tight">ورود</h1>
+              <p className="text-xs text-warm">سوزان</p>
+              <h1 className="text-2xl font-bold">ورود</h1>
             </div>
           </div>
           <p className="text-sm leading-7 text-muted">فروشگاه را در چت می‌سازی. شماره‌ات را وارد کن تا کد پیامک بیاید.</p>

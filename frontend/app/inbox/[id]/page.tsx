@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
 import { api } from "@/lib/api";
@@ -112,30 +113,46 @@ export default function InboxThreadPage() {
 
   return (
     <AppShell
+      scene
       header={
-        <div>
-          <Link className="text-sm text-warm" href="/inbox">
-            بازگشت
-          </Link>
-          <h1 className="text-lg font-bold">{thread?.sender || "گفتگو"}</h1>
-          <p className="text-sm text-muted">
-            {thread?.platformLabel}
-            {modeLabel ? ` · ${modeLabel}` : ""}
-          </p>
-          <button
-            type="button"
-            className="mt-1 text-xs text-warm disabled:opacity-50"
-            disabled={pausing || !thread}
-            onClick={() => void togglePaused()}
+        <div className="flex min-w-0 items-center gap-1">
+          <Link
+            href="/inbox"
+            aria-label="بازگشت به صندوق"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-warm hover:bg-canvas"
           >
-            {thread?.paused ? "پاسخ خودکار این گفتگو خاموش است · روشن کن" : "پاسخ خودکار این گفتگو را خاموش کن"}
-          </button>
-          {thread?.handoffReason ? (
-            <p className="text-xs text-warm">منتظر شما · {thread.handoffReason}</p>
-          ) : null}
+            <ChevronRight size={22} aria-hidden />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-lg font-bold" dir="auto">
+              {thread?.sender || "گفتگو"}
+            </h1>
+            <p className="truncate text-sm text-muted">
+              {thread?.platformLabel}
+              {modeLabel ? ` · ${modeLabel}` : ""}
+            </p>
+          </div>
         </div>
       }
     >
+      <div className="sozan-glass mx-3 flex shrink-0 items-center justify-between gap-3 rounded-2xl px-4 py-1.5">
+        <p className="min-w-0 text-sm leading-6 text-muted">
+          {thread?.paused ? "پاسخ خودکار این گفتگو خاموش است." : "پاسخ خودکار این گفتگو روشن است."}
+        </p>
+        <button
+          type="button"
+          className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-line px-3 text-sm text-warm disabled:opacity-50"
+          disabled={pausing || !thread}
+          onClick={() => void togglePaused()}
+        >
+          {thread?.paused ? "روشن کن" : "خاموش کن"}
+        </button>
+      </div>
+      {thread?.handoffReason ? (
+        <p className="shrink-0 bg-accent/10 px-4 py-2 text-sm leading-6 text-warm" role="status">
+          منتظر شما · {thread.handoffReason}
+        </p>
+      ) : null}
       {error ? (
         <p className="shrink-0 px-4 pt-3 text-sm text-danger" role="alert">
           {error}

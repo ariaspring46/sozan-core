@@ -12,7 +12,7 @@ export default function MoreSettingsPage() {
       header={
         <div>
           <p className="text-sm text-muted">
-            <Link href="/more" className="text-warm">
+            <Link href="/more" className="tap text-warm">
               بیشتر
             </Link>
           </p>
@@ -20,7 +20,7 @@ export default function MoreSettingsPage() {
         </div>
       }
     >
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         <SalesPolicyForm />
         <TrainingChoice />
         <ShopSettingsForm />

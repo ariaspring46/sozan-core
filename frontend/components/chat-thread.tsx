@@ -1,16 +1,29 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Mic, Paperclip, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ChatAttach } from "@/components/chat-attach";
-import { SozanMark } from "@/components/sozan-mark";
+import { ChatWelcome, type ChatStarter } from "@/components/chat-welcome";
+import { ChatComposer, type Aspect, type ChatSend, type ComposerHandle } from "@/components/chat-composer";
+import {
+  Avatar,
+  AvatarSpacer,
+  BuildNote,
+  ComposeWait,
+  ConfirmCard,
+  PendingDock,
+  QuickReplies,
+  RevealText,
+  shortWhen,
+  TypingBubble,
+  useFreshIds,
+  useWaitLabel,
+  VoteButtons,
+} from "@/components/chat-parts";
 import { StudioPublishCard, type PublishPayload, type PublishTarget, type StudioAttachment, type StudioCaptions } from "@/components/studio-publish";
-import { formatWhen } from "@/lib/digits";
-import { TypingHints } from "@/components/typing-hints";
+import { LinkText } from "@/components/link-text";
 
 export type ChatMsg = {
   id: string;
@@ -19,6 +32,8 @@ export type ChatMsg = {
   at: number;
   trainId?: string;
   kind?: string;
+  /** ابزاری که کارت تأیید برایش آمده (عنوان و نماد کارت از روی آن). */
+  tool?: string;
   confirmId?: string;
   options?: string[];
   campaignId?: string;
@@ -36,7 +51,7 @@ export type ChatMsg = {
   error?: string;
 };
 
-export type ChatSend = { text: string; file?: File };
+export type { ChatSend };
 
 const SHOP_DENY = /seed phrase|bitcoin|private key|mnemonic|Traceback|FAIL:/i;
 const SHOP_WELCOME = [
@@ -51,81 +66,12 @@ export function sanitizeShopText(text: string, enabled?: boolean) {
   return text;
 }
 
-const WAIT_LINES = ["دارم فکر می‌کنم…", "یک لحظه…", "جواب را می‌چینم…"];
-
-function composeWaitLabel(compose: NonNullable<ChatMsg["compose"]>, now: number): string {
-  const started = Number(compose.startedAt || 0);
-  const elapsed = started > 0 ? Math.max(0, Math.round(now / 1000 - started)) : 0;
-  const clock = elapsed ? ` ${elapsed.toLocaleString("fa-IR")} ثانیه گذشته.` : "";
-  if (compose.stage === "layout") return `متن روی عکس چیده می‌شود. چند ثانیه.${clock}`;
-  return `عکس در حال ساخته شدن است. معمولاً حدود یک دقیقه.${clock}`;
-}
-
-function ComposeWait({ compose }: { compose: NonNullable<ChatMsg["compose"]> }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  return <WaitSignal label={composeWaitLabel(compose, now)} />;
-}
-
-function WaitSignal({ label }: { label: string }) {
-  return (
-    <div className="ms-auto flex max-w-[85%] items-center gap-3 rounded-2xl border border-line/70 bg-paper px-4 py-2.5">
-      <span className="flex items-center gap-1">
-        <span className="sozan-dot h-1.5 w-1.5 rounded-full bg-signal" />
-        <span className="sozan-dot h-1.5 w-1.5 rounded-full bg-signal" />
-        <span className="sozan-dot h-1.5 w-1.5 rounded-full bg-signal" />
-      </span>
-      <p className="text-xs text-warm">{label}</p>
-    </div>
-  );
-}
-
-function VoteButtons({ trainId }: { trainId: string }) {
-  const [voted, setVoted] = useState<"" | "up" | "down">("");
-  async function vote(good: boolean) {
-    if (voted) return;
-    setVoted(good ? "up" : "down");
-    try {
-      await api("/settings/feedback", { method: "POST", body: JSON.stringify({ trainId, good }) });
-    } catch {
-      setVoted("");
-    }
-  }
-  return (
-    <span className="flex items-center gap-1">
-      <button
-        type="button"
-        aria-label="پاسخ خوب بود"
-        disabled={voted !== ""}
-        onClick={() => void vote(true)}
-        className={cn("min-h-9 rounded-lg px-2 text-sm", voted === "up" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas")}
-      >
-        👍
-      </button>
-      <button
-        type="button"
-        aria-label="پاسخ خوب نبود"
-        disabled={voted !== ""}
-        onClick={() => void vote(false)}
-        className={cn("min-h-9 rounded-lg px-2 text-sm", voted === "down" ? "bg-accent/15 text-warm" : "text-muted hover:bg-canvas")}
-      >
-        👎
-      </button>
-    </span>
-  );
-}
-
 export function ChatThread({
   messages,
   busy,
   placeholder,
   onSend,
-  livePanel,
   pendingText,
-  tone = "default",
   allowMedia = true,
   publishTargets,
   onPublish,
@@ -138,20 +84,20 @@ export function ChatThread({
   sanitize = false,
   welcome = false,
   welcomeLines,
-  hints,
+  starters,
   confirmId = "",
   onConfirm,
   onCancel,
   persona = "",
   aspects,
+  loading = false,
+  banner,
 }: {
   messages: ChatMsg[];
   busy: boolean;
   placeholder: string;
   onSend: (payload: ChatSend) => Promise<void> | void;
-  livePanel?: ReactNode;
   pendingText?: string;
-  tone?: "default" | "future";
   allowMedia?: boolean;
   publishTargets?: PublishTarget[];
   onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>;
@@ -163,460 +109,359 @@ export function ChatThread({
   sanitize?: boolean;
   welcome?: boolean;
   welcomeLines?: string[];
-  /** جمله‌های راهنما که در چت خالی تایپ می‌شوند و باد می‌بردشان. */
-  hints?: string[];
+  /** کارت‌های شروع در چت خالی؛ لمس، جملهٔ شروع را در کادر می‌گذارد. */
+  starters?: readonly ChatStarter[];
   confirmId?: string;
   onConfirm?: (confirmId: string) => void;
   onCancel?: (confirmId: string) => void;
   persona?: string;
   showTime?: boolean;
   /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */
-  aspects?: readonly { id: string; label: string; word: string }[];
+  aspects?: readonly Aspect[];
+  /** تا تاریخچه نرسیده، صفحهٔ خوشامد نشان داده نمی‌شود (سوسوی «سلام، من سوزانم» در بازدید دوباره). */
+  loading?: boolean;
+  /** خطا یا اعلان؛ بالای کادر نوشتن می‌نشیند تا کنار جایی باشد که کاربر دست دارد. */
+  banner?: ReactNode;
 }) {
-  const [draft, setDraft] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [micError, setMicError] = useState("");
-  const [waitLine, setWaitLine] = useState(WAIT_LINES[0]);
+  const composer = useRef<ComposerHandle>(null);
+  const [typing, setTyping] = useState(false);
+  const [away, setAway] = useState(false);
+  /** کارتی که فروشنده همین حالا لمسش کرد: تا آمدن جواب مدل (چند ثانیه) بسته یا «در حال انجام» می‌ماند؛ اگر درخواست شکست خورد دوباره باز می‌شود. */
+  const [tapped, setTapped] = useState<Record<string, "confirm" | "cancel">>({});
+  useEffect(() => {
+    if (!busy) setTapped({});
+  }, [busy]);
+  const tap = (id: string, how: "confirm" | "cancel") => {
+    setTapped((prev) => ({ ...prev, [id]: how }));
+    (how === "confirm" ? onConfirm : onCancel)?.(id);
+  };
   const scrollerRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const draftRef = useRef<HTMLTextAreaElement>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const future = tone === "future";
-  const canSend = Boolean((draft.trim() || (allowMedia && file)) && !busy);
+  /** آخرین جایی که خود برنامه گفتگو را به آن برد؛ رویداد scroll در همان‌جا کار کاربر نیست. */
+  const autoTop = useRef(-1);
+  const waitLabel = useWaitLabel(busy, "دارم فکر می‌کنم…");
+  const fresh = useFreshIds(
+    messages.map((msg) => msg.id),
+    Boolean(persona) && !loading,
+  );
 
-  const stickToEnd = () => {
-    if (!stickRef.current) return;
+  const stickToEnd = useCallback(() => {
     const el = scrollerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
+    // چت خالی پایین نمی‌رود تا گوی و سلام خوشامد از بالا دیده شوند.
+    if (!el || !stickRef.current || !el.querySelector("article")) return;
+    el.scrollTop = el.scrollHeight;
+    autoTop.current = el.scrollTop;
+  }, []);
 
-  useEffect(() => {
+  // پیش از نقاشی: رویداد scroll مرورگر (جابه‌جایی محتوا) نباید «دنبال کردن گفتگو» را خاموش کند.
+  useLayoutEffect(() => {
     stickToEnd();
-  }, [messages, busy, pendingText, file]);
+  }, [messages, busy, pendingText, stickToEnd]);
 
+  // بزرگ و کوچک شدن محتوا یا قاب (اعلان، پیوست، کیبورد) گفتگو را پایین نگه می‌دارد.
   useEffect(() => {
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", stickToEnd);
-    return () => vv?.removeEventListener("resize", stickToEnd);
-  }, []);
-
-  useEffect(() => {
-    if (!busy || !future) return;
-    let index = 0;
-    const timer = window.setInterval(() => {
-      index = (index + 1) % WAIT_LINES.length;
-      setWaitLine(WAIT_LINES[index]);
-    }, 2200);
-    return () => window.clearInterval(timer);
-  }, [busy, future]);
-
-  useEffect(() => {
-    return () => {
-      recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
-    };
-  }, []);
-
-  async function toggleVoice() {
-    setMicError("");
-    if (recording) {
-      recorderRef.current?.stop();
-      return;
-    }
-    if (typeof MediaRecorder === "undefined") {
-      setMicError("ضبط صدا در این مرورگر نیست.");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      chunksRef.current = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size) chunksRef.current.push(event.data);
-      };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        const ext = blob.type.includes("ogg") ? "ogg" : "webm";
-        setFile(new File([blob], `voice.${ext}`, { type: blob.type || "audio/webm" }));
-        setRecording(false);
-        recorderRef.current = null;
-      };
-      recorderRef.current = recorder;
-      recorder.start();
-      setRecording(true);
-    } catch {
-      setMicError("میکروفون در دسترس نیست.");
-    }
-  }
-
-  const [aspect, setAspect] = useState("");
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!canSend) return;
-    let text = draft.trim();
-    const chosen = (aspects || []).find((row) => row.id === aspect);
-    if (chosen && chosen.word && !text.includes(chosen.word)) text = `${text} (${chosen.word})`.trim();
-    const attached = file || undefined;
-    try {
-      await onSend({ text, file: attached });
-      setDraft("");
-      setFile(null);
-    } catch {
-      setDraft(text);
-      setFile(attached || null);
-    }
-  }
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(stickToEnd);
+    watch.observe(el);
+    if (el.firstElementChild) watch.observe(el.firstElementChild);
+    return () => watch.disconnect();
+  }, [stickToEnd]);
 
   return (
     <div className="flex h-full flex-col bg-transparent">
-      {livePanel}
       <div
         ref={scrollerRef}
-        className="min-h-0 flex-1 overflow-y-auto"
+        className="sozan-fade-top min-h-0 flex-1 overflow-y-auto"
         onScroll={() => {
           const el = scrollerRef.current;
-          if (!el) return;
+          if (!el || Math.abs(el.scrollTop - autoTop.current) < 2) return;
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+          setAway(!stickRef.current);
         }}
       >
-        <div className="space-y-3 px-4 py-5">
-          {messages.length === 0 && !pendingText ? (
+        <div className="sozan-log mx-auto max-w-3xl space-y-3 px-4 pb-8 pt-5" role="log" aria-live="polite" aria-relevant="additions text" aria-label="گفتگو">
+          {loading && messages.length === 0 ? (
+            <div className="space-y-3 pt-4" aria-hidden="true">
+              <div className="h-12 w-3/5 animate-pulse rounded-2xl bg-line/40" />
+              <div className="ms-auto h-16 w-4/5 animate-pulse rounded-2xl bg-line/30" />
+              <div className="h-10 w-2/5 animate-pulse rounded-2xl bg-line/40" />
+            </div>
+          ) : messages.length === 0 && !pendingText ? (
             welcome || welcomeLines ? (
-              <div className="flex min-h-[min(60vh,28rem)] flex-col items-center justify-center gap-6 pt-6">
-                <div className="space-y-1 text-center text-sm leading-7 text-muted">
-                  {(welcomeLines || SHOP_WELCOME).map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
-                {hints?.length && !draft.trim() && !busy ? (
-                  <TypingHints
-                    hints={hints}
-                    onPick={(text) => {
-                      setDraft(text);
-                      window.requestAnimationFrame(() => draftRef.current?.focus());
-                    }}
-                  />
-                ) : null}
-              </div>
+              <ChatWelcome lines={welcomeLines || SHOP_WELCOME} starters={starters} excited={typing} onPick={(text) => composer.current?.fill(text)} />
             ) : (
               <p className="pt-10 text-center text-sm leading-7 text-muted">پیام را پایین بنویس.</p>
             )
           ) : (
-            messages.map((msg) => {
+            messages.map((msg, index) => {
+              const prev = messages[index - 1];
+              const next = messages[index + 1];
               const assistantPersona = Boolean(persona) && msg.role === "assistant";
+              const special = (row?: ChatMsg) => Boolean(row && (row.kind === "confirm" || row.kind === "build"));
+              const together = (a?: ChatMsg, b?: ChatMsg) =>
+                Boolean(a && b && a.role === b.role && !special(a) && !special(b) && Math.abs((b.at || 0) - (a.at || 0)) < 300);
+              const lastInGroup = !together(msg, next);
               const wide = Boolean(
-                msg.kind === "build" ||
-                  msg.campaignId ||
-                  msg.compose ||
-                  msg.captions ||
-                  msg.attachments?.length ||
-                  (msg.mediaKind && msg.mediaName),
+                msg.campaignId || msg.compose || msg.captions || msg.attachments?.length || (msg.mediaKind && msg.mediaName),
               );
-              const tone =
-                msg.kind === "build"
-                  ? "ms-auto rounded-2xl border border-line/70 bg-canvas text-warm"
-                  : msg.role === "user"
-                    ? "ms-0 rounded-2xl bg-accent text-onAccent"
-                    : "ms-auto rounded-2xl border border-line/60 bg-paper text-ink";
-              const width = assistantPersona && wide ? "min-w-0 flex-1" : wide ? "w-full max-w-[85%]" : "w-fit max-w-[85%]";
+              const isLast = index === messages.length - 1;
+              const side = msg.role === "user" ? "items-start" : "items-end";
+
+              if (msg.kind === "confirm") {
+                return (
+                  <div key={msg.id} data-confirm={msg.confirmId} className={cn("flex flex-col", side)}>
+                    <article className="w-full max-w-[92%]">
+                      <ConfirmCard
+                        tool={msg.tool}
+                        text={sanitizeShopText(msg.text, sanitize)}
+                        open={Boolean(msg.confirmId && onConfirm && msg.confirmId === confirmId)}
+                        busy={busy}
+                        tapped={tapped[msg.confirmId || ""]}
+                        onConfirm={() => tap(msg.confirmId || "", "confirm")}
+                        onCancel={onCancel ? () => tap(msg.confirmId || "", "cancel") : undefined}
+                      />
+                      {showTime && msg.at ? <p className="mt-1 px-1 text-[11px] text-muted/80">{shortWhen(msg.at)}</p> : null}
+                    </article>
+                  </div>
+                );
+              }
+              if (msg.kind === "build") {
+                return (
+                  <div key={msg.id} className={cn("flex flex-col", side)}>
+                    <article className="w-full max-w-[92%]">
+                      <BuildNote text={msg.text} />
+                    </article>
+                  </div>
+                );
+              }
+
               const bubble = (
-              <article
-                key={assistantPersona ? undefined : msg.id}
-                className={cn(
-                  "px-3.5 py-2.5 text-sm leading-7",
-                  msg.kind === "confirm"
-                    ? "w-fit max-w-full rounded-2xl border border-warm/60 bg-canvas text-ink"
-                    : cn(width, tone),
-                )}
-              >
-                {assistantPersona ? <p className="mb-1 text-[11px] text-warm">{persona}</p> : null}
-                {msg.platformLabel || msg.platform || msg.sender ? (
-                  <p className="mb-1 text-[11px] text-warm">
-                    {[msg.platformLabel || msg.platform, msg.sender].filter(Boolean).join(" · ")}
-                  </p>
-                ) : null}
-                {msg.text ? <p className="whitespace-pre-wrap">{sanitizeShopText(msg.text, sanitize)}</p> : null}
-                {msg.captions && !onPublish ? (
-                  <div className="mt-2 space-y-1 text-[11px] leading-6 text-muted">
-                    {msg.captions.instagram ? <p className="whitespace-pre-wrap">اینستاگرام: {msg.captions.instagram}</p> : null}
-                    {msg.captions.telegram ? <p className="whitespace-pre-wrap">تلگرام: {msg.captions.telegram}</p> : null}
-                    {msg.captions.whatsapp ? <p className="whitespace-pre-wrap">واتساپ: {msg.captions.whatsapp}</p> : null}
-                  </div>
-                ) : null}
-                {msg.kind === "confirm" && msg.confirmId && onConfirm ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      className="h-auto py-1 text-xs"
-                      disabled={busy || confirmId !== msg.confirmId}
-                      onClick={() => onConfirm(msg.confirmId || "")}
-                    >
-                      تأیید
-                    </Button>
-                    {onCancel ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="h-auto py-1 text-xs"
-                        disabled={busy || confirmId !== msg.confirmId}
-                        onClick={() => onCancel(msg.confirmId || "")}
-                      >
-                        انصراف
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : null}
-                {msg.kind === "ask" && msg.options?.length ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {msg.options.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        className="rounded-full border border-warm/40 bg-paper px-3 py-1 text-xs text-ink disabled:opacity-50"
-                        disabled={busy}
-                        onClick={() => void onSend({ text: option })}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {msg.role === "assistant" && msg.trainId ? <VoteButtons trainId={msg.trainId} /> : null}
-                {showTime && msg.at ? (
-                  <p className="mt-1 text-[11px] opacity-70">
-                    {formatWhen(msg.at)}
+                <article
+                  className={cn(
+                    "px-4 py-2.5 text-[15px] leading-[1.9]",
+                    wide ? "w-full max-w-full" : "w-fit max-w-full",
+                    msg.role === "user"
+                      ? cn("sozan-me rounded-[1.4rem] bg-accentStrong text-onAccent", lastInGroup && "rounded-br-md")
+                      : cn("sozan-ai rounded-[1.4rem] text-ink", lastInGroup && "rounded-bl-md", msg.kind === "ask" && "ring-1 ring-accent/35"),
+                  )}
+                >
+                  {msg.platformLabel || msg.platform || msg.sender ? (
+                    <p className={cn("mb-1 text-xs", msg.role === "user" ? "text-onAccent/90" : "text-warm")}>
+                      {[msg.platformLabel || msg.platform, msg.sender].filter(Boolean).join(" · ")}
+                    </p>
+                  ) : null}
+                  {msg.text ? (
+                    <RevealText className="wrap-any whitespace-pre-wrap" on={msg.role === "assistant" && fresh.has(msg.id)}>
+                      {msg.role === "assistant" ? <LinkText text={sanitizeShopText(msg.text, sanitize)} /> : sanitizeShopText(msg.text, sanitize)}
+                    </RevealText>
+                  ) : null}
+                  {msg.captions && !onPublish ? (
+                    <div className="wrap-any mt-2 space-y-1 text-xs leading-6 text-muted">
+                      {msg.captions.instagram ? <p className="whitespace-pre-wrap">اینستاگرام: {msg.captions.instagram}</p> : null}
+                      {msg.captions.telegram ? <p className="whitespace-pre-wrap">تلگرام: {msg.captions.telegram}</p> : null}
+                      {msg.captions.whatsapp ? <p className="whitespace-pre-wrap">واتساپ: {msg.captions.whatsapp}</p> : null}
+                    </div>
+                  ) : null}
+                  {msg.kind === "ask" && msg.options?.length && isLast && !busy ? (
+                    <QuickReplies options={msg.options} disabled={busy} onPick={(option) => void onSend({ text: option })} />
+                  ) : null}
+                  {msg.role === "assistant" && msg.trainId ? <VoteButtons trainId={msg.trainId} /> : null}
+                  {msg.kind === "draft" ? (
+                    <div className="mt-2">
+                      <p className="text-xs text-warm">پیش‌نویس هوش مصنوعی — هنوز ارسال نشده</p>
+                      {onApproveDraft ? (
+                        <div className="mt-1 flex gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto py-1 text-xs"
+                            disabled={busy}
+                            onClick={() => void onApproveDraft({ messageId: msg.id, text: msg.text })}
+                          >
+                            بفرست
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto py-1 text-xs"
+                            disabled={busy}
+                            onClick={() => {
+                              composer.current?.fill(msg.text);
+                              onEditDraft?.({ messageId: msg.id, text: msg.text });
+                            }}
+                          >
+                            ویرایش
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {msg.kind === "failed" || msg.status === "failed" ? (
+                    <div className="mt-2">
+                      <p className="text-xs text-danger" role="alert">
+                        {msg.error || "ارسال نشد"}
+                      </p>
+                      <div className="mt-1 flex gap-2">
+                        {onApproveDraft ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto py-1 text-xs"
+                            onClick={() => void onApproveDraft({ messageId: msg.id, text: msg.text })}
+                          >
+                            دوباره بفرست
+                          </Button>
+                        ) : null}
+                        {onDiscardFailed ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto py-1 text-xs"
+                            disabled={busy}
+                            onClick={() => void onDiscardFailed({ messageId: msg.id })}
+                          >
+                            حذف
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                  {msg.compose?.status === "running" ? <ComposeWait compose={msg.compose} /> : null}
+                  {msg.compose?.status === "failed" ? (
+                    <div className="mt-2">
+                      <p className="text-xs text-danger" role="alert">{msg.compose.error || "ساخت تصویر نشد"}</p>
+                      {onRegenerate ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="mt-1 h-auto py-1 text-xs"
+                          onClick={() => void onRegenerate({ messageId: msg.id, campaignId: msg.campaignId, part: "image" })}
+                        >
+                          دوباره بساز
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {(msg.attachments?.length
+                    ? msg.attachments
+                    : msg.mediaKind && msg.mediaName
+                      ? [{ kind: msg.mediaKind, name: msg.mediaName }]
+                      : []
+                  ).map((item) => (
+                    <ChatAttach key={item.name} kind={item.kind} name={item.name} />
+                  ))}
+                  {onPublish && msg.role === "assistant" && (msg.attachments?.length || (msg.mediaKind && msg.mediaName)) ? (
+                    <StudioPublishCard
+                      campaignId={msg.campaignId}
+                      messageId={msg.id}
+                      attachments={
+                        msg.attachments?.length
+                          ? msg.attachments
+                          : [{ kind: msg.mediaKind || "image", name: msg.mediaName || "" }]
+                      }
+                      captions={msg.captions}
+                      published={msg.published}
+                      targets={publishTargets || []}
+                      onPublish={onPublish}
+                      onRegenerate={
+                        onRegenerate
+                          ? (part, file) => onRegenerate({ messageId: msg.id, campaignId: msg.campaignId, part, file })
+                          : undefined
+                      }
+                      onSaveCaptions={
+                        onSaveCaptions
+                          ? (next) => onSaveCaptions({ messageId: msg.id, captions: next })
+                          : undefined
+                      }
+                    />
+                  ) : null}
+                  {msg.campaignId ? (
+                    <Link className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warm" href={`/campaigns/${msg.campaignId}`}>
+                      باز کردن کمپین
+                    </Link>
+                  ) : null}
+                </article>
+              );
+              const stamp =
+                showTime && msg.at && lastInGroup ? (
+                  <p className="mt-1 px-2 text-[11px] text-muted/80">
+                    {shortWhen(msg.at)}
                     {msg.status === "sending"
                       ? " · در حال ارسال…"
                       : msg.kind === "outbound" && (msg.status === "sent" || msg.delivered)
                         ? " · ارسال شد"
                         : ""}
                   </p>
-                ) : null}
-                {msg.kind === "draft" ? (
-                  <div className="mt-2">
-                    <p className="text-[11px] text-warm">پیش‌نویس هوش مصنوعی — هنوز ارسال نشده</p>
-                    {onApproveDraft ? (
-                      <div className="mt-1 flex gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-auto py-1 text-xs"
-                          disabled={busy}
-                          onClick={() => void onApproveDraft({ messageId: msg.id, text: msg.text })}
-                        >
-                          بفرست
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-auto py-1 text-xs"
-                          disabled={busy}
-                          onClick={() => {
-                            setDraft(msg.text);
-                            onEditDraft?.({ messageId: msg.id, text: msg.text });
-                          }}
-                        >
-                          ویرایش
-                        </Button>
-                      </div>
-                    ) : null}
+                ) : null;
+              if (!assistantPersona) {
+                return (
+                  <div key={msg.id} className={cn("flex flex-col", side)}>
+                    <div className={cn("flex min-w-0", wide ? "w-full max-w-[92%]" : "max-w-[86%]")}>{bubble}</div>
+                    {stamp}
                   </div>
-                ) : null}
-                {msg.kind === "failed" || msg.status === "failed" ? (
-                  <div className="mt-2">
-                    <p className="text-[11px] text-danger" role="alert">
-                      {msg.error || "ارسال نشد"}
-                    </p>
-                    <div className="mt-1 flex gap-2">
-                      {onApproveDraft ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-auto py-1 text-xs"
-                          onClick={() => void onApproveDraft({ messageId: msg.id, text: msg.text })}
-                        >
-                          دوباره بفرست
-                        </Button>
-                      ) : null}
-                      {onDiscardFailed ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-auto py-1 text-xs"
-                          disabled={busy}
-                          onClick={() => void onDiscardFailed({ messageId: msg.id })}
-                        >
-                          حذف
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : null}
-                {msg.compose?.status === "running" ? <ComposeWait compose={msg.compose} /> : null}
-                {msg.compose?.status === "failed" ? (
-                  <div className="mt-2">
-                    <p className="text-[11px] text-danger" role="alert">{msg.compose.error || "ساخت تصویر نشد"}</p>
-                    {onRegenerate ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="mt-1 h-auto py-1 text-xs"
-                        onClick={() => void onRegenerate({ messageId: msg.id, campaignId: msg.campaignId, part: "image" })}
-                      >
-                        دوباره بساز
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : null}
-                {(msg.attachments?.length
-                  ? msg.attachments
-                  : msg.mediaKind && msg.mediaName
-                    ? [{ kind: msg.mediaKind, name: msg.mediaName }]
-                    : []
-                ).map((item) => (
-                  <ChatAttach key={item.name} kind={item.kind} name={item.name} />
-                ))}
-                {onPublish && msg.role === "assistant" && (msg.attachments?.length || (msg.mediaKind && msg.mediaName)) ? (
-                  <StudioPublishCard
-                    campaignId={msg.campaignId}
-                    messageId={msg.id}
-                    attachments={
-                      msg.attachments?.length
-                        ? msg.attachments
-                        : [{ kind: msg.mediaKind || "image", name: msg.mediaName || "" }]
-                    }
-                    captions={msg.captions}
-                    published={msg.published}
-                    targets={publishTargets || []}
-                    onPublish={onPublish}
-                    onRegenerate={
-                      onRegenerate
-                        ? (part, file) => onRegenerate({ messageId: msg.id, campaignId: msg.campaignId, part, file })
-                        : undefined
-                    }
-                    onSaveCaptions={
-                      onSaveCaptions
-                        ? (next) => onSaveCaptions({ messageId: msg.id, captions: next })
-                        : undefined
-                    }
-                  />
-                ) : null}
-                {msg.campaignId ? (
-                  <Link className="mt-1 block text-warm" href={`/campaigns/${msg.campaignId}`}>
-                    باز کردن کمپین
-                  </Link>
-                ) : null}
-              </article>
-              );
-              if (!assistantPersona) return bubble;
+                );
+              }
               return (
-                <div key={msg.id} className={cn("ms-auto flex items-end gap-2", wide ? "w-full max-w-[85%]" : "w-fit max-w-[85%]")}>
-                  {bubble}
-                  <SozanMark className="mb-1 h-8 w-8 shrink-0" glow={false} />
+                <div key={msg.id} className={cn("flex flex-col", side)}>
+                  <div className={cn("flex items-end gap-2", wide ? "w-full max-w-[96%]" : "max-w-[92%]")}>
+                    <div className="min-w-0 flex-1">{bubble}</div>
+                    {lastInGroup ? <Avatar /> : <AvatarSpacer />}
+                  </div>
+                  {stamp}
                 </div>
               );
             })
           )}
           {pendingText ? (
-            <article className="ms-0 max-w-[85%] rounded-2xl bg-accent px-3.5 py-2.5 text-sm leading-7 text-onAccent opacity-80">
-              <p className="whitespace-pre-wrap">{pendingText}</p>
-            </article>
+            <div className="flex flex-col items-start">
+              <article className="sozan-me w-fit max-w-[86%] rounded-[1.4rem] rounded-br-md bg-accentStrong px-4 py-2.5 text-[15px] leading-[1.9] text-onAccent opacity-80">
+                <p className="wrap-any whitespace-pre-wrap">{pendingText}</p>
+              </article>
+            </div>
           ) : null}
-          {busy ? future ? <WaitSignal label={waitLine} /> : <p className="text-center text-xs text-muted">در حال نوشتن…</p> : null}
+          {busy ? (
+            <div className="flex flex-col items-end">
+              <TypingBubble label={waitLabel} />
+            </div>
+          ) : null}
         </div>
       </div>
-      <form className="shrink-0 space-y-2 border-t border-line/70 bg-canvas px-3 pb-2 pt-2" onSubmit={(event) => void submit(event)}>
-        {file ? (
-          <div className="flex items-center justify-between gap-2 rounded-2xl border border-line/70 bg-paper px-3 py-2 text-xs text-muted">
-            <span className="truncate">{file.type.startsWith("image/") ? "تصویر" : file.type.startsWith("video/") ? "ویدیو" : "صدا"} · {file.name}</span>
-            <button type="button" className="text-warm" onClick={() => setFile(null)}>
-              حذف
-            </button>
-          </div>
-        ) : null}
-        {recording ? <p className="text-xs text-warm">در حال ضبط صدا…</p> : null}
-        {micError ? <p className="text-xs text-danger">{micError}</p> : null}
-        {aspects?.length ? (
-          <div className="flex items-center gap-2 px-1" role="group" aria-label="نسبت تصویر">
-            {aspects.map((row) => {
-              const on = aspect === row.id || (!aspect && row.id === "post");
-              return (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => setAspect((value) => (value === row.id ? "" : row.id))}
-                  className={cn(
-                    "min-h-9 rounded-xl px-3 text-xs font-medium",
-                    on ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted",
-                  )}
-                >
-                  {row.label}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-        <div className="flex items-end gap-2 rounded-2xl border border-line/80 bg-paper px-2 py-2">
-          {allowMedia ? (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                className="hidden"
-                accept="image/*,video/mp4,video/webm,audio/*"
-                onChange={(event) => {
-                  setFile(event.target.files?.[0] || null);
-                  event.target.value = "";
-                }}
+      <ChatComposer
+        handle={composer}
+        busy={busy}
+        placeholder={placeholder}
+        allowMedia={allowMedia}
+        aspects={aspects}
+        banner={
+          <>
+            {confirmId && onConfirm ? (
+              <PendingDock
+                cardId={confirmId}
+                tool={messages.findLast((row) => row.confirmId === confirmId)?.tool}
+                busy={busy}
+                tapped={tapped[confirmId]}
+                scroller={scrollerRef}
+                version={messages.length}
+                onConfirm={() => tap(confirmId, "confirm")}
+                onCancel={onCancel ? () => tap(confirmId, "cancel") : undefined}
               />
-              <button
-                type="button"
-                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted"
-                aria-label="پیوست تصویر یا ویدیو"
-                disabled={busy}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Paperclip size={18} />
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-                  recording ? "text-danger" : "text-muted",
-                )}
-                aria-label={recording ? "پایان ضبط" : "ضبط صدا"}
-                disabled={busy}
-                onClick={() => void toggleVoice()}
-              >
-                {recording ? <Square size={16} /> : <Mic size={18} />}
-              </button>
-            </>
-          ) : null}
-          <textarea
-            ref={draftRef}
-            className="max-h-28 min-h-11 flex-1 resize-none bg-transparent px-1 py-2 text-[16px] leading-6 outline-none"
-            rows={1}
-            value={draft}
-            disabled={busy}
-            placeholder={placeholder}
-            aria-label={placeholder}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                event.currentTarget.form?.requestSubmit();
-              }
-            }}
-          />
-          <Button type="submit" className="h-auto shrink-0 whitespace-nowrap rounded-xl px-3 py-2" disabled={!canSend}>
-            بفرست
-          </Button>
-        </div>
-      </form>
+            ) : null}
+            {banner}
+          </>
+        }
+        away={away && messages.length > 0}
+        onJump={() => {
+          stickRef.current = true;
+          setAway(false);
+          scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
+        }}
+        onSend={(payload) => {
+          stickRef.current = true;
+          return onSend(payload);
+        }}
+        onTyping={setTyping}
+      />
     </div>
   );
 }

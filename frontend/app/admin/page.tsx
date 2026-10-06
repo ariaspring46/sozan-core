@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/empty-state";
+import { AdminHealth } from "@/components/admin-health";
 import { api } from "@/lib/api";
 
 type UserRow = {
@@ -18,6 +21,10 @@ type UserRow = {
   aiWeek: number;
   lastActivity: number;
   blocked?: boolean;
+  name?: string;
+  brand?: string;
+  pages?: string[];
+  shopHost?: string;
 };
 
 type UserDetail = UserRow & {
@@ -45,7 +52,7 @@ function faDate(ts: number) {
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"users" | "payments" | "audit">("users");
+  const [tab, setTab] = useState<"health" | "users" | "payments" | "audit">("health");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [payments, setPayments] = useState<PaymentsData | null>(null);
   const [audit, setAudit] = useState<{ action: string; target: string; reason: string; at: number }[]>([]);
@@ -124,7 +131,37 @@ export default function AdminPage() {
     }
   }
 
-  const filtered = users.filter((u) => !search || u.phone.includes(search) || u.plan.includes(search));
+  const needle = search.trim().toLowerCase();
+  const filtered = users.filter(
+    (u) =>
+      !needle ||
+      [u.phone, u.plan, u.name, u.brand, u.shopHost, ...(u.pages || [])].some((v) => String(v || "").toLowerCase().includes(needle)),
+  );
+
+  if (/فقط برای مدیر/.test(error)) {
+    return (
+      <AppShell
+        header={
+          <div>
+            <p className="text-sm text-muted">مدیریت سوزان</p>
+            <h1 className="text-lg font-bold">پیشخوان مدیر</h1>
+          </div>
+        }
+      >
+        <div className="h-full overflow-y-auto p-4">
+          <EmptyState
+            title="این بخش فقط برای مدیر سوزان است"
+            detail="با حساب فروشنده به این صفحه دسترسی نداری."
+            action={
+              <Link href="/chat" className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm text-onAccent">
+                رفتن به چت
+              </Link>
+            }
+          />
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell
@@ -138,24 +175,26 @@ export default function AdminPage() {
       <div className="h-full space-y-4 overflow-y-auto p-4">
         {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
 
-        <div className="flex gap-2">
-          {(["users", "payments", "audit"] as const).map((t) => (
+        <div className="flex flex-wrap gap-2">
+          {(["health", "users", "payments", "audit"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`min-h-9 rounded-xl px-3 text-sm ${tab === t ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted"}`}
+              className={`min-h-11 rounded-xl px-4 text-sm ${tab === t ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted"}`}
             >
-              {t === "users" ? "کاربران" : t === "payments" ? "پرداخت‌ها" : "اقدامات"}
+              {t === "health" ? "سلامت" : t === "users" ? "کاربران" : t === "payments" ? "پرداخت‌ها" : "اقدامات"}
             </button>
           ))}
         </div>
 
+        {tab === "health" ? <AdminHealth /> : null}
+
         {tab === "users" ? (
           <>
-            <input
-              className="w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm"
-              placeholder="جستجو: شماره یا پلن"
+            <Input
+              placeholder="جستجو: نام، برند، پیج، شماره یا پلن"
+              aria-label="جستجوی کاربر"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -163,10 +202,11 @@ export default function AdminPage() {
               <ul className="space-y-2">
                 {filtered.map((u) => (
                   <li key={u.phone} className="rounded-xl border border-line bg-canvas p-3">
-                    <button type="button" className="w-full text-right" onClick={() => void openDetail(u.phone)}>
+                    <button type="button" className="min-h-11 w-full text-start" onClick={() => void openDetail(u.phone)}>
                       <p className="text-sm font-bold">
-                        <bdo dir="ltr">{u.phone}</bdo>
-                        <span className={`mr-2 text-xs ${u.status === "active" ? "text-signal" : "text-danger"}`}>
+                        {u.name || u.brand ? <span className="me-2">{u.name || "بی‌نام"}{u.brand ? ` · ${u.brand}` : ""}</span> : null}
+                        <bdo dir="ltr" className="text-muted">{u.phone}</bdo>
+                        <span className={`ms-2 text-xs ${u.status === "active" ? "text-signal" : "text-danger"}`}>
                           · {STATUS_LABEL[u.status] || u.status}
                         </span>
                       </p>
@@ -176,6 +216,14 @@ export default function AdminPage() {
                         {` · ${fa(u.sites)} سایت · ${fa(u.channels)} کانال`}
                         {` · ابر: $${u.aiToday?.toFixed(3) || 0} امروز`}
                       </p>
+                      {u.pages?.length || u.shopHost ? (
+                        <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs" dir="ltr">
+                          {(u.pages || []).map((pg) => (
+                            <span key={pg} className="text-warm">{pg.replace(/^instagram:/, "IG ").replace(/^telegram:/, "TG ")}</span>
+                          ))}
+                          {u.shopHost ? <span className="text-muted">{u.shopHost}</span> : null}
+                        </p>
+                      ) : null}
                     </button>
                     {detail?.phone === u.phone ? (
                       <div className="mt-3 space-y-3 border-t border-line pt-3">

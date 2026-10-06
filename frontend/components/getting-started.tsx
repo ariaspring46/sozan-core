@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { api } from "@/lib/api";
+import { useBackClose } from "@/lib/back-stack";
 
 type Step = { id: string; title: string; hint: string; href: string; done: boolean };
 
@@ -17,11 +18,30 @@ function readHidden(): boolean {
   }
 }
 
-/** فهرست «شروع کار» برای فروشندهٔ تازه؛ وقتی همه انجام شد یا بسته شد، دیده نمی‌شود. */
-export function GettingStarted() {
+/** حلقهٔ پیشرفت راه‌اندازی با شمارهٔ «انجام‌شده/همه» وسطش. */
+function Ring({ done, total }: { done: number; total: number }) {
+  return (
+    <span className="relative grid h-9 w-9 shrink-0 place-items-center" aria-hidden>
+      <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90">
+        <circle cx="18" cy="18" r="15" fill="none" strokeWidth="3" className="stroke-line/60" />
+        <circle cx="18" cy="18" r="15" fill="none" strokeWidth="3" strokeLinecap="round" className="stroke-accent" strokeDasharray={`${Math.max(4, (done / total) * 94.2)} 94.2`} />
+      </svg>
+      <span className="text-[11px] font-bold text-warm">
+        {done.toLocaleString("fa-IR")}/{total.toLocaleString("fa-IR")}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * فهرست «شروع کار» برای فروشندهٔ تازه؛ وقتی همه انجام شد یا بسته شد، دیده نمی‌شود.
+ * `compact`: فقط حلقهٔ پیشرفت گرد (برای سربرگ وسط گفتگو) که با لمس فهرست قدم‌ها را باز می‌کند.
+ */
+export function GettingStarted({ compact = false }: { compact?: boolean }) {
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [hidden, setHidden] = useState(true);
   const [open, setOpen] = useState(false);
+  useBackClose(compact && open && !hidden, () => setOpen(false));
 
   useEffect(() => {
     setHidden(readHidden());
@@ -93,70 +113,92 @@ export function GettingStarted() {
   if (doneCount === steps.length) return null;
   const next = steps.find((step) => !step.done);
 
-  return (
-    <section aria-label="شروع کار" className="mx-3 mt-3 rounded-2xl border border-accent/30 bg-canvas p-4 shadow-card sm:mx-4">
-      <div className="flex items-center justify-between gap-2">
-        <button type="button" className="flex min-h-9 items-center gap-2 font-bold" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-          شروع کار
-          <span className="text-xs font-normal text-warm">{open ? "کمتر" : "همه"}</span>
-        </button>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted">
-            {doneCount.toLocaleString("fa-IR")} از {steps.length.toLocaleString("fa-IR")}
-          </span>
-          <button
-            type="button"
-            className="min-h-9 px-1 text-xs text-muted"
-            onClick={() => {
-              try {
-                localStorage.setItem(HIDE_KEY, "1");
-              } catch {
-                /* ignore */
+  const hide = () => {
+    try {
+      localStorage.setItem(HIDE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setHidden(true);
+  };
+
+  const list = (
+    <ol className="space-y-1 p-2">
+      {steps.map((step) => (
+        <li key={step.id}>
+          <Link href={step.href} className="flex min-h-11 items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-ink/5">
+            <span
+              className={
+                step.done
+                  ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal text-canvas"
+                  : "h-6 w-6 shrink-0 rounded-full border-2 border-field"
               }
-              setHidden(true);
-            }}
-          >
-            بستن
-          </button>
-        </div>
+              aria-hidden
+            >
+              {step.done ? <Check size={14} strokeWidth={3} /> : null}
+            </span>
+            <span className="min-w-0">
+              <span className={step.done ? "block text-sm text-muted line-through" : "block text-sm font-medium text-ink"}>{step.title}</span>
+              {!step.done ? <span className="block text-xs text-muted">{step.hint}</span> : null}
+            </span>
+            <span className="sr-only">{step.done ? "انجام شد" : "انجام نشده"}</span>
+          </Link>
+        </li>
+      ))}
+    </ol>
+  );
+
+  if (compact) {
+    return (
+      <div className="relative shrink-0">
+        <button
+          type="button"
+          className="sozan-glass grid h-11 w-11 place-items-center rounded-full"
+          aria-expanded={open}
+          aria-label={`راه‌اندازی: ${doneCount.toLocaleString("fa-IR")} از ${steps.length.toLocaleString("fa-IR")} قدم`}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <Ring done={doneCount} total={steps.length} />
+        </button>
+        {open ? (
+          <div className="sozan-chat sozan-sheet absolute end-0 top-[3.25rem] z-30 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-[1.4rem] border border-line/50 shadow-card">
+            <p className="px-4 pt-3 font-sozan text-[15px] font-extrabold text-ink">راه‌اندازی سوزان</p>
+            {list}
+            <button type="button" className="min-h-11 w-full border-t border-line/40 text-sm text-muted" onClick={hide}>
+              دیگر نشان نده
+            </button>
+          </div>
+        ) : null}
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden>
-        <div className="h-full rounded-full bg-warm" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+    );
+  }
+
+  return (
+    <section aria-label="شروع کار" className="sozan-glass mx-auto mt-1 w-[calc(100%-1.5rem)] max-w-3xl shrink-0 overflow-hidden rounded-[1.4rem]">
+      <div className="flex items-center gap-0.5 py-0.5 pe-1 ps-1.5">
+        {next ? (
+          <Link href={next.href} className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-2xl px-1.5">
+            <Ring done={doneCount} total={steps.length} />
+            <span className="min-w-0">
+              <span className="block text-[11px] text-muted">قدم بعد برای راه‌اندازی</span>
+              <span className="block truncate text-sm font-bold text-ink">{next.title}</span>
+            </span>
+          </Link>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-ink/5"
+          aria-expanded={open}
+          aria-label={open ? "بستن فهرست قدم‌ها" : "نمایش همهٔ قدم‌ها"}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <ChevronDown size={18} className={open ? "rotate-180" : undefined} aria-hidden />
+        </button>
+        <button type="button" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-ink/5" aria-label="پنهان کردن شروع کار" onClick={hide}>
+          <X size={18} aria-hidden />
+        </button>
       </div>
-      {!open && next ? (
-        <Link href={next.href} className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded-xl bg-paper px-3 py-2 text-sm">
-          <span className="min-w-0">
-            <span className="block text-xs text-muted">قدم بعد</span>
-            <span className="block truncate font-medium text-ink">{next.title}</span>
-          </span>
-          <span className="shrink-0 text-warm">انجام بده</span>
-        </Link>
-      ) : null}
-      {open ? (
-      <ol className="mt-3 space-y-1">
-        {steps.map((step) => (
-          <li key={step.id}>
-            <Link href={step.href} className="flex min-h-11 items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-paper">
-              <span
-                className={
-                  step.done
-                    ? "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-signal text-canvas"
-                    : "h-6 w-6 shrink-0 rounded-full border-2 border-field"
-                }
-                aria-hidden
-              >
-                {step.done ? <Check size={14} strokeWidth={3} /> : null}
-              </span>
-              <span className="min-w-0">
-                <span className={step.done ? "block text-sm text-muted line-through" : "block text-sm font-medium text-ink"}>{step.title}</span>
-                {!step.done ? <span className="block text-xs text-muted">{step.hint}</span> : null}
-              </span>
-              <span className="sr-only">{step.done ? "انجام شد" : "انجام نشده"}</span>
-            </Link>
-          </li>
-        ))}
-      </ol>
-      ) : null}
+      {open ? list : null}
     </section>
   );
 }

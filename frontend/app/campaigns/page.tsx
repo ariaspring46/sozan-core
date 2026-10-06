@@ -56,11 +56,11 @@ export default function CampaignsPage() {
         </div>
       }
     >
-    <main className="h-full space-y-4 overflow-y-auto p-4">
+    <main className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
       <StudioNav current="campaigns" />
       {isAdmin ? (
       <details className="rounded-2xl bg-canvas px-4 py-3 text-sm shadow-card">
-        <summary className="cursor-pointer text-muted">ورود کمپین از پوشهٔ دیسک</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center text-muted">ورود کمپین از پوشهٔ دیسک (فقط مدیر)</summary>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row">
           <Input
             placeholder="شناسه روی دیسک"
@@ -73,7 +73,7 @@ export default function CampaignsPage() {
         </div>
       </details>
       ) : null}
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
       {!ready && !error ? <p className="text-sm text-muted">در حال خواندن…</p> : null}
       {ready && items.length === 0 && !error ? (
         <EmptyState
@@ -82,7 +82,7 @@ export default function CampaignsPage() {
           action={
             <Link
               href="/chat"
-              className="inline-flex min-h-11 items-center rounded-xl bg-accent px-4 text-sm text-onAccent"
+              className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm text-onAccent"
             >
               رفتن به چت
             </Link>
@@ -95,9 +95,11 @@ export default function CampaignsPage() {
           <li key={c.id}>
             <Link href={`/campaigns/${c.id}`}>
               <Card className="hover:border-accent">
-                <p className="text-sm text-muted">{c.slug}</p>
-                <p className="text-lg font-medium">{c.title}</p>
-                <p className="text-sm text-muted">{c.pillar}</p>
+                <p className="wrap-any text-lg font-medium leading-8">{c.title || "کمپین بدون نام"}</p>
+                {c.subtitle ? <p className="wrap-any text-sm leading-6 text-muted">{c.subtitle}</p> : null}
+                <p className="mt-1 text-xs text-muted">
+                  {(c.copies?.length || 0).toLocaleString("fa-IR")} متن · {(c.assets?.length || 0).toLocaleString("fa-IR")} رسانه
+                </p>
               </Card>
             </Link>
           </li>

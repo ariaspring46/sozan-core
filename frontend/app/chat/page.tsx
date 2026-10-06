@@ -5,11 +5,11 @@ import { AppShell } from "@/components/app-shell";
 import { ChannelAlert } from "@/components/channel-alert";
 import { GettingStarted } from "@/components/getting-started";
 import { ChatThread, type ChatMsg } from "@/components/chat-thread";
+import { CHAT_STARTERS, greeting } from "@/components/chat-welcome";
+import { ChatHeader, type ThreadRow } from "@/components/chat-header";
 import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
-import { api } from "@/lib/api";
+import { api, timeoutSignal } from "@/lib/api";
 import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
-
-type ThreadRow = { id: string; title: string; at?: number };
 
 type ChatPayload = {
   messages: ChatMsg[];
@@ -20,34 +20,14 @@ type ChatPayload = {
   threads?: ThreadRow[];
 };
 
-function welcomeLines(brand: string) {
-  const name = brand.trim();
-  return [
-    name ? `سلام، من سوزانم — برای ${name}.` : "سلام، من سوزانم.",
-    "فروشگاه، محتوا یا دایرکت را همین‌جا بگو.",
-    "تغییر تنظیمات همین‌جا با تأیید یا انصراف بسته می‌شود.",
-  ];
-}
-
-/** نمونه‌جمله‌هایی که سوزان واقعاً انجام می‌دهد؛ در چت خالی تایپ می‌شوند. */
-const CHAT_HINTS = [
-  "برای انگشتر نقره یک پست اینستاگرام بساز",
-  "رنگ دکمه‌های فروشگاه را زرشکی کن",
-  "حس فروشگاه را لوکس و خلوت کن",
-  "یک بخش درباره ما به سایت اضافه کن",
-  "برای تخفیف یلدا پست بساز",
-  "دایرکت‌های اینستاگرام را خودکار جواب بده",
-  "دستبند چرم را با قیمت ۴۵۰٬۰۰۰ تومان اضافه کن",
-  "دامنهٔ فروشگاه من چیه؟",
-  "اینستاگرام وصل هست یا نه؟",
-  "تو چه کارهایی می‌توانی بکنی؟",
-];
-
 const STUDIO_ASPECTS = [
   { id: "post", label: "پست ۴:۵", word: "" },
   { id: "square", label: "مربع", word: "مربع" },
   { id: "story", label: "استوری/ریلز", word: "استوری" },
 ] as const;
+
+/** کمی بیشتر از بدترین زمان سرور (دو مدل پشت‌سرهم)؛ بعد از آن پیام خطا می‌آید و متن برمی‌گردد. */
+const CHAT_TIMEOUT_MS = 100_000;
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -55,6 +35,7 @@ export default function ChatPage() {
   const [brand, setBrand] = useState("");
   const [threadId, setThreadId] = useState("");
   const [threads, setThreads] = useState<ThreadRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
@@ -86,7 +67,9 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    void load().catch((err) => setError(err instanceof Error ? err.message : "خطا"));
+    void load()
+      .catch((err) => setError(err instanceof Error ? err.message : "خطا"))
+      .finally(() => setLoaded(true));
     void api<{ targets?: PublishTarget[] }>("/studio")
       .then((data) => setPublishTargets(data.targets || []))
       .catch(() => setPublishTargets([]));
@@ -102,7 +85,8 @@ export default function ChatPage() {
     return () => window.clearInterval(timer);
   }, [messages, load]);
 
-  async function send(text: string, file?: File, confirmId?: string, cancelId?: string) {
+  /** true = جواب رسید (یا گفتگو عوض شد)؛ false = ارسال نشد و متن باید به کادر برگردد. */
+  async function send(text: string, file?: File, confirmId?: string, cancelId?: string): Promise<boolean> {
     const seen = ++epoch.current;
     busyRef.current = true;
     setBusy(true);
@@ -125,6 +109,7 @@ export default function ChatPage() {
           method: "POST",
           headers: { "Idempotency-Key": key },
           body,
+          signal: timeoutSignal(CHAT_TIMEOUT_MS),
         });
       } else {
         data = await api<ChatPayload>("/chat", {
@@ -136,6 +121,7 @@ export default function ChatPage() {
             cancelId: cancelId || "",
             threadId: current,
           }),
+          signal: timeoutSignal(CHAT_TIMEOUT_MS),
         });
       }
       finishIdempotencyKey(chatKey.current);
@@ -143,15 +129,18 @@ export default function ChatPage() {
         apply(data);
         if (data.notice) setNotice(data.notice);
       }
+      return true;
     } catch (err) {
-      if (seen !== epoch.current) return;
+      if (seen !== epoch.current) return true;
       finishIdempotencyKey(chatKey.current, err);
       setError(err instanceof Error ? err.message : "خطا");
+      return false;
     } finally {
-      if (seen !== epoch.current) return;
-      busyRef.current = false;
-      setPending("");
-      setBusy(false);
+      if (seen === epoch.current) {
+        busyRef.current = false;
+        setPending("");
+        setBusy(false);
+      }
     }
   }
 
@@ -215,63 +204,41 @@ export default function ChatPage() {
 
   return (
     <AppShell
+      scene
       header={
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="shrink-0">
-            <p className="text-sm text-muted">گفتگو</p>
-            <h1 className="whitespace-nowrap text-lg font-bold">سوزان</h1>
-          </div>
-          <div className="min-w-0 flex-1" />
-          {threads.length ? (
-            <label className="sr-only" htmlFor="sozan-thread">
-              گفتگوها
-            </label>
-          ) : null}
-          {threads.length ? (
-            <select
-              id="sozan-thread"
-              className="min-w-0 max-w-[8rem] rounded-xl border border-line bg-canvas px-2 py-1 text-xs text-ink sm:max-w-[14rem]"
-              value={threadId}
-              onChange={(event) => void openThread(event.target.value).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
-            >
-              {threads.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.title}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          <button
-            type="button"
-            className="shrink-0 rounded-xl border border-line px-2 py-1 text-xs text-warm"
-            onClick={() => void startThread().catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
-          >
-            گفتگوی تازه
-          </button>
-        </div>
+        <ChatHeader
+          busy={busy}
+          threads={threads}
+          threadId={threadId}
+          onOpen={(id) => void openThread(id).catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
+          onNew={() => void startThread().catch((err) => setError(err instanceof Error ? err.message : "خطا"))}
+          extra={messages.length ? <GettingStarted compact /> : null}
+        />
       }
     >
-      <div className="sozan-chat flex h-full flex-col">
+      <div className="flex h-full flex-col">
         <ChannelAlert />
-        <GettingStarted />
-        {error ? (
-          <p className="px-4 pt-3 text-sm text-danger" role="alert">
-            {error}
-          </p>
-        ) : null}
-        {notice ? (
-          <p className="px-4 pt-3 text-sm text-warm" role="status">
-            {notice}
-          </p>
-        ) : null}
+        {messages.length ? null : <GettingStarted />}
         <div className="min-h-0 flex-1">
           <ChatThread
             messages={messages}
             busy={busy}
+            loading={!loaded}
+            banner={
+              error ? (
+                <p className="rounded-xl border border-danger/40 bg-paper px-3 py-2 text-sm text-danger" role="alert">
+                  {error}
+                </p>
+              ) : notice ? (
+                <p className="rounded-xl border border-line bg-paper px-3 py-2 text-sm text-warm" role="status">
+                  {notice}
+                </p>
+              ) : null
+            }
             pendingText={pending}
             welcome
-            welcomeLines={welcomeLines(brand)}
-            hints={CHAT_HINTS}
+            welcomeLines={greeting(brand)}
+            starters={CHAT_STARTERS}
             aspects={STUDIO_ASPECTS}
             placeholder="به سوزان بگو…"
             persona="سوزان"
@@ -281,7 +248,7 @@ export default function ChatPage() {
             onConfirm={(id) => void send("", undefined, id)}
             onCancel={(id) => void send("", undefined, undefined, id)}
             onSend={async (payload) => {
-              await send(payload.text, payload.file);
+              if (!(await send(payload.text, payload.file))) throw new Error("not-sent");
             }}
             publishTargets={publishTargets}
             onPublish={publishStudio}

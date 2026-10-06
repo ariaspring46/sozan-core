@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ExternalLink, Globe } from "lucide-react";
+import { ChevronDown, ExternalLink, Globe, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useBackClose } from "@/lib/back-stack";
 
 export type ShopState = {
   brand: string;
@@ -22,6 +23,8 @@ export type ShopState = {
   cnameCheck?: { detail?: string; status?: string };
   cnameSetup?: { ok?: boolean; error?: string };
   pendingBuild?: number;
+  /** چند تغییر هنوز با «برگشت» پس گرفتنی است؛ بعد از هر بیلد ۰ می‌شود. */
+  undoDepth?: number;
   hidePrices?: boolean;
   priceBlocked?: boolean;
 };
@@ -94,42 +97,98 @@ export function DomainMenu({
   const [confirmRebuild, setConfirmRebuild] = useState(false);
   const [domain, setDomain] = useState(personalDomainValue(shop));
   const [mounted, setMounted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saved, setSaved] = useState(false);
   const live = shopPublicUrl(shop);
   const running = shop?.status === "running" || shop?.status === "queued";
+  const hostLabel = Boolean(live) && !running && shop?.status !== "failed";
   const label = running
     ? "در حال ساخت…"
     : shop?.status === "failed"
-      ? "ساخت ناتمام"
+      ? "ساخت کامل نشد"
       : live
         ? shopHostLabel(live)
         : "بعد از ساخت سایت";
+  // نشانی سوزان بدون پسوند کوتاه نشان داده می‌شود؛ دامنهٔ شخصی کامل.
+  const shortLabel = hostLabel ? label.replace(/\.sozan-core\.ir$/i, "") : label;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  /** خطای سرور (دامنهٔ نامعتبر، دامنهٔ دیگران، قطع شبکه) داخل همین کادر دیده می‌شود، نه بی‌صدا بسته‌شدن. */
+  async function saveDomain() {
+    setSaveError("");
+    setSaved(false);
+    setSaving(true);
+    try {
+      await onSaveDomain(domain.trim());
+      if (domain.trim()) setSaved(true);
+      else setOpen(false);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "ذخیره نشد. دوباره امتحان کن.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   useEffect(() => {
     setDomain(personalDomainValue(shop));
   }, [shop?.domain, shop?.publicHost]);
 
+  useEffect(() => {
+    if (!open && !preview) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setConfirmRebuild(false);
+      setOpen(false);
+      setPreview(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, preview]);
+
+  useBackClose(open, () => {
+    setConfirmRebuild(false);
+    setOpen(false);
+  });
+  useBackClose(Boolean(preview && live), () => setPreview(false));
+
   const sheet = open ? (
     <div
-      className="fixed inset-0 z-[80] bg-black/55 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 backdrop-blur-[2px] sm:items-center sm:p-4"
       onClick={() => {
         setConfirmRebuild(false);
         setOpen(false);
       }}
     >
       <div
-        className="mx-auto mt-20 max-w-md space-y-4 rounded-3xl border border-line bg-paper p-5 shadow-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="دامنه و انتشار"
+        className="max-h-[92dvh] w-full max-w-md space-y-4 overflow-y-auto overscroll-contain rounded-t-3xl border border-line bg-paper p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-card sm:rounded-3xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 className="text-lg font-bold">دامنه و انتشار</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold">دامنه و انتشار</h2>
+          <button
+            type="button"
+            aria-label="بستن"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted hover:bg-canvas"
+            onClick={() => {
+              setConfirmRebuild(false);
+              setOpen(false);
+            }}
+          >
+            <X size={20} aria-hidden />
+          </button>
+        </div>
         <p className="text-sm leading-7 text-muted">
           {live
-            ? "فروشگاه روی دامنهٔ سوزان زنده است. دامنهٔ شخصی را فقط وقتی بگذار که CNAME آن به نشانی زیر باشد."
+            ? "فروشگاه روی دامنهٔ سوزان زنده است. دامنهٔ شخصی را وقتی بگذار که در پنل دامنه‌ات یک رکورد CNAME به نشانی زیر ساخته باشی."
             : running
-              ? "کارخانه در حال ساخت است. پیشرفت را در چت می‌بینی."
+              ? "سوزان در حال ساخت سایت است. پیشرفت را در چت می‌بینی."
               : "اول در چت سبک و رنگ را بگو، بعد بگو بساز. دامنه بعد از آماده شدن سایت است."}
         </p>
         {live ? (
@@ -137,34 +196,56 @@ export function DomainMenu({
             href={live}
             target="_blank"
             rel="noreferrer"
-            className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent text-sm font-medium text-onAccent"
+            className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accentStrong text-sm font-medium text-onAccent"
           >
             باز کردن فروشگاه
             <ExternalLink size={16} />
           </a>
         ) : null}
-        <label className="block text-sm">دامنه شخصی</label>
+        <label className="block text-sm" htmlFor="shop-domain">دامنهٔ شخصی (اختیاری)</label>
         <Input
+          id="shop-domain"
           dir="ltr"
           placeholder="shop.example.com"
+          inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="done"
           value={domain}
           onChange={(event) => setDomain(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              void saveDomain();
+            }
+          }}
         />
         {shop?.cnameTarget ? (
-          <p className="rounded-xl bg-canvas px-3 py-2 text-xs leading-6 text-muted" dir="ltr">
+          <p className="wrap-any rounded-xl bg-canvas px-3 py-2 text-sm leading-6 text-muted" dir="ltr">
             CNAME → {shop.cnameTarget}
           </p>
         ) : null}
         {shop?.publicHost ? (
-          <p className="text-xs leading-6 text-muted">
-            نشانی سوزان: <span dir="ltr">{shop.publicHost}</span>
+          <p className="wrap-any text-sm leading-6 text-muted">
+            نشانی سوزان: <bdi dir="ltr">{shop.publicHost}</bdi>
           </p>
         ) : null}
-        {shop?.cnameCheck?.detail ? <p className="text-xs leading-6 text-warm">{shop.cnameCheck.detail}</p> : null}
-        {shop?.cnameSetup?.error ? <p className="text-xs leading-6 text-danger">{shop.cnameSetup.error}</p> : null}
+        {shop?.cnameCheck?.detail ? <p className="text-sm leading-6 text-warm">{shop.cnameCheck.detail}</p> : null}
+        {shop?.cnameSetup?.error ? <p className="text-sm leading-6 text-danger" role="alert">{shop.cnameSetup.error}</p> : null}
+        {saveError ? (
+          <p className="text-sm leading-6 text-danger" role="alert">
+            {saveError}
+          </p>
+        ) : null}
+        {saved ? (
+          <p className="text-sm leading-6 text-warm" role="status">
+            ذخیره شد. رکورد CNAME بالا را در پنل دامنه‌ات بگذار؛ وقتی DNS رسید وضعیت «درست» می‌شود.
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-2">
-          <Button type="button" disabled={busy} onClick={() => void onSaveDomain(domain).then(() => setOpen(false))}>
-            ذخیره دامنه
+          <Button type="button" disabled={busy || saving} onClick={() => void saveDomain()}>
+            {saving ? "در حال ذخیره…" : "ذخیره دامنه"}
           </Button>
           <Button
             type="button"
@@ -213,7 +294,7 @@ export function DomainMenu({
             </p>
             <a
               href="/more/inventory?focus=price"
-              className="inline-flex min-h-9 items-center rounded-xl bg-accentStrong px-3 text-xs font-bold text-onAccent"
+              className="inline-flex min-h-11 items-center rounded-xl bg-accentStrong px-4 text-sm font-bold text-onAccent"
             >
               انبار و قیمت‌گذاری
             </a>
@@ -234,8 +315,8 @@ export function DomainMenu({
 
   const previewFrame =
     preview && live ? (
-      <div className="fixed inset-0 z-[90] flex flex-col bg-paper">
-        <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
+      <div className="fixed inset-x-0 top-0 z-[90] flex h-dvh flex-col bg-paper">
+        <div className="flex items-center justify-between gap-2 border-b border-line px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
           <p className="truncate text-sm" dir="ltr">
             {live}
           </p>
@@ -254,43 +335,23 @@ export function DomainMenu({
 
   return (
     <>
-      <div className="flex min-w-0 items-center gap-1">
-        {live ? (
-          <a
-            href={live}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex max-w-[58vw] items-center gap-2 rounded-full border border-line bg-paper px-3 py-1.5 text-sm shadow-card"
-          >
-            <Globe size={16} />
-            <span className="truncate">{label}</span>
-            <ExternalLink size={14} className="shrink-0 text-muted" />
-          </a>
-        ) : (
-          <button
-            type="button"
-            className="inline-flex max-w-[70vw] items-center gap-2 rounded-full border border-line bg-paper px-3 py-1.5 text-sm"
-            onClick={() => {
-              setDomain(personalDomainValue(shop));
-              setOpen(true);
-            }}
-          >
-            <Globe size={16} />
-            <span className="truncate">{label}</span>
-          </button>
-        )}
-        <button
-          type="button"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line bg-paper text-muted"
-          aria-label="تنظیم دامنه"
-          onClick={() => {
-            setDomain(personalDomainValue(shop));
-            setOpen(true);
-          }}
-        >
-          <ChevronDown size={16} />
-        </button>
-      </div>
+      <button
+        type="button"
+        className="inline-flex min-h-11 max-w-[46vw] shrink-0 items-center gap-2 rounded-full border border-line bg-paper px-3 text-sm shadow-card sm:max-w-[58vw]"
+        aria-label={hostLabel ? `دامنه و انتشار؛ آدرس فروشگاه ${label}` : `دامنه و انتشار؛ ${label}`}
+        onClick={() => {
+          setDomain(personalDomainValue(shop));
+          setSaveError("");
+          setSaved(false);
+          setOpen(true);
+        }}
+      >
+        <Globe size={16} className="shrink-0" aria-hidden />
+        <span className="truncate" dir={hostLabel ? "ltr" : undefined}>
+          {shortLabel}
+        </span>
+        <ChevronDown size={16} className="shrink-0 text-muted" aria-hidden />
+      </button>
       {mounted ? createPortal(
         <>
           {sheet}

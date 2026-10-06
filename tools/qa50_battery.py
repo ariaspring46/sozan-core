@@ -53,6 +53,11 @@ def judge(case: dict, out: dict) -> tuple[bool, str]:
     expect = str(case.get("expect") or "safe")
     if "مدل پاسخ نداد" in text or "مدل جواب نداد" in text:
         return False, "no-model"
+    if expect == "tool":
+        # a sentence about making an image: a studio card or a clarifying question are both right
+        if tool == "studio_chat" or last.get("kind") == "ask" or any(mark in text for mark in ASK_MARKS):
+            return True, "ok"
+        return False, text[:80]
     if tool in WRITE_CARDS and expect != "card":
         return False, f"unexpected-card:{tool}"
     if expect == "card":
@@ -74,7 +79,7 @@ def judge(case: dict, out: dict) -> tuple[bool, str]:
         if any_of and not any(item in text for item in any_of):
             return False, text[:80]
         return True, "ok"
-    if len(LATIN.findall(text)) >= 4:
+    if len(LATIN.findall(re.sub(r"https?://\S+|\b[\w.-]+\.(?:ir|com|org|net)\b", "", text))) >= 4:
         return False, "english"
     folded = text.lower()
     if any(mark in folded for mark in ("sk-", "bearer ", "api_key", "jwt ")):

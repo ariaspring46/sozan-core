@@ -6,18 +6,37 @@ import Link from "next/link";
 import { api, Campaign, getApiBase } from "@/lib/api";
 import { AppShell } from "@/components/app-shell";
 import { StudioNav } from "@/components/studio-nav";
-import { AuthMedia } from "@/components/auth-media";
+import { AuthMedia, MEDIA_RATIO } from "@/components/auth-media";
 import { Field } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+const CHANNEL_FA: Record<string, string> = {
+  instagram: "اینستاگرام",
+  telegram: "تلگرام",
+  whatsapp: "واتساپ",
+  bale: "بله",
+  rubika: "روبیکا",
+};
+const FORMAT_FA: Record<string, string> = {
+  post: "پست",
+  story: "استوری",
+  reel: "ریلز",
+  reels: "ریلز",
+  captions: "کپشن",
+  poster: "پوستر",
+  video: "ویدیو",
+};
+
 export default function CampaignDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [busy, setBusy] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
   const ig = useMemo(
@@ -39,8 +58,14 @@ export default function CampaignDetailPage() {
   const [telegram, setTelegram] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
 
+  /** پاسخ ناقص سرور صفحه را نمی‌شکند؛ دوباره از سرور خوانده می‌شود. */
+  function usable(data: Campaign | null): data is Campaign {
+    return Boolean(data && Array.isArray(data.copies) && Array.isArray(data.assets));
+  }
+
   async function load() {
     const data = await api<Campaign>(`/campaigns/${id}`);
+    if (!usable(data)) throw new Error("کمپین درست خوانده نشد. دوباره امتحان کن.");
     setCampaign(data);
     setTitle(data.title);
     setSubtitle(data.subtitle);
@@ -54,9 +79,16 @@ export default function CampaignDetailPage() {
     void load().catch((err) => setError(err.message));
   }, [id]);
 
+  useEffect(() => {
+    if (!saved) return;
+    const timer = window.setTimeout(() => setSaved(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [saved]);
+
   async function save() {
     setBusy(true);
     setError("");
+    setSaved(false);
     try {
       const data = await api<Campaign>(`/campaigns/${id}`, {
         method: "PATCH",
@@ -69,7 +101,9 @@ export default function CampaignDetailPage() {
           whatsapp_caption: whatsapp,
         }),
       });
-      setCampaign(data);
+      if (usable(data)) setCampaign(data);
+      else await load();
+      setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
@@ -79,15 +113,18 @@ export default function CampaignDetailPage() {
 
   async function compose() {
     setBusy(true);
+    setComposing(true);
     setError("");
     try {
       await save();
       const data = await api<Campaign>(`/campaigns/${id}/compose`, { method: "POST" });
-      setCampaign(data);
+      if (usable(data)) setCampaign(data);
+      else await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "خطا");
     } finally {
       setBusy(false);
+      setComposing(false);
     }
   }
 
@@ -118,7 +155,21 @@ export default function CampaignDetailPage() {
   if (!campaign) {
     return (
       <AppShell header={<h1 className="text-lg font-bold">کمپین</h1>}>
-        <p className="p-8 text-muted">{error || "در حال بارگذاری…"}</p>
+        <div className="space-y-3 p-8">
+          <p className={error ? "text-danger" : "text-muted"} role={error ? "alert" : "status"}>
+            {error || "در حال بارگذاری…"}
+          </p>
+          {error ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => void load().then(() => setError("")).catch((err) => setError(err.message))}>
+                دوباره امتحان کن
+              </Button>
+              <Link className="inline-flex min-h-11 items-center rounded-xl border border-line px-4 text-sm text-warm" href="/campaigns">
+                بازگشت به کمپین‌ها
+              </Link>
+            </div>
+          ) : null}
+        </div>
       </AppShell>
     );
   }
@@ -134,9 +185,9 @@ export default function CampaignDetailPage() {
         </div>
       }
     >
-    <main className="h-full space-y-4 overflow-y-auto p-4">
+    <main className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
       <StudioNav current="campaigns" />
-      <Link className="text-sm text-warm" href="/campaigns">
+      <Link className="inline-flex min-h-11 items-center text-sm text-warm" href="/campaigns">
         بازگشت به کمپین‌ها
       </Link>
       <div className="grid gap-4">
@@ -153,13 +204,13 @@ export default function CampaignDetailPage() {
         </Card>
         <Card className="space-y-3">
           <Field label="کپشن اینستاگرام">
-            <Textarea value={instagram} onChange={(e) => setInstagram(e.target.value)} />
+            <Textarea value={instagram} maxLength={2200} onChange={(e) => setInstagram(e.target.value)} />
           </Field>
           <Field label="کپشن تلگرام">
-            <Textarea value={telegram} onChange={(e) => setTelegram(e.target.value)} />
+            <Textarea value={telegram} maxLength={2200} onChange={(e) => setTelegram(e.target.value)} />
           </Field>
           <Field label="پیام واتساپ">
-            <Textarea value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+            <Textarea value={whatsapp} maxLength={2200} onChange={(e) => setWhatsapp(e.target.value)} />
           </Field>
         </Card>
       </div>
@@ -168,27 +219,38 @@ export default function CampaignDetailPage() {
           ذخیره متن
         </Button>
         <Button disabled={busy} onClick={() => void compose()}>
-          بساز ویدیو
+          {composing ? "در حال ساخت ویدیو…" : "ساخت ویدیو"}
         </Button>
-        <Button className="bg-surface" disabled={busy} onClick={() => void download()}>
-          دانلود پک
+        <Button variant="ghost" disabled={busy} onClick={() => void download()}>
+          دانلود فایل‌ها
         </Button>
       </div>
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {composing ? (
+        <p className="text-sm text-warm" role="status">
+          ویدیو چند دقیقه طول می‌کشد؛ این صفحه را باز نگه دار.
+        </p>
+      ) : null}
+      {saved ? (
+        <p className="text-sm text-warm" role="status">
+          ذخیره شد.
+        </p>
+      ) : null}
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
       <section className="grid gap-4 md:grid-cols-2">
         {overlays.map((asset) => (
           <Card key={asset.id}>
             <p className="mb-2 text-sm text-muted">
-              {asset.channel} — {asset.format}
+              {CHANNEL_FA[asset.channel] || asset.channel} — {FORMAT_FA[asset.format] || asset.format}
             </p>
             {asset.format === "captions" ? (
-              <p className="whitespace-pre-wrap text-sm">{ig || tg || wa}</p>
+              <p className="wrap-any whitespace-pre-wrap text-sm leading-7">{ig || tg || wa}</p>
             ) : (
               <AuthMedia
                 campaignId={campaign.id}
                 relPath={asset.rel_path}
                 kind={asset.kind}
                 alt={asset.format}
+                ratio={MEDIA_RATIO[asset.format] || "1 / 1"}
               />
             )}
           </Card>

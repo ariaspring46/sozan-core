@@ -27,6 +27,8 @@ type Platform = {
 };
 type Voice = { summary: string; tone: string; sampleReply: string };
 
+const fa = (value?: number) => Number(value || 0).toLocaleString("fa-IR");
+
 const INSTAGRAM_OAUTH_NOTICE: Record<string, string> = {
   ok: "اینستاگرام وصل شد.",
   exists: "این پیج از قبل وصل شده است. از فهرست انتخابش کن.",
@@ -67,7 +69,7 @@ function DestEditor({
   const label = account.platform === "telegram" ? "مقصد پست کانال" : "شماره مقصد ارسال";
   return (
     <div className="mt-2 space-y-2">
-      <p className="text-[11px] text-muted">{label}</p>
+      <p className="text-xs text-muted">{label}</p>
       <Input
         dir="ltr"
         value={value}
@@ -77,7 +79,7 @@ function DestEditor({
       <Button
         type="button"
         variant="ghost"
-        className="h-9 min-h-9 w-full text-xs"
+        className="w-full text-sm"
         disabled={disabled || saving}
         onClick={() => {
           setSaving(true);
@@ -108,6 +110,7 @@ export default function ChannelsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [existing, setExisting] = useState<{ id: string; username: string; bound?: boolean }[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState("");
 
   const spec = useMemo(
     () => platforms.find((item) => item.id === platform) || platforms[0],
@@ -230,12 +233,12 @@ export default function ChannelsPage() {
       resetForm(spec.id);
       if (data.account?.error && !data.account.verified) setNotice(data.account.error);
       else if (data.instagram?.error) setNotice(data.instagram.error);
-      else if (data.instagram?.ok) setNotice(`${data.instagram.imported || 0} دایرکت خوانده شد.`);
+      else if (data.instagram?.ok) setNotice(`${fa(data.instagram.imported)} دایرکت خوانده شد.`);
       else if (data.telegram?.error) setNotice(data.telegram.error);
-      else if (data.telegram?.ok) setNotice(`${data.telegram.imported || 0} پیام تلگرام خوانده شد.`);
+      else if (data.telegram?.ok) setNotice(`${fa(data.telegram.imported)} پیام تلگرام خوانده شد.`);
       else if (data.scan?.status === "running") setNotice("در حال خواندن صفحه… کالاها به فروش می‌آیند.");
       else if (data.scan?.error) setNotice(data.scan.error);
-      else if (data.scan?.productCount) setNotice(`${data.scan.productCount} کالا از این کانال به فروش اضافه شد.`);
+      else if (data.scan?.productCount) setNotice(`${fa(data.scan.productCount)} کالا از این کانال به فروش اضافه شد.`);
       else if (data.account?.verified) setNotice("اتصال برقرار شد.");
       else setNotice("حساب اضافه شد.");
     } catch (err) {
@@ -249,19 +252,21 @@ export default function ChannelsPage() {
     <AppShell
       header={
         <div>
-          <Link className="text-sm text-warm" href="/more">
-            بازگشت
-          </Link>
+          <p className="text-sm text-muted">
+            <Link className="tap text-warm" href="/more">
+              بیشتر
+            </Link>
+          </p>
           <h1 className="text-lg font-bold">حساب کانال‌ها</h1>
         </div>
       }
     >
-      <div className="h-full space-y-4 overflow-y-auto p-4">
+      <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         <p className="text-sm text-muted">
           اینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.
         </p>
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
-        {notice ? <p className="text-sm text-signal">{notice}</p> : null}
+        {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
+        {notice ? <p className="text-sm text-signal" role="status">{notice}</p> : null}
         <Card>
           <form className="space-y-3" onSubmit={(event) => void add(event)}>
             <Field label="پلتفرم">
@@ -274,11 +279,11 @@ export default function ChannelsPage() {
               </Select>
             </Field>
             {loading && platforms.length === 0 ? (
-              <p className="text-xs leading-6 text-muted">در حال خواندن پلتفرم‌ها…</p>
+              <p className="text-sm leading-6 text-muted">در حال خواندن پلتفرم‌ها…</p>
             ) : null}
-            {spec?.help ? <p className="text-xs leading-6 text-muted">{spec.help}</p> : null}
+            {spec?.help ? <p className="text-sm leading-7 text-muted">{spec.help}</p> : null}
             {spec?.docs ? (
-              <a className="block text-xs text-warm" href={spec.docs} target="_blank" rel="noreferrer">
+              <a className="inline-flex min-h-11 items-center text-sm text-warm" href={spec.docs} target="_blank" rel="noreferrer">
                 اسناد اتصال {spec.label}
               </a>
             ) : null}
@@ -312,7 +317,7 @@ export default function ChannelsPage() {
               </Button>
             ))}
             {spec?.id === "instagram" && spec.oauth && !spec.sendboxConfigured ? (
-              <p className="text-xs text-warm">ورود با اینستاگرام به‌زودی روشن می‌شود.</p>
+              <p className="text-sm text-warm">ورود با اینستاگرام به‌زودی روشن می‌شود.</p>
             ) : null}
             <Field label={spec?.handleLabel || "شناسه حساب"}>
               <Input
@@ -353,22 +358,22 @@ export default function ChannelsPage() {
           <ul className="space-y-2">
             {accounts.map((account) => (
               <li key={account.id}>
-                <Card className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{account.label}</p>
-                    <p className="text-sm text-muted" dir="ltr">
+                <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="wrap-any font-medium">{account.label}</p>
+                    <p className="wrap-any text-start text-sm text-muted" dir="ltr">
                       {account.handle}
                     </p>
-                    {account.display ? <p className="text-xs text-muted">{account.display}</p> : null}
+                    {account.display ? <p className="wrap-any text-sm text-muted">{account.display}</p> : null}
                     <p
                       className={
                         account.needsReconnect
-                          ? "text-xs text-warm"
+                          ? "text-sm text-warm"
                           : account.verified
-                            ? "text-xs text-signal"
+                            ? "text-sm text-signal"
                             : account.connected
-                              ? "text-xs text-muted"
-                              : "text-xs text-warm"
+                              ? "text-sm text-muted"
+                              : "text-sm text-warm"
                       }
                     >
                       {account.needsReconnect
@@ -380,10 +385,10 @@ export default function ChannelsPage() {
                             : "بدون اتصال"}
                       {account.voiceReady ? " · لحن یاد گرفته شد" : ""}
                     </p>
-                    {account.error ? <p className="text-xs text-danger">{account.error}</p> : null}
+                    {account.error ? <p className="wrap-any text-sm text-danger" role="alert">{account.error}</p> : null}
                     <DestEditor account={account} disabled={busy} onAccounts={setAccounts} />
                   </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap gap-2 sm:flex-col">
                     {account.platform === "instagram" && account.needsReconnect ? (
                       <Button disabled={busy} onClick={() => void startInstagram()}>
                         اتصال دوباره
@@ -400,7 +405,7 @@ export default function ChannelsPage() {
                             method: "POST",
                           })
                             .then((data) => {
-                              setNotice(data.error || `${data.imported || 0} پیام خوانده شد.`);
+                              setNotice(data.error || `${fa(data.imported)} پیام خوانده شد.`);
                             })
                             .catch((err) => setError(err instanceof Error ? err.message : "خطا"))
                             .finally(() => setBusy(false));
@@ -412,7 +417,13 @@ export default function ChannelsPage() {
                     <Button
                       variant="ghost"
                       disabled={busy}
+                      className={confirmDelete === account.id ? "border-danger text-danger" : undefined}
                       onClick={() => {
+                        if (confirmDelete !== account.id) {
+                          setConfirmDelete(account.id);
+                          return;
+                        }
+                        setConfirmDelete("");
                         setBusy(true);
                         void api<{ accounts: Account[] }>(`/channels/${account.id}`, { method: "DELETE" })
                           .then((data) => setAccounts(data.accounts || []))
@@ -420,8 +431,13 @@ export default function ChannelsPage() {
                           .finally(() => setBusy(false));
                       }}
                     >
-                      حذف
+                      {confirmDelete === account.id ? "تأیید حذف" : "حذف"}
                     </Button>
+                    {confirmDelete === account.id ? (
+                      <Button variant="ghost" disabled={busy} onClick={() => setConfirmDelete("")}>
+                        انصراف
+                      </Button>
+                    ) : null}
                   </div>
                 </Card>
               </li>
@@ -431,9 +447,9 @@ export default function ChannelsPage() {
         {voice?.summary ? (
           <Card>
             <h2 className="font-bold">لحن یادگرفته</h2>
-            <p className="mt-1 text-sm">{voice.tone}</p>
-            <p className="text-sm text-muted">{voice.summary}</p>
-            {voice.sampleReply ? <p className="mt-2 text-sm">نمونه پاسخ: {voice.sampleReply}</p> : null}
+            <p className="wrap-any mt-1 text-sm">{voice.tone}</p>
+            <p className="wrap-any text-sm leading-7 text-muted">{voice.summary}</p>
+            {voice.sampleReply ? <p className="wrap-any mt-2 text-sm leading-7">نمونه پاسخ: {voice.sampleReply}</p> : null}
           </Card>
         ) : null}
       </div>

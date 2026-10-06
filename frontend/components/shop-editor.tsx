@@ -16,12 +16,30 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { LinkText } from "@/components/link-text";
 
 export type ShopMsg = { id: string; role: "user" | "assistant"; text: string; at?: number };
-export type ShopSelection = { text: string; tag: string };
+export type ShopSelection = {
+  text: string;
+  tag: string;
+  kind?: "image" | "text" | "block";
+  src?: string;
+  alt?: string;
+  /** عکسی که زیر متن یا داخل همین بخش است؛ با نگه داشتن روی نوشتهٔ روی عکس هم عوض‌کردنش ممکن است. */
+  image?: { src: string; alt?: string };
+  /** `/products/<id>` کارتی که بخش داخل آن است؛ کالای بی‌عکس هم با همین عکس می‌گیرد. */
+  product?: string;
+};
+
+/** عکس قابل‌عوض‌شدن این انتخاب (خود عکس، یا عکس پشت متن)، یا فقط کارت کالای بی‌عکس. */
+export function selectionPhoto(selection: ShopSelection): { src: string; alt?: string } | null {
+  if (selection.kind === "image" && selection.src) return { src: selection.src, alt: selection.alt };
+  if (selection.image?.src) return selection.image;
+  return selection.product ? { src: "", alt: "" } : null;
+}
 
 /** سقف متن اشاره‌شده در سرور (`viewTarget` تا ۸۰ نویسه). */
-const TARGET_MAX = 80;
+export const TARGET_MAX = 80;
 
 /** همان رنگ‌های نام‌داری که سرور می‌شناسد (`NAMED_COLORS` در ویرایشگر فروشگاه). */
 const SWATCHES: { name: string; hex: string }[] = [
@@ -42,6 +60,10 @@ const PAGES = ["درباره ما", "تماس با ما", "داستان برند
 
 type Tool = "" | "colors" | "name" | "cta" | "pages" | "history";
 
+export function selectionLabel(selection: ShopSelection) {
+  return selection.kind === "image" ? "عکس" : tagLabel(selection.tag);
+}
+
 function tagLabel(tag: string) {
   const t = tag.toLowerCase();
   if (/^h[1-3]$/.test(t)) return "تیتر";
@@ -52,11 +74,11 @@ function tagLabel(tag: string) {
   return "بخش";
 }
 
-/** متن‌های سرور را برای فروشنده روان کن (اصطلاح «بیلد» در پنل نیست). */
+/** پاسخ سرور را برای فروشنده روان کن: نشانی داخلی نمی‌ماند و دکمه همان «بیلد» نام دارد. */
 export function friendlyReply(text: string) {
   return String(text || "")
-    .replace(/وقتی آماده بودی بیلد بزن\.?/g, "هر وقت آماده بودی «انتشار تغییرات» را بزن.")
-    .replace(/بیلد/g, "انتشار");
+    .replace(/\s*https?:\/\/(?:localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?\S*/g, "")
+    .replace(/«?انتشار تغییرات»?/g, "«بیلد»");
 }
 
 function cleanQuote(text: string) {
@@ -109,7 +131,7 @@ export function ShopEditor({
   );
   const lastReply = [...recent].reverse().find((row) => row.role === "assistant");
 
-  const isImage = selection ? tagLabel(selection.tag) === "عکس" : false;
+  const isImage = selection ? selectionLabel(selection) === "عکس" : false;
   const target = selection && !isImage ? selection.text.slice(0, TARGET_MAX) : "";
   const tooLong = Boolean(selection && selection.text.length > TARGET_MAX);
   const canRewrite = Boolean(target && !tooLong && cleanQuote(selText) && cleanQuote(selText) !== selection?.text);
@@ -123,8 +145,10 @@ export function ShopEditor({
     event.preventDefault();
     const text = draft.trim();
     if (!text) return;
+    const keepKeyboard = document.activeElement === draftRef.current;
     const ok = await run(text, target ? { target } : undefined);
     if (ok) setDraft("");
+    if (keepKeyboard) window.requestAnimationFrame(() => draftRef.current?.focus());
   }
 
   function toggle(next: Tool) {
@@ -138,7 +162,7 @@ export function ShopEditor({
     { id: "hero", label: "عکس بالای سایت", icon: ImageIcon },
     { id: "prices", label: hidePrices ? "نمایش قیمت‌ها" : "پنهان کردن قیمت‌ها", icon: Tag },
     { id: "pages", label: "صفحهٔ تازه", icon: FilePlus2 },
-    { id: "undo", label: "برگرد به قبل", icon: Undo2 },
+    { id: "undo", label: "برگشت", icon: Undo2 },
     { id: "history", label: "گفتگو", icon: History },
   ];
 
@@ -162,11 +186,11 @@ export function ShopEditor({
     <div className="flex min-h-0 flex-col gap-2 lg:gap-3">
       {pending > 0 ? (
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2">
-          <p className="min-w-0 text-xs leading-5 text-ink">
-            <span className="font-bold">{pending.toLocaleString("fa-IR")} تغییر</span> در پیش‌نمایش است و هنوز روی سایت نرفته.
+          <p className="min-w-0 text-sm leading-6 text-ink">
+            <span className="font-bold">{pending.toLocaleString("fa-IR")} تغییر</span> در پیش‌نمایش است؛ با «بیلد» روی سایت می‌رود.
           </p>
-          <Button type="button" className="h-9 min-h-9 shrink-0 px-3 text-xs" disabled={buildBusy} onClick={onPublish}>
-            انتشار تغییرات
+          <Button type="button" className="shrink-0 px-3 text-sm" disabled={buildBusy} onClick={onPublish}>
+            بیلد
           </Button>
         </div>
       ) : null}
@@ -175,9 +199,9 @@ export function ShopEditor({
         <section aria-label="بخش انتخاب‌شده" className="rounded-2xl border border-line bg-canvas p-3 shadow-card">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted">
-              انتخاب‌شده: <span className="font-bold text-warm">{tagLabel(selection.tag)}</span>
+              انتخاب‌شده: <span className="font-bold text-warm">{selectionLabel(selection)}</span>
             </p>
-            <button type="button" aria-label="لغو انتخاب" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-paper" onClick={onClearSelection}>
+            <button type="button" aria-label="لغو انتخاب" className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:bg-paper" onClick={onClearSelection}>
               <X size={16} />
             </button>
           </div>
@@ -202,19 +226,19 @@ export function ShopEditor({
                 rows={2}
                 maxLength={TARGET_MAX}
                 value={selText}
-                disabled={locked}
+                readOnly={locked}
                 onChange={(event) => setSelText(event.target.value)}
                 className="w-full resize-none rounded-xl border border-field bg-paper px-3 py-2 text-[16px] leading-7 text-ink outline-none focus:border-accent"
               />
               <div className="flex gap-2">
-                <Button type="submit" className="h-10 min-h-10 flex-1 text-sm" disabled={!canRewrite || locked}>
+                <Button type="submit" className="flex-1 text-sm" disabled={!canRewrite || locked}>
                   ثبت متن
                 </Button>
                 <button
                   type="button"
                   disabled={locked}
                   onClick={() => void run("این متن را حذف کن", { target })}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm text-danger disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line px-3 text-sm text-danger disabled:opacity-50"
                 >
                   <Trash2 size={15} />
                   حذف
@@ -229,7 +253,7 @@ export function ShopEditor({
         </p>
       )}
 
-      <div role="toolbar" aria-label="ابزارهای ویرایش" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 lg:flex-wrap lg:overflow-visible">
+      <div role="toolbar" aria-label="ابزارهای ویرایش" className="-mx-1 -my-1 flex snap-x gap-1.5 overflow-x-auto px-1 py-1.5 [mask-image:linear-gradient(to_right,transparent,black_28px)] lg:flex-wrap lg:overflow-visible lg:[mask-image:none]">
         {tools.map((item) => {
           const Icon = item.icon;
           const active = tool === item.id;
@@ -241,7 +265,7 @@ export function ShopEditor({
               aria-pressed={["colors", "name", "cta", "pages", "history"].includes(item.id) ? active : undefined}
               onClick={() => onTool(item.id)}
               className={cn(
-                "inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs disabled:opacity-50",
+                "tap inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] disabled:opacity-50",
                 active ? "border-accent bg-accent/15 font-bold text-warm" : "border-line bg-canvas text-ink hover:border-accent/50",
                 item.id === "history" && "lg:hidden",
               )}
@@ -265,9 +289,9 @@ export function ShopEditor({
                 title={swatch.name}
                 aria-label={`رنگ ${swatch.name}`}
                 onClick={() => void run(`رنگ اصلی را ${swatch.name} کن`)}
-                className="flex flex-col items-center gap-1 text-[10px] text-muted disabled:opacity-50"
+                className="flex min-h-11 flex-col items-center gap-1 text-xs text-muted disabled:opacity-50"
               >
-                <span className="h-8 w-8 rounded-full border border-line shadow-card" style={{ background: swatch.hex }} />
+                <span className="h-9 w-9 rounded-full border border-line shadow-card" style={{ background: swatch.hex }} />
                 {swatch.name}
               </button>
             ))}
@@ -292,11 +316,11 @@ export function ShopEditor({
             id="shop-name"
             value={nameText}
             maxLength={40}
-            disabled={locked}
+            readOnly={locked}
             onChange={(event) => setNameText(event.target.value)}
             className="min-w-0 flex-1 rounded-xl border border-field bg-paper px-3 text-[16px] text-ink outline-none focus:border-accent"
           />
-          <Button type="submit" className="h-10 min-h-10 shrink-0 px-4 text-sm" disabled={locked || !cleanQuote(nameText) || cleanQuote(nameText) === brand}>
+          <Button type="submit" className="shrink-0 px-4 text-sm" disabled={locked || !cleanQuote(nameText) || cleanQuote(nameText) === brand}>
             ثبت
           </Button>
         </form>
@@ -322,11 +346,11 @@ export function ShopEditor({
               value={ctaText}
               maxLength={30}
               placeholder="مثلاً همین حالا بخر"
-              disabled={locked}
+              readOnly={locked}
               onChange={(event) => setCtaText(event.target.value)}
               className="min-w-0 flex-1 rounded-xl border border-field bg-paper px-3 text-[16px] text-ink outline-none focus:border-accent"
             />
-            <Button type="submit" className="h-10 min-h-10 shrink-0 px-4 text-sm" disabled={locked || !cleanQuote(ctaText)}>
+            <Button type="submit" className="shrink-0 px-4 text-sm" disabled={locked || !cleanQuote(ctaText)}>
               ثبت
             </Button>
           </div>
@@ -343,7 +367,7 @@ export function ShopEditor({
                 type="button"
                 disabled={locked}
                 onClick={() => void run(`صفحهٔ ${label} بساز`)}
-                className="min-h-9 rounded-xl border border-line bg-paper px-3 text-sm text-ink hover:border-accent/50 disabled:opacity-50"
+                className="min-h-11 rounded-xl border border-line bg-paper px-3 text-sm text-ink hover:border-accent/50 disabled:opacity-50"
               >
                 {label}
               </button>
@@ -354,7 +378,7 @@ export function ShopEditor({
 
       <form onSubmit={(event) => void submitDraft(event)} className="flex items-center gap-2 rounded-2xl border border-field bg-canvas p-1.5 ps-3 focus-within:border-accent">
         {target ? (
-          <span className="max-w-[35%] shrink-0 truncate rounded-lg bg-accent/10 px-2 py-1 text-[11px] text-warm" title={target}>
+          <span className="max-w-[35%] shrink-0 truncate rounded-lg bg-accent/10 px-2 py-1 text-xs text-warm" title={target}>
             «{target}»
           </span>
         ) : null}
@@ -365,23 +389,31 @@ export function ShopEditor({
           ref={draftRef}
           id="shop-command"
           value={draft}
-          disabled={locked}
+          readOnly={locked}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={target ? "بگو با این چه کنم…" : "بگو چه چیزی در سایت عوض شود…"}
-          className="min-h-10 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-muted"
+          className="min-h-11 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-muted"
         />
-        <Button type="submit" aria-label="بفرست" className="h-10 min-h-10 w-10 shrink-0 p-0" disabled={locked || !draft.trim()}>
+        <Button
+          type="submit"
+          aria-label="بفرست"
+          className="h-11 w-11 shrink-0 p-0"
+          disabled={locked || !draft.trim()}
+          onMouseDown={(event) => event.preventDefault()}
+        >
           <SendHorizontal size={17} className="-scale-x-100" />
         </Button>
       </form>
 
-      <p className="min-h-5 px-1 text-xs leading-6" role="status" aria-live="polite">
+      <p className="min-h-5 px-1 text-sm leading-6" role="status" aria-live="polite">
         {busy ? (
           <span className="text-warm">در حال اعمال…</span>
         ) : buildBusy ? (
-          <span className="text-warm">سایت در حال انتشار است؛ کمی صبر کن.</span>
+          <span className="text-warm">سایت در حال بیلد است؛ کمی صبر کن.</span>
         ) : lastReply ? (
-          <span className="text-muted">سوزان: {friendlyReply(lastReply.text)}</span>
+          <span className="line-clamp-1 text-muted sm:line-clamp-2">
+            سوزان: <LinkText text={friendlyReply(lastReply.text)} />
+          </span>
         ) : null}
       </p>
 
@@ -396,11 +428,11 @@ export function ShopEditor({
               <li
                 key={row.id}
                 className={cn(
-                  "rounded-xl px-3 py-2 text-xs leading-6",
+                  "rounded-xl px-3 py-2 text-sm leading-6",
                   row.role === "user" ? "ms-6 bg-accent/10 text-ink" : "me-6 bg-paper text-ink",
                 )}
               >
-                {row.role === "assistant" ? friendlyReply(row.text) : row.text}
+                {row.role === "assistant" ? <LinkText text={friendlyReply(row.text)} /> : row.text}
               </li>
             ))}
           </ol>
