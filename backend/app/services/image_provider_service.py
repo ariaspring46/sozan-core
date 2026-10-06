@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import httpx
 from PIL import Image, ImageDraw, ImageFilter
 
+from app.services import proxy_health
 from app.services.observe_client import emit_later, observe_base
 
 log = logging.getLogger("sozan.image")
@@ -24,6 +25,8 @@ DEFAULT_STILL = (
     "cinematic product still life on a clean studio surface, soft directional light, "
     "empty shop, no people, no text, no logos"
 )
+DATA_URI = re.compile(r"data:image/[A-Za-z0-9.+-]+;base64,[A-Za-z0-9+/=]+")
+_BLOCKED = {"http-401", "http-402", "http-403"}
 _FURNITURE = re.compile(r"\b(table|stool|chair|furniture|desk|bench)\b", re.I)
 DEFAULT_MODEL = "black-forest-labs/flux.2-klein-4b"
 DEFAULT_EDIT_MODEL = "bytedance-seed/seedream-4.5"
@@ -682,13 +685,16 @@ def _cloud_chain(
         result, reason = _attempt(primary_url, primary_token, model, prompt, size, source, timeout)
         if result:
             return result
-    _emit_retry(reason or "error", model)
-    _pause()
-    result, reason = _attempt(primary_url, primary_token, model, prompt, size, source, timeout)
-    if result:
-        result["retried"] = True
-        return result
     mode = _fallback_mode()
+    # مسیر OpenRouter بسته است (403/401/402): تلاش دوباره روی همان مسیر بی‌فایده است، مستقیم به آروان.
+    skip_retry = mode == "arvan" and reason in _BLOCKED
+    if not skip_retry:
+        _emit_retry(reason or "error", model)
+        _pause()
+        result, reason = _attempt(primary_url, primary_token, model, prompt, size, source, timeout)
+        if result:
+            result["retried"] = True
+            return result
     if mode == "seedream" and "seedream" not in model.lower():
         seed_model = (os.environ.get("IMAGE_OR_EDIT_MODEL") or DEFAULT_EDIT_MODEL).strip()
         _emit_fallback(reason, model, seed_model)
@@ -804,14 +810,15 @@ def _body(model: str, prompt: str, size: tuple[int, int], source: bytes) -> dict
 
 
 def _post(url: str, token: str, body: dict, timeout: float = 120.0) -> dict:
-    proxy = _proxy_for(url)
     try:
-        with httpx.Client(timeout=httpx.Timeout(timeout, connect=8.0), trust_env=False, proxy=proxy) as client:
-            res = client.post(
-                f"{url.rstrip('/')}/chat/completions",
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-                json=body,
-            )
+        res = proxy_health.post_sync(
+            f"{url.rstrip('/')}/chat/completions",
+            proxy=_proxy_for(url),
+            total=timeout,
+            connect=8.0,
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            json=body,
+        )
     except httpx.TimeoutException as exc:
         raise ImageHttpError(0) from exc
     if res.status_code >= 400:
@@ -842,8 +849,10 @@ def _image_bytes(payload: dict) -> bytes:
                 raw = str(image_url.get("url") if isinstance(image_url, dict) else image_url or "")
                 if raw:
                     break
-        elif isinstance(content, str) and content.startswith("data:image"):
-            raw = content
+        elif isinstance(content, str):
+            # آروان تصویر را به‌صورت مارک‌داون برمی‌گرداند: ![image](data:image/jpeg;base64,...)
+            found = DATA_URI.search(content)
+            raw = found.group(0) if found else ""
     if not raw.startswith("data:") or "," not in raw:
         return b""
     try:
@@ -1151,8 +1160,14 @@ def _token_for(url: str) -> str:
 def _proxy_for(url: str) -> str | None:
     host = _host(url)
     if host == "openrouter.ai" or host.endswith(".openrouter.ai"):
-        return (os.environ.get("OPENROUTER_PROXY") or "").strip() or None
+        from app.services.proxy_health import openrouter_fallback
+
+        return openrouter_fallback()
     if host.endswith("arvancloudai.ir"):
+        return None
+    fallback_host = _host(os.environ.get("CLOUD_LLM_FALLBACK_URL") or os.environ.get("IMAGE_FALLBACK_URL") or "")
+    if host and host == fallback_host:
+        # آروان از ایران مستقیم در دسترس است؛ پراکسی خارجی فقط کندش می‌کند.
         return None
     raw = (os.environ.get("CLOUD_LLM_PROXY") or os.environ.get("CHANNEL_PROXY") or "").strip()
     return raw or None

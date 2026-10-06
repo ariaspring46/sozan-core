@@ -5,6 +5,7 @@ import re
 import subprocess
 import tempfile
 import threading
+import time
 from html import unescape
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -12,7 +13,7 @@ from uuid import uuid4
 
 from app.config import settings
 from app.services import storefront_service, voice_service
-from app.services.channel_http import async_client, channel_proxy
+from app.services.channel_http import async_client, proxies_for
 from app.services.llm import complete_json
 from app.services.observe_client import emit_later
 from app.services.settings_service import get_settings
@@ -98,6 +99,16 @@ def parse_caption_sizes(text: str) -> str:
 
 
 def site_type_hint() -> str:
+    """Channel categories suggest bags or shoes. The shop tagline wins when it names a domain."""
+    from app.state_store import read_json
+
+    shop = read_json("shop.json", {})
+    vertical = str(shop.get("vertical") or "").strip() if isinstance(shop, dict) else ""
+    if vertical:
+        return vertical
+    named = f"{shop.get('tagline') or ''} {shop.get('brand') or ''}" if isinstance(shop, dict) else ""
+    if any(token in named for token in ("جواهر", "طلا", "الماس", "زیورآلات", "اکسسوری", "بدلیجات")):
+        return "jewelry"
     scan = get_scan()
     cats = [str(item).strip() for item in (scan.get("categories") or []) if str(item).strip()]
     if not cats:
@@ -171,6 +182,24 @@ def get_scan() -> dict:
     return data if isinstance(data, dict) else {}
 
 
+# a scan runs as a task inside the API process: a restart (every deploy) kills it and «running» would stay forever
+SCAN_STALE_SECONDS = 20 * 60
+SCAN_STALE_FA = "اسکن پیج نیمه‌کاره ماند؛ بگو دوباره اسکن کنم."
+
+
+def _scan_started_at(data: dict) -> float:
+    try:
+        started = float(data.get("startedAt") or 0)
+    except (TypeError, ValueError):
+        started = 0.0
+    if started:
+        return started
+    try:
+        return (tenant_dir() / "scan-status.json").stat().st_mtime  # rows written before startedAt existed
+    except OSError:
+        return 0.0
+
+
 def scan_status() -> dict:
     data = read_json("scan-status.json", {})
     if not isinstance(data, dict):
@@ -178,10 +207,15 @@ def scan_status() -> dict:
     status = str(data.get("status") or "idle")
     if status not in {"idle", "running", "done", "error"}:
         status = "idle"
+    error = str(data.get("error") or "")
+    if status == "running":
+        started = _scan_started_at(data)
+        if started and time.time() - started > SCAN_STALE_SECONDS:
+            status, error = "error", SCAN_STALE_FA
     return {
         "status": status,
         "productCount": int(data.get("productCount") or 0),
-        "error": str(data.get("error") or ""),
+        "error": error,
         "handles": [str(item) for item in (data.get("handles") or []) if str(item).strip()],
         "needsReview": bool(data.get("needsReview")),
         "errorClass": str(data.get("errorClass") or ""),
@@ -202,11 +236,13 @@ def _set_scan_status(*, status: str, product_count: int = 0, error: str = "", ha
     }
     if extra:
         payload.update(extra)
+    if status == "running":
+        payload["startedAt"] = time.time()
     write_json("scan-status.json", payload)
     return payload
 
 
-def start_scan(accounts: list[dict]) -> dict:
+def start_scan(accounts: list[dict], notify=None) -> dict:
     import asyncio
 
     from app.state_store import current_tenant, tenant_scope
@@ -243,6 +279,11 @@ def start_scan(accounts: list[dict]) -> dict:
                         status="failed",
                         payload={"handles": handles, "errorClass": SCAN_MODEL_ERROR},
                     )
+                    if notify:
+                        try:
+                            notify()
+                        except Exception:
+                            pass
                     return
                 count = int(out.get("productCount") or 0)
                 quality = out.get("quality") if isinstance(out.get("quality"), dict) else {}
@@ -279,6 +320,11 @@ def start_scan(accounts: list[dict]) -> dict:
                     title="scan-error",
                     payload={"handles": handles},
                 )
+            if notify:
+                try:
+                    notify()
+                except Exception:
+                    pass
 
     try:
         asyncio.get_running_loop().create_task(job())
@@ -347,12 +393,13 @@ def _extract(html: str, base: str) -> dict:
     return {"title": title, "description": description, "images": seen[:12], "text": _plain(html)}
 
 
-def _curl_get(url: str, headers: dict[str, str], timeout: float) -> tuple[int, bytes, str]:
+def _curl_once(url: str, headers: dict[str, str], timeout: float, proxy: str | None) -> tuple[int, bytes, str]:
     dest = Path(tempfile.mkstemp(prefix="sozan-scan-")[1])
     cmd = ["curl", "-sS", "-L", "--max-time", str(max(5, int(timeout))), "-o", str(dest), "-w", "%{http_code} %{url_effective}"]
-    proxy = channel_proxy()
     if proxy:
-        cmd.extend(["--proxy", proxy, "--noproxy", "*"])
+        cmd.extend(["--proxy", proxy])
+    else:
+        cmd.extend(["--noproxy", "*"])
     ua = headers.get("User-Agent") or USER_AGENT
     cmd.extend(["-A", ua])
     for key, value in headers.items():
@@ -371,6 +418,17 @@ def _curl_get(url: str, headers: dict[str, str], timeout: float) -> tuple[int, b
         return 0, b"", url
     finally:
         dest.unlink(missing_ok=True)
+
+
+def _curl_get(url: str, headers: dict[str, str], timeout: float) -> tuple[int, bytes, str]:
+    hops: list[str | None] = list(proxies_for(url)) or [None]
+    last = (0, b"", url)
+    for proxy in hops:
+        status, body, final = _curl_once(url, headers, timeout, proxy)
+        if status:
+            return status, body, final
+        last = (status, body, final)
+    return last
 
 
 async def _http_get(url: str, *, headers: dict[str, str], timeout: float) -> tuple[int, bytes, str]:
@@ -487,7 +545,7 @@ async def _sendbox_page(handle: str, sendbox_id: str) -> dict | None:
     except Exception:
         return None
     posts: list[dict] = []
-    for _ in range(8):
+    for _ in range(12):
         await asyncio.sleep(1.2)
         posts = sendbox_service.take_list_posts(ident)
         if posts:
@@ -777,6 +835,9 @@ def _page_posts(page: dict) -> list[dict]:
 
 
 def _product_from_caption(caption: str, brand: str = "", image_url: str = "", fallback_no: int = 0) -> dict | None:
+    text = str(caption or "")
+    if ":root" in text or "--fds-" in text or (text.count("{") and text.count("}") and len(re.findall(r"[A-Za-z]", text)) > 40):
+        return None
     title = product_title_from_caption(caption, brand=brand)
     if not title:
         # نامی پیدا نشد؛ جملهٔ فراخوان هرگز نام کالا نمی‌شود.
@@ -919,6 +980,12 @@ async def scan_account(*, platform: str, handle: str, brand: str, work: str, sen
     ident = str(sendbox_id or "").strip()
     if platform == "instagram":
         page = await _sendbox_page(handle, ident)
+        if not page and ident:
+            from app.services import sendbox_service
+
+            reason = sendbox_service.posts_block_reason(ident)
+            if reason:
+                notes.append(reason)
         if not page:
             page = await _boxapi_page(handle)
         if not page:
@@ -1206,12 +1273,13 @@ async def scan_accounts(accounts: list[dict]) -> dict:
         if key:
             seen_keys.add(key)
         title = str(row.get("title") or "").strip()
-        if not title:
+        description = str(row.get("description") or "")
+        if not title or storefront_service.is_placeholder_catalog(title, description):
             continue
         storefront_service.upsert_scanned_product(
             title=title,
             price=int(row.get("price") or 0),
-            description=str(row.get("description") or ""),
+            description=description,
             sku=str(row.get("sku") or ""),
             image=str(row.get("image") or ""),
             source=str(row.get("source") or ""),
@@ -1235,6 +1303,50 @@ async def scan_accounts(accounts: list[dict]) -> dict:
     if payload["about"]:
         voice_service.merge_summary(str(payload["about"]))
     return _save_scan(payload)
+
+
+_HANDLE_FULL = re.compile(r"(?:https?://)?(?:www\.)?(?:instagram\.com/)?(@?)([A-Za-z0-9._]{3,30})/?")
+_HANDLE_IN_SENTENCE = re.compile(r"(?:پیج|صفحه|اینستا(?:گرام)?|instagram)\s*(?:من|م|ام|ـم)?\s*(?:[:=]|اسمش|اسم|آیدی|ایدی|هست|است)?\s*@?([A-Za-z][A-Za-z0-9._]{2,29})(?![A-Za-z0-9._])", re.I)
+
+
+def handle_in_text(text: str) -> str:
+    """The Instagram page a seller names in the chat: a lone @handle / instagram.com link / handle with _ . or digits,
+    or «پیج من pinkshop_x». A bare English word is not a handle."""
+    value = (text or "").strip()
+    lone = _HANDLE_FULL.fullmatch(value)
+    if lone and (lone.group(1) or "instagram.com" in value.lower() or re.search(r"[_.\d]", lone.group(2))):
+        return lone.group(2).strip(".")
+    inside = _HANDLE_IN_SENTENCE.search(value)
+    if inside and re.search(r"[_.\d]", inside.group(1)):
+        return inside.group(1).strip(".")
+    if re.search(r"پیج|صفحه|اینستا|instagram", value, re.I):
+        marked = [
+            token.strip(".")
+            for token in re.findall(r"@?([A-Za-z][A-Za-z0-9._]{2,29})", value)
+            if re.search(r"[_.\d]", token) and not re.search(r"\.(com|ir|me|net|org)$", token, re.I)
+        ]
+        if len(marked) == 1:
+            return marked[0]
+    return ""
+
+
+def scan_outcome() -> str:
+    """One honest line about what the page scan found. The model must not say prices come from a page that gave nothing."""
+    status = scan_status()
+    accounts = [row for row in (get_scan().get("accounts") or []) if isinstance(row, dict)]
+    handles = "، ".join(str(row.get("handle") or "") for row in accounts if row.get("handle")) or "، ".join(status["handles"])
+    if status["status"] == "running":
+        return f"اسکن پیج {'، '.join(status['handles']) or handles} هنوز در جریان است؛ نتیجه‌اش را بعد بپرس."
+    scanned = [row for row in storefront_service.list_products().get("products") or [] if row.get("source")]
+    if scanned:
+        return f"اسکن پیج {handles} {len(scanned)} کالا آورد."
+    if not accounts and status["status"] == "idle":
+        return "هنوز هیچ پیجی اسکن نشده؛ هیچ کالا یا قیمتی از پیج در دست نیست."
+    return (
+        f"اسکن پیج {handles or 'ثبت‌شده'} نتیجه‌ای نداشت (اینستاگرام خالی داد یا پیج خوانده نشد)؛ هیچ کالا و قیمتی از پیج نخوانده‌ام "
+        "و قیمت را نمی‌شود از پیج برداشت. راه‌ها: اسم درست پیجت را بده تا دوباره اسکن کنم، یا کالا را با عکس و قیمت از «بیشتر ← انبار» "
+        "اضافه کن، یا بگو «بدون قیمت بساز» تا ویترین فقط استعلام بگیرد."
+    )
 
 
 def brief_for_shop() -> str:
@@ -1274,13 +1386,19 @@ def brief_for_shop() -> str:
     categories = "، ".join(cats) or "هنوز دسته اسکن نشده"
     catalog = "\n".join(f"- {line}" for line in lines) or "هنوز کالایی از کانال نیامده"
     page = "، ".join(handles) or "هنوز پیج اسکن نشده"
+    found = bool(scanned)
     return (
+        f"نتیجهٔ اسکن: {scan_outcome()}\n"
         f"پیج اسکن‌شده: {page}\n"
         f"اسکن شبکه‌ها: {scan.get('about') or '—'}\n"
         f"رنگ‌های دیده‌شده: {colors}\n"
         f"دسته‌بندی کانال: {categories}\n"
         f"کالاهای پیدا شده:\n{catalog}\n"
-        f"همین کاتالوگ را استفاده کن. نگو به پیج یا اینستاگرام دسترسی نداری. از همین عکس‌های کانال برای کارت کالا استفاده کن. تصویر ساختگی نساز."
+        + (
+            "همین کاتالوگ را استفاده کن. نگو به پیج یا اینستاگرام دسترسی نداری. از همین عکس‌های کانال برای کارت کالا استفاده کن. تصویر ساختگی نساز."
+            if found
+            else "از پیج چیزی نخوانده‌ای: نگو قیمت‌ها را از پیج برمی‌داری و قول اسکن نده؛ صادقانه بگو اسکن نتیجه نداشت و راه‌های بالا را بگو. تصویر ساختگی نساز."
+        )
     )
 
 # ---- Public API for other roles (docs/agents). Wrappers call the private names at call time, so tests that patch those still work.

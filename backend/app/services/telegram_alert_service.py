@@ -1,17 +1,16 @@
 """هشدار تلگرام به مالک: تیکت تازهٔ فروشنده و رویدادهای بحرانی.
 
 کلید `TELEGRAM_BOT_TOKEN` و `TELEGRAM_CHAT_ID` در env هاب است (مالک می‌گذارد)؛
-بی‌کلید همه‌چیز بی‌اثر است. ارسال با CHANNEL_PROXY که خود C برای پایشش استفاده
-می‌کند هم می‌رسد؛ هرگز متن مشتری یا شماره در پیام نمی‌آید.
+بی‌کلید همه‌چیز بی‌اثر است. ارسال از همان مسیر کانال است (پروکسی خارجی با پشتیبان)؛
+هرگز متن مشتری یا شماره در پیام نمی‌آید.
 """
 
 from __future__ import annotations
 
 import logging
 
-import httpx
-
 from app.config import settings
+from app.services.channel_http import async_client
 from app.services.observe_client import emit_later
 
 log = logging.getLogger("sozan.alerts")
@@ -31,16 +30,12 @@ def _chat_id() -> str:
     return str(getattr(settings, "telegram_chat_id", "") or "").strip()
 
 
-def _proxy() -> str | None:
-    return (str(getattr(settings, "channel_proxy", "") or "").strip() or None)
-
-
 async def send(text: str) -> bool:
     """یک پیام به چت مالک؛ بی‌کلید False و بدون هشدار."""
     if not configured():
         return False
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT, trust_env=False, proxy=_proxy()) as client:
+        async with async_client(timeout=TIMEOUT) as client:
             response = await client.post(
                 f"https://api.telegram.org/bot{_token()}/sendMessage",
                 json={"chat_id": _chat_id(), "text": text[:3500]},

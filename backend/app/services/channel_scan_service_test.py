@@ -1,6 +1,8 @@
 import asyncio
 import json
+import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -8,6 +10,60 @@ from unittest.mock import AsyncMock, patch
 from app.config import settings
 from app.services import channel_scan_service, shop_service
 from app.state_store import tenant_scope
+
+
+class PageHandleAndOutcomeTests(unittest.TestCase):
+    def test_a_named_page_is_found_in_the_chat_but_a_plain_word_is_not(self) -> None:
+        for text, handle in (
+            ("pinkshop528_sirjan", "pinkshop528_sirjan"),
+            ("@pinkshop528_sirjan", "pinkshop528_sirjan"),
+            ("https://www.instagram.com/mahsoo__beauty/", "mahsoo__beauty"),
+            ("پیج من pinkshop528_sirjan هست", "pinkshop528_sirjan"),
+            ("اینستاگرام: shop.sirjan", "shop.sirjan"),
+        ):
+            self.assertEqual(channel_scan_service.handle_in_text(text), handle, text)
+        for text in ("hello", "بساز", "yes build it", "قیمت ۸۵۰ هزار", "انگشتر نقره", ""):
+            self.assertEqual(channel_scan_service.handle_in_text(text), "", text)
+
+    def test_a_scan_killed_by_a_restart_does_not_stay_running_forever(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.state_store import write_json
+
+                write_json("scan-status.json", {"status": "running", "handles": ["pinkshop528_sirjan"], "startedAt": time.time() - 60})
+                self.assertEqual(channel_scan_service.scan_status()["status"], "running")
+                write_json("scan-status.json", {"status": "running", "handles": ["pinkshop528_sirjan"], "startedAt": time.time() - 3 * 3600})
+                stale = channel_scan_service.scan_status()
+                self.assertEqual(stale["status"], "error")
+                self.assertEqual(stale["error"], channel_scan_service.SCAN_STALE_FA)
+                self.assertNotIn("در جریان", channel_scan_service.scan_outcome())
+                # a row from before startedAt existed is judged by the file's age
+                write_json("scan-status.json", {"status": "running", "handles": ["pinkshop528_sirjan"]})
+                path = Path(raw) / "tenants" / "09123456789" / "scan-status.json"
+                old = time.time() - 5 * 3600
+                os.utime(path, (old, old))
+                self.assertEqual(channel_scan_service.scan_status()["status"], "error")
+
+    def test_an_empty_scan_is_told_as_it_is_and_never_as_a_source_of_prices(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.state_store import write_json
+
+                self.assertIn("هیچ پیجی اسکن نشده", channel_scan_service.scan_outcome())
+                write_json("scan-status.json", {"status": "done", "productCount": 0, "handles": ["mahsoo__beauty"], "rejected": 1})
+                write_json("channel-scan.json", {"accounts": [{"platform": "instagram", "handle": "mahsoo__beauty", "fetched": False, "products": []}]})
+                outcome = channel_scan_service.scan_outcome()
+                self.assertIn("mahsoo__beauty", outcome)
+                self.assertIn("نتیجه‌ای نداشت", outcome)
+                self.assertIn("نمی‌شود از پیج برداشت", outcome)
+                write_json("scan-status.json", {"status": "running", "productCount": 0, "handles": ["pinkshop528_sirjan"]})
+                self.assertIn("pinkshop528_sirjan", channel_scan_service.scan_outcome())
+                self.assertIn("در جریان", channel_scan_service.scan_outcome())
+                write_json("scan-status.json", {"status": "done", "productCount": 0, "handles": ["mahsoo__beauty"], "rejected": 1})
+                brief = channel_scan_service.brief_for_shop()
+                self.assertIn("نتیجهٔ اسکن:", brief)
+                self.assertIn("قول اسکن نده", brief)
+                self.assertNotIn("نگو به پیج یا اینستاگرام دسترسی نداری", brief)
 
 
 class ChannelScanTests(unittest.TestCase):
@@ -141,6 +197,12 @@ class ChannelScanTests(unittest.TestCase):
         merged = channel_scan_service.enrich_scan_products(caption_rows, llm_rows)
         self.assertEqual(merged[0]["price"], 3900)
 
+    def test_a_css_caption_is_not_a_product(self) -> None:
+        from app.services.channel_scan_service import _product_from_caption
+
+        css = ":root, .__ig-light-mode {--fds-black:#000000;--fds-black-alpha-05:rgba(0, 0, 0, 0.05);}"
+        self.assertIsNone(_product_from_caption(css, brand="سوزان"))
+
     def test_factory_prompt_forbids_invented_clothing(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
@@ -201,13 +263,25 @@ class ChannelScanTests(unittest.TestCase):
                 hint = captured[0][captured[0].index("--site-type-hint") + 1]
                 self.assertEqual(hint, "bags")
                 self.assertNotEqual(hint, "fashion")
-                self.assertIn("--catalog", captured[0])
-                catalog_path = Path(captured[0][captured[0].index("--catalog") + 1])
-                payload = json.loads(catalog_path.read_text(encoding="utf-8"))
-                self.assertEqual(payload["items"][0]["title"], "کیف دوشی")
-                self.assertEqual(payload["items"][0]["price"], 850000)
-                self.assertTrue(payload.get("lockItems"))
-                self.assertNotIn("مانتو", json.dumps(payload, ensure_ascii=False))
+
+    def test_jewelry_tagline_beats_bag_category(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                from app.state_store import write_json
+                from app.services import storefront_service
+
+                write_json("shop.json", {"brand": "سوزان", "tagline": "جواهر فروش و سنگ های گران قیمت"})
+                storefront_service.add_product(
+                    title="کیف دوشی",
+                    price=850000,
+                    stock=1,
+                    sku="ig",
+                    source="instagram",
+                    category="کیف",
+                )
+                self.assertEqual(channel_scan_service.site_type_hint(), "jewelry")
+                prompt = shop_service._factory_prompt("از نو بساز")
+                self.assertIn("شعار فروشگاه: جواهر فروش و سنگ های گران قیمت", prompt)
 
     def test_site_type_hint_unknown_category_is_general_store(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

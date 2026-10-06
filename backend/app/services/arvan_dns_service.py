@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import settings
+from app import egress
 
 API = "https://napi.arvancloud.ir/cdn/4.0"
 CNAME_PLAN_LEVEL = 2
@@ -95,7 +96,7 @@ def _origin_port() -> int:
 
 
 def _client() -> httpx.Client:
-    return httpx.Client(timeout=20.0, trust_env=False, headers=_headers())
+    return httpx.Client(timeout=20.0, trust_env=False, headers=_headers(), **egress.client_kwargs(sync=True))
 
 
 def _raise(res: httpx.Response) -> None:

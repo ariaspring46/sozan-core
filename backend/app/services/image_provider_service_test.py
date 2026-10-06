@@ -132,7 +132,7 @@ class ImageCutoverTests(unittest.TestCase):
             "IMAGE_FALLBACK_URL": "",
             "CLOUD_LLM_FALLBACK_URL": "",
             "IMAGE_LOCAL": "",
-            "OPENROUTER_PROXY": "",
+            "OPENROUTER_PROXY_FALLBACK": "",
         }
         with patch.dict("os.environ", env, clear=False), patch(
             "app.services.image_provider_service._post", side_effect=fake_post
@@ -144,15 +144,60 @@ class ImageCutoverTests(unittest.TestCase):
         self.assertEqual(seen["token"], "or-test-key")
         self.assertIn("openrouter.ai", seen["url"])
         self.assertEqual(seen["modalities"], ["image"])
-        with patch.dict("os.environ", {"OPENROUTER_PROXY": "socks5://127.0.0.1:9"}, clear=False):
+        with patch.dict("os.environ", {"OPENROUTER_PROXY_FALLBACK": "socks5://127.0.0.1:9"}, clear=False):
             self.assertEqual(
                 image_provider_service._proxy_for("https://openrouter.ai/api/v1"),
                 "socks5://127.0.0.1:9",
             )
         self.assertIsNone(image_provider_service._proxy_for("https://ai.arvancloudai.ir/v1"))
+        with patch.dict(
+            "os.environ",
+            {"CLOUD_LLM_FALLBACK_URL": "https://ai.sozan-core.ir/v1", "CHANNEL_PROXY": "socks5h://127.0.0.1:9"},
+            clear=False,
+        ):
+            self.assertIsNone(image_provider_service._proxy_for("https://ai.sozan-core.ir/v1"))
+            self.assertEqual(image_provider_service._proxy_for("https://other.example/v1"), "socks5h://127.0.0.1:9")
         self.assertEqual(result["cost"], 0.014)
         self.assertEqual(result["provider"], "Together")
         self.assertNotIn("or-test-key", seen["url"])
+
+    def test_arvan_markdown_image_content_is_parsed(self) -> None:
+        import base64
+
+        blob = b"\x89PNG\r\n\x1a\n" + b"x" * 40
+        encoded = base64.b64encode(blob).decode("ascii")
+        payload = {"choices": [{"message": {"role": "assistant", "content": f"![image](data:image/jpeg;base64,{encoded})"}}]}
+        self.assertEqual(image_provider_service._image_bytes(payload), blob)
+        plain = {"choices": [{"message": {"content": f"data:image/png;base64,{encoded}"}}]}
+        self.assertEqual(image_provider_service._image_bytes(plain), blob)
+        self.assertEqual(image_provider_service._image_bytes({"choices": [{"message": {"content": "no image here"}}]}), b"")
+
+    def test_blocked_primary_goes_straight_to_arvan_without_retry(self) -> None:
+        calls = []
+
+        def fake_post(url, token, body, timeout=None):
+            calls.append(body["model"])
+            if "openrouter.ai" in url:
+                raise image_provider_service.ImageHttpError(403)
+            return _payload(_png((9, 9, 9)), cost=0.068, provider="arvan")
+
+        env = {
+            "open_router_api_token": "or-test-key",
+            "IMAGE_FALLBACK": "arvan",
+            "IMAGE_RETRY_PAUSE": "0",
+            "IMAGE_FALLBACK_URL": "https://ai.sozan-core.ir/v1",
+            "IMAGE_FALLBACK_MODEL": "Gemini-3.1-Flash-Image-Preview",
+            "IMAGE_FALLBACK_TOKEN": "arvan-test",
+            "IMAGE_LOCAL": "",
+        }
+        with patch.dict("os.environ", env, clear=False), patch(
+            "app.services.image_provider_service._post", side_effect=fake_post
+        ), patch("app.services.image_provider_service._fit", side_effect=lambda data, size: data + b"0" * 3000), patch(
+            "app.services.image_provider_service.emit_later"
+        ):
+            result = image_provider_service.generate_image("mug")
+        self.assertEqual(calls, [image_provider_service.DEFAULT_MODEL, "Gemini-3.1-Flash-Image-Preview"])
+        self.assertTrue(result["fallback"])
 
     def test_timeout_falls_back_to_gemini_and_skips_local(self) -> None:
         calls = []

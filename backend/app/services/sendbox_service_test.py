@@ -15,7 +15,7 @@ class SendboxTakeoverTests(unittest.TestCase):
     def _bind(self, raw: str, tenant: str, account: str) -> None:
         with patch.object(settings, "state_dir", raw), patch.object(
             sendbox_service, "_kick_scan", lambda **kwargs: None
-        ):
+        ), patch.object(sendbox_service, "_schedule_activate", lambda account_id: None):
             sendbox_service.bind_instagram(account_id=account, phone=tenant, handle="victim")
 
     def test_claim_refuses_foreign_free_account(self) -> None:
@@ -32,7 +32,7 @@ class SendboxTakeoverTests(unittest.TestCase):
             self._bind(raw, "09135409482", "777")
             with patch.object(settings, "state_dir", raw), patch.object(
                 sendbox_service, "_kick_scan", lambda **kwargs: None
-            ):
+            ), patch.object(sendbox_service, "_schedule_activate", lambda account_id: None):
                 out = asyncio.run(
                     sendbox_service.claim_account(account_id="777", phone="09135409482", handle="newname")
                 )
