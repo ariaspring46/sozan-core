@@ -395,7 +395,10 @@ class RouterServiceTests(unittest.TestCase):
                 raise RuntimeError("blip")
             return {"text": "سلام، چه کمکی از من برمی‌آید؟", "tool_calls": [], "usage": {}}
 
-        with patch("app.services.router_service.asyncio.sleep", new=AsyncMock()):
+        # the fake sleep never yields; the heartbeat (which also sleeps) would spin once wait_for hands it the loop
+        with patch("app.services.router_service.asyncio.sleep", new=AsyncMock()), patch(
+            "app.services.router_service._heartbeat", new=AsyncMock()
+        ):
             out = self._turn("یک سؤال دارم", complete)
         self.assertEqual(calls["n"], 2)
         self.assertNotIn("مدل پاسخ نداد", out["messages"][-1]["text"])
