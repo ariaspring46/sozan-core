@@ -7,7 +7,8 @@
    "core": 39293,
    "core_pct": 87,
    "id": "X1",
-   "manifest": 8399,
+   "loose_contracts": 2,
+   "manifest": 8824,
    "rare": 8819,
    "tests": 26340
   },
@@ -16,7 +17,8 @@
    "core": 39779,
    "core_pct": 88,
    "id": "X2",
-   "manifest": 9665,
+   "loose_contracts": 6,
+   "manifest": 9770,
    "rare": 45152,
    "tests": 30370
   },
@@ -25,7 +27,8 @@
    "core": 15497,
    "core_pct": 34,
    "id": "X3",
-   "manifest": 10134,
+   "loose_contracts": 19,
+   "manifest": 10161,
    "rare": 1208,
    "tests": 33819
   },
@@ -34,17 +37,19 @@
    "core": 29023,
    "core_pct": 64,
    "id": "X4",
-   "manifest": 8695,
+   "loose_contracts": 12,
+   "manifest": 8815,
    "rare": 2323,
    "tests": 26367
   },
   {
-   "active": 76201,
+   "active": 77282,
    "core": 21155,
    "core_pct": 47,
    "id": "X5",
-   "manifest": 11568,
-   "rare": 33135,
+   "loose_contracts": 27,
+   "manifest": 11872,
+   "rare": 18591,
    "tests": 47892
   },
   {
@@ -52,7 +57,8 @@
    "core": 32543,
    "core_pct": 72,
    "id": "Y",
-   "manifest": 8886,
+   "loose_contracts": 12,
+   "manifest": 9539,
    "rare": 19762,
    "tests": 35711
   },
@@ -61,7 +67,8 @@
    "core": 33408,
    "core_pct": 74,
    "id": "Z",
-   "manifest": 4853,
+   "loose_contracts": 0,
+   "manifest": 4947,
    "rare": 29390,
    "tests": 14831
   },
@@ -70,7 +77,8 @@
    "core": 19799,
    "core_pct": 44,
    "id": "C",
-   "manifest": 9870,
+   "loose_contracts": 14,
+   "manifest": 10404,
    "rare": 0,
    "tests": 16166
   },
@@ -79,16 +87,18 @@
    "core": 9743,
    "core_pct": 22,
    "id": "U",
-   "manifest": 6260,
+   "loose_contracts": 0,
+   "manifest": 6906,
    "rare": 15872,
    "tests": 0
   },
   {
-   "active": 173089,
+   "active": 199885,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",
-   "manifest": 3323,
+   "loose_contracts": 0,
+   "manifest": 3431,
    "rare": 0,
    "tests": 0
   }

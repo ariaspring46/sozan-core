@@ -56,7 +56,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~6.3k tokens. Your core files total 9.7k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~6.9k tokens. Your core files total 9.7k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -117,7 +117,7 @@ export function panelOriginFromHost(hostHeader: string | null): string  # change
 ```
 **`frontend/components/onboard-gate.tsx`** — owner X3
 ```
-export function OnboardGate({ children }: { children: React.ReactNode })  # changed 2026-09-27
+export function OnboardGate({ children }: { children: React.ReactNode })  # changed 2026-09-18
 ```
 **`frontend/lib/use-ai-budget.ts`** — owner X5
 ```
@@ -128,15 +128,36 @@ export function useAiBudget(): AiBudget | null  # changed 2026-09-28
 export function usePlan(): PlanInfo | null  # changed 2026-09-27
 ```
 
-**Backend endpoints your pages call** (ask the owner for the response shape; do not read the file):
+**HTTP routes you call** (contract: method, path, parameters, response):
 
-- `/auth/me` → `backend/app/api/auth.py` (X5)
-- `/billing/plans` → `backend/app/api/billing.py` (X5)
-- `/campaigns` → `backend/app/api/campaigns.py` (X2)
-- `/channels` → `backend/app/api/channels.py` (X3)
-- `/inbox`, `/inbox/unread` → `backend/app/api/inbox.py` (Y)
-- `/shop` → `backend/app/api/shop.py` (X4)
-- `/catalog` → `backend/app/api/storefront.py` (C)
+```
+GET /auth/me  ()  # owner X5, changed 2026-10-02
+    backend/app/api/auth.py: returns keys {id, isAdmin, onboarded, phone, role}
+GET /billing/plans  ()  # owner X5, changed 2026-10-02
+    backend/app/api/billing.py: response untyped
+GET /campaigns  () -> list[CampaignOut]  # owner X2, changed 2026-10-02
+    backend/app/api/campaigns.py: response_model list[CampaignOut]
+GET /catalog  ()  # owner C, changed 2026-10-02
+    backend/app/api/storefront.py: response untyped
+GET /channels  ()  # owner X3, changed 2026-10-02
+    backend/app/api/channels.py: returns keys {voice}
+GET /inbox  (q: str, platform: str, filter: str)  # owner Y, changed 2026-10-02
+    backend/app/api/inbox.py: response untyped
+GET /inbox/unread  ()  # owner Y, changed 2026-10-02
+    backend/app/api/inbox.py: response untyped
+GET /inbox/{thread_id}  (thread_id: str)  # owner Y, changed 2026-10-02
+    backend/app/api/inbox.py: response untyped
+GET /shop  ()  # owner X4, changed 2026-10-02
+    backend/app/api/shop.py: response untyped
+PATCH /inbox/{thread_id}  (thread_id: str, body: ThreadPatchIn)  # owner Y, changed 2026-10-02
+    backend/app/api/inbox.py: ThreadPatchIn {paused: bool | None = None}; response untyped
+POST /campaigns  (body: CampaignCreateIn) -> CampaignOut  # owner X2, changed 2026-10-02
+    backend/app/api/campaigns.py: CampaignCreateIn {slug: str = Field(min_length=2, max_length=80, pattern='^[a-z0-9-]+$'); pillar: str; title: str; subtitle: str = ''; cta: str = ''; instagram_caption: str = ''; telegram_caption: str = ''; whatsapp_caption: str = ''}; response_model CampaignOut
+POST /catalog  (body: ProductIn)  # owner C, changed 2026-10-02
+    backend/app/api/storefront.py: ProductIn {title: str = Field(min_length=1, max_length=200); price: int = Field(default=0, ge=0); stock: int = Field(default=0, ge=0); sku: str = Field(default='', max_length=80); description: str = Field(default='', max_length=400); discount: int = Field(default=0, ge=0, le=90); priceNote: str = Field(default='', max_length=40); category: str = Field(default='', max
+POST /channels  (body: ChannelIn)  # owner X3, changed 2026-10-02
+    backend/app/api/channels.py: ChannelIn {platform: str = Field(min_length=2, max_length=32); handle: str = Field(default='', max_length=200); secret: str = Field(default='', max_length=2000); credentials: dict[str, str] = Field(default_factory=dict); samples: str = Field(default='', max_length=4000)}; returns keys {account, scan}
+```
 
 ## 8. Contracts outside imports (HTTP, files, services)
 
@@ -148,23 +169,23 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 
 ## 10. Your contract (others call these; change only after their ack)
 
-- `frontend/components/app-shell.tsx`: `AppShell` (changed 2026-09-28) ← C, X1, X2, X3, X4, X5, Y
+- `frontend/components/app-shell.tsx`: `AppShell` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y
 - `frontend/components/auth-image.tsx`: `AuthImage` (changed 2026-09-18) ← C, X2
 - `frontend/components/auth-media.tsx`: `AuthMedia` (changed 2026-09-18) ← X2
 - `frontend/components/empty-state.tsx`: `EmptyState` (changed 2026-09-18) ← C, X2, X3, X4, X5, Y
 - `frontend/components/field.tsx`: `Field` (changed 2026-09-18) ← C, X2, X3, X5, Y
 - `frontend/components/getting-started.tsx`: `GettingStarted` (changed 2026-09-27) ← X1
-- `frontend/components/login-coder-scene.tsx`: `LoginCoderScene` (changed 2026-09-27) ← X3, X5
+- `frontend/components/login-coder-scene.tsx`: `LoginCoderScene` (changed 2026-09-18) ← X3, X5
 - `frontend/components/sozan-mark.tsx`: `SozanMark` (changed 2026-09-18) ← C, X1, X3, X5
 - `frontend/components/theme-toggle.tsx`: `ThemeToggle` (changed 2026-09-27) ← X5
-- `frontend/components/ui/button.tsx`: `Button` (changed 2026-09-28) ← C, X1, X2, X3, X4, X5, Y
+- `frontend/components/ui/button.tsx`: `Button` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y
 - `frontend/components/ui/card.tsx`: `Card` (changed 2026-09-18) ← C, X2, X3, X5, Y
-- `frontend/components/ui/input.tsx`: `Input` (changed 2026-09-27) ← C, X2, X3, X5, Y
-- `frontend/components/ui/select.tsx`: `Select` (changed 2026-09-27) ← C, X3, Y
-- `frontend/components/ui/textarea.tsx`: `Textarea` (changed 2026-09-27) ← C, X2, X3
-- `frontend/lib/api.ts`: `ApiError` (changed 2026-09-24) ← X3, X5; `Brand` (changed 2026-09-24) ← X2; `Campaign` (changed 2026-09-24) ← X2; `api` (changed 2026-09-24) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-24) ← C; `chatMediaUrl` (changed 2026-09-24) ← X1; `clearToken` (changed 2026-09-24) ← X5; `fileUrl` (changed 2026-09-24) ← C; `getApiBase` (changed 2026-09-24) ← C, X2; `getOnboarded` (changed 2026-09-24) ← X3; `getToken` (changed 2026-09-24) ← X1, X2, X3; `setOnboarded` (changed 2026-09-24) ← X3, X5; `setToken` (changed 2026-09-24) ← X5
+- `frontend/components/ui/input.tsx`: `Input` (changed 2026-09-18) ← C, X2, X3, X5, Y
+- `frontend/components/ui/select.tsx`: `Select` (changed 2026-09-18) ← C, X3, Y
+- `frontend/components/ui/textarea.tsx`: `Textarea` (changed 2026-09-18) ← C, X2, X3
+- `frontend/lib/api.ts`: `ApiError` (changed 2026-09-21) ← X3, X5; `Brand` (changed 2026-09-18) ← X2; `Campaign` (changed 2026-09-18) ← X2; `api` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-18) ← C; `chatMediaUrl` (changed 2026-09-18) ← X1; `clearToken` (changed 2026-09-18) ← X5; `fileUrl` (changed 2026-09-18) ← C; `getApiBase` (changed 2026-09-18) ← C, X2; `getOnboarded` (changed 2026-09-18) ← X3; `getToken` (changed 2026-09-18) ← X1, X2, X3; `setOnboarded` (changed 2026-09-18) ← X3, X5; `setToken` (changed 2026-09-18) ← X5
 - `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← X1, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← X5
-- `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-21) ← X1, X4, Y; `finishIdempotencyKey` (changed 2026-09-21) ← X1, X4, Y; `takeIdempotencyKey` (changed 2026-09-21) ← X1, X4, Y
+- `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-20) ← X1, X4, Y; `finishIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y; `takeIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y
 - `frontend/lib/utils.ts`: `cn` (changed 2026-09-18) ← X1, X4, Y
 
 ## 11. Verify (exact commands)

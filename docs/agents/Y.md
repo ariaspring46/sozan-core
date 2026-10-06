@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~8.9k tokens. Your core files total 32.5k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.5k tokens. Your core files total 32.5k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -107,17 +107,17 @@ def edge_dry() -> bool  # changed 2026-09-27
 ```
 **`backend/app/services/pay_service.py`** — owner C
 ```
-async def create_order(*, title: str='', amount: int=0, product_id: str='', qty: int=1, customer: str='', channel: str='دایرکت', thread_id: str='', mobile: str='', lines: list[dict] | None=None) -> dict  # changed 2026-10-01
-def get_order(order_id: str) -> dict | None  # changed 2026-10-01
-def public_order(row: dict) -> dict  # changed 2026-10-01
+async def create_order(*, title: str='', amount: int=0, product_id: str='', qty: int=1, customer: str='', channel: str='دایرکت', thread_id: str='', mobile: str='', lines: list[dict] | None=None) -> dict  # changed 2026-09-19
+def get_order(order_id: str) -> dict | None  # changed 2026-09-18
+def public_order(row: dict) -> dict  # changed 2026-09-18
 ```
 **`backend/app/services/storefront_service.py`** — owner C
 ```
-def list_products() -> dict  # changed 2026-10-01
+def list_products() -> dict  # changed 2026-09-18
 ```
 **`frontend/components/app-shell.tsx`** — owner U
 ```
-export function AppShell(  # changed 2026-09-28
+export function AppShell(  # changed 2026-09-18
 ```
 **`frontend/components/empty-state.tsx`** — owner U
 ```
@@ -129,7 +129,7 @@ export function Field({ label, children }: { label: string; children: React.Reac
 ```
 **`frontend/components/ui/button.tsx`** — owner U
 ```
-export function Button(  # changed 2026-09-28
+export function Button(  # changed 2026-09-18
 ```
 **`frontend/components/ui/card.tsx`** — owner U
 ```
@@ -137,15 +137,15 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>)  #
 ```
 **`frontend/components/ui/input.tsx`** — owner U
 ```
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)  # changed 2026-09-27
+export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>)  # changed 2026-09-18
 ```
 **`frontend/components/ui/select.tsx`** — owner U
 ```
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)  # changed 2026-09-27
+export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>)  # changed 2026-09-18
 ```
 **`frontend/lib/api.ts`** — owner U
 ```
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T>  # changed 2026-09-24
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T>  # changed 2026-09-18
 ```
 **`frontend/lib/digits.ts`** — owner U
 ```
@@ -155,9 +155,9 @@ export function parseNonNegativeInt(raw: string): number | null  # changed 2026-
 ```
 **`frontend/lib/idempotency.ts`** — owner U
 ```
-export function emptyIdempotencySlot(): IdempotencySlot  # changed 2026-09-21
-export function finishIdempotencyKey(slot: IdempotencySlot, err?: unknown): void  # changed 2026-09-21
-export function takeIdempotencyKey(slot: IdempotencySlot, stamp: string): string  # changed 2026-09-21
+export function emptyIdempotencySlot(): IdempotencySlot  # changed 2026-09-20
+export function finishIdempotencyKey(slot: IdempotencySlot, err?: unknown): void  # changed 2026-09-20
+export function takeIdempotencyKey(slot: IdempotencySlot, stamp: string): string  # changed 2026-09-20
 ```
 **`frontend/lib/utils.ts`** — owner U
 ```
@@ -169,34 +169,33 @@ def guard_output(text: str, *, finish: str='', limit: int=800) -> str  # changed
 ```
 **`backend/app/services/router_embed.py`** — owner X1
 ```
-def cosine(left: list[float], right: list[float]) -> float  # changed 2026-10-01
+def cosine(left: list[float], right: list[float]) -> float  # changed 2026-09-22
 ```
 **`frontend/components/chat-thread.tsx`** — owner X1
 ```
 export type ChatMsg =  # changed 2026-09-29
-export function ChatThread(  # changed 2026-09-29
+export function ChatThread(  # changed 2026-09-28
 ```
 **`backend/app/services/channel_outbound_service.py`** — owner X3
 ```
-async def deliver(*, platform: str, sender_id: str, chat_id: str, text: str) -> None  # changed 2026-09-21
+async def deliver(*, platform: str, sender_id: str, chat_id: str, text: str) -> None  # changed 2026-09-18
 ```
 **`backend/app/services/channel_service.py`** — owner X3
 ```
-IG_RECONNECT = 'این پیج را دوباره با ورود رسمی وصل کن.'  # changed 2026-10-01
-PLATFORMS = {key: spec['label'] for key, spec in SPECS.items()}  # changed 2026-10-01
-PLATFORMS = {key: spec['label'] for key, spec in SPECS.items()}  # changed 2026-10-01
-def iter_accounts() -> list[dict]  # changed 2026-10-01
-def sendbox_account_id(row: dict) -> str  # changed 2026-10-01
-def token_for(row: dict) -> str  # changed 2026-10-01
+IG_RECONNECT = 'این پیج را دوباره با ورود رسمی وصل کن.'  # changed 2026-09-28
+PLATFORMS = {key: spec['label'] for key, spec in SPECS.items()}  # changed 2026-09-18
+def iter_accounts() -> list[dict]  # changed 2026-09-18
+def sendbox_account_id(row: dict) -> str  # changed 2026-09-18
+def token_for(row: dict) -> str  # changed 2026-09-18
 def uses_hub_bot(row: dict) -> bool  # Telegram row with no bot of its own: it only borrows the shared hub bot to post.  # changed 2026-10-01
 ```
 **`backend/app/services/chat_media_service.py`** — owner X3
 ```
-def caption(kind: str) -> str  # changed 2026-10-01
+def caption(kind: str) -> str  # changed 2026-09-18
 ```
 **`backend/app/services/telegram_service.py`** — owner X3
 ```
-async def pull_updates(*, token: str, handle: str='') -> dict  # changed 2026-09-26
+async def pull_updates(*, token: str, handle: str='') -> dict  # changed 2026-09-18
 ```
 **`frontend/components/channel-alert.tsx`** — owner X3
 ```
@@ -205,18 +204,18 @@ export function ChannelAlert({ inset = true }: { inset?: boolean })  # changed 2
 **`backend/app/services/shop_service.py`** — owner X4
 ```
 def current_shop() -> dict  # changed 2026-10-01
-def live_url(shop: dict) -> str  # changed 2026-10-01
+def live_url(shop: dict) -> str  # changed 2026-09-18
 ```
 **`backend/app/config.py`** — owner X5
 ```
-settings = Settings()  # changed 2026-10-01
-Settings.jwt_secret: str = 'change-me-to-a-long-random-secret'  # changed 2026-10-01
-Settings.local_llm_token: str = 'sk-local'  # changed 2026-10-01
-Settings.local_llm_url: str = 'http://127.0.0.1:9292/v1'  # changed 2026-10-01
+settings = Settings()  # changed 2026-09-18
+Settings.jwt_secret: str = 'change-me-to-a-long-random-secret'  # changed 2026-09-18
+Settings.local_llm_token: str = 'sk-local'  # changed 2026-09-18
+Settings.local_llm_url: str = 'http://127.0.0.1:9292/v1'  # changed 2026-09-18
 ```
 **`backend/app/security.py`** — owner X5
 ```
-def require_permission(code: str)  # changed 2026-09-27
+def require_permission(code: str)  # changed 2026-09-18
 ```
 **`backend/app/services/idempotency_service.py`** — owner X5
 ```
@@ -226,53 +225,73 @@ def recall(scope: str, key: str, stamp: str) -> Any | None  # changed 2026-09-24
 ```
 **`backend/app/services/llm.py`** — owner X5
 ```
-ARVAN_HOST_SUFFIX = 'arvancloudai.ir'  # changed 2026-10-01
-INBOX_TURN_BUDGET = 30.0  # changed 2026-10-01
-LLM_BAD_JSON = {'reply': 'مدل پاسخ خوانا نداد. پیام را کوتاه\u200cتر دوباره بفرست.', 'error': 'llm_bad_json'}  # changed 2026-10-01
-async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict  # changed 2026-10-01
-async def complete_tools(*, messages: list[dict], tools: list[dict], temperature: float=0.2, max_tokens: int=ROUTER_MAX_TOKENS, timeout: float | None=None, surface: str='router') -> dict  # Tool-call round. Router and inbox are cloud-first.  # changed 2026-10-01
-def spoken_model_reply(text: str) -> str  # changed 2026-10-01
+ARVAN_HOST_SUFFIX = 'arvancloudai.ir'  # changed 2026-09-21
+INBOX_TURN_BUDGET = 30.0  # changed 2026-09-27
+LLM_BAD_JSON = {'reply': 'مدل پاسخ خوانا نداد. پیام را کوتاه\u200cتر دوباره بفرست.', 'error': 'llm_bad_json'}  # changed 2026-09-18
+async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700) -> dict  # changed 2026-09-18
+async def complete_tools(*, messages: list[dict], tools: list[dict], temperature: float=0.2, max_tokens: int=ROUTER_MAX_TOKENS, timeout: float | None=None, surface: str='router') -> dict  # Tool-call round. Router and inbox are cloud-first.  # changed 2026-09-27
+def spoken_model_reply(text: str) -> str  # changed 2026-09-18
 ```
 **`backend/app/services/observe_client.py`** — owner X5
 ```
-def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, surface: str='', component: str='', stage: str='', status: str='', conversation_id: str='', turn_id: str='', operation_id: str='', job_id: str='', scan_id: str='', parent_id: str='', event_id: str='', started_at: float | None=None, duration_ms: int | None=None) -> None  # changed 2026-10-01
+def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, surface: str='', component: str='', stage: str='', status: str='', conversation_id: str='', turn_id: str='', operation_id: str='', job_id: str='', scan_id: str='', parent_id: str='', event_id: str='', started_at: float | None=None, duration_ms: int | None=None) -> None  # changed 2026-09-18
 ```
 **`backend/app/services/pipeline_release.py`** — owner X5
 ```
-BEHAVIOR_VERSION = '2026.09.16-pipeline'  # changed 2026-10-01
-def hub_release_id() -> str  # changed 2026-10-01
+BEHAVIOR_VERSION = '2026.09.16-pipeline'  # changed 2026-09-18
+def hub_release_id() -> str  # changed 2026-09-18
 ```
 **`backend/app/services/plan_service.py`** — owner X5
 ```
-def current() -> dict  # changed 2026-09-28
+def current() -> dict  # changed 2026-09-18
 ```
 **`backend/app/services/profile_service.py`** — owner X5
 ```
 TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\u200cتعارف.', 'sampleRepl...  # changed 2026-09-18
-TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\u200cتعارف.', 'sampleRepl...  # changed 2026-09-18
 ```
 **`backend/app/services/settings_service.py`** — owner X5
 ```
-def allows_training() -> bool  # True unless this seller turned «کمک به بهتر شدن سوزان» off.  # changed 2026-10-01
-def get_settings() -> dict  # changed 2026-10-01
+def allows_training() -> bool  # True unless this seller turned «کمک به بهتر شدن سوزان» off.  # changed 2026-09-28
+def get_settings() -> dict  # changed 2026-09-18
 ```
 **`backend/app/services/tenant_lock.py`** — owner X5
 ```
-def tenant_file_lock(name: str='shop') -> Iterator[None]  # changed 2026-09-25
+def tenant_file_lock(name: str='shop') -> Iterator[None]  # changed 2026-09-18
 ```
 **`backend/app/state_store.py`** — owner X5
 ```
-def current_tenant() -> str  # changed 2026-10-01
-def read_json(name: str, default: Any, *, shared: bool=False) -> Any  # changed 2026-10-01
-def write_json(name: str, payload: Any, *, shared: bool=False) -> None  # changed 2026-10-01
+def current_tenant() -> str  # changed 2026-09-18
+def read_json(name: str, default: Any, *, shared: bool=False) -> Any  # changed 2026-09-18
+def write_json(name: str, payload: Any, *, shared: bool=False) -> None  # changed 2026-09-18
 ```
 
-**Backend endpoints your pages call** (ask the owner for the response shape; do not read the file):
+**HTTP routes you call** (contract: method, path, parameters, response):
 
-- `/channels` → `backend/app/api/channels.py` (X3)
-- `/settings`, `/settings/sales-policy` → `backend/app/api/settings.py` (X5)
-- `/sales` → `backend/app/api/storefront.py` (C)
-- `/wallet/orders` → `backend/app/api/wallet.py` (X5)
+```
+GET /channels  ()  # owner X3, changed 2026-10-02
+    backend/app/api/channels.py: returns keys {voice}
+GET /sales  ()  # owner C, changed 2026-10-02
+    backend/app/api/storefront.py: response untyped
+GET /settings  ()  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: response untyped
+GET /settings/sales-policy  ()  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: response untyped
+GET /wallet/orders  ()  # owner C, changed 2026-10-02
+    backend/app/api/pay.py: returns keys {orders}
+PATCH /settings  (body: SettingsIn)  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: SettingsIn {mockSms: bool | None = None; adminPhone: str | None = None; otpTtlSeconds: int | None = None; gatewayPublicUrl: str | None = None; storeName: str | None = None; storeTagline: str | None = None; paymentSandbox: bool | None = None; paymentGateway: str | None = None; paymentMerchantId: str | None = Field(default=None, max_length=80); paymentApiKey: str | None 
+POST /channels  (body: ChannelIn)  # owner X3, changed 2026-10-02
+    backend/app/api/channels.py: ChannelIn {platform: str = Field(min_length=2, max_length=32); handle: str = Field(default='', max_length=200); secret: str = Field(default='', max_length=2000); credentials: dict[str, str] = Field(default_factory=dict); samples: str = Field(default='', max_length=4000)}; returns keys {account, scan}
+POST /sales  (body: SaleIn)  # owner C, changed 2026-10-02
+    backend/app/api/storefront.py: SaleIn {title: str = Field(min_length=1, max_length=200); amount: int = Field(ge=0); customer: str = Field(default='', max_length=200); channel: str = Field(default='فروشگاه', max_length=80)}; response untyped
+PUT /settings/sales-policy  (body: SalesPolicyIn)  # owner X5, changed 2026-10-02
+    backend/app/api/settings.py: SalesPolicyIn {shippingMethod: str | None = None; shippingCost: str | int | None = None; shippingDays: str | None = None; shippingCities: str | None = None; freeShippingFrom: str | int | None = None; returnDays: str | int | None = None; returnNote: str | None = None; returnPayer: str | None = None; hours: str | None = None; sizeExchange: str | None = None; invoice: str
+```
+
+**Shared runtime state files** (other roles depend on these keys; changing a key is a contract change):
+
+- `inbox.json`: writers: Y; readers: X5 — top-level keys per role: X5: {threads}; Y: {threads}
+- `voice.json`: writers: Y; readers: X1 — top-level keys per role: X1: {toneId}
 
 ## 8. Contracts outside imports (HTTP, files, services)
 
@@ -285,14 +304,15 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 
 ## 10. Your contract (others call these; change only after their ack)
 
-- `backend/app/api/inbox.py`: `router` (changed 2026-09-28) ← X5
+- `HTTP routes`: `GET /inbox/unread` (changed 2026-10-02) ← U; `GET /inbox/{thread_id}` (changed 2026-10-02) ← U; `GET /inbox` (changed 2026-10-02) ← U; `PATCH /inbox/{thread_id}` (changed 2026-10-02) ← U
+- `backend/app/api/inbox.py`: `router` (changed 2026-09-18) ← X5
 - `backend/app/services/claims_guard.py`: `check` (changed 2026-09-27) ← X2
-- `backend/app/services/inbox_service.py`: `expire_stale_sending` (changed 2026-10-01) ← X5; `handle_inbound` (changed 2026-10-01) ← X3; `list_publish_audience` (changed 2026-10-01) ← X1, X2; `list_threads` (changed 2026-10-01) ← X1; `rearm_pending_auto_replies` (changed 2026-10-01) ← X5; `save_auto_reply` (changed 2026-10-01) ← X1; `unread_count` (changed 2026-10-01) ← X1
+- `backend/app/services/inbox_service.py`: `expire_stale_sending` (changed 2026-09-18) ← X5; `handle_inbound` (changed 2026-09-18) ← X3; `list_publish_audience` (changed 2026-09-21) ← X1, X2; `list_threads` (changed 2026-09-18) ← X1; `rearm_pending_auto_replies` (changed 2026-09-26) ← X5; `save_auto_reply` (changed 2026-09-18) ← X1; `unread_count` (changed 2026-09-18) ← X1
 - `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X5
-- `backend/app/services/sales_policy_service.py`: `public_policy` (changed 2026-09-29) ← X5; `save_policy` (changed 2026-09-29) ← X5
-- `backend/app/services/training_log.py`: `log_example` (changed 2026-09-29) ← X1, X2, X4; `log_label` (changed 2026-09-29) ← X5
-- `backend/app/services/voice_service.py`: `apply_tone` (changed 2026-10-01) ← X1, X3; `get_voice` (changed 2026-10-01) ← X3, X5; `learn` (changed 2026-10-01) ← X3; `merge_summary` (changed 2026-10-01) ← X3
-- `frontend/components/sales-policy-form.tsx`: `SalesPolicyForm` (changed 2026-09-28) ← X5
+- `backend/app/services/sales_policy_service.py`: `public_policy` (changed 2026-09-27) ← X5; `save_policy` (changed 2026-09-27) ← X5
+- `backend/app/services/training_log.py`: `log_example` (changed 2026-09-28) ← X1, X2, X4; `log_label` (changed 2026-09-28) ← X5
+- `backend/app/services/voice_service.py`: `apply_tone` (changed 2026-09-18) ← X1, X3; `get_voice` (changed 2026-09-18) ← X3, X5; `learn` (changed 2026-09-18) ← X3; `merge_summary` (changed 2026-09-18) ← X3
+- `frontend/components/sales-policy-form.tsx`: `SalesPolicyForm` (changed 2026-09-27) ← X5
 - `frontend/components/training-choice.tsx`: `TrainingChoice` (changed 2026-09-28) ← X5
 
 ## 11. Verify (exact commands)

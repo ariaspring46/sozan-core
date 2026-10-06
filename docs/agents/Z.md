@@ -90,13 +90,22 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Tests:** `voice-gateway/test_voice.py`
 
-**Yours but never read** (generated or huge; change only through its script): `voice-agent-talk.md` (55.5k), `voice-gateway/sales-holdout.jsonl` (4.0k), `voice-gateway/sales-train.jsonl` (115.2k)
+**Yours but never read** (generated or huge; change only through its script): `voice-agent-talk.md` (57.3k), `voice-gateway/sales-holdout.jsonl` (4.0k), `voice-gateway/sales-train.jsonl` (115.2k)
 
 Every other file in the repo belongs to another role (see `docs/agents/README.md`).
 
 ## 7. What you use from other roles (do not open their files; signatures are here)
 
 Nothing.
+
+**HTTP routes you call** (contract: method, path, parameters, response):
+
+```
+GET /billing/plans  ()  # owner X5, changed 2026-10-02
+    backend/app/api/billing.py: response untyped
+GET /health  ()  # owner X5, changed 2026-10-02
+    backend/app/main.py: returns keys {edgeDry, ok, paymentReady}
+```
 
 ## 8. Contracts outside imports (HTTP, files, services)
 

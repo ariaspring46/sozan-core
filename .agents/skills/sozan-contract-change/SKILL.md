@@ -4,16 +4,16 @@ display-name: Sozan Contract Change
 description: Checklist for changing a cross-role signature in Sozan-Core: regenerate docs/agents with build.py and notify every consumer role.
 ---
 
-Use this skill whenever a task changes anything another role depends on: a function or class signature listed in `docs/agents/contracts.json`, an import across roles, an API route, or a config setting.
+Use this skill whenever a task changes anything another role depends on: a function or class signature listed in `docs/agents/contracts.json`, the fields of a shared class or TS type (`shape`), an HTTP route another role calls (`HTTP <METHOD> <path>` keys, including the voice gateway's calls to api.sozan-core.ir), a top-level key of a shared state file (`STATE <file>` keys), an import across roles, or a config setting.
 
 ## Before the edit
-1. Find the contract in `docs/agents/contracts.json`: note `owner`, `users`, and the current `signature` and `since`.
+1. Find the contract in `docs/agents/contracts.json`: note `owner`, `users`, the current `signature`, `shape` and `since` (`since` = the date the signature or shape last changed, not the file's last commit).
 2. Prefer non-breaking changes: add parameters with defaults, keep old call shapes working where possible.
 3. If the change requires a file you do not own, it is a request in that role's report file, never an edit (harness §2).
 
 ## The change
 4. Edit the code.
-5. Run `python3 tools/agent_context/build.py`. It regenerates `docs/agents/**`, stamps the `since` date on changed contracts, and prints `اعلام قرارداد` lines naming every consumer role (with its report file) that must be told.
+5. Run `python3 tools/agent_context/build.py`. It regenerates `docs/agents/**`, sets `since` to today only on contracts whose signature or shape changed (others keep their date), and prints `اعلام قرارداد` lines naming every consumer role (with its report file) that must be told.
 6. For each named role, append a request to its report file (report file per role: table in `docs/agents/README.md`):
 
    ```
