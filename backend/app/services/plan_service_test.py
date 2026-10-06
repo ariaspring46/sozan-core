@@ -72,7 +72,8 @@ class PlanPriceTests(unittest.TestCase):
                 self.assertEqual(out["amount"], pro["price"])
 
     def test_phone_coupon_stacks_on_effective_price(self) -> None:
-        now = datetime(2026, 9, 27, tzinfo=timezone.utc)
+        # the coupon check reads the real clock: a fixed date here expired the window on 2026-10-04 and broke CI
+        now = datetime.now(timezone.utc)
         patches = _during_discount()
         with tempfile.TemporaryDirectory() as raw:
             with (

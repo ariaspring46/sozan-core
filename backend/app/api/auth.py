@@ -6,7 +6,7 @@ from app.database import get_session
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas import OtpSendIn, OtpVerifyIn
-from app.security import get_current_user
+from app.security import encode_token, get_current_user, session_minutes
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -64,3 +64,9 @@ async def me(user: User = Depends(get_current_user)):
         "onboarded": bool(profile.get("onboarded")),
         "isAdmin": _is_hub_admin(user.phone),
     }
+
+
+@router.post("/refresh")
+async def refresh(user: User = Depends(get_current_user)):
+    """توکن تازه با مهلت کامل؛ پنل روزی یک بار صدا می‌زند تا فروشنده‌ای که سر می‌زند هیچ‌وقت بیرون نیفتد."""
+    return {"access_token": encode_token(user.id, user.role, ttl_minutes=session_minutes()), "token_type": "bearer"}

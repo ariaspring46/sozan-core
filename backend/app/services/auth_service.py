@@ -11,7 +11,7 @@ from app.config import settings
 from app.phone import normalize_digits, normalize_phone
 from app.redis_client import redis_client
 from app.repositories.user_repository import UserRepository
-from app.security import encode_token
+from app.security import encode_token, session_minutes
 from app.services import sms_service
 from app.services.settings_service import get_settings
 from app.state_store import tenant_scope
@@ -317,7 +317,7 @@ class AuthService:
         from app.services import profile_service
 
         profile = profile_service.touch(phone, existed=existed)
-        token = encode_token(user.id, user.role)
+        token = encode_token(user.id, user.role, ttl_minutes=session_minutes())
         return {
             "access_token": token,
             "token_type": "bearer",

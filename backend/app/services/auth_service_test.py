@@ -97,6 +97,15 @@ class OtpResendTests(unittest.TestCase):
         self.assertEqual(out.get("token") or out.get("access_token") or "jwt", "jwt")
         self.assertNotIn("otp:09111234567", self.redis.store)
 
+    def test_verify_issues_long_session_token(self) -> None:
+        self.redis.store["otp:09111234567"] = "123456"
+        self.redis.ttls["otp:09111234567"] = 100
+        with patch("app.services.profile_service.touch", return_value={}), patch.object(
+            auth_service, "encode_token", return_value="jwt"
+        ) as encode:
+            asyncio.run(self.svc.verify_otp("09111234567", "123456"))
+        self.assertEqual(encode.call_args.kwargs.get("ttl_minutes"), auth_service.settings.session_days * 24 * 60)
+
     def test_verify_rejects_wrong_or_empty_code(self) -> None:
         self.redis.store["otp:09111234567"] = "123456"
         with self.assertRaises(HTTPException):

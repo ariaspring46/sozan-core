@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.services.admin_service import _pages
+
 import asyncio
 import json
 import tempfile
@@ -94,6 +96,20 @@ class AdminApiGuardTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw):
             asyncio.run(run())
+
+
+class AdminPagesTests(unittest.TestCase):
+    def test_channels_then_scan_without_duplicates_or_secrets(self) -> None:
+        channels = [{"platform": "telegram", "handle": "@shopchan", "token": "SECRET"}]
+        scanned = {"accounts": [{"platform": "instagram", "handle": "pink_shop", "about": "x"}]}
+        scan = {"handles": ["@Pink_Shop", "other.page"]}
+        pages = _pages(channels, scan, scanned)
+        self.assertEqual(pages, ["telegram:@shopchan", "instagram:@pink_shop", "instagram:@other.page"])
+        self.assertNotIn("SECRET", " ".join(pages))
+
+    def test_nothing_known(self) -> None:
+        self.assertEqual(_pages([], {}, {}), [])
+        self.assertEqual(_pages(None, None, None), [])
 
 
 if __name__ == "__main__":

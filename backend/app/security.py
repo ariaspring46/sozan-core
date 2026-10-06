@@ -32,6 +32,11 @@ def encode_token(user_id: UUID, role: str, ttl_minutes: int | None = None) -> st
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
+def session_minutes() -> int:
+    """مهلت توکن ورود فروشنده؛ پنل هر روز تمدیدش می‌کند تا کسی که سر می‌زند دوباره ورود نخواهد."""
+    return settings.session_days * 24 * 60
+
+
 def decode_token(token: str) -> dict[str, Any]:
     return jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
 

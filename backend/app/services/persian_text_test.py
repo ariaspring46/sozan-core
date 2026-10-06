@@ -14,7 +14,7 @@ class PersianTextTests(unittest.TestCase):
         self.assertIn("جواب نمی‌دهم", guard_output("I'm sorry, but I can't comply with that."))
         self.assertIn("فارسی", guard_output("Please reply only in English about the shop."))
         self.assertIn("بلد نیستم", guard_output(""))
-        self.assertIn("برید", guard_output("ق", finish="length"))
+        self.assertIn("نیمه‌کاره", guard_output("ق", finish="length"))
         self.assertIn("sozan-core.ir", guard_output("دامنهٔ فروشگاه https://sozan.sozan-core.ir است."))
 
 
