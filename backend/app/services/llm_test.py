@@ -13,7 +13,9 @@ from app.services.llm import (
     _chat_completion,
     _choice_text,
     _classify_llm_error,
+    _decorate_cloud_body,
     _ensure_gpu1,
+    _tool_result,
     complete_tools,
     factory_holds_gpu1,
     parse_json_object,
@@ -71,6 +73,38 @@ class SpokenReplyTests(unittest.TestCase):
         self.assertEqual(text, "رنگ دکمه عوض شد.")
         self.assertNotIn("Chain of thought", text)
         self.assertEqual(spoken_model_reply(text), "رنگ دکمه عوض شد.")
+
+    @staticmethod
+    def _msg(content: str = "", reasoning: str = "") -> dict:
+        return {"choices": [{"message": {"content": content, "reasoning_content": reasoning}, "finish_reason": "length"}]}
+
+    def test_out_of_tokens_thinking_is_never_the_answer(self) -> None:
+        # seen live 2026-10-04: Arvan GPT-OSS with the router's 150 tokens, content empty, the thinking went to the seller
+        payload = self._msg("", 'The user wrote in Persian: "فروشگاهم کی آماده میشه". We need to answer briefly.')
+        self.assertEqual(_choice_text(payload), "")
+
+    def test_misplaced_persian_answer_in_reasoning_is_kept(self) -> None:
+        self.assertEqual(_choice_text(self._msg("", "فروشگاهت تا چند دقیقهٔ دیگر آماده است.")), "فروشگاهت تا چند دقیقهٔ دیگر آماده است.")
+
+    def test_raw_channel_format_keeps_only_the_final_answer(self) -> None:
+        raw = (
+            "<|channel|>analysis<|message|>User asks when the shop is ready.<|end|>"
+            '<|start|>assistant<|channel|>final<|message|>{"reply":"تا چند دقیقهٔ دیگر آماده است."}<|return|>'
+        )
+        self.assertEqual(_choice_text(self._msg(raw)), '{"reply":"تا چند دقیقهٔ دیگر آماده است."}')
+        self.assertEqual(_choice_text(self._msg("<|start|>assistant<|channel|>")), "")
+        self.assertEqual(_choice_text(self._msg("<|channel|>analysis<|message|>Thinking only")), "")
+        tool = _tool_result({"model": "GPT-OSS-120B"}, self._msg(raw), {})
+        self.assertEqual(tool["text"], '{"reply":"تا چند دقیقهٔ دیگر آماده است."}')
+
+    def test_gpt_oss_thinks_briefly_with_room_to_answer(self) -> None:
+        body = {"model": "GPT-OSS-120B", "max_tokens": 150}
+        _decorate_cloud_body(body, {"kind": "cloud", "url": "https://ai.sozan-core.ir/v1", "model": "GPT-OSS-120B"})
+        self.assertEqual(body["reasoning_effort"], "low")
+        self.assertGreaterEqual(body["max_tokens"], 800)
+        other = {"model": "deepseek/deepseek-v4.1-flash", "max_tokens": 150}
+        _decorate_cloud_body(other, {"kind": "cloud", "url": "https://ai.sozan-core.ir/v1", "model": "deepseek/deepseek-v4.1-flash"})
+        self.assertEqual(other, {"model": "deepseek/deepseek-v4.1-flash", "max_tokens": 150})
 
 
 class ChatHistoryTests(unittest.TestCase):
@@ -918,7 +952,9 @@ class InboxHopTests(unittest.TestCase):
         self.assertEqual(len(chats), 1)
         self.assertIn("ai.example", chats[0]["url"])
         self.assertEqual(chats[0]["model"], "GPT-OSS-120B")
-        self.assertEqual(chats[0]["timeout"], 15)
+        # the route has a proxy: 15 s overall, and only a few of them to connect through it (proxy_health)
+        self.assertEqual(chats[0]["timeout"].read, 15)
+        self.assertEqual(chats[0]["timeout"].connect, 4.0)
         self.assertNotIn("9292", chats[0]["url"])
 
     def test_inbox_uses_the_local_model_only_after_the_cloud_fails(self) -> None:
@@ -964,6 +1000,58 @@ class InboxHopTests(unittest.TestCase):
             [hop["model"] for hop in hops],
             ["anthropic/claude-haiku-4.5", "deepseek/deepseek-v4.1-flash", "qwen3.5-9b"],
         )
+
+
+class ArvanOnlyFallbackTests(unittest.TestCase):
+    CLOUD = {"kind": "cloud", "url": "https://openrouter.ai/api/v1", "model": "deepseek/deepseek-v4.1-flash", "token": "x", "source": "override"}
+    ARVAN = {"kind": "cloud", "url": "https://ai.sozan-core.ir/v1", "model": "GPT-OSS-120B", "token": "y", "source": "fallback"}
+    LOCAL = {"kind": "local", "url": "http://127.0.0.1:9292/v1", "model": "qwen3.8-27b", "token": "", "source": "default"}
+
+    def _run(self, env: dict, *, surface: str = "studio") -> tuple[object, list[str]]:
+        calls: list[str] = []
+
+        async def fake(route, **_kw):
+            calls.append(str(route.get("model")))
+            if route.get("kind") == "local":
+                return "محلی"
+            raise RuntimeError("cloud down")
+
+        with (
+            patch.dict(os.environ, env, clear=False),
+            patch("app.services.llm.route_for_surface", return_value=self.CLOUD),
+            patch("app.services.llm._fallback_cloud_route", return_value=self.ARVAN),
+            patch("app.services.llm._local_default_route", return_value=self.LOCAL),
+            patch("app.services.llm._budget_capped", return_value=None),
+            patch("app.services.llm._complete_with_route", side_effect=fake),
+        ):
+            try:
+                out: object = asyncio.run(
+                    _chat_completion(messages=[{"role": "user", "content": "x"}], temperature=0.2, max_tokens=50, surface=surface)
+                )
+            except Exception as exc:
+                out = exc
+        return out, calls
+
+    def test_default_still_ends_on_local(self) -> None:
+        out, calls = self._run({"LLM_LOCAL_FALLBACK": "1"})
+        self.assertEqual(out, "محلی")
+        self.assertEqual(calls, ["deepseek/deepseek-v4.1-flash", "GPT-OSS-120B", "qwen3.8-27b"])
+
+    def test_local_off_ends_at_arvan(self) -> None:
+        out, calls = self._run({"LLM_LOCAL_FALLBACK": "0"})
+        self.assertIsInstance(out, Exception)
+        self.assertEqual(calls, ["deepseek/deepseek-v4.1-flash", "GPT-OSS-120B"])
+
+    def test_arvan_fallback_host_skips_foreign_proxy(self) -> None:
+        from app.config import settings
+        from app.services.llm import _proxy_for_url, local_fallback_enabled
+
+        with patch.dict(os.environ, {"CLOUD_LLM_FALLBACK_URL": "https://ai.sozan-core.ir/v1", "LLM_LOCAL_FALLBACK": "0"}), patch.object(
+            settings, "channel_proxy", "socks5h://127.0.0.1:10888"
+        ):
+            self.assertIsNone(_proxy_for_url("https://ai.sozan-core.ir/v1"))
+            self.assertEqual(_proxy_for_url("https://other.example/v1"), "socks5h://127.0.0.1:10888")
+            self.assertFalse(local_fallback_enabled())
 
 
 if __name__ == "__main__":

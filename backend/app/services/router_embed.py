@@ -13,8 +13,7 @@ import logging
 import math
 from pathlib import Path
 
-import httpx
-
+from app.services import proxy_health
 from app.services.llm import CLOUD_UA, route_for_surface
 from app.services.llm import auth_scheme as _auth_scheme
 from app.services.llm import emit_usage as _emit_usage
@@ -150,10 +149,11 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     headers = {"Content-Type": "application/json", "User-Agent": CLOUD_UA}
     scheme = _auth_scheme(route.get("auth"))
     headers["Authorization"] = f"{scheme} {route['token']}"
-    async with httpx.AsyncClient(timeout=EMBED_TIMEOUT, trust_env=False, proxy=route.get("proxy")) as client:
-        res = await client.post(f"{route['url'].rstrip('/')}/embeddings", json=body, headers=headers)
-        res.raise_for_status()
-        payload = res.json()
+    res = await proxy_health.post(
+        f"{route['url'].rstrip('/')}/embeddings", proxy=route.get("proxy"), total=EMBED_TIMEOUT, json=body, headers=headers
+    )
+    res.raise_for_status()
+    payload = res.json()
     _emit_usage(surface="router", model=EMBED_MODEL, payload=payload if isinstance(payload, dict) else {})
     return _vectors_from(payload, len(cleaned))
 

@@ -14,6 +14,22 @@ from app.services import router_service
 from app.state_store import tenant_scope
 
 
+
+_VOICE_PATCHES: list = []
+
+
+def setUpModule() -> None:
+    # The assistant's own voice (shop_voice_service) asks the cloud model; tests that are not about it take the plain fallbacks.
+    for name, empty in (("complete_json", {"error": "llm_unreachable"}), ("complete_text_chat", None)):
+        started = patch(f"app.services.shop_voice_service.{name}", new=AsyncMock(return_value=empty))
+        started.start()
+        _VOICE_PATCHES.append(started)
+
+
+def tearDownModule() -> None:
+    while _VOICE_PATCHES:
+        _VOICE_PATCHES.pop().stop()
+
 class RouterChatApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.dir = tempfile.TemporaryDirectory()

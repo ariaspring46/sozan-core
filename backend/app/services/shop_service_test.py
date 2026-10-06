@@ -61,7 +61,74 @@ def _live_shop_chat(*, login_root: Path | None = None):
         tmp.cleanup()
 
 
+
+_VOICE_PATCHES: list = []
+
+
+def setUpModule() -> None:
+    # The assistant's own voice (shop_voice_service) asks the cloud model; tests that are not about it take the plain fallbacks.
+    for name, empty in (("complete_json", {"error": "llm_unreachable"}), ("complete_text_chat", None)):
+        started = patch(f"app.services.shop_voice_service.{name}", new=AsyncMock(return_value=empty))
+        started.start()
+        _VOICE_PATCHES.append(started)
+
+
+def tearDownModule() -> None:
+    while _VOICE_PATCHES:
+        _VOICE_PATCHES.pop().stop()
+
+class BeforeTheFirstBuildChatTests(unittest.TestCase):
+    def setUp(self) -> None:
+        for item in (
+            patch("app.services.shop_service.complete_chat", new=AsyncMock(return_value="ANSWER")),
+            patch("app.services.shop_service.emit_later"),  # a stray observe event would leak into the outbox cap test
+        ):
+            item.start()
+            self.addCleanup(item.stop)
+
+    def test_without_prices_the_seller_can_choose_an_inquiry_only_shop(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                out = asyncio.run(shop_service.chat("قیمت نزن، فقط استعلام"))
+                self.assertTrue(shop_service._shop().get("hidePrices"))
+                self.assertIn("استعلام", out["assistant"]["text"])
+                self.assertFalse(shop_service._missing_sellable_price(shop_service._shop()))
+
+    def test_a_question_about_prices_does_not_flip_the_shop_to_inquiry_only(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                asyncio.run(shop_service.chat("یعنی بدون قیمت هم می‌شود؟"))
+                self.assertFalse(shop_service._shop().get("hidePrices"))
+
+    def test_naming_the_page_starts_a_scan_of_that_page(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                with patch("app.services.channel_scan_service.start_scan") as scan:
+                    out = asyncio.run(shop_service.chat("pinkshop528_sirjan"))
+                scan.assert_called_once_with([{"platform": "instagram", "handle": "pinkshop528_sirjan"}])
+                self.assertIn("pinkshop528_sirjan", out["assistant"]["text"])
+
+
 class LiveShopChatRouteTests(unittest.TestCase):
+    def test_a_typed_full_rebuild_asks_first_and_builds_only_when_confirmed(self) -> None:
+        with _live_shop_chat():
+            with patch.object(shop_service, "start_build", return_value={"ok": True}) as build:
+                asked = asyncio.run(shop_service.chat("فروشگاه را از نو بساز"))
+                build.assert_not_called()
+                self.assertTrue(asked["needsConfirm"])
+                self.assertEqual(asked["assistant"]["kind"], "ask")
+                self.assertIn("برگشت", asked["assistant"]["text"])
+                done = asyncio.run(shop_service.chat("فروشگاه را از نو بساز", confirmed=True))
+                build.assert_called_once()
+                self.assertNotIn("needsConfirm", done)
+
+    def test_an_ordinary_build_press_does_not_ask(self) -> None:
+        with _live_shop_chat():
+            with patch.object(shop_service, "start_build", return_value={"ok": True}) as build:
+                out = asyncio.run(shop_service.chat("بیلد کن"))
+                build.assert_called_once()
+                self.assertNotIn("needsConfirm", out)
+
     def test_homepage_advice_question_answers_instead_of_editing(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -139,7 +206,7 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 "preview": {"colors": {"primary": "#B42318"}},
             }
             result = asyncio.run(shop_service.chat("میخواهم رنگ آن قرمز باشد"))
-        self.assertIn("انتشار تغییرات", result["assistant"]["text"])
+        self.assertIn("بیلد", result["assistant"]["text"])
         self.assertEqual(result["preview"]["colors"]["primary"], "#B42318")
         self.assertTrue(result["patched"])
         answer.assert_not_called()
@@ -162,6 +229,8 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 )
                 with (
                     patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
+                    patch.object(shop_service, "_read_job_file", return_value={"buildDir": raw}),
+                    patch("app.services.shop_edit_service.build_dir_for", return_value=Path(raw)),
                     patch.object(
                         shop_service,
                         "_run_factory",
@@ -188,6 +257,58 @@ class LiveShopChatRouteTests(unittest.TestCase):
                     out = shop_service.start_build(prompt="x", rebuild=True)
                 blocked.assert_not_called()
                 self.assertFalse(out["ok"])
+
+    def test_full_rebuild_phrases_cover_natural_persian(self) -> None:
+        for text in ("از نو بساز", "از دیزاینش خوشم نمیاد میخوام از نو ساخته شه", "ازنو درستش کن", "از اول بسازش", "بساز از صفر"):
+            self.assertTrue(shop_service._wants_full_rebuild(text), text)
+        for text in ("دوباره بساز", "رنگ را آبی کن", "قیمت را عوض کن"):
+            self.assertFalse(shop_service._wants_full_rebuild(text), text)
+
+    def test_rebuild_with_missing_job_falls_back_to_fresh_build(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="کیف", price=850000, stock=1, sku="k", category="کیف")
+                shop_service._save_shop(
+                    {**shop_service._shop(), "slug": "demo-shop", "status": "failed", "port": 12410, "jobId": "gone"}
+                )
+                with (
+                    patch("app.services.shop_edit_service.spawn_rebuild") as spawn,
+                    patch.object(shop_service, "_read_job_file", return_value=None),
+                    patch.object(
+                        shop_service,
+                        "_run_factory",
+                        return_value={"ok": True, "jobId": "j9", "status": "running", "slug": "demo-shop"},
+                    ) as factory,
+                    patch.object(shop_service, "_factory_prompt", return_value="p"),
+                    patch.object(shop_service, "_publish_dns", side_effect=lambda shop: shop),
+                    patch.object(shop_service, "_emit_build"),
+                    patch("app.services.shop_service.get_settings", return_value={"storeName": "دمو"}),
+                    patch("app.services.shop_service.record_site"),
+                ):
+                    out = shop_service.start_build(prompt="دوباره بساز", rebuild=True)
+                spawn.assert_not_called()
+                factory.assert_called_once()
+                self.assertTrue(out["ok"])
+                self.assertTrue(out["freshBuild"])
+                self.assertEqual(shop_service._shop()["error"], "")
+
+    def test_build_text_never_shows_internal_url(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                shop_service._save_shop({**shop_service._shop(), "slug": "demo-shop", "publicHost": "demo-shop.sozan-core.ir"})
+                with patch.object(shop_service, "_missing_sellable_price", return_value=False):
+                    local = shop_service._persian_build_text({"status": "ready", "url": "http://127.0.0.1:12410", "urlOk": True})
+                    ip = shop_service._persian_build_text({"status": "ready", "url": "http://10.0.0.5:3010/", "urlOk": True})
+                    public = shop_service._persian_build_text({"status": "ready", "url": "https://shop.example.com", "urlOk": True})
+                self.assertEqual(local, "سایت زنده است. https://demo-shop.sozan-core.ir")
+                self.assertNotIn("10.0.0.5", ip)
+                self.assertEqual(public, "سایت زنده است. https://shop.example.com")
+                shop_service._save_shop({**shop_service._shop(), "publicHost": ""})
+                with patch.object(shop_service, "_missing_sellable_price", return_value=False):
+                    bare = shop_service._persian_build_text({"status": "ready", "url": "http://127.0.0.1:12410", "urlOk": True})
+                self.assertEqual(bare, "سایت زنده است.")
 
     def test_from_page_uses_catalog_instead_of_edit(self) -> None:
         with _live_shop_chat() as (edit, answer):
@@ -369,6 +490,68 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 self.assertTrue(saved["cnameOk"])
                 self.assertEqual(saved["cnameCheck"]["status"], "sozan-host")
 
+    def _domain_shop(self, raw: str, **extra) -> None:
+        write_json(
+            "shop.json",
+            {**shop_service.DEFAULT_SHOP, "slug": "mine", "port": 12390, "publicHost": "mine.sozan-core.ir", "status": "ready", **extra},
+        )
+
+    def test_set_domain_rejects_text_that_is_not_a_domain(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            self._domain_shop(raw)
+            for text in ("bad domain with spaces", "localhost", "shop..example.com", "-bad-.com", "http://", "javascript:alert(1)", "127.0.0.1"):
+                with self.assertRaises(ValueError, msg=text):
+                    shop_service.set_domain(text)
+
+    def test_set_domain_refuses_sozan_hosts_that_are_not_its_own(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            self._domain_shop(raw)
+            for text in ("sozan-core.ir", "app.sozan-core.ir", "api.sozan-core.ir", "evil.sozan-core.ir", "other-shop.sozan-core.ir"):
+                with self.assertRaises(ValueError, msg=text) as ctx:
+                    shop_service.set_domain(text)
+                self.assertIn("سوزان", str(ctx.exception))
+            self.assertNotEqual(shop_service._shop().get("domain"), "app.sozan-core.ir")
+
+    def test_set_domain_accepts_persian_domain_as_punycode(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            self._domain_shop(raw)
+            with (
+                patch.object(shop_service, "_write_shop_upstream"),
+                patch.object(shop_service, "_publish_dns", side_effect=lambda shop: shop),
+                patch("app.services.arvan_dns_service.check_cname", return_value={"ok": False, "status": "waiting", "detail": "w"}),
+                patch("app.services.arvan_dns_service.start_cname_setup", return_value={"ok": True}),
+                patch("app.services.channel_scan_service.scan_status", return_value={}),
+                patch.object(shop_service, "_factory_status", return_value={}),
+                patch.object(shop_service, "_refresh_job", side_effect=lambda shop: shop),
+            ):
+                shop_service.set_domain("https://فروشگاه.ir/")
+            self.assertEqual(shop_service._shop()["domain"], "xn--mgbtj4c7ad63e.ir")
+
+    def test_set_domain_empty_box_returns_to_the_sozan_address(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+            self._domain_shop(raw, domain="shop.example.com")
+            with (
+                patch.object(shop_service, "_write_shop_upstream"),
+                patch.object(shop_service, "_publish_dns", side_effect=lambda shop: shop),
+                patch("app.services.channel_scan_service.scan_status", return_value={}),
+                patch.object(shop_service, "_factory_status", return_value={}),
+                patch.object(shop_service, "_refresh_job", side_effect=lambda shop: shop),
+            ):
+                shop_service.set_domain("   ")
+            self.assertEqual(shop_service._shop()["domain"], "mine.sozan-core.ir")
+
+    def test_shop_reply_never_shows_an_internal_address_or_status_jargon(self) -> None:
+        out = shop_service._seller_words(
+            "وضعیت بیلد: ready و سایت زنده است روی http://127.0.0.1:12410 و http://10.0.0.5:3000/x", "https://a.sozan-core.ir"
+        )
+        self.assertNotIn("127.0.0.1", out)
+        self.assertNotIn("10.0.0.5", out)
+        self.assertNotIn("بیلد", out)
+        self.assertNotIn("ready", out)
+        self.assertIn("وضعیت ساخت: آماده", out)
+        self.assertIn("https://a.sozan-core.ir", out)
+        self.assertEqual(shop_service._seller_words("آدرس https://shop.example.com باز است"), "آدرس https://shop.example.com باز است")
+
     def test_write_shop_upstream_rebuilds_without_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             map_path = Path(raw) / "shop-upstreams.map"
@@ -477,6 +660,25 @@ class PriceMissingBuildTests(unittest.TestCase):
                 spawn.assert_not_called()
                 factory.assert_not_called()
                 self.assertEqual(result["code"], "price_missing")
+
+    def test_an_empty_catalog_is_told_apart_from_missing_prices_and_offers_the_way_out(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                with patch.object(shop_service, "_run_factory") as factory, patch.object(shop_service, "_emit_build"):
+                    empty = shop_service.start_build(prompt="بساز", rebuild=False)
+                    factory.assert_not_called()
+                self.assertEqual(empty["code"], "price_missing")
+                self.assertEqual(empty["reason"], "no_products")
+                self.assertIn("هیچ کالایی", empty["error"])
+                self.assertIn("بدون قیمت بساز", empty["error"])
+                from app.services import storefront_service
+
+                storefront_service.add_product(title="رژ لب", price=0, stock=1, sku="r", category="آرایشی")
+                with patch.object(shop_service, "_run_factory"), patch.object(shop_service, "_emit_build"):
+                    unpriced = shop_service.start_build(prompt="بساز", rebuild=False)
+                self.assertEqual(unpriced["reason"], "price_missing")
+                self.assertIn("بدون قیمت بساز", unpriced["error"])
+                self.assertEqual(shop_service._operator_error(empty["error"]), shop_service.NO_PRODUCTS)
 
     def test_empty_catalog_blocks_unless_hide_prices(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

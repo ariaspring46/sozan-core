@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
+from app.services import turn_subject
+
 _DATA = Path(__file__).resolve().parent.parent / "data"
 _WORD = r"(?<![\u0600-\u06FF\w]){token}(?![\u0600-\u06FF\w])"
 
@@ -78,14 +80,21 @@ def _subject(text: str, data: dict) -> str:
     for drop in drops:
         cleaned = cleaned.replace(drop, " ")
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" ،؛.")
-    return cleaned[:36]
+    return turn_subject.guard(cleaned, text)[:36]
+
+
+# «رمز» فقط وقتی کلمهٔ مستقل است؛ در «قرمز» و «رمزگذاری» پنهان نیست.
+_SECRET_WORD = re.compile(
+    r"(?<![\u0600-\u06FF])(?:رمز(?:م|\s?عبور|\s?دوم|\s?پویا|\s?یکبار)?|پسورد|password)(?![\u0600-\u06FF])", re.I
+)
+_MENU_WORD = re.compile(r"(?<![\u0600-\u06FF])منو(?:ی)?(?![\u0600-\u06FF])")
 
 
 def _topic(text: str, write: bool) -> str:
     folded = (text or "").lower().replace("’", "'")
     if "وضعیت" in text:
         return "status"
-    if any(mark in folded for mark in ("otp", "توکن", "رمز", "کد ورود", "کد یکبار", "api key", "کلید api")):
+    if _SECRET_WORD.search(text) or any(mark in folded for mark in ("otp", "توکن", "کد ورود", "کد یکبار", "api key", "کلید api")):
         return "secret"
     if "شبا" in text:
         return "shaba"
@@ -94,6 +103,10 @@ def _topic(text: str, write: bool) -> str:
     channels = ("اینستاگرام", "تلگرام", "روبیکا", "واتساپ")
     if any(mark in text for mark in channels) and "وصل" in text and "کن" in text:
         return "channel_connect"
+    scan_marks = ("ببین", "ببینم", "ببینی", "بخون", "بخوان", "اسکن")
+    page_marks = ("پیج", "اینستا", "تلگرام", "کانال")
+    if any(mark in text for mark in scan_marks) and any(mark in text for mark in page_marks):
+        return "channel_scan"
     if write:
         return ""
     if any(mark in text for mark in ("ساعت کاری", "آدرس", "تلفن", "شماره تماس")):
@@ -114,7 +127,7 @@ def _topic(text: str, write: bool) -> str:
         return "plan"
     if any(mark in text for mark in ("اینستاگرام", "تلگرام", "روبیکا")) and "وصل" in text and "کن" not in text:
         return "channel_status"
-    if "کالا" in text and any(mark in text for mark in ("چند", "تعداد")):
+    if ("کالا" in text or "محصول" in text) and any(mark in text for mark in ("چند", "تعداد")):
         return "product_count"
     if "موجودی" in text:
         return "stock"
@@ -122,7 +135,7 @@ def _topic(text: str, write: bool) -> str:
         return "shop_name"
     if "شعار" in text:
         return "slogan"
-    if "منو" in text:
+    if _MENU_WORD.search(text):
         return "menu"
     if "رنگ" in text and any(mark in text for mark in ("چقدر", "چند", "چیست", "چیه", "هست", "دارم", "داری", "بگو", "بالا")):
         return "color"
@@ -141,6 +154,7 @@ def _topic(text: str, write: bool) -> str:
         and "بگذار" not in text
         and "بذار" not in text
         and "اضافه" not in text
+        and not any(mark in text for mark in ("نشون", "نمایش", "قایم", "پنهون", "بردار", "حذف", "عوض", "تغییر", "درصد", "ببر", "بزار"))
     ):
         return "price"
     if any(mark in text for mark in ("بالا است", "بالاست", "آماده است")):
@@ -151,7 +165,7 @@ def _topic(text: str, write: bool) -> str:
 
 
 def _act(text: str, data: dict, *, revise: bool, topic: str) -> str:
-    if any(mark in text for mark in data.get("publish_marks") or []):
+    if turn_subject.wants_publish(text, data.get("publish_marks") or []):
         return "publish"
     if revise or _has_mark(text, ["کپشن", "هشتگ", "استوری"]):
         return "studio"
@@ -194,11 +208,22 @@ def _platform(text: str) -> str:
     return ""
 
 
+def _bare_caption_change(text: str) -> bool:
+    """«کپشنش رو کوتاه‌تر کن» changes the last caption. A caption for a named product is a new post."""
+    if "کپشن" not in (text or ""):
+        return False
+    if not any(mark in text for mark in ("کوتاه", "بلند", "عوض", "تغییر", "بهتر", "رسمی", "جمع")):
+        return False
+    from app.services.turn_subject import vocab_subject
+
+    return not vocab_subject(text)
+
+
 def parse_turn(text: str) -> Turn:
     data = registry()
     raw = text or ""
     write = _write(raw, data)
-    revise = _has_mark(raw, list(data.get("revise_marks") or [])) and "عکس" not in raw and "تصویر" not in raw
+    revise = (_has_mark(raw, list(data.get("revise_marks") or [])) or _bare_caption_change(raw)) and "عکس" not in raw and "تصویر" not in raw
     topic = _topic(raw, write)
     return Turn(
         raw=raw,

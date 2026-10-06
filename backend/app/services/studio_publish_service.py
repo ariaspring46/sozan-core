@@ -33,6 +33,15 @@ def _row(platform: str) -> dict:
     return row
 
 
+def channel_block(platform: str) -> str:
+    """Why a post cannot go to this platform right now ("" when it can); the chat checks it before showing a send card."""
+    try:
+        _row(platform)
+    except ValueError as exc:
+        return str(exc)
+    return ""
+
+
 def _path(name: str) -> Path:
     return chat_media_service.resolve(name)
 

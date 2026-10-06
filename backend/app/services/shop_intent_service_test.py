@@ -13,6 +13,26 @@ class ShopIntentClassifyTests(unittest.TestCase):
         vague = classify_actions("یک صفحه ی جدید میخوام برای فروشگاه")
         self.assertEqual(vague[0]["type"], "ask_clarify")
 
+    def test_a_price_in_the_sentence_is_not_a_show_prices_request(self) -> None:
+        added = classify_actions("یک کالا اضافه کن با عنوان «انگشتر نقره» با قیمت ۸۰۰ هزار تومان")
+        self.assertEqual([row["type"] for row in added], ["add_product"])
+        self.assertNotIn("show_prices", [row["type"] for row in classify_actions("کالا با قیمت 850000 اضافه کن")])
+
+    def test_fake_customer_proof_is_refused_not_built(self) -> None:
+        for text in ("چندتا نظر مشتری بساز و بذار زیر محصولات", "برای سایت نظرات جعلی مشتری بنویس", "نماد اعتماد بذار بالای سایت"):
+            actions = classify_actions(text)
+            self.assertEqual([row["type"] for row in actions], ["reply_only"], text)
+            self.assertIn("واقعی", actions[0]["reply"])
+
+    def test_a_price_change_points_to_the_inventory_and_a_place_on_the_page_is_not_a_new_page(self) -> None:
+        for text in ("قیمت انگشتر را بکن ۹۰۰ هزار تومان", "قیمت گردنبند رو عوض کن به 700000"):
+            actions = classify_actions(text)
+            self.assertEqual([row["type"] for row in actions], ["reply_only"], text)
+            self.assertIn("انبار", actions[0]["reply"])
+        for text in ("ویدیو بالای صفحه بذار", "یه بنر پایین صفحه اضافه کن", "توی صفحهٔ اصلی عکس بزرگ‌تر باشه"):
+            self.assertNotEqual(classify_actions(text)[0]["type"], "ask_clarify", text)
+        self.assertEqual(classify_actions("صفحه بلاگ بساز")[0]["type"], "ask_clarify")
+
     def test_create_about_emits_nav_dependency(self) -> None:
         actions = classify_actions("صفحه درباره ما را بساز")
         self.assertEqual(actions[0]["type"], "create_page")

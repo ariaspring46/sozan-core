@@ -10,7 +10,9 @@ from unittest.mock import patch
 from app.config import settings
 from app.services import shop_service, storefront_service, shop_workspace_service
 from app.services.shop_edit_service import (
+    BRAND_BLOCKED,
     apply_live_edit,
+    brand_text_blocked,
     build_dir_for,
     has_runtime_chrome,
     looks_like_foreign_payload,
@@ -32,6 +34,16 @@ from app.state_store import tenant_scope
 
 
 class ShopEditPatchTests(unittest.TestCase):
+    def test_replies_never_show_a_tag_name_and_a_question_is_not_an_edit(self) -> None:
+        from app.services import shop_edit_service
+
+        text = shop_edit_service._reply_for_verify({"type": "delete_text", "target": "h1"}, {"ok": False})
+        self.assertNotIn("h1", text)
+        shown = shop_edit_service._reply_for_verify({"type": "delete_text", "target": "قیمت ویژه"}, {"ok": True})
+        self.assertIn("«قیمت ویژه»", shown)
+        for kind in ("ask_clarify", "reply_only", "greet"):
+            self.assertNotIn("بیلد", shop_edit_service._reply_for_verify({"type": kind, "reply": "x"}, {"ok": True}, frame_only=True), kind)
+
     def test_selected_heading_patches_brand_and_page(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -341,6 +353,51 @@ class ShopEditFlowTests(unittest.TestCase):
             self.assertFalse((root / "app" / "blog" / "page.tsx").exists())
             self.assertEqual(created["preview"].get("viewPath"), "/about")
             self.assertNotIn("/blog", created["preview"].get("viewPath") or "")
+
+    def test_obscene_brand_text_is_refused_and_files_stay(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = _flow_root(Path(raw))
+            (root / "lib" / "nav.ts").write_text("export const nav = { logoFa: 'سوزان', links: [] }\n", encoding="utf-8")
+            before = (root / "lib" / "brand.ts").read_text(encoding="utf-8")
+            with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
+                shop = shop_service._save_shop({**shop_service._shop(), "slug": "zafran-test", "status": "ready", "jobId": "j1"})
+                with patch("app.services.shop_edit_service.build_dir_for", return_value=root), _patch_runtime(root):
+                    header = asyncio.run(
+                        apply_live_edit(
+                            shop,
+                            "عنوان هدر",
+                            "/",
+                            "",
+                            classified={"actions": [{"type": "set_header", "logoFa": "کیر"}]},
+                        )
+                    )
+                    renamed = asyncio.run(
+                        apply_live_edit(
+                            shop,
+                            "نام",
+                            "/",
+                            "",
+                            classified={"actions": [{"type": "set_brand", "fields": {"name": "کیری"}}]},
+                        )
+                    )
+                    swapped = asyncio.run(
+                        apply_live_edit(
+                            shop,
+                            "متن",
+                            "/",
+                            "",
+                            classified={"actions": [{"type": "replace_text", "find": "زعفران", "replace": "جنده"}]},
+                        )
+                    )
+            self.assertFalse(brand_text_blocked("عکس انگشتر فیروزه"))
+            self.assertFalse(header["patched"])
+            self.assertFalse(renamed["patched"])
+            self.assertFalse(swapped["patched"])
+            self.assertEqual(header["reply"], BRAND_BLOCKED)
+            self.assertIn("سوزان", (root / "lib" / "nav.ts").read_text(encoding="utf-8"))
+            self.assertNotIn("کیر", (root / "lib" / "nav.ts").read_text(encoding="utf-8"))
+            self.assertEqual(before, (root / "lib" / "brand.ts").read_text(encoding="utf-8"))
+            self.assertIn("زعفران", (root / "lib" / "brand.ts").read_text(encoding="utf-8"))
 
     def test_header_mixed_fail_foreign_and_show_prices(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

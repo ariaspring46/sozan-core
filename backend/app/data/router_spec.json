@@ -8,8 +8,8 @@
       "allow": ["shop_chat", "edit_shop", "add_product", "studio_chat", "publish_post", "read"]
     },
     "card_open": {
-      "allow": ["read"],
-      "block": "اول کارت باز را تأیید یا انصراف بده."
+      "allow": ["status", "ask_user", "inbox_status", "channel"],
+      "block": "هر ابزاری جز این‌ها کارت باز را کنار می‌گذارد. جواب تأییدگونه مثل بله پشت کارت می‌ماند."
     },
     "composing": {
       "publish": "هنوز تصویر این پست تمام نشده."

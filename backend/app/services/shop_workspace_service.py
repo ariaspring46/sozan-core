@@ -187,7 +187,13 @@ def _rewrite_instructions() -> None:
         add("مدل‌ها را از پیج/کانال اسکن‌شده بگذار؛ ادیت TSX جای کاتالوگ نیست.")
     if NO_CLOTHING_RE.search(blob) and DELETE_RE.search(blob):
         add("مانتو و شلوار و شومیز نگذار مگر در کاتالوگ همین پوشه باشند.")
-    recent = [str(row.get("text") or "").strip() for row in rows[-8:] if str(row.get("text") or "").strip()]
+    from app.services.shop_edit_service import brand_text_blocked
+
+    recent = [
+        str(row.get("text") or "").strip()
+        for row in rows[-8:]
+        if str(row.get("text") or "").strip() and not brand_text_blocked(str(row.get("text") or ""))
+    ]
     lines = ["# دستورهای فروشنده", "", "## پایدار"]
     lines.extend(f"- {rule}" for rule in rules)
     if recent:

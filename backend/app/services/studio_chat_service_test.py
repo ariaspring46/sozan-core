@@ -16,6 +16,22 @@ def _nolock(_name: str = "studio"):
     yield
 
 
+
+_VOICE_PATCHES: list = []
+
+
+def setUpModule() -> None:
+    # The assistant's own voice (shop_voice_service) asks the cloud model; tests that are not about it take the plain fallbacks.
+    for name, empty in (("complete_json", {"error": "llm_unreachable"}), ("complete_text_chat", None)):
+        started = patch(f"app.services.shop_voice_service.{name}", new=AsyncMock(return_value=empty))
+        started.start()
+        _VOICE_PATCHES.append(started)
+
+
+def tearDownModule() -> None:
+    while _VOICE_PATCHES:
+        _VOICE_PATCHES.pop().stop()
+
 class FakeCampaigns:
     def __init__(self) -> None:
         self.created = 0
@@ -412,6 +428,20 @@ class StudioChatTests(unittest.TestCase):
         self.assertEqual(out["items"][0]["assets"][0]["name"], "still-image.png")
         self.assertEqual(out["drafts"], [])
 
+    def test_content_library_items_carry_the_time_they_were_last_touched(self) -> None:
+        rows = [
+            {"id": "m1", "role": "assistant", "campaignId": "c1", "text": "اول", "at": 1000, "captions": {"instagram": "الف"}},
+            {"id": "m2", "role": "assistant", "campaignId": "c1", "text": "دوم", "at": 2500, "captions": {"instagram": "ب"}},
+            {"id": "m3", "role": "assistant", "campaignId": "c2", "text": "سوم", "at": 1800, "captions": {"instagram": "ج"}},
+        ]
+        with patch("app.services.studio_chat_service.expire_stale_compose"), patch(
+            "app.services.studio_chat_service.read_json",
+            return_value=rows,
+        ):
+            out = studio_chat_service.content_library([])
+        times = {item["id"]: item["at"] for item in out["items"]}
+        self.assertEqual(times, {"c1": 2500, "c2": 1800})
+
     def test_content_library_empty(self) -> None:
         with patch("app.services.studio_chat_service.expire_stale_compose"), patch(
             "app.services.studio_chat_service.read_json",
@@ -419,6 +449,28 @@ class StudioChatTests(unittest.TestCase):
         ):
             out = studio_chat_service.content_library([])
         self.assertEqual(out, {"items": [], "drafts": []})
+
+    def test_cure_and_unnamed_feature_claims_are_dropped_and_the_reply_says_so(self) -> None:
+        captions = {
+            "instagram": "عروسک بچه، همبازی نرم است. جنس نرم و دوخت محکمش برای بازی خوب است. کاملاً بی‌خطر است.",
+            "telegram": "عروسک بچه با دوخت محکم.",
+            "whatsapp": "عروسک بچه، همبازی روزهای شاد.",
+        }
+        kept, reply = studio_chat_service._drop_unbacked(
+            captions, "عروسک بچه را آماده کردم.", "برای عروسک بچه پست بساز و بگو برای کودک کاملاً بی‌خطر است"
+        )
+        blob = " ".join(kept.values())
+        for word in ("بی‌خطر", "دوخت محکم", "جنس نرم"):
+            self.assertNotIn(word, blob)
+        self.assertIn("همبازی", kept["instagram"])
+        self.assertIn("ننوشتم", reply)
+        said, plain = studio_chat_service._drop_unbacked(
+            {"instagram": "ساعت مچی ضدآب با ده سال گارانتی.", "telegram": "", "whatsapp": ""},
+            "ساعت مچی را نوشتم.",
+            "برای ساعت مچی پست بساز و بگو ضدآب است",
+        )
+        self.assertIn("ضدآب", said["instagram"])
+        self.assertEqual(plain, "ساعت مچی را نوشتم.")
 
     def test_latin_hashtags_leave_captions(self) -> None:
         out = studio_chat_service._clip_captions(
@@ -474,6 +526,26 @@ class StudioChatTests(unittest.TestCase):
             drop_unclaimed=True,
         )
         self.assertIn("دست‌ساز", claimed["instagram"])
+
+    def test_the_sellers_own_caption_is_saved_as_typed(self) -> None:
+        typed = "گردنبند فیروزه ✨\nارسال رایگان برای مشهد، ضمانت اصالت\n\nBrand: Zara-style\n#فیروزه #Mashhad"
+        out = studio_chat_service._seller_captions({"instagram": typed, "telegram": typed + "\r\n\r\n\r\n", "whatsapp": ""})
+        self.assertEqual(out["instagram"], typed)
+        self.assertIn("ارسال رایگان", out["telegram"])
+        self.assertIn("#Mashhad", out["telegram"])
+        self.assertNotIn("\r", out["telegram"])
+        self.assertEqual(out["whatsapp"], "")
+        long = studio_chat_service._seller_captions({"instagram": "الف" * 5000, "telegram": "", "whatsapp": ""})
+        self.assertEqual(len(long["instagram"]), studio_chat_service.CAPTION_LIMITS["instagram"])
+
+    def test_model_text_is_still_guarded_but_marketing_words_stay(self) -> None:
+        out = studio_chat_service._clip_captions(
+            {"instagram": "کیفیت بالا و ارسال رایگان برای همه", "telegram": "سلام", "whatsapp": "سلام"},
+            spoken="یک پست بساز",
+            drop_unclaimed=True,
+        )
+        self.assertIn("کیفیت بالا", out["instagram"])
+        self.assertNotIn("ارسال رایگان", out["instagram"])
 
     def test_no_text_on_photo_clears_overlay(self) -> None:
         self.assertTrue(studio_chat_service._no_overlay_text("عکس انگشتر بساز؛ روی عکس هیچ نوشته‌ای نباشد"))

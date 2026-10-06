@@ -28,6 +28,24 @@ TEXT_SHORT = 40
 TEXT_LONG = 400
 
 
+_PLACEHOLDER_MARKS = ("آزمایش", "پست آزمایشی", "انتظارش را نداشتید", "کالای تست", "بازبینی")
+
+
+def is_placeholder_catalog(title: str, description: str = "") -> bool:
+    """Studio probes and English sample posts are not products. A real title like «آویز فیروزه» stays."""
+    import re
+
+    value = str(title or "").strip()
+    blob = f"{value} {description or ''}"
+    if not value and not str(description or "").strip():
+        return False
+    if re.search(r"[✨👋…]", blob):
+        return True
+    if value and re.search(r"[A-Za-z]{3,}", value) and not re.search(r"[\u0600-\u06FF]", value):
+        return True
+    return any(mark in blob for mark in _PLACEHOLDER_MARKS)
+
+
 def price_label(price: int, note: str = "") -> str:
     cleaned = str(note or "").strip()
     if cleaned == "دایرکت":
@@ -179,6 +197,24 @@ def categories() -> list[dict]:
     return sorted(buckets.values(), key=lambda row: (-int(row.get("count") or 0), str(row.get("title") or "")))
 
 
+def _remember_catalog(rows: list) -> None:
+    try:
+        from app.services.shop_memory_service import schedule_backfill
+
+        schedule_backfill(rows)
+    except Exception:
+        return
+
+
+def _forget_catalog(doc_id: str) -> None:
+    try:
+        from app.services.shop_memory_service import schedule_delete
+
+        schedule_delete("catalog", doc_id)
+    except Exception:
+        return
+
+
 def add_product(
     *,
     title: str,
@@ -200,6 +236,8 @@ def add_product(
     title = sanitize_persian(title, limit=36)
     if not title:
         raise ValueError("نام محصول را بنویس")
+    if is_placeholder_catalog(title, description):
+        raise ValueError("پست آزمایشی در کاتالوگ نمی‌آید")
     if price < 0 or stock < 0:
         raise ValueError("قیمت و موجودی منفی نمی‌شود")
     row = {
@@ -225,6 +263,7 @@ def add_product(
     rows = _list("products.json")
     rows.append(row)
     _save("products.json", rows)
+    _remember_catalog(rows)
     return {"product": public_product(row), "products": [public_product(item) for item in rows]}
 
 
@@ -296,6 +335,8 @@ def upsert_scanned_product(
     stableKey: str = "",
     stock: int | None = None,
 ) -> dict:
+    if is_placeholder_catalog(title, description):
+        return {}
     rows = _list("products.json")
     cat = _clean_category(category)
     color_list = _clean_colors(colors)
@@ -457,17 +498,38 @@ def remove_product(product_id: str) -> dict:
     removed = next((row for row in rows if str(row.get("id")) == product_id), None)
     kept = [row for row in rows if str(row.get("id")) != product_id]
     _save("products.json", kept)
+    if removed:
+        _forget_catalog(str(removed.get("id") or ""))
     return {
         "products": [public_product(item) for item in kept],
         "removedImages": _row_images(removed) if removed else [],
     }
 
 
+def drop_placeholder_products() -> list[str]:
+    rows = _list("products.json")
+    kept = []
+    removed: list[str] = []
+    for row in rows:
+        title = str(row.get("title") or "")
+        if is_placeholder_catalog(title, str(row.get("description") or "")):
+            removed.append(title)
+            continue
+        kept.append(row)
+    if removed:
+        _save("products.json", kept)
+    return removed
+
+
 def remove_product_by_title(title: str) -> dict:
     wanted = title.strip()
-    rows = [row for row in _list("products.json") if str(row.get("title") or "").strip() != wanted]
-    _save("products.json", rows)
-    return {"products": [public_product(item) for item in rows]}
+    rows = _list("products.json")
+    removed = [row for row in rows if str(row.get("title") or "").strip() == wanted]
+    kept = [row for row in rows if str(row.get("title") or "").strip() != wanted]
+    _save("products.json", kept)
+    for row in removed:
+        _forget_catalog(str(row.get("id") or ""))
+    return {"products": [public_product(item) for item in kept]}
 
 
 def referenced_image_names() -> set[str]:

@@ -11,12 +11,15 @@ from pathlib import Path
 import httpx
 
 from app.config import settings
-from app.services import ai_budget_service
+from app.services import ai_budget_service, proxy_health
 from app.services.observe_client import emit_later, llm_headers, safe_text
 
 log = logging.getLogger("sozan.llm")
 
 THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+HARMONY_FINAL = re.compile(r"<\|channel\|>\s*final\s*<\|message\|>(.*?)(?=<\|(?:end|return|call|start)\|>|$)", re.DOTALL)
+HARMONY_TOKEN = re.compile(r"<\|[a-z_]+\|>")
+REASONING_MODEL_MIN_TOKENS = 800
 FENCE = re.compile(r"^\s*```(?:json)?|```\s*$", re.MULTILINE)
 FA_CHAR = re.compile(r"[\u0600-\u06FF]")
 LATIN_CHAR = re.compile(r"[A-Za-z]")
@@ -138,13 +141,27 @@ def _is_arvan_url(url: str) -> bool:
     return host == ARVAN_HOST_SUFFIX or host.endswith(f".{ARVAN_HOST_SUFFIX}")
 
 
+def local_fallback_enabled() -> bool:
+    """LLM_LOCAL_FALLBACK=0 removes the last-resort home-GPU hop: cloud failures end at the Arvan fallback, not a local model."""
+    return (os.environ.get("LLM_LOCAL_FALLBACK") or "1").strip().lower() not in {"0", "false", "no", "off"}
+
+
+def is_fallback_cloud_host(url: str) -> bool:
+    """The configured fallback endpoint (Arvan AI behind our own domain) is reachable from Iran; no foreign proxy."""
+    host = _host_of(url)
+    configured = os.environ.get("CLOUD_LLM_FALLBACK_URL", "").strip() or _str_setting(
+        getattr(settings, "cloud_llm_fallback_url", "")
+    )
+    return bool(host) and host == _host_of(configured)
+
+
 def _proxy_for_url(url: str) -> str | None:
     host = _host_of(url)
-    if _is_arvan_url(url):
+    if _is_arvan_url(url) or is_fallback_cloud_host(url):
         return None
-    # OpenRouter در صورت نیاز پروکسی اختصاصی خودش را دارد (مثلاً برای مسیر فیلترینگ).
+    # Direct through the WireGuard exit. The fallback SOCKS is only the second try inside proxy_health.
     if host == "openrouter.ai" or host.endswith(".openrouter.ai"):
-        return (os.environ.get("OPENROUTER_PROXY") or "").strip() or None
+        return proxy_health.openrouter_fallback()
     return _cloud_proxy()
 
 
@@ -182,6 +199,11 @@ def _decorate_cloud_body(body: dict, route: dict) -> None:
         body["think"] = False
     if route.get("kind") != "cloud":
         return
+    if "gpt-oss" in str(route.get("model") or "").lower():
+        # GPT-OSS (the Arvan fallback) always reasons first and that counts against max_tokens: with the router's 150
+        # it spent them all thinking and sent no answer. Short thinking and room for the answer.
+        body.setdefault("reasoning_effort", "low")
+        body["max_tokens"] = max(int(body.get("max_tokens") or 0), REASONING_MODEL_MIN_TOKENS)
     for key, value in _openrouter_extra_body(url).items():
         if key == "think":
             continue
@@ -242,6 +264,12 @@ def _fallback_cloud_route() -> dict | None:
         "source": "fallback",
         "cloud": "fallback",
     }
+
+
+class BudgetCapped(RuntimeError):
+    """The tenant (or the company) reached its cloud cap and the local model is switched off."""
+
+    budget_capped = True
 
 
 def _emit_cloud_fallback(*, surface: str, reason: str, requested: str, used: str) -> None:
@@ -340,12 +368,28 @@ def route_for_surface(surface: str) -> dict:
     if surface in SHOP_CLOUD_SURFACES:
         cloud = _shop_cloud_route()
         if cloud:
-            return cloud
+            return _with_effort(surface, cloud)
     if surface in PINNED_SURFACES:
         cloud = _studio_cloud_route()
         if cloud:
             return cloud
     return _local_default_route(surface)
+
+
+def _with_effort(surface: str, route: dict) -> dict:
+    """Heavy shop turns use the Pro id. Studio and every other surface stay on their pinned route."""
+    if surface not in {"shop", "shop-edit"}:
+        return route
+    if "openrouter.ai" not in str(route.get("url") or ""):
+        return route
+    from app.services.decider_service import heavy_model
+
+    model = heavy_model()
+    if not model or model == route.get("model"):
+        return route
+    upgraded = dict(route)
+    upgraded["model"] = model
+    return upgraded
 
 
 def _default_local_model(surface: str) -> str:
@@ -412,12 +456,26 @@ def _routing_override(surface: str) -> dict | None:
     }
 
 
+def _strip_harmony(text: str) -> str:
+    """GPT-OSS behind Arvan sometimes returns its raw channel format; keep only the final answer, never the thinking."""
+    if "<|" not in text:
+        return text.strip()
+    finals = HARMONY_FINAL.findall(text)
+    if finals:
+        return HARMONY_TOKEN.sub("", finals[-1]).strip()
+    if "<|channel|>" in text or "<|start|>" in text:
+        return ""  # only thinking, or a header cut off by max_tokens
+    return HARMONY_TOKEN.sub("", text).strip()
+
+
 def _choice_text(payload: dict) -> str:
     msg = ((payload.get("choices") or [{}])[0].get("message") or {})
-    content = str(msg.get("content") or "").strip()
+    content = _strip_harmony(str(msg.get("content") or ""))
     if content:
         return content
-    return str(msg.get("reasoning_content") or msg.get("reasoning") or "").strip()
+    # A reasoning model that ran out of tokens leaves only its thinking, usually English: never the seller's answer.
+    thought = _strip_harmony(str(msg.get("reasoning_content") or msg.get("reasoning") or ""))
+    return thought if _persian_enough(thought) else ""
 
 
 async def _running_models() -> set[str] | None:
@@ -611,11 +669,11 @@ def _usage_counts(payload: dict) -> dict[str, int]:
     if not isinstance(usage, dict):
         return {"promptTokens": 0, "completionTokens": 0}
     try:
-        prompt = int(usage.get("prompt_tokens") or 0)
+        prompt = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
     except (TypeError, ValueError):
         prompt = 0
     try:
-        completion = int(usage.get("completion_tokens") or 0)
+        completion = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
     except (TypeError, ValueError):
         completion = 0
     return {"promptTokens": max(0, prompt), "completionTokens": max(0, completion)}
@@ -698,18 +756,19 @@ async def _complete_with_route(
     started = time.perf_counter()
     for attempt in range(1, max(1, attempts) + 1):
         try:
-            async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route["proxy"]) as client:
-                res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
-                res.raise_for_status()
-                data = res.json()
-                latency_ms = (time.perf_counter() - started) * 1000
-                _emit_usage(
-                    surface=surface,
-                    model=str(route.get("model") or ""),
-                    payload=data if isinstance(data, dict) else {},
-                    latency_ms=latency_ms,
-                )
-                return _choice_text(data)
+            res = await proxy_health.post(
+                f"{route['url']}/chat/completions", proxy=route["proxy"], total=timeout, json=body, headers=headers
+            )
+            res.raise_for_status()
+            data = res.json()
+            latency_ms = (time.perf_counter() - started) * 1000
+            _emit_usage(
+                surface=surface,
+                model=str(route.get("model") or ""),
+                payload=data if isinstance(data, dict) else {},
+                latency_ms=latency_ms,
+            )
+            return _choice_text(data)
         except Exception as exc:
             last_exc = exc
             klass = _classify_llm_error(exc)
@@ -758,11 +817,11 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
             (route, PRIMARY_CLOUD_TIMEOUT, 1),
             (fallback, FALLBACK_CLOUD_TIMEOUT, 2),
         ]
-        allow_local = surface in CLOUD_PRIMARY_SURFACES
+        allow_local = surface in CLOUD_PRIMARY_SURFACES and local_fallback_enabled()
     else:
         primary_timeout = CLOUD_PRIMARY_TIMEOUT if surface in CLOUD_PRIMARY_SURFACES else 120
         hops = [(route, primary_timeout, 2)]
-        allow_local = surface in CLOUD_PRIMARY_SURFACES and surface != "router"
+        allow_local = surface in CLOUD_PRIMARY_SURFACES and surface != "router" and local_fallback_enabled()
     last_exc: Exception | None = None
     for index, (hop, timeout, attempts) in enumerate(hops):
         final_hop = index == len(hops) - 1 and not allow_local
@@ -805,14 +864,16 @@ async def _chat_completion(*, messages: list[dict], temperature: float, max_toke
         raise last_exc or RuntimeError("llm")
 
 
-async def complete_json(system: str, user: str, *, surface: str = "llm", max_tokens: int = 700) -> dict:
+async def complete_json(
+    system: str, user: str, *, surface: str = "llm", max_tokens: int = 700, temperature: float = 0.2
+) -> dict:
     try:
         text = await _chat_completion(
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            temperature=0.2,
+            temperature=temperature,
             max_tokens=max_tokens,
             surface=surface,
         )
@@ -854,6 +915,21 @@ def visible_chat_turns(turns: list[dict], *, limit: int = 12, keep_links: bool =
             continue
         messages.append({"role": role, "content": text[:800]})
     return messages
+
+
+async def complete_text_chat(
+    *, system: str, turns: list[dict], surface: str = "shop", temperature: float = 0.7, max_tokens: int = 500
+) -> str | None:
+    """The model's next message as plain text (a JSON {"reply"} is unwrapped); None when it fails or says nothing readable."""
+    messages = [{"role": "system", "content": system}, *visible_chat_turns(turns, keep_links=True)]
+    if len(messages) < 2:
+        return None
+    try:
+        text = await _chat_completion(messages=messages, temperature=temperature, max_tokens=max_tokens, surface=surface)
+    except Exception:
+        return None
+    reply = spoken_model_reply(text)
+    return None if reply == LLM_BAD_JSON["reply"] else reply
 
 
 async def complete_chat(*, system: str, turns: list[dict], surface: str = "shop") -> str:
@@ -898,7 +974,7 @@ def _tool_result(route: dict, payload: dict, counts: dict) -> dict:
             args = parsed if isinstance(parsed, dict) else {}
         calls.append({"id": str(raw.get("id") or ""), "name": name, "arguments": args})
     return {
-        "text": str(msg.get("content") or "").strip(),
+        "text": _strip_harmony(str(msg.get("content") or "")),
         "tool_calls": calls,
         "usage": counts,
         "finish_reason": finish,
@@ -940,10 +1016,11 @@ async def _tools_once(
         headers["Authorization"] = f"{scheme} {route['token']}"
         headers["User-Agent"] = CLOUD_UA
     started = time.perf_counter()
-    async with httpx.AsyncClient(timeout=timeout, trust_env=False, proxy=route.get("proxy")) as client:
-        res = await client.post(f"{route['url']}/chat/completions", json=body, headers=headers)
-        res.raise_for_status()
-        payload = res.json()
+    res = await proxy_health.post(
+        f"{route['url']}/chat/completions", proxy=route.get("proxy"), total=timeout, json=body, headers=headers
+    )
+    res.raise_for_status()
+    payload = res.json()
     counts = _emit_usage(
         surface=surface,
         model=str(body.get("model") or route.get("model") or ""),
@@ -1051,6 +1128,9 @@ async def complete_tools(
     if route.get("kind") != "cloud" or capped:
         if surface == "router" and not capped:
             raise RuntimeError("router_requires_cloud")
+        if capped and surface == "router" and not local_fallback_enabled():
+            # the home model needs a minute per reply; the seller gets the cap message at once instead
+            raise BudgetCapped(str(capped))
         return await _tools_once(
             _local_default_route(surface) if capped else route,
             messages=messages,
@@ -1065,10 +1145,10 @@ async def complete_tools(
     later = FALLBACK_CLOUD_TIMEOUT if timeout is None else timeout
     if chained:
         hops: list[tuple[dict, float]] = [(route, PRIMARY_CLOUD_TIMEOUT), (fallback, later)]
-        allow_local = True
+        allow_local = local_fallback_enabled()
     else:
         hops = [(route, CLOUD_PRIMARY_TIMEOUT if timeout is None else timeout)]
-        allow_local = surface != "router"
+        allow_local = surface != "router" and local_fallback_enabled()
     last_exc: Exception | None = None
     for index, (hop, hop_timeout) in enumerate(hops):
         try:
