@@ -32,7 +32,16 @@ _OUT_OF_STOCK = re.compile(r"تموم\s*شد|تمام\s*شد|ناموجود|مو
 _STOCK_ADD = re.compile(r"اضافه|بیشتر|دیگه\s*(?:اومد|رسید|آوردم)|رسید|اومد")
 _NO_DISCOUNT = re.compile(r"تخفیف.{0,40}(?:بردار|حذف|برداشته|صفر\s*کن)|بدون\s*تخفیف|تخفیف\s*نخوره")
 _PERCENT = re.compile(r"(\d{1,3})\s*(?:درصد|درصدی|٪|%)")
-_SALES = re.compile(r"گزارش\s*فروش|فروش(?!گاه|نده).{0,12}(?:امروز|دیروز|هفته|ماه|چقد)|(?:چقدر|چقد|چند).{0,10}(?:فروختم|فروختیم|فروش(?!گاه))|درآمد")
+_PERCENT_WORDS = {
+    "بیست و پنج": 25, "سی و پنج": 35, "پانزده": 15, "پونزده": 15, "پنجاه": 50, "بیست": 20, "چهل": 40, "شصت": 60,
+    "هفتاد": 70, "پنج": 5, "سی": 30, "ده": 10,
+}
+_PERCENT_WORD = re.compile(
+    r"(?<![\u0600-\u06FF])(" + "|".join(_PERCENT_WORDS) + r")\s*(?:درصد|درصدی|٪)"
+)
+_STOCK_ASK = re.compile(r"(?:کدوم|کدام|کدوما|چه\s*کالا|چی|لیست|فهرست).{0,30}(?:موجودی|تموم|تمام|ناموجود)")
+_REPLY_IT = re.compile(r"(?:بهش|براش|به\s*او)\s+(?:بگو|بنویس|بفرست|جواب\s*بده)(?:\s*(?:که|:))?\s*(?P<text>.+)$")
+_SALES = re.compile(r"گزارش\s*فروش|(?:امروز|دیروز|هفته|ماه)\S*\s.{0,12}فروش(?!گاه|نده)|فروش(?!گاه|نده).{0,12}(?:امروز|دیروز|هفته|ماه|چقد)|(?:چقدر|چقد|چند).{0,10}(?:فروختم|فروختیم|فروش(?!گاه))|درآمد")
 _ORDERS = re.compile(r"سفارش")
 _REPLY = re.compile(
     r"(?:^|\s)(?:به|برای)\s+(?P<who>\S+(?:\s+\S+)?)\s+(?:بگو|بنویس|بفرست|پیام\s*بده|جواب\s*بده)(?:\s*(?:که|:))?\s*(?P<text>.+)$"
@@ -59,6 +68,14 @@ def _int(value: object) -> int | None:
         return int(float(str(value).translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")).replace(",", "").replace("٬", "")))
     except ValueError:
         return None
+
+
+def _percent_in(text: str) -> int | None:
+    found = _PERCENT.search(fold(text))
+    if found:
+        return int(found.group(1))
+    spoken = _PERCENT_WORD.search(text or "")
+    return _PERCENT_WORDS[spoken.group(1)] if spoken else None
 
 
 def _quote(title: str) -> str:
@@ -212,10 +229,14 @@ def products_text(query: str = "", spoken: str = "") -> str:
     rows = _products()
     if not rows:
         return "کاتالوگ هنوز کالایی ندارد."
+    empty = [row for row in rows if int(row.get("stock") or 0) <= 0]
+    if not query and _STOCK_ASK.search(spoken or ""):
+        if not empty:
+            return f"همهٔ {fa_digits(len(rows))} کالا موجودی دارند."
+        return "این کالاها موجودی ندارند:\n" + "\n".join(_product_line(row) for row in empty[:12])
     hits = find_products(query, spoken) if (query or _name_in(spoken)) else []
     if hits:
         return "\n".join(_product_line(row) for row in hits[:8])
-    empty = [row for row in rows if int(row.get("stock") or 0) <= 0]
     lines = [f"کاتالوگ {fa_digits(len(rows))} کالا دارد؛ {fa_digits(len(empty))} تا موجودی ندارد."]
     lines += [_product_line(row) for row in rows[:8]]
     if len(rows) > 8:
@@ -349,8 +370,7 @@ def _discount_plan(args: dict, spoken: str) -> dict:
         if _NO_DISCOUNT.search(text):
             percent = 0
         else:
-            found = _PERCENT.search(fold(text))
-            percent = int(found.group(1)) if found else None
+            percent = _percent_in(text)
     if percent is None:
         return {"problem": "چند درصد تخفیف؟"}
     if percent < 0 or percent > 90:
@@ -420,7 +440,20 @@ def _reply_parts(args: dict, spoken: str) -> tuple[str, str]:
     if match:
         who = who or (match.group("who") or match.group("who2") or "").strip().lstrip("@")
         body = body or (match.group("text") or match.group("text2") or "").strip()
+    elif _REPLY_IT.search(spoken or ""):
+        # «مشتری آخر پرسیده کی می‌رسه، بهش بگو پس‌فردا»: the customer is named earlier in the sentence
+        body = body or _REPLY_IT.search(spoken or "").group("text").strip()
+        who = who or _named_customer(spoken or "")
     return who, body.strip(" «»\"'")
+
+
+def _named_customer(spoken: str) -> str:
+    if re.search(r"مشتری\s*آخر|آخرین\s*(?:مشتری|پیام|نفر)", spoken):
+        return "آخرین"
+    loose = _loose(spoken)
+    names = [str(row.get("sender") or "") for row in _threads()]
+    named = [name for name in names if len(_loose(name)) >= 3 and _loose(name) in loose]
+    return max(named, key=len) if named else ""
 
 
 def _threads() -> list[dict]:
@@ -491,13 +524,13 @@ def asks_sales(text: str) -> bool:
 def route(spoken: str) -> str:
     """A tool only when the sentence is plainly one of these jobs; anything else goes on to the model."""
     text = spoken or ""
-    if "؟" in text or "?" in text:  # a question never opens a write card
-        return _read_route(text)
-    if _REPLY.search(text) and not re.search(r"پست|کپشن|استوری|تبلیغ|عکس", text):
+    if (_REPLY.search(text) or _REPLY_IT.search(text)) and not re.search(r"پست|کپشن|استوری|تبلیغ|عکس", text):
         who, body = _reply_parts({}, text)
-        if body and find_threads(who):
-            return "reply_customer"
-    if "تخفیف" in text and (_CHANGE.search(text) or "بده" in text) and (_PERCENT.search(fold(text)) or _NO_DISCOUNT.search(text)):
+        if body and who and find_threads(who):
+            return "reply_customer"  # before the question check: «به مریم بگو آدرس رو می‌فرستی؟» is still a reply
+    if "؟" in text or "?" in text or _STOCK_ASK.search(text):  # a question never opens a write card
+        return _read_route(text)
+    if "تخفیف" in text and (_CHANGE.search(text) or "بده" in text) and (_percent_in(text) is not None or _NO_DISCOUNT.search(text)):
         return "set_discount"
     if not _PAGE.search(text):
         # «قیمت‌ها را پنهان کن» is a page edit. «اضافه» is a new product («هودی را با قیمت ... اضافه کن»), unless it
@@ -513,6 +546,8 @@ def route(spoken: str) -> str:
 
 
 def _read_route(text: str) -> str:
+    if _STOCK_ASK.search(text):
+        return "products"
     if _ORDERS.search(text) and not _CHANGE.search(text):
         return "orders"
     if asks_sales(text):
@@ -620,7 +655,7 @@ register(
         name="reply_customer",
         schema=_schema(
             "reply_customer",
-            "فرستادن حرف فروشنده به یک مشتری در صندوق. متن را از جملهٔ فروشنده بردار و چیزی اضافه نکن.",
+            "فرستادن حرف فروشنده به یک مشتری صندوق («به مریم بگو …»، «بهش بگو …»). متن را از جملهٔ فروشنده بردار و چیزی اضافه نکن. آخرین گفتگو: customer=آخرین.",
             {"customer": {"type": "string"}, "text": {"type": "string"}},
         ),
         level="write",

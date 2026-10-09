@@ -153,6 +153,24 @@ class RouteTests(_Tenant):
         self.assertEqual(seller_tools.route("به علی بگو سلام"), "")
         self.assertNotEqual(seller_tools.route("انگشتر فیروزه ناموجوده؟"), "edit_product")
 
+    def test_the_sentences_that_missed_on_the_lab_phone(self) -> None:
+        # live check 2026-10-09: advice, the old stock fact reply, «ده درصدی» and the model's inbox_status took these
+        self.assertEqual(router_service.route_tool("این هفته فروش چطور بوده؟"), "sales_report")
+        self.assertEqual(router_service.route_tool("ببین کدوم کالاها موجودی ندارن"), "products")
+        self.assertEqual(router_service.route_tool("کدوم کالاها تموم شده"), "products")
+        self.assertEqual(router_service.route_tool("واسه انگشتر فیروزه یه تخفیف ده درصدی بذار"), "set_discount")
+        self.assertEqual(router_service.route_tool("مشتری آخر پرسیده کی ارسال میشه، بهش بگو پس‌فردا"), "reply_customer")
+        self.assertEqual(router_service.route_tool("رضا احمدی پرسیده موجوده؟ بهش بگو آره"), "reply_customer")
+        self.assertEqual(seller_tools._reply_parts({}, "مشتری آخر پرسیده کی ارسال میشه، بهش بگو پس‌فردا"), ("آخرین", "پس‌فردا"))
+        self.assertIn("انگشتر نقره", seller_tools.products_text("", "ببین کدوم کالاها موجودی ندارن"))
+        self.assertNotIn("انگشتر فیروزه", seller_tools.products_text("", "ببین کدوم کالاها موجودی ندارن"))
+        self.assertEqual(seller_tools._percent_in("بیست و پنج درصد"), 25)
+        self.assertIsNone(seller_tools._percent_in("ده تا انگشتر"))
+
+    def test_the_reply_to_the_last_customer_goes_to_the_newest_waiting_thread(self) -> None:
+        card = self._card("مشتری آخر پرسیده کی ارسال میشه، بهش بگو پس‌فردا")
+        self.assertEqual(card["summary"], "این پیام برای «مریم» در اینستاگرام فرستاده شود؟\n«پس‌فردا»")
+
     def test_counting_and_discount_questions_get_the_numbers(self) -> None:
         with patch("app.services.seller_tools.time.time", return_value=NOW):
             said = router_service.decide("امروز چند تا خرید داشتیم؟")
@@ -305,7 +323,7 @@ class ReplyTests(_Tenant):
             self.assertEqual([item["function"]["name"] for item in tools], ["reply_customer"])
             return {"text": "", "tool_calls": [{"name": "reply_customer", "arguments": {"customer": "مریم", "text": "پنجشنبه می‌رسه"}}]}
 
-        out = self._turn("مریم پرسیده کی می‌رسه، بهش بگو پنجشنبه", complete, decider=decider)
+        out = self._turn("مریم منتظر جوابه، جوابش اینه که پنجشنبه می‌رسه", complete, decider=decider)
         self.assertIn("«پنجشنبه می‌رسه»", (out.get("pendingConfirm") or {}).get("summary", ""))
 
     def test_an_unknown_customer_lists_the_recent_ones(self) -> None:
