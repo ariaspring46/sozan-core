@@ -375,6 +375,7 @@
         "backend/app/services/proxy_health.py",
         "frontend/components/quota-usage.tsx",
         "tools/sozan_health.py",
+        "backend/app/ci_watchdog_test.py",
         "backend/app/services/admin_health_service.py",
         "backend/app/services/ai_budget_service.py",
         "backend/app/services/observe_client.py",
