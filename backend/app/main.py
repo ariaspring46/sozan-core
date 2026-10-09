@@ -14,6 +14,7 @@ from app.api.brand import router as brand_router
 from app.api.campaigns import router as campaigns_router
 from app.api.channels import router as channels_router
 from app.api.chat_media import router as chat_media_router
+from app.api.events import router as events_router
 from app.api.router_chat import router as chat_router
 from app.api.inbox import router as inbox_router
 from app.api.onboard import router as onboard_router
@@ -112,6 +113,9 @@ async def lifespan(_app: FastAPI):
     from app.services import renewal_reminder_service
 
     renewal = asyncio.create_task(renewal_reminder_service.loop())
+    from app.services import seller_events
+
+    events = asyncio.create_task(seller_events.loop())
     loop_watch = start_loop_watch()
     from app.services import image_provider_service, llm_routing_service
 
@@ -125,7 +129,8 @@ async def lifespan(_app: FastAPI):
     router_task.cancel()
     loop_watch.cancel()
     renewal.cancel()
-    for task in (poller, housekeeper, rearm, probe_task, router_task, loop_watch, renewal):
+    events.cancel()
+    for task in (poller, housekeeper, rearm, probe_task, router_task, loop_watch, renewal, events):
         try:
             await task
         except asyncio.CancelledError:
@@ -161,6 +166,7 @@ app.include_router(settings_router)
 app.include_router(channels_router)
 app.include_router(inbox_router)
 app.include_router(chat_media_router)
+app.include_router(events_router)
 app.include_router(public_media_router)
 app.include_router(storefront_router)
 app.include_router(pay_router)
