@@ -13,7 +13,7 @@ from app.config import settings
 
 class AdminServiceTests(unittest.TestCase):
     def setUp(self) -> None:
-        self._tmp = tempfile.TemporaryDirectory()
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # a late observe write into tenants/ raced the cleanup (1 in 5 runs)
         self.addCleanup(self._tmp.cleanup)
         self._state = patch.object(settings, "state_dir", self._tmp.name)
         self._state.start()

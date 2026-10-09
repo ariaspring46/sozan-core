@@ -88,33 +88,26 @@ def check() -> list[str]:
 
 
 def check_keyboard() -> list[str]:
-    """U8: mobile keyboard must resize the shell and the login lamp, without double-subtracting.
+    """U8: the Android keyboard resizes the page, and the shell follows the visible viewport.
 
-    The arithmetic mirror below stays in Python because CI runs this file before Node is installed.
+    The approach in production since PR 26 (2026-10-03, tested with tools/ui_back_probe.mjs on Android sizes):
+    `interactive-widget=resizes-content` in the viewport meta, and useAppViewport measures visualViewport against the
+    tallest height seen per width (Android shrinks innerHeight too, so innerHeight alone cannot tell the keyboard),
+    sets --app-height and toggles `sozan-keyboard`. The earlier viewportFrame/--keyboard-inset variant of this rule
+    (32c5d87) described code that never reached main or the hub.
     """
     problems: list[str] = []
     layout = (FRONT / "app" / "layout.tsx").read_text(encoding="utf-8")
-    css = (FRONT / "app" / "globals.css").read_text(encoding="utf-8")
     hook = (FRONT / "lib" / "use-app-viewport.ts").read_text(encoding="utf-8")
-    if 'interactiveWidget: "resizes-content"' not in layout or "AppViewportSync" not in layout:
-        problems.append("U8 frontend/app/layout.tsx: keyboard viewport sync missing")
-    if "--keyboard-inset" not in css or ".sozan-lamp" not in css:
-        problems.append("U8 frontend/app/globals.css: keyboard inset missing on shell/lamp")
-    if "export function viewportFrame" not in hook or "geometrychange" not in hook:
-        problems.append("U8 frontend/lib/use-app-viewport.ts: viewportFrame/virtualKeyboard missing")
-    if "viewportTookKeyboard || vkHeight <= KEYBOARD_PX ? 0 : vkHeight" not in hook:
-        problems.append("U8 frontend/lib/use-app-viewport.ts: keyboard inset must not be subtracted twice")
-    cases = [
-        ({"vv": 500, "inner": 800, "top": 0, "vk": 0, "closed": 800}, {"app": 500, "inset": 0, "open": True, "closed": 800}),
-        ({"vv": 800, "inner": 800, "top": 0, "vk": 320, "closed": 800}, {"app": 800, "inset": 320, "open": True, "closed": 800}),
-        ({"vv": 500, "inner": 500, "top": 0, "vk": 320, "closed": 800}, {"app": 500, "inset": 0, "open": True, "closed": 800}),
-        ({"vv": 800, "inner": 800, "top": 0, "vk": 0, "closed": 800}, {"app": 800, "inset": 0, "open": False, "closed": 800}),
-        ({"vv": 720, "inner": 800, "top": 0, "vk": 0, "closed": 800}, {"app": 720, "inset": 0, "open": False, "closed": 800}),
-    ]
-    for raw, want in cases:
-        got = _viewport_frame(raw["vv"], raw["inner"], raw["top"], raw["vk"], raw["closed"])
-        if got != want:
-            problems.append(f"U8 viewportFrame: {raw} -> {got} != {want}")
+    css = (FRONT / "app" / "globals.css").read_text(encoding="utf-8")
+    if 'interactiveWidget: "resizes-content"' not in layout:
+        problems.append("U8 frontend/app/layout.tsx: viewport must use interactiveWidget resizes-content")
+    if "visualViewport" not in hook or "tallest" not in hook:
+        problems.append("U8 frontend/lib/use-app-viewport.ts: keyboard must be measured against the tallest height per width")
+    if "--app-height" not in hook or "sozan-keyboard" not in hook:
+        problems.append("U8 frontend/lib/use-app-viewport.ts: --app-height and the sozan-keyboard class must be set")
+    if "--app-height" not in css:
+        problems.append("U8 frontend/app/globals.css: the shell must size itself from --app-height")
     return problems
 
 

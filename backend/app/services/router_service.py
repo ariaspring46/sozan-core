@@ -22,11 +22,10 @@ PENDING_FILE = "router-pending.json"
 USAGE_FILE = "router-usage.json"
 BUSY_FILE = "router-busy.json"
 INDEX_FILE = "router-threads.json"
-WRITE_TOOLS = frozenset(
-    {"set_auto_reply", "set_voice_tone", "edit_shop", "add_product", "studio_chat", "publish_post"}
-)
-PASSTHROUGH = frozenset({"shop_chat"})
-READ_TOOLS = frozenset({"status", "ask_user", "inbox_status", "channel"})
+# tools, levels and ranks are declared once in router_tools
+from app.services import router_tools  # noqa: E402
+from app.services.router_tools import PASSTHROUGH, READ_TOOLS, TOOLS, WRITE_TOOLS  # noqa: E402,F401
+from app.services.router_tools import TOOL_RANK as _TOOL_RANK  # noqa: E402
 ALLOWED = WRITE_TOOLS | PASSTHROUGH | READ_TOOLS
 _MUTATIONS = frozenset(
     {
@@ -69,19 +68,6 @@ BUDGET_CAPPED = (
 CLARIFY_FALLBACK = "دقیق‌تر بگو چه کاری انجام دهم: فروشگاه، پست یا صندوق."
 _AUTO_MODES = {"", "draft", "send"}
 _STUDIO_FIELDS = ("campaignId", "captions", "attachments", "compose", "mediaKind", "mediaName", "published")
-_TOOL_RANK = {
-    "set_auto_reply": 0,
-    "set_voice_tone": 0,
-    "edit_shop": 0,
-    "add_product": 0,
-    "publish_post": 0,
-    "studio_chat": 0,
-    "shop_chat": 1,
-    "ask_user": 2,
-    "status": 3,
-    "inbox_status": 3,
-    "channel": 3,
-}
 _THREAD: ContextVar[str] = ContextVar("router_thread", default="")
 _TURN_TRACE: ContextVar[dict | None] = ContextVar("router_turn_trace", default=None)
 
@@ -133,127 +119,6 @@ _PERSIAN = re.compile(r"[\u0600-\u06FF]")
 _UNSAFE_ERROR = re.compile(r"[/\\]|traceback|\.py\b|https?://|exception", re.I)
 HOLD_PENDING = "کارت همین زیر است: برای انجام «تأیید» و برای کنار گذاشتن «انصراف» را بزن؛ نوشتن «بله» کافی نیست. اگر کار دیگری می‌خواهی، همان را بگو."
 
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "channel",
-            "description": "وضعیت، وصل کردن، یا خواندن پیج اینستاگرام یا تلگرام. سؤال کلی فروشگاه نیست.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "platform": {"type": "string", "enum": ["instagram", "telegram", "whatsapp", "rubika"]},
-                    "action": {"type": "string", "enum": ["status", "connect", "scan"]},
-                    "handle": {"type": "string"},
-                },
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "status",
-            "description": "پرسش وضعیت، اسکن، بیلد، پلن، کیف یا دامنه. حتی با کلمهٔ فروشگاه. کانال و پیج را به channel بده.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "inbox_status",
-            "description": "صندوق، خوانده‌نشده و پاسخ خودکار. پرسش وضعیت فروشگاه نیست.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "ask_user",
-            "description": "سؤال ساخت‌یافته وقتی خواسته مبهم است. دامنه: بپرس شخصی یا ساب‌دامین سوزان؛ NS را ست نکن، بگو بعد از تأیید نیم‌سرور آروان می‌آید.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "question": {"type": "string"},
-                    "options": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["question"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "set_auto_reply",
-            "description": "حالت پاسخ خودکار صندوق: خاموش، پیش‌نویس یا ارسال",
-            "parameters": {
-                "type": "object",
-                "properties": {"mode": {"type": "string", "enum": ["", "draft", "send"]}},
-                "required": ["mode"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "set_voice_tone",
-            "description": "لحن پاسخ دایرکت",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "toneId": {"type": "string", "enum": ["warm", "formal", "street", "luxury"]},
-                },
-                "required": ["toneId"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "shop_chat",
-            "description": "ساخت ویترین از صفر. تغییر صفحهٔ زنده را به edit_shop بده. پرسش وضعیت را به status بده.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "edit_shop",
-            "description": "تغییر صفحهٔ زنده: رنگ، متن، هدر، پنهان کردن قیمت. متن تازه را خودت ننویس.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "add_product",
-            "description": "افزودن کالا وقتی کاربر نام و قیمت تومان گفته. قیمت را از جملهٔ کاربر بردار.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "studio_chat",
-            "description": "کپشن، کپی، شعار، پست یا استوری. متن تبلیغ را خودت ننویس؛ فقط این ابزار.",
-            "parameters": {"type": "object", "properties": {}},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "publish_post",
-            "description": "فرستادن آخرین پست آماده. اینستاگرام دایرکت است و مخاطب می‌خواهد.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "platform": {"type": "string", "enum": ["telegram", "whatsapp", "instagram"]},
-                    "recipientId": {"type": "string"},
-                },
-                "required": ["platform"],
-            },
-        },
-    },
-]
 
 SYSTEM = (
     "تو سوزان هستی. فارسی کوتاه، بدون مقدمه. تنظیمات با ابزار. "
@@ -648,43 +513,6 @@ def _chooser_history(spoken: str) -> list[dict]:
         {"role": "system", "content": _system_prompt(spoken)},
         {"role": "user", "content": router_text.mask_payment(spoken)[:800]},
     ]
-
-
-def _wants_apply(text: str) -> bool:
-    return any(word in (text or "") for word in ("عوض", "اعمال", "انجام بده", "تغییر بده", "درست کن"))
-
-
-_GROWTH_MARKS = (
-    "فروشم",
-    "فروش کم",
-    "فروش کمه",
-    "سود کم",
-    "نرخ تبدیل",
-    "تبدیل فروش",
-    "رشد فروش",
-    "قیف فروش",
-    "حاشیه سود",
-    "درآمد ماه",
-)
-
-
-def _wants_growth(text: str) -> bool:
-    raw = text or ""
-    if "قیمت" in raw and any(word in raw for word in ("عوض", "کن", "بکن", "بگذار", "بذار")) and "فروشم" not in raw and "نرخ تبدیل" not in raw:
-        return False
-    return any(mark in raw for mark in _GROWTH_MARKS)
-
-
-def _growth_write_ok(name: str, goal: str) -> bool:
-    """A growth experiment may open one existing tool only when that gap is already measured."""
-    from app.services.skill_catalog import business_facts
-
-    facts = business_facts()
-    if name == "studio_chat" and "بدون عکس" in facts and any(word in goal for word in ("عکس", "تصویر")):
-        return True
-    if name == "set_voice_tone" and "لحن" in goal:
-        return True
-    return False
 
 
 def _wants_advice(spoken: str) -> bool:
@@ -1403,6 +1231,9 @@ def _authority_route(name: str, args: dict, spoken: str, view_path: str, view_ta
 
 
 def _summary_for(name: str, args: dict, *, spoken: str = "", view_path: str = "", view_target: str = "") -> str:
+    declared = router_tools.summary(name, args, spoken)  # a tool's own card sentence, when it has one
+    if declared:
+        return declared
     if name == "set_auto_reply":
         labels = {"": "خاموش", "draft": "پیش‌نویس", "send": "ارسال خودکار"}
         return f"پاسخ خودکار دایرکت بشود {labels.get(str(args.get('mode') or ''), '؟')}؟"
@@ -1534,66 +1365,6 @@ def _with_studio(rows: list[dict]) -> list[dict]:
     return merged
 
 
-async def _status_payload() -> dict:
-    from app.services import channel_service, plan_service, shop_service, wallet_service
-
-    snap = shop_service.snapshot()
-    shop = snap.get("shop") or {}
-    scan = snap.get("scan") or {}
-    build = snap.get("build") or {}
-    accounts = channel_service.list_accounts().get("accounts") or []
-    plan = plan_service.snapshot()
-    wallet = wallet_service.get()
-    return {
-        "shopStatus": shop.get("status") or "",
-        "slug": shop.get("slug") or "",
-        "cnameOk": _domain_ok(shop),
-        "scanStatus": scan.get("status") or "",
-        "scanNoPrice": scan.get("noPrice"),
-        "scanNoImage": scan.get("noImage"),
-        "buildStatus": build.get("status") or "",
-        "channels": [
-            {
-                "platform": row.get("platform"),
-                "handle": row.get("handle"),
-                "connected": bool(row.get("connected")),
-            }
-            for row in accounts
-        ],
-        "plan": plan.get("plan") or plan.get("id") or "",
-        "walletAvailable": int(wallet.get("available") or 0),
-        "missingImages": _missing_image_titles(),
-    }
-
-
-def _missing_image_titles() -> list[str]:
-    from app.services.storefront_service import _list, _row_images
-
-    titles: list[str] = []
-    for row in _list("products.json"):
-        if _row_images(row):
-            continue
-        title = str(row.get("title") or "").strip()
-        if title and title not in titles:
-            titles.append(title)
-    return titles[:8]
-
-
-_STATUS_FA = {
-    "ready": "آماده",
-    "running": "در حال ساخت",
-    "queued": "در صف",
-    "failed": "ناموفق",
-    "idle": "بیکار",
-    "done": "تمام",
-    "free": "رایگان",
-    "pro": "پرو",
-    "pro_max": "پرو مکس",
-    "promax": "پرو مکس",
-    "ultra": "اولترا",
-}
-
-
 def _fa_status(value: object) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -1612,43 +1383,6 @@ def _domain_ok(shop: dict) -> bool:
 
 
 _CHANNEL_FA = {"instagram": "اینستاگرام", "telegram": "تلگرام", "rubika": "روبیکا", "whatsapp": "واتساپ"}
-
-
-def _format_status(data: dict) -> str:
-    chans = data.get("channels") or []
-    parts: list[str] = []
-    for c in chans:
-        handle = str(c.get("handle") or "").strip().lstrip("@")
-        label = _CHANNEL_FA.get(str(c.get("platform")), str(c.get("platform") or ""))
-        part = f"{label}{f' ({handle})' if handle else ''} {'وصل است' if c.get('connected') else 'وصل نیست'}"
-        if part not in parts:
-            parts.append(part)
-    chan = "، ".join(parts)
-    state = str(data.get("shopStatus") or "")
-    build = str(data.get("buildStatus") or "")
-    host = _shop_public()
-    if "failed" in (state, build):
-        shop_line = "ساخت فروشگاه کامل نشد."
-    elif state in {"running", "queued"} or build in {"running", "queued"}:
-        shop_line = "فروشگاه در حال ساخت است."
-    elif state == "ready":
-        shop_line = f"فروشگاه آماده است: {host}" if host else "فروشگاه آماده است."
-    else:
-        shop_line = "فروشگاه هنوز ساخته نشده."
-    lines = [
-        shop_line,
-        f"دامنه: {'وصل است' if data.get('cnameOk') else 'هنوز وصل نشده'}",
-        f"پلن: {_fa_status(data.get('plan'))}",
-        f"موجودی کیف پول: {router_text.fa_money(data.get('walletAvailable') or 0)} تومان",
-        f"کانال‌ها: {chan or 'هنوز وصل نشده'}",
-    ]
-    missing = [str(item).strip() for item in (data.get("missingImages") or []) if str(item).strip()]
-    if missing:
-        lines.append("بدون عکس: " + "، ".join(missing))
-    text = "\n".join(lines)
-    if "failed" in (state, build):
-        text += "\nبگو «فروشگاه را از نو بساز» تا دوباره بسازم."
-    return text
 
 
 async def _inbox_payload() -> dict:
@@ -1690,12 +1424,9 @@ async def _run_tool(
     view_target: str = "",
     confirmed: bool = False,
 ) -> tuple[str, dict]:
-    if name == "channel":
-        from app.services.channel_tool import run as channel_run
-
-        return await channel_run(source_text, args)
-    if name == "status":
-        return _format_status(await _status_payload()), {}
+    registered = router_tools.handler(name)
+    if registered is not None:
+        return await registered(source_text, args)
     if name == "inbox_status":
         return _format_inbox(await _inbox_payload()), {}
     if name == "set_auto_reply":
@@ -2111,394 +1842,6 @@ def _stamp_content_id(name: str, args: dict, spoken: str) -> dict:
     return nxt
 
 
-def _decider_state(spoken: str, media: dict | None, card_open: bool) -> dict:
-    from app.services import decider_service
-    from app.services.shop_service import current_shop
-
-    shop = current_shop() or {}
-    return decider_service.state_from(
-        _messages(),
-        shop=shop if isinstance(shop, dict) else {},
-        card_open=card_open,
-        last_post=_latest_post(spoken) is not None,
-        media=media,
-    )
-
-
-async def _decider_result(spoken: str, media: dict | None, card_open: bool, decider) -> dict | None:
-    from app.services import decider_service
-
-    state = _decider_state(spoken, media, card_open)
-    try:
-        decision = await decider(state) if decider is not None else await decider_service.choose_with_retry(state)
-    except Exception:
-        return None
-    if not isinstance(decision, dict):
-        return None
-    if decision.get("accepted"):
-        plan = decider_service.plan_for(
-            str(decision.get("action") or ""),
-            spoken,
-            frustrated=bool(decision.get("frustrated")),
-            effort=str(decision.get("effort") or "normal"),
-        )
-    else:
-        plan = decider_service.chips_for(list(decision.get("ranked") or []))
-        plan["frustrated"] = bool(decision.get("frustrated"))
-        plan["effort"] = str(decision.get("effort") or "quick")
-    result = decider_service.as_result(plan, decision.get("observed") if isinstance(decision.get("observed"), dict) else {})
-    _trace(
-        path="decider",
-        decider={
-            "action": decision.get("action"),
-            "probability": decision.get("probability"),
-            "margin": decision.get("margin"),
-            "accepted": decision.get("accepted"),
-            "effort": decision.get("effort"),
-            "refers_back": decision.get("refers_back"),
-            "frustrated": decision.get("frustrated"),
-            "media_kind": state.get("media_kind"),
-        },
-    )
-    return result
-
-
-def _subset_for(tool: str) -> list[dict]:
-    if not tool or tool == "ask_user":
-        return []
-    return [item for item in TOOLS if str((item.get("function") or {}).get("name") or "") == tool]
-
-
-def _overlay(base: dict, model_args: dict) -> dict:
-    merged = dict(base)
-    for key, value in model_args.items():
-        if value in ("", None, [], {}):
-            continue
-        merged[key] = value
-    return merged
-
-
-def _goal_name() -> str:
-    tid = _THREAD.get()
-    return f"router-{tid}-goal.json" if tid else "router-goal.json"
-
-
-def _load_goal() -> dict:
-    row = read_json(_goal_name(), {})
-    return row if isinstance(row, dict) else {}
-
-
-def _save_goal(goal: str, skill: str, suggestions: str, *, reached: bool) -> None:
-    write_json(
-        _goal_name(),
-        {"goal": goal, "skill": skill, "suggestions": suggestions[:800], "reached": reached},
-    )
-
-
-def _goal_line(text: str) -> str:
-    for line in (text or "").splitlines():
-        stripped = line.strip().lstrip("-").strip()
-        if stripped.startswith("هدف"):
-            parts = stripped.split(":", 1)
-            if len(parts) == 2 and parts[1].strip():
-                return _short_goal(parts[1].strip())
-    first = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    return _short_goal(first[0]) if first else ""
-
-
-def _short_goal(text: str) -> str:
-    goal = text.strip()
-    for sep in ("،", ".", "؛"):
-        at = goal.find(sep)
-        if at >= 25:
-            goal = goal[:at]
-            break
-    return goal[:110]
-
-
-async def _skill_plan(spoken: str, skill: str, mode: str, goal: str = "") -> str:
-    from app.services import shop_service
-    from app.services.turn_clock import expired, remaining
-
-    if expired() or remaining() <= 0:
-        return ""
-    out = await shop_service.chat(spoken, skill=skill, mode=mode, goal=goal)
-    picked = out.get("assistant") if isinstance(out.get("assistant"), dict) else _last_assistant(out)
-    text = str(picked.get("text") or "").strip()
-    return re.sub(r"otp|api[_-]?key|jwt|bearer\s+\S+", "", text, flags=re.I).strip()
-
-
-def _add_tokens(total: dict, usage: object) -> None:
-    if not isinstance(usage, dict):
-        return
-    total["promptTokens"] = int(total.get("promptTokens") or 0) + int(usage.get("promptTokens") or 0)
-    total["completionTokens"] = int(total.get("completionTokens") or 0) + int(usage.get("completionTokens") or 0)
-
-
-async def _steer_decider(spoken: str, media: dict | None, card_open: bool, decider, history: list, completer) -> dict | None:
-    """Two rounds at most. The chat model sees only the decider's tool. None means the turn already answered."""
-    from app.services import decider_service
-    from app.services.turn_clock import expired, remaining
-
-    state = _decider_state(spoken, media, card_open)
-    if _wants_growth(spoken):
-        from app.services.skill_catalog import remember_seller_metric
-
-        remember_seller_metric(spoken)
-    saved = _load_goal()
-    if saved.get("goal") and not saved.get("reached") and not _wants_advice(spoken) and not _wants_growth(spoken):
-        state["goal"] = str(saved.get("goal") or "")
-        state["suggestions"] = str(saved.get("suggestions") or "done")
-        state["planSkill"] = str(saved.get("skill") or "")
-        state["phase"] = "act"
-    messages = list(history)
-    rounds: list[dict] = []
-    spent = {"promptTokens": 0, "completionTokens": 0}
-    carried: list[str] = []
-    for round_index in range(5):
-        if expired() or remaining() <= 0:
-            _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-            _emit("router-llm-fail", {"error": "budget"}, status="error")
-            return None
-        try:
-            decision = await decider(state) if decider is not None else await decider_service.choose_with_retry(state)
-        except Exception:
-            decision = None
-        if not isinstance(decision, dict):
-            if state.get("lastTool"):
-                _append("assistant", str((state.get("lastTool") or {}).get("text") or ""))
-            _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-            _emit("router-llm-fail", {"error": "decider"}, status="error")
-            _trace(path="decider", loopEnough=True, tools=[], deciderRounds=rounds)
-            return None
-        loop_enough = bool(decision.get("loopEnough", True))
-        if decision.get("accepted"):
-            plan = decider_service.plan_for(
-                str(decision.get("action") or ""),
-                spoken,
-                frustrated=bool(decision.get("frustrated")),
-                effort=str(decision.get("effort") or "normal"),
-            )
-        else:
-            plan = decider_service.chips_for(list(decision.get("ranked") or []))
-            plan["frustrated"] = bool(decision.get("frustrated"))
-            plan["effort"] = str(decision.get("effort") or "quick")
-        skill = decider_service.chosen_skill(decision) if decision.get("accepted") else "none"
-        if skill != "none" and isinstance(plan.get("arguments"), dict):
-            plan["arguments"]["skill"] = skill
-        subset = _subset_for(str(plan.get("tool") or ""))
-        names = [str((item.get("function") or {}).get("name") or "") for item in subset]
-        rounds.append({"action": decision.get("action"), "loopEnough": loop_enough, "tools": names})
-        _trace(
-            path="decider",
-            loopEnough=loop_enough,
-            tools=names,
-            deciderRounds=rounds,
-            decider={
-                "action": decision.get("action"),
-                "probability": decision.get("probability"),
-                "margin": decision.get("margin"),
-                "accepted": decision.get("accepted"),
-                "effort": decision.get("effort"),
-                "refers_back": decision.get("refers_back"),
-                "frustrated": decision.get("frustrated"),
-                "loopEnough": loop_enough,
-                "skill": skill,
-                "media_kind": state.get("media_kind"),
-            },
-            skill=skill,
-            goal=state.get("goal") or "",
-        )
-        from app.services.skill_catalog import plans as skill_plans
-
-        if skill_plans(skill):
-            state["planSkill"] = skill
-        if state.get("planSkill") and not state.get("suggestions"):
-            text = await _skill_plan(spoken, str(state.get("planSkill") or ""), "suggest")
-            if not text:
-                _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-                return None
-            _append("assistant", "پیشنهادها:\n" + text)
-            state["suggestions"] = text[:800]
-            state["phase"] = "suggest"
-            messages.append({"role": "assistant", "content": text[:800]})
-            continue
-        if state.get("planSkill") and not state.get("goal"):
-            text = await _skill_plan(spoken, str(state.get("planSkill") or ""), "revise")
-            if not text:
-                _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-                return None
-            goal = _goal_line(text)
-            _append("assistant", "پلن اصلاح:\n" + text)
-            state["goal"] = goal
-            state["phase"] = "revise"
-            if str(state.get("planSkill") or "") == "ecommerce-growth-mba":
-                from app.services.skill_catalog import append_business_plan
-
-                append_business_plan(
-                    diagnosis=str(state.get("suggestions") or ""),
-                    revision=text,
-                    goal=goal,
-                )
-            else:
-                _save_goal(goal, str(state.get("planSkill") or ""), str(state.get("suggestions") or ""), reached=False)
-            messages.append({"role": "assistant", "content": text[:800]})
-            continue
-        if state.get("goal") and bool(decision.get("goalReached", True)):
-            if str(state.get("planSkill") or "") != "ecommerce-growth-mba":
-                _save_goal(
-                    str(state.get("goal") or ""),
-                    str(state.get("planSkill") or skill),
-                    str(state.get("suggestions") or ""),
-                    reached=True,
-                )
-            _trace(goal=state.get("goal"), goalReached=True)
-            return None
-        observed = decision.get("observed") if isinstance(decision.get("observed"), dict) else {}
-        if plan.get("direct") or not subset:
-            result = decider_service.as_result(plan, observed)
-            usage = result.get("usage") if isinstance(result.get("usage"), dict) else {}
-            usage = dict(usage)
-            _add_tokens(usage, spent)
-            result["usage"] = usage
-            return result
-        try:
-            try:
-                model = await asyncio.wait_for(completer(messages, subset), timeout=max(0.05, remaining()))
-            except TimeoutError:
-                if state.get("lastTool"):
-                    _append("assistant", str((state.get("lastTool") or {}).get("text") or ""))
-                _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-                _emit("router-llm-fail", {"error": "budget"}, status="error")
-                return None
-            except Exception as first:
-                if getattr(first, "budget_capped", False):
-                    raise
-                if expired() or remaining() < 1:
-                    _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-                    _emit("router-llm-fail", {"error": "budget"}, status="error")
-                    return None
-                await asyncio.sleep(min(1.0, remaining()))
-                model = await asyncio.wait_for(completer(messages, subset), timeout=max(0.05, remaining()))
-        except Exception as exc:
-            if state.get("lastTool"):
-                _append("assistant", str((state.get("lastTool") or {}).get("text") or ""))
-            if getattr(exc, "budget_capped", False):
-                _append("assistant", BUDGET_CAPPED)
-                _emit("router-budget-capped", {"reason": str(exc)[:40]}, status="error")
-                return None
-            _append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-            _emit("router-llm-fail", {"error": "unreachable"}, status="error")
-            return None
-        if not isinstance(model, dict):
-            model = {}
-        _add_tokens(spent, model.get("usage"))
-        allowed = set(names)
-        calls = [
-            call
-            for call in (model.get("tool_calls") or [])
-            if isinstance(call, dict) and str(call.get("name") or "") in allowed
-        ]
-        plan_args = plan.get("arguments") if isinstance(plan.get("arguments"), dict) else {}
-        if calls:
-            raw_args = calls[0].get("arguments") if isinstance(calls[0].get("arguments"), dict) else {}
-            name = str(calls[0].get("name") or plan.get("tool") or "")
-        else:
-            name = str(plan.get("tool") or "")
-            raw_args = {}
-        args = _overlay(plan_args, raw_args)
-        if carried and name == "studio_chat":
-            args["missingImages"] = carried
-        if state.get("goal"):
-            args["goal"] = state["goal"]
-        result = {
-            "text": str(model.get("text") or ""),
-            "tool_calls": [{"name": name, "arguments": args}],
-            "usage": dict(spent),
-            "provider": str(model.get("provider") or ""),
-            "model": str(model.get("model") or ""),
-            "latencyMs": int(model.get("latencyMs") or 0),
-            "frustrated": bool(plan.get("frustrated")),
-            "direct": "",
-            "finish_reason": str(model.get("finish_reason") or ""),
-        }
-        if name == "shop_chat" and state.get("goal") and not args.get("rebuild"):
-            if state.get("phase") == "act" and _wants_advice(spoken) and not _wants_apply(spoken):
-                _save_goal(
-                    str(state.get("goal") or ""),
-                    str(state.get("planSkill") or skill),
-                    str(state.get("suggestions") or ""),
-                    reached=True,
-                )
-                _trace(goal=state.get("goal"), goalReached=True)
-                return None
-            reply = await _skill_plan(spoken, skill or str(state.get("planSkill") or ""), "act", goal=str(state.get("goal") or ""))
-            same = reply[:60] and reply[:60] == str(state.get("suggestions") or "")[:60]
-            if same and _wants_advice(spoken):
-                _save_goal(
-                    str(state.get("goal") or ""),
-                    str(state.get("planSkill") or skill),
-                    str(state.get("suggestions") or ""),
-                    reached=True,
-                )
-                _trace(goal=state.get("goal"), goalReached=True)
-                return None
-            if reply and not same:
-                _append("assistant", reply)
-                state["lastTool"] = {"name": name, "text": reply[:800]}
-                state["phase"] = "act"
-                messages.append({"role": "assistant", "content": reply[:800]})
-            continue
-        continues = (not loop_enough) and name in READ_TOOLS and name != "ask_user" and round_index == 0
-        if not continues:
-            if _wants_growth(spoken) and name in WRITE_TOOLS and not _growth_write_ok(name, str(state.get("goal") or "")):
-                _append("assistant", "این پله سنجه ندارد. اول همان عدد را ثبت کن؛ صفحه را عوض نمی‌کنم.")
-                return None
-            return result
-        try:
-            reply, _extra = await _run_tool(
-                name,
-                args,
-                source_text=spoken,
-                media=media if isinstance(media, dict) else None,
-            )
-        except Exception as exc:
-            await _say(spoken, _tool_error(name, exc), "tool_failed")
-            return None
-        if name == "status":
-            carried = _missing_image_titles()
-        state["lastTool"] = {"name": name, "text": str(reply or "")[:800]}
-        messages.append({"role": "assistant", "content": str(reply or "")[:800]})
-    if state.get("goal"):
-        _append("assistant", f"هدف هنوز باز است: {state['goal']}")
-    return None
-
-
-def _shadow_after(out: dict, media: dict | None, *, decider) -> None:
-    if decider is not None:
-        return
-    from app.services import decider_service
-    from app.state_store import current_tenant
-
-    if not decider_service.shadow_for(current_tenant()):
-        return
-    messages = out.get("messages") if isinstance(out, dict) else None
-    if not isinstance(messages, list):
-        return
-    from app.services.shop_service import current_shop
-
-    shop = current_shop() or {}
-    pending = out.get("pendingConfirm") if isinstance(out, dict) else None
-    state = decider_service.state_from(
-        messages,
-        shop=shop if isinstance(shop, dict) else {},
-        card_open=bool(isinstance(pending, dict) and pending.get("id")),
-        last_post=_latest_post() is not None,
-        media=media,
-    )
-    decider_service.schedule_shadow(state)
-
-
 _TURN_ID = re.compile(r"^[A-Za-z0-9-]{1,64}$")
 
 
@@ -2912,3 +2255,30 @@ def post_notice(thread_id: str, text: str) -> None:
 
 def remember_content(extra: dict) -> None:
     _remember_content(extra)
+
+
+from app.services.router_loop import (  # noqa: E402  (the decider loop lives in router_loop)
+    _wants_apply,
+    _GROWTH_MARKS,
+    _wants_growth,
+    _growth_write_ok,
+    _decider_state,
+    _decider_result,
+    _subset_for,
+    _overlay,
+    _goal_name,
+    _load_goal,
+    _save_goal,
+    _goal_line,
+    _short_goal,
+    _skill_plan,
+    _add_tokens,
+    _steer_decider,
+    _shadow_after,
+)
+from app.services.router_status import (  # noqa: E402  (the status tool lives in router_status)
+    _status_payload,
+    _missing_image_titles,
+    _STATUS_FA,
+    _format_status,
+)

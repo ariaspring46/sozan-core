@@ -123,6 +123,8 @@ class Settings(BaseSettings):
     decider_min_prob: float = 0.6
     decider_min_margin: float = 0.2
     decider_pro_model: str = "deepseek/deepseek-v4-pro"
+    # The chat model sees the decider's tool plus the read tools of its groups (router_tools). Off until tried live.
+    decider_tool_groups: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:

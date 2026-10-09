@@ -85,7 +85,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 15.7k | the files most tasks touch; read the relevant one first |
-| active | 90.4k | yours to edit; read only what the task needs |
+| active | 90.2k | yours to edit; read only what the task needs |
 | rare | 34.5k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
@@ -106,7 +106,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (4.3k), `getting-started.tsx` (2.9k), `landing-phone.tsx` (2.8k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `drop-stale-workers.tsx` (0.1k), `field.tsx` (0.1k)
 - `frontend/components/ui/`: `button.tsx` (0.2k), `textarea.tsx` (0.1k), `select.tsx` (0.1k), `input.tsx` (0.1k), `card.tsx` (0.1k)
 - `frontend/lib/`: `api.ts` (2.3k), `back-stack.ts` (2.0k), `use-app-viewport.ts` (0.8k), `theme.ts` (0.7k), `digits.ts` (0.4k), `idempotency.ts` (0.4k), `public-plans.ts` (0.3k), `utils.ts` (0.1k)
-- `tools/`: `ui_shop_mobile_probe.mjs` (8.9k), `ui_shop_probe.mjs` (6.5k), `ui_chat_probe.mjs` (6.1k), `ui_chat_visual.mjs` (5.5k), `ui_back_probe.mjs` (3.9k), `ui_studio_probe.mjs` (3.7k), `ui_menu_probe.mjs` (2.8k), `ui_check.py` (2.3k), `ui_chat_live.mjs` (1.9k)
+- `tools/`: `ui_shop_mobile_probe.mjs` (8.9k), `ui_shop_probe.mjs` (6.5k), `ui_chat_probe.mjs` (6.1k), `ui_chat_visual.mjs` (5.5k), `ui_back_probe.mjs` (3.9k), `ui_studio_probe.mjs` (3.7k), `ui_menu_probe.mjs` (2.8k), `ui_check.py` (2.1k), `ui_chat_live.mjs` (1.9k)
 
 **Rare (yours; only when the task names it):**
 
