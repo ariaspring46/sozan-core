@@ -2448,6 +2448,7 @@
   "signature": "def latest_thread_id() -> str",
   "since": "2026-10-09",
   "users": [
+   "C",
    "X3"
   ]
  },
@@ -2456,6 +2457,7 @@
   "signature": "def post_notice(thread_id: str, text: str) -> None",
   "since": "2026-10-09",
   "users": [
+   "C",
    "X3"
   ]
  },

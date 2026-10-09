@@ -743,7 +743,7 @@ def write_catalog_json(root: Path, products: list[dict]) -> Path:
             "categoryFa": str(row.get("categoryFa") or row.get("category") or "کالا"),
             "image": image,
         }
-        for key in ("discount", "subcategory", "subcategoryFa", "images", "priceLabel", "specs"):
+        for key in ("discount", "stock", "subcategory", "subcategoryFa", "images", "priceLabel", "specs"):
             value = row.get(key)
             if value not in (None, "", []):
                 item[key] = value

@@ -67,7 +67,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 31.8k | the files most tasks touch; read the relevant one first |
-| active | 66.3k | yours to edit; read only what the task needs |
+| active | 67.1k | yours to edit; read only what the task needs |
 | rare | 19.8k | yours; read only when the task names it |
 | tests | 37.0k | read only the test of the module you change |
 
@@ -83,7 +83,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `backend/app/services/`: `inbox_agent_service.py` (15.7k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (3.5k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (1.2k), `pii_mask.py` (0.5k)
 - `frontend/app/inbox/`: `page.tsx` (4.4k)
 - `frontend/app/inbox/[id]/`: `page.tsx` (2.3k)
-- `frontend/app/sales/`: `page.tsx` (3.2k)
+- `frontend/app/sales/`: `page.tsx` (4.0k)
 - `frontend/components/`: `sales-policy-form.tsx` (1.3k), `training-choice.tsx` (0.5k)
 - `tools/`: `sales100_battery.py` (7.8k), `train_nightly.py` (3.4k)
 

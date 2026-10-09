@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.1k tokens. Your core files total 20.4k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.2k tokens. Your core files total 21.9k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -66,22 +66,22 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 20.4k | the files most tasks touch; read the relevant one first |
-| active | 59.1k | yours to edit; read only what the task needs |
+| core | 21.9k | the files most tasks touch; read the relevant one first |
+| active | 60.6k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
-| tests | 18.6k | read only the test of the module you change |
+| tests | 20.6k | read only the test of the module you change |
 
 **Core:**
 
 - `backend/app/services/storefront_service.py` (6.1k)
-- `backend/app/services/pay_service.py` (7.7k)
+- `backend/app/services/pay_service.py` (9.2k)
 - `backend/app/api/storefront.py` (2.9k)
 - `backend/app/api/pay.py` (3.7k)
 
 **Active (you may edit):**
 
 - `backend/app/api/`: `pay.py` (3.7k), `storefront.py` (2.9k)
-- `backend/app/services/`: `pay_service.py` (7.7k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
+- `backend/app/services/`: `pay_service.py` (9.2k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.7k)
 - `frontend/app/p/[id]/`: `page.tsx` (0.8k)
@@ -94,7 +94,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `tools/monitor/`: `install.sh` (0.4k), `sozan_monitor.py` (7.1k), `status-nginx.conf` (0.3k)
 - `tools/storefront/`: `scan_storefront.py` (3.4k), `shop-closed.html` (0.3k)
 
-**Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
+**Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/pay_stock_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
 
 **Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (33.2k)
 
@@ -162,6 +162,11 @@ export function priceText(price: number, label?: string): string  # changed 2026
 **`backend/app/services/persian_text.py`** — owner X1
 ```
 def sanitize_persian(text: str, *, limit: int=80) -> str  # changed 2026-09-24
+```
+**`backend/app/services/router_service.py`** — owner X1
+```
+def latest_thread_id() -> str  # changed 2026-10-09
+def post_notice(thread_id: str, text: str) -> None  # A line Sozan adds on her own, after a channel connects or a page scan finishes.  # changed 2026-10-09
 ```
 **`backend/app/services/product_image_service.py`** — owner X2
 ```
@@ -369,6 +374,7 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
     app.services.arvan_dns_service_test \
     app.services.catalog_sync_service_test \
     app.services.pay_service_test \
+    app.services.pay_stock_test \
     app.services.shop_otp_service_test \
     app.services.storefront_service_test \
     app.services.support_service_test 2>&1 | tail -5

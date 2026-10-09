@@ -107,6 +107,10 @@ def orders_text(now: float | None = None) -> str:
         counts[status] = counts.get(status, 0) + 1
     parts = [f"{fa_digits(counts[key])} {label}" for key, label in _ORDER_FA.items() if counts.get(key)]
     lines = ["سفارش‌ها: " + "، ".join(parts) + "."]
+    need = [row for row in rows if isinstance(row.get("needsAction"), dict)]
+    if need:
+        titles = "، ".join(_quote(str(row.get("title") or "سفارش")[:30]) for row in need[:3])
+        lines.insert(0, f"نیازمند اقدام: {fa_digits(len(need))} سفارش پرداخت‌شده که موجودی کافی نداشت ({titles}). شماره و نام مشتری در صفحهٔ «فروش» است.")
     lines.append("آخرین‌ها:")
     for row in rows[:5]:
         label = _ORDER_FA.get(str(row.get("status") or ""), "در انتظار پرداخت")
