@@ -319,7 +319,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `HTTP routes`: `GET /inbox/unread` (changed 2026-10-02) ← U; `GET /inbox/{thread_id}` (changed 2026-10-02) ← U; `GET /inbox` (changed 2026-10-02) ← U; `PATCH /inbox/{thread_id}` (changed 2026-10-02) ← U
 - `backend/app/api/inbox.py`: `router` (changed 2026-09-18) ← X5
 - `backend/app/services/claims_guard.py`: `check` (changed 2026-09-27) ← X2, X4; `needs_claims_model` (changed 2026-10-06) ← X4
-- `backend/app/services/inbox_service.py`: `expire_stale_sending` (changed 2026-09-18) ← X5; `handle_inbound` (changed 2026-09-18) ← X3; `list_publish_audience` (changed 2026-09-21) ← X1, X2; `list_threads` (changed 2026-09-18) ← X1; `rearm_pending_auto_replies` (changed 2026-09-26) ← X5; `save_auto_reply` (changed 2026-09-18) ← X1; `unread_count` (changed 2026-09-18) ← X1
+- `backend/app/services/inbox_service.py`: `expire_stale_sending` (changed 2026-09-18) ← X5; `handle_inbound` (changed 2026-09-18) ← X3; `list_publish_audience` (changed 2026-09-21) ← X1, X2; `list_threads` (changed 2026-09-18) ← X1; `rearm_pending_auto_replies` (changed 2026-09-26) ← X5; `reply` (changed 2026-10-09) ← X1; `save_auto_reply` (changed 2026-09-18) ← X1; `unread_count` (changed 2026-09-18) ← X1
 - `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X1, X4, X5
 - `backend/app/services/sales_policy_service.py`: `public_policy` (changed 2026-09-27) ← X5; `save_policy` (changed 2026-09-27) ← X5
 - `backend/app/services/shop_memory_service.py`: `schedule_backfill` (changed 2026-10-06) ← C; `schedule_delete` (changed 2026-10-06) ← C

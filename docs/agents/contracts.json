@@ -1839,6 +1839,14 @@
    "X5"
   ]
  },
+ "backend/app/services/inbox_service.py::reply": {
+  "owner": "Y",
+  "signature": "async def reply(thread_id: str, text: str, *, deliver: bool=True, draft_id: str='', as_draft: bool=False, auto: bool=False) -> dict",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/inbox_service.py::save_auto_reply": {
   "owner": "Y",
   "signature": "def save_auto_reply(mode: str) -> dict",
@@ -2124,6 +2132,14 @@
   "since": "2026-09-18",
   "users": [
    "Y"
+  ]
+ },
+ "backend/app/services/pay_service.py::list_orders": {
+  "owner": "C",
+  "signature": "def list_orders(limit: int=40) -> list[dict]",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
   ]
  },
  "backend/app/services/pay_service.py::public_order": {
@@ -2602,6 +2618,14 @@
    "X1"
   ]
  },
+ "backend/app/services/shop_intent_service.py::_price_toman": {
+  "owner": "X4",
+  "signature": "def _price_toman(text: str) -> int",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/shop_intent_service.py::catalog_add": {
   "owner": "X4",
   "signature": "def catalog_add(text: str) -> dict | None",
@@ -3014,6 +3038,7 @@
   "signature": "def update_product(product_id: str, patch: dict) -> dict",
   "since": "2026-10-06",
   "users": [
+   "X1",
    "X4"
   ]
  },

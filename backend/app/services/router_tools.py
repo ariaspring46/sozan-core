@@ -1,7 +1,7 @@
 """Seller-chat tools, declared once.
 
 A tool is a name, the schema the chat model sees, a level, a rank (which call wins when the model makes several),
-the groups it belongs to, and optionally its own card sentence and handler. router_service takes TOOLS, the level
+the groups it belongs to, and optionally its own card sentence, handler and pre-card check. router_service takes TOOLS, the level
 sets and the ranks from here, so a new tool is one `register(Tool(...))` (plus its handler module) instead of edits
 in five places of the router.
 
@@ -21,6 +21,7 @@ from typing import Awaitable, Callable
 
 Handler = Callable[[str, dict], Awaitable[tuple[str, dict]]]
 Summary = Callable[[dict, str], str]
+Check = Callable[[dict, str], str]
 LEVELS = ("read", "write", "pass")
 
 
@@ -33,6 +34,7 @@ class Tool:
     groups: tuple[str, ...] = ()
     run: Handler | None = None
     summary: Summary | None = None
+    check: Check | None = None  # a sentence that answers instead of the card (missing product, unknown customer)
 
 
 _REGISTRY: dict[str, Tool] = {}
@@ -77,6 +79,14 @@ def summary(name: str, args: dict, spoken: str) -> str:
     if tool is None or tool.summary is None:
         return ""
     return str(tool.summary(args, spoken) or "")
+
+
+def check(name: str, args: dict, spoken: str) -> str | None:
+    """None when the tool has no check of its own; else the sentence that blocks it, empty when it may go on."""
+    tool = _REGISTRY.get(name)
+    if tool is None or tool.check is None:
+        return None
+    return str(tool.check(args, spoken) or "")
 
 
 def toolset(name: str) -> list[str]:
@@ -248,6 +258,8 @@ for _schema in _SCHEMAS:
     _name = str(_schema["function"]["name"])
     _level, _rank, _groups = _PLACES[_name]
     register(Tool(name=_name, schema=_schema, level=_level, rank=_rank, groups=_groups, run=_HANDLERS.get(_name)))
+
+from app.services import seller_tools  # noqa: E402,F401  registers orders, sales, catalog edits and customer replies
 
 TOOLS = schemas()
 WRITE_TOOLS = names("write")

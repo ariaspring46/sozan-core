@@ -23,7 +23,7 @@ USAGE_FILE = "router-usage.json"
 BUSY_FILE = "router-busy.json"
 INDEX_FILE = "router-threads.json"
 # tools, levels and ranks are declared once in router_tools
-from app.services import router_tools  # noqa: E402
+from app.services import router_tools, seller_tools  # noqa: E402
 from app.services.router_tools import PASSTHROUGH, READ_TOOLS, TOOLS, WRITE_TOOLS  # noqa: E402,F401
 from app.services.router_tools import TOOL_RANK as _TOOL_RANK  # noqa: E402
 ALLOWED = WRITE_TOOLS | PASSTHROUGH | READ_TOOLS
@@ -127,7 +127,7 @@ SYSTEM = (
     "تغییر صفحهٔ زنده = edit_shop. کالای با قیمت تومان = add_product. "
     "کپشن، کپی، شعار، پست و استوری = studio_chat و خودت متن تبلیغ ننویس. "
     "فرستادن پست آماده = publish_post. "
-    "دایرکت را جواب نده. مبهم=ask_user. "
+    "دایرکت را خودت جواب نده. مبهم=ask_user. "
     "درخواست عکس یا پست = studio_chat. "
     "پیوست را با همان ابزار بفرست. نام ابزار، کلید و JSON را در جواب ننویس."
 )
@@ -340,10 +340,10 @@ def _fact_reply(spoken: str) -> str:
         return "این را در چت نمی‌گویم."
     if topic == "shaba":
         return "شبا را اینجا نمی‌گویم. از صفحهٔ کیف می‌توانی ببینی."
-    if topic == "missing_profile" or topic == "discount":
+    if topic == "missing_profile":
         return "این را در پروندهٔ فروشگاه ندارم."
-    if topic == "purchases":
-        return "تعداد خرید امروز را در چت جمع نمی‌کنم."
+    if topic in {"discount", "purchases"}:
+        return seller_tools.discount_text() if topic == "discount" else seller_tools.sales_text()
     if topic == "build_error":
         err = str(_shop_row().get("error") or "").strip()
         return f"آخرین ساخت این خطا را دارد: {err}" if err else "آخرین ساخت خطایی ثبت نکرده."
@@ -632,6 +632,8 @@ def _direct_reply(spoken: str, use_decider: bool = False) -> str:
 
     if router_text.has_payment_number(spoken):
         return router_text.SENSITIVE_REPLY
+    if seller_tools.route(spoken):
+        return ""
     if _parse(spoken).topic not in {"secret", "shaba", "other_shop"}:
         quick = router_text.social_reply(spoken) or router_text.redirect_reply(spoken)
         if quick:
@@ -1219,6 +1221,9 @@ def _decider_guard(name: str, args: dict, spoken: str) -> str:
 
 
 def _authority_route(name: str, args: dict, spoken: str, view_path: str, view_target: str) -> tuple[str, str]:
+    own = router_tools.check(name, args, spoken)
+    if own is not None:
+        return name, own
     if args.get("_from_decider"):
         if name == "publish_post":
             return name, _publish_block(args, spoken)
@@ -1795,6 +1800,9 @@ def route_tool(spoken: str, view_path: str = "", view_target: str = "") -> str:
 
     if channel_routed(spoken):
         return "channel"
+    business = seller_tools.route(spoken)
+    if business:
+        return business
     if catalog_add(spoken) is not None:
         return "add_product"
     if kinds & {"create_page", "set_colors", "show_prices", "hide_prices", "remove_product"}:

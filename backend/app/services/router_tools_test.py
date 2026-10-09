@@ -9,16 +9,20 @@ from app.services.router_tools import Tool
 
 class RegistryTests(unittest.TestCase):
     def test_the_router_sees_the_same_tools_as_before(self) -> None:
-        # order, levels and ranks are what router_service had before the registry (2026-10-09)
+        # order, levels and ranks are what router_service had before the registry (2026-10-09); seller_tools come after
         self.assertEqual(
             [item["function"]["name"] for item in router_service.TOOLS],
-            ["channel", "status", "inbox_status", "ask_user", "set_auto_reply", "set_voice_tone", "shop_chat", "edit_shop", "add_product", "studio_chat", "publish_post"],
+            [
+                "channel", "status", "inbox_status", "ask_user", "set_auto_reply", "set_voice_tone", "shop_chat", "edit_shop",
+                "add_product", "studio_chat", "publish_post",
+                "orders", "sales_report", "products", "edit_product", "set_discount", "reply_customer",
+            ],
         )
         self.assertEqual(
             router_service.WRITE_TOOLS,
-            {"set_auto_reply", "set_voice_tone", "edit_shop", "add_product", "studio_chat", "publish_post"},
+            {"set_auto_reply", "set_voice_tone", "edit_shop", "add_product", "studio_chat", "publish_post", "edit_product", "set_discount", "reply_customer"},
         )
-        self.assertEqual(router_service.READ_TOOLS, {"status", "ask_user", "inbox_status", "channel"})
+        self.assertEqual(router_service.READ_TOOLS, {"status", "ask_user", "inbox_status", "channel", "orders", "sales_report", "products"})
         self.assertEqual(router_service.PASSTHROUGH, {"shop_chat"})
         self.assertEqual(router_service._TOOL_RANK["shop_chat"], 1)
         self.assertEqual(router_service._TOOL_RANK["ask_user"], 2)
@@ -39,6 +43,20 @@ class RegistryTests(unittest.TestCase):
             self.assertNotIn("ask_user", extra)
         self.assertEqual(router_tools.toolset("set_auto_reply"), ["set_auto_reply", "inbox_status"])
         self.assertIn("status", router_tools.toolset("edit_shop"))
+        self.assertEqual(router_tools.toolset("edit_product"), ["edit_product", "products"])
+        self.assertEqual(router_tools.toolset("reply_customer"), ["reply_customer", "inbox_status"])
+
+    def test_every_decider_action_names_a_registered_tool(self) -> None:
+        from app.services import decider_service
+
+        for action, (tool, _args) in decider_service._ACTIONS.items():
+            self.assertTrue(not tool or router_tools.get(tool) is not None, action)
+            self.assertIn(action, decider_service._LABELS)
+            self.assertIn(action, decider_service._CRITERIA)
+
+    def test_a_check_answers_before_the_card(self) -> None:
+        self.assertIsNone(router_tools.check("status", {}, "وضعیت"))
+        self.assertEqual(router_tools.check("set_discount", {"percent": 95, "all": True}, ""), "تخفیف باید بین ۱ تا ۹۰ درصد باشد.")
 
     def test_a_new_tool_brings_its_own_handler_and_card(self) -> None:
         schema = {"type": "function", "function": {"name": "demo_write", "description": "آزمون", "parameters": {"type": "object", "properties": {}}}}
