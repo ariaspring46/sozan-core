@@ -24,11 +24,9 @@ class SocialReplyTests(unittest.TestCase):
 class RedirectTests(unittest.TestCase):
     def test_what_chat_cannot_do_points_to_the_page_that_can(self) -> None:
         cases = {
-            "قیمت همه محصولات را ۱۰ درصد ببر بالا": "انبار",
-            "قیمت انگشتر نقره را ۳ میلیون کن": "انبار",
+            "قیمت همه محصولات را ۱۰ درصد ببر بالا": "جدا بگو",
             "پلن را به پرو مکس عوض کن": "پرداخت و پیامک",
             "قیمت دلار امروز چنده؟": "ارز",
-            "امروز چقدر فروختم؟": "«فروش»",
             "لوگوی من را عوض کن": "هویت و لوگو",
             "یه دامنه ir. برام بخر": "ثبت‌کنندهٔ دامنه",
             "برای همهٔ مشتری‌ها پیامک تبلیغاتی بفرست": "پیامک گروهی",
@@ -40,6 +38,9 @@ class RedirectTests(unittest.TestCase):
 
     def test_ordinary_requests_are_left_alone(self) -> None:
         for text in (
+            "قیمت انگشتر نقره را ۳ میلیون کن",  # seller_tools.edit_product since 2026-10-09
+            "امروز چقدر فروختم؟",  # seller_tools.sales_report
+            "اون کالا را موجود کن",
             "قیمت‌ها را مخفی کن",
             "پلن من چیه؟",
             "دستبند چرم را با قیمت ۴۵۰٬۰۰۰ تومان اضافه کن",

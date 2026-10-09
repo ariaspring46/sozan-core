@@ -6,7 +6,7 @@ Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Eac
 
 | role | area | harness | core | active | rare | tests | report file |
 |---|---|---|---|---|---|---|---|
-| X1 | Router and panel chat | [X1.md](X1.md) (11.1k) | 44.8k | 150.1k | 9.9k | 55.8k | `talk-x1.md` |
+| X1 | Router and panel chat | [X1.md](X1.md) (11.2k) | 44.9k | 160.2k | 9.6k | 61.8k | `talk-x1.md` |
 | X2 | Studio, images and brand content | [X2.md](X2.md) (10.3k) | 41.3k | 82.8k | 53.6k | 32.5k | `talk-x2.md` |
 | X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (11.2k) | 18.0k | 86.5k | 1.2k | 42.3k | `talk-x3.md` |
 | X4 | Shop build and live editing | [X4.md](X4.md) (10.4k) | 31.9k | 110.4k | 2.3k | 48.8k | `talk-x4.md` |

@@ -103,9 +103,10 @@ class RouterChatBehaviorTests(unittest.TestCase):
         out = self.turn("کیف مشکی ۱.۲ میلیون تومن بذار تو سایت")
         self.assertIn("«کیف مشکی»", out["messages"][-1]["text"])
 
-    def test_stock_change_points_to_the_inventory_page(self) -> None:
+    def test_stock_change_without_a_known_product_asks_which(self) -> None:
         out = self.turn("اون کالا را موجود کن")
-        self.assertIn("انبار", out["messages"][-1]["text"])
+        self.assertIn("کدام کالا", out["messages"][-1]["text"])
+        self.assertFalse((out.get("pendingConfirm") or {}).get("id"))
 
     def test_pronoun_follow_up_uses_the_product_just_discussed(self) -> None:
         with tenant_scope(PHONE):

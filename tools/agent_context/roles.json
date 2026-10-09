@@ -47,6 +47,7 @@
         "backend/app/services/router_tools.py",
         "backend/app/services/router_loop.py",
         "backend/app/services/router_status.py",
+        "backend/app/services/seller_tools.py",
         "backend/app/services/router_context.py",
         "backend/app/services/turn_clock.py",
         "backend/app/services/number_span.py",

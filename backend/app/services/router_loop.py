@@ -42,6 +42,10 @@ _GROWTH_MARKS = (
 
 def _wants_growth(text: str) -> bool:
     raw = text or ""
+    from app.services.seller_tools import asks_sales
+
+    if asks_sales(raw) and not any(word in raw for word in ("کمه", "کم شده", "چطور", "چیکار", "بیشتر")):
+        return False  # «امروز چقدر فروختم» wants the number, not a growth plan
     if "قیمت" in raw and any(word in raw for word in ("عوض", "کن", "بکن", "بگذار", "بذار")) and "فروشم" not in raw and "نرخ تبدیل" not in raw:
         return False
     return any(mark in raw for mark in _GROWTH_MARKS)

@@ -2,7 +2,7 @@
 
 import { ReactNode, RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, CheckCircle2, Hammer, ImageIcon, Megaphone, MessageSquareText, Package, PencilRuler, Send, Sparkles, XCircle } from "lucide-react";
+import { Check, CheckCircle2, Hammer, ImageIcon, Megaphone, MessageSquareText, Package, PencilRuler, Percent, Send, Sparkles, XCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -151,6 +151,9 @@ const CONFIRM_KIND: Record<string, { title: string; icon: typeof Hammer }> = {
   add_product: { title: "افزودن کالا", icon: Package },
   set_auto_reply: { title: "پاسخ خودکار دایرکت", icon: MessageSquareText },
   set_voice_tone: { title: "لحن پاسخ‌ها", icon: Sparkles },
+  edit_product: { title: "قیمت و موجودی", icon: Package },
+  set_discount: { title: "تخفیف", icon: Percent },
+  reply_customer: { title: "پاسخ به مشتری", icon: Send },
 };
 
 /** کارتی که پیش از هر کار برگشت‌ناپذیر می‌آید: چه کاری، توضیح کوتاه، و دو دکمهٔ درشت. */
@@ -187,7 +190,7 @@ export function ConfirmCard({
           <p className="truncate text-[15px] font-bold text-ink">{spec.title}</p>
         </div>
       </div>
-      <p className="wrap-any px-4 py-3 text-[15px] leading-[1.9] text-ink">{text}</p>
+      <p className="wrap-any whitespace-pre-line px-4 py-3 text-[15px] leading-[1.9] text-ink">{text}</p>
       {tapped === "confirm" ? <span aria-hidden className="sozan-shimmer block h-1" /> : null}
       {live ? (
         <div className="grid grid-cols-5 gap-2 px-4 pb-4">

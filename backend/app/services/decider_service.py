@@ -58,6 +58,12 @@ _ACTIONS: dict[str, tuple[str, dict]] = {
     "channel_status": ("channel", {}),
     "connect_channel": ("channel", {}),
     "scan_page": ("channel", {}),
+    "orders": ("orders", {}),
+    "sales_report": ("sales_report", {}),
+    "find_product": ("products", {}),
+    "edit_product": ("edit_product", {}),
+    "set_discount": ("set_discount", {}),
+    "reply_customer": ("reply_customer", {}),
 }
 
 _LABELS = {
@@ -82,6 +88,12 @@ _LABELS = {
     "channel_status": "وضعیت کانال",
     "connect_channel": "وصل کردن کانال",
     "scan_page": "خواندن پیج",
+    "orders": "سفارش‌ها",
+    "sales_report": "گزارش فروش",
+    "find_product": "دیدن کالا",
+    "edit_product": "قیمت و موجودی",
+    "set_discount": "تخفیف",
+    "reply_customer": "پاسخ به مشتری",
 }
 
 _CRITERIA = {
@@ -92,7 +104,7 @@ _CRITERIA = {
     "studio_image": "A post photo or product image for the studio, not the site header. Example: a necklace photo. Also the step that makes photos after products without one were listed.",
     "studio_caption": "A caption for a post. Example: کپشن این عکس را بنویس.",
     "advise_live_site": "Look at the live site and suggest improvements. Example: برو سایت خودمون رو ببین و پیشنهاد بهبود بده. One step, so loop_enough is true, and the skill is the installed UI/UX skill. Not a sales, profit, or conversion question.",
-    "advise_growth": "Sales, profit, conversion, or growth for this shop. Example: فروشم کمه. The skill is ecommerce-growth-mba. Diagnose before any change. When a funnel step has no number, the experiment is to record that number and the page is not edited. loop_enough is false until the diagnosis and the one experiment are both said.",
+    "advise_growth": "Sales, profit, conversion, or growth for this shop. Example: فروشم کمه. Not a question about how much was sold (sales_report). The skill is ecommerce-growth-mba. Diagnose before any change. When a funnel step has no number, the experiment is to record that number and the page is not edited. loop_enough is false until the diagnosis and the one experiment are both said.",
     "hero_image": "An image for the site header, with no product named. Example: بیا برای هدر تصویر رو بسازیم.",
     "edit_page": "Change text, color, or a page on the live shop. Example: رنگ پس‌زمینه کرم شود.",
     "correct_category": "The seller is correcting the shop's business, often angrily. Example: سایت مربوط به جواهر فروشی است. Never status.",
@@ -106,6 +118,12 @@ _CRITERIA = {
     "channel_status": "Whether a named channel is connected. Example: «میخوام ببینم وصل شده؟» or «من وصل کردم» or «ببین وصل شد». Not the whole shop status.",
     "connect_channel": "The seller wants to connect Instagram or Telegram. Example: «بریم وصلش کنیم» or «اتصال اینستاگرام».",
     "scan_page": "Read the seller's public Instagram page or public Telegram channel. Example: «صفحه ی اینستاگرام من رو ببین sozan_core» or «تو باید بتونی پیج من رو ببینی». Never say Instagram cannot be opened.",
+    "orders": "The shop's orders: new, paid, waiting for payment, or a receipt to review. Example: سفارش جدید داریم؟",
+    "sales_report": "How much the shop sold today, this week, or this month, and what sold best. Example: امروز چقدر فروختم؟ A number, not advice.",
+    "find_product": "Look up the price, stock, or discount of catalog products. Example: موجودی انگشتر فیروزه چنده؟",
+    "edit_product": "Change the price or stock of a product already in the catalog. Example: قیمت انگشتر فیروزه رو بکن ۶۰۰ هزار. A new product is add_product.",
+    "set_discount": "Put a percent discount on one product or on all products, or remove it. Example: روی همه ۲۰ درصد تخفیف بذار.",
+    "reply_customer": "Send the seller's own words to one customer in the inbox. Example: به مریم بگو فردا ارسال میشه. Not the auto-reply setting.",
 }
 
 
