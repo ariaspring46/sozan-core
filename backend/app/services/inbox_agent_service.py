@@ -297,12 +297,16 @@ def tool_order_status(order_id: str) -> dict:
     if not row:
         return {"ok": False, "error": "سفارش پیدا نشد"}
     pub = public_order(row)
+    from app.services.order_flow_service import stage_line
+
     return {
         "ok": True,
         "id": pub.get("id") or "",
         "title": pub.get("title") or "",
         "status": pub.get("status") or "",
         "amount": int(pub.get("amount") or 0),
+        "stage": stage_line(row),
+        "tracking": pub.get("tracking") or "",
     }
 
 

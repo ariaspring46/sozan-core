@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.2k tokens. Your core files total 21.9k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.6k tokens. Your core files total 23.3k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -66,26 +66,26 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 21.9k | the files most tasks touch; read the relevant one first |
-| active | 60.6k | yours to edit; read only what the task needs |
+| core | 23.3k | the files most tasks touch; read the relevant one first |
+| active | 68.8k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
-| tests | 20.6k | read only the test of the module you change |
+| tests | 23.4k | read only the test of the module you change |
 
 **Core:**
 
 - `backend/app/services/storefront_service.py` (6.1k)
-- `backend/app/services/pay_service.py` (9.2k)
+- `backend/app/services/pay_service.py` (10.0k)
 - `backend/app/api/storefront.py` (2.9k)
-- `backend/app/api/pay.py` (3.7k)
+- `backend/app/api/pay.py` (4.2k)
 
 **Active (you may edit):**
 
-- `backend/app/api/`: `pay.py` (3.7k), `storefront.py` (2.9k)
-- `backend/app/services/`: `pay_service.py` (9.2k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
+- `backend/app/api/`: `pay.py` (4.2k), `storefront.py` (2.9k)
+- `backend/app/services/`: `pay_service.py` (10.0k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (2.9k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.7k)
-- `frontend/app/p/[id]/`: `page.tsx` (0.8k)
-- `frontend/components/`: `shop-settings-form.tsx` (8.8k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.4k), `domain-menu.tsx` (4.3k)
+- `frontend/app/p/[id]/`: `page.tsx` (1.9k)
+- `frontend/components/`: `shop-settings-form.tsx` (8.8k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.4k), `domain-menu.tsx` (4.3k), `order-flow-card.tsx` (2.8k)
 - `frontend/lib/`: `site-host.ts` (0.1k)
 
 **Rare (yours; only when the task names it):**
@@ -94,7 +94,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `tools/monitor/`: `install.sh` (0.4k), `sozan_monitor.py` (7.1k), `status-nginx.conf` (0.3k)
 - `tools/storefront/`: `scan_storefront.py` (3.4k), `shop-closed.html` (0.3k)
 
-**Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/pay_stock_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
+**Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/order_flow_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/pay_stock_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
 
 **Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (33.2k)
 
@@ -155,9 +155,11 @@ export function useBackClose(open: boolean, onBack: () => boolean | void)  # cha
 ```
 **`frontend/lib/digits.ts`** — owner U
 ```
+export function formatWhen(at: number): string  # changed 2026-09-18
 export function money(amount: number): string  # changed 2026-09-18
 export function parseNonNegativeInt(raw: string): number | null  # changed 2026-09-18
 export function priceText(price: number, label?: string): string  # changed 2026-09-18
+export function toLatinDigits(raw: string): string  # changed 2026-09-18
 ```
 **`backend/app/services/persian_text.py`** — owner X1
 ```
@@ -183,6 +185,10 @@ def unattributed_dir() -> Path  # changed 2026-10-01
 **`backend/app/services/chat_media_service.py`** — owner X3
 ```
 def save(filename: str, data: bytes, content_type: str, *, sweep: bool=True) -> dict  # changed 2026-09-25
+```
+**`backend/app/services/melipayamak_otp_service.py`** — owner X3
+```
+async def send_pattern(phone: str, text: str, *, body_id: str, surface: str='auth') -> str  # One approved template; `text` is its values joined by «;» ({0};{1};…). Returns the provider recId.  # changed 2026-10-09
 ```
 **`backend/app/services/sms_service.py`** — owner X3
 ```
@@ -222,6 +228,7 @@ Settings.arvan_origin_ip: str = ''  # changed 2026-09-18
 Settings.arvan_origin_port: int = 80  # changed 2026-09-18
 Settings.arvan_zone: str = 'sozan-core.ir'  # changed 2026-09-18
 Settings.jwt_secret: str = 'change-me-to-a-long-random-secret'  # changed 2026-09-18
+Settings.melipayamak_order_body_id: str = ''  # changed 2026-10-09
 Settings.otp_dev: bool = False  # changed 2026-09-18
 Settings.otp_ttl_seconds: int = 300  # changed 2026-09-18
 Settings.panel_url: str = 'https://app.sozan-core.ir'  # changed 2026-09-18
@@ -305,6 +312,10 @@ export function QuotaUsage({ budget, compact = false }: { budget: AiBudget; comp
 ```
 export function useAiBudget(): AiBudget | null  # changed 2026-09-28
 ```
+**`backend/app/services/inbox_service.py`** — owner Y
+```
+async def reply(thread_id: str, text: str, *, deliver: bool=True, draft_id: str='', as_draft: bool=False, auto: bool=False) -> dict  # changed 2026-10-09
+```
 **`backend/app/services/shop_memory_service.py`** — owner Y
 ```
 def schedule_backfill(products: list[dict], *, phone: str | None=None) -> None  # Catalog sync stays off the chat turn. A down Chroma does not slow add_product.  # changed 2026-10-06
@@ -358,10 +369,12 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `backend/app/api/storefront.py`: `router` (changed 2026-09-18) ← X5
 - `backend/app/services/arvan_dns_service.py`: `check_cname` (changed 2026-09-18) ← X4; `cname_target` (changed 2026-09-18) ← X4; `edge_dry` (changed 2026-09-27) ← X4, X5, Y; `ensure_shop_record` (changed 2026-09-18) ← X4; `hostname` (changed 2026-09-18) ← X4; `is_zone_host` (changed 2026-09-18) ← X4; `public_host` (changed 2026-09-18) ← X4; `start_cname_setup` (changed 2026-09-18) ← X4; `zone` (changed 2026-09-18) ← X4
 - `backend/app/services/catalog_sync_service.py`: `sync_live` (changed 2026-09-18) ← X1, X4
-- `backend/app/services/pay_service.py`: `create_order` (changed 2026-09-19) ← Y; `ensure_pay_secret` (changed 2026-09-18) ← X4; `get_order` (changed 2026-09-18) ← Y; `list_orders` (changed 2026-10-09) ← X1; `public_order` (changed 2026-09-18) ← Y
+- `backend/app/services/order_flow_service.py`: `STAGES` (changed 2026-10-09) ← X1; `STAGE_FA` (changed 2026-10-09) ← X1; `TELLS_SHOPPER` (changed 2026-10-09) ← X1; `advance_order` (changed 2026-10-09) ← X1; `notify_channel` (changed 2026-10-09) ← X1; `stage_line` (changed 2026-10-09) ← X1, Y; `stage_problem` (changed 2026-10-09) ← X1
+- `backend/app/services/pay_service.py`: `create_order` (changed 2026-10-09) ← Y; `ensure_pay_secret` (changed 2026-09-18) ← X4; `get_order` (changed 2026-09-18) ← Y; `list_orders` (changed 2026-10-09) ← X1; `public_order` (changed 2026-09-18) ← Y; `review_receipt` (changed 2026-10-09) ← X1
 - `backend/app/services/storefront_service.py`: `_list` (changed 2026-10-09) ← X1; `_row_images` (changed 2026-10-09) ← X1; `add_product` (changed 2026-09-18) ← X4; `clear_scanned_catalog` (changed 2026-09-18) ← X3; `count_scanned_handle` (changed 2026-09-19) ← X3; `is_placeholder_catalog` (changed 2026-10-06) ← X2, X3, X4; `list_products` (changed 2026-09-18) ← X1, X2, X3, X4, Y; `list_sales` (changed 2026-09-18) ← X1, X5; `price_label` (changed 2026-09-18) ← X4; `referenced_image_names` (changed 2026-09-18) ← X2; `remove_product_by_title` (changed 2026-09-18) ← X1, X4; `remove_scanned_handle` (changed 2026-09-18) ← X3; `retitle_scanned_from_captions` (changed 2026-09-18) ← X5; `update_product` (changed 2026-10-06) ← X1, X4; `upsert_scanned_product` (changed 2026-09-18) ← X3
 - `backend/app/services/support_service.py`: `create_ticket` (changed 2026-10-09) ← X5; `list_all_tickets_for_hub_admin` (changed 2026-09-29) ← X5; `list_tickets` (changed 2026-09-29) ← X5; `reply_hub_ticket` (changed 2026-10-01) ← X5
 - `frontend/components/domain-menu.tsx`: `DomainMenu` (changed 2026-09-18) ← X4; `ShopState` (changed 2026-10-06) ← X4; `shopHostLabel` (changed 2026-09-18) ← X4; `shopPublicUrl` (changed 2026-09-18) ← X4
+- `frontend/components/order-flow-card.tsx`: `FlowOrder` (changed 2026-10-09) ← Y; `OrderFlowCard` (changed 2026-10-09) ← Y
 - `frontend/components/shop-settings-form.tsx`: `ShopSettingsForm` (changed 2026-09-18) ← X5
 - `frontend/lib/site-host.ts`: `isPanelHost` (changed 2026-09-18) ← U; `panelOriginFromHost` (changed 2026-09-18) ← U
 
@@ -373,6 +386,7 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
   python3 -m unittest app.api.pay_status_rate_test \
     app.services.arvan_dns_service_test \
     app.services.catalog_sync_service_test \
+    app.services.order_flow_service_test \
     app.services.pay_service_test \
     app.services.pay_stock_test \
     app.services.shop_otp_service_test \

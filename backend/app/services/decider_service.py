@@ -64,6 +64,8 @@ _ACTIONS: dict[str, tuple[str, dict]] = {
     "edit_product": ("edit_product", {}),
     "set_discount": ("set_discount", {}),
     "reply_customer": ("reply_customer", {}),
+    "update_order": ("update_order", {}),
+    "review_receipt": ("approve_receipt", {}),
 }
 
 _LABELS = {
@@ -94,6 +96,8 @@ _LABELS = {
     "edit_product": "قیمت و موجودی",
     "set_discount": "تخفیف",
     "reply_customer": "پاسخ به مشتری",
+    "update_order": "وضعیت سفارش",
+    "review_receipt": "رسید کارت‌به‌کارت",
 }
 
 _CRITERIA = {
@@ -124,6 +128,8 @@ _CRITERIA = {
     "edit_product": "Change the price or stock of a product already in the catalog. Example: قیمت انگشتر فیروزه رو بکن ۶۰۰ هزار. A new product is add_product.",
     "set_discount": "Put a percent discount on one product or on all products, or remove it. Example: روی همه ۲۰ درصد تخفیف بذار.",
     "reply_customer": "Send the seller's own words to one customer in the inbox. Example: به مریم بگو فردا ارسال میشه. Not the auto-reply setting.",
+    "update_order": "Move a paid order: preparing, shipped with a tracking code, delivered, or cancelled. Example: سفارش مریم رو فرستادم کد رهگیری ۱۲۳۴۵۶۷۸۹۰. Not a question about orders.",
+    "review_receipt": "Approve or reject a card-to-card receipt the seller has checked. Example: رسید مریم رو تأیید کن.",
 }
 
 

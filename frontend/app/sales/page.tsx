@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { formatWhen, money, parseNonNegativeInt } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
+import { FlowOrder, OrderFlowCard } from "@/components/order-flow-card";
 
 type Sale = {
   id: string;
@@ -24,17 +25,10 @@ type Sale = {
 
 type ShortItem = { productId: string; title: string; wanted: number; had: number };
 
-type Order = {
-  id: string;
-  title: string;
-  amount: number;
-  status: string;
-  channel: string;
+type Order = FlowOrder & {
   payUrl?: string;
-  /** پرداخت شده ولی موجودی کافی نبود؛ فقط همین سفارش‌ها نام و شمارهٔ مشتری دارند. */
+  /** پرداخت شده ولی موجودی کافی نبود. */
   needsAction?: { reason: string; items: ShortItem[] };
-  customer?: string;
-  customerMobile?: string;
 };
 
 type Account = { id: string; label: string; handle: string };
@@ -204,6 +198,11 @@ export default function SalesPage() {
             </ul>
           </Card>
         ) : null}
+
+        <OrderFlowCard
+          orders={orders}
+          onChanged={(next) => setOrders((rows) => rows.map((row) => (row.id === next.id ? { ...row, ...next } : row)))}
+        />
 
         {pending.length ? (
           <Card>

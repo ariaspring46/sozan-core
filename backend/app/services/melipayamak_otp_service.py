@@ -50,11 +50,11 @@ class OtpSendError(RuntimeError):
         self.return_code = return_code
 
 
-def _emit_failure(error_class: str, return_code: str) -> None:
+def _emit_failure(error_class: str, return_code: str, surface: str = "auth") -> None:
     emit_later(
         kind="sms",
-        title="otp-provider-failed",
-        surface="auth",
+        title="otp-provider-failed" if surface == "auth" else "sms-provider-failed",
+        surface=surface,
         status="error",
         payload={"errorClass": error_class, "returnCode": return_code},
     )
@@ -66,12 +66,16 @@ def classify(return_code: str) -> str:
 
 async def send_otp(phone: str, code: str) -> str:
     """Send the code inside the approved template. Returns the provider recId."""
+    return await send_pattern(phone, code, body_id=str(settings.melipayamak_body_id or "").strip())
+
+
+async def send_pattern(phone: str, text: str, *, body_id: str, surface: str = "auth") -> str:
+    """One approved template; `text` is its values joined by «;» ({0};{1};…). Returns the provider recId."""
     username = str(settings.melipayamak_username or "").strip()
     apikey = str(settings.melipayamak_otp_apikey or "").strip()
-    body_id = str(settings.melipayamak_body_id or "").strip()
     base = str(settings.melipayamak_pattern_base or "").rstrip("/")
     if not username or not apikey or not body_id:
-        _emit_failure("config", "")
+        _emit_failure("config", "", surface)
         raise OtpSendError("config")
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT, trust_env=False, **egress.client_kwargs()) as client:
@@ -82,19 +86,19 @@ async def send_otp(phone: str, code: str) -> str:
                     "password": apikey,
                     "to": phone,
                     "from": "",
-                    "text": code,
+                    "text": text,
                     "isFlash": "false",
                     "bodyId": body_id,
                 },
             )
     except Exception as exc:
         log.warning("melipayamak pattern request failed: %s", type(exc).__name__)
-        _emit_failure("network", type(exc).__name__)
+        _emit_failure("network", type(exc).__name__, surface)
         raise OtpSendError("network") from None
     text = (response.text or "").strip()
     if response.status_code >= 400:
         log.warning("melipayamak pattern rejected: http=%s", response.status_code)
-        _emit_failure("provider", f"http-{response.status_code}")
+        _emit_failure("provider", f"http-{response.status_code}", surface)
         raise OtpSendError("provider", f"http-{response.status_code}")
     # پنل دو شکل موفق می‌دهد: رشتهٔ عددی (recId) یا {"d":"<recId>"} از مسیر JSON.
     if text.startswith("{") and "\"d\"" in text:
@@ -109,12 +113,12 @@ async def send_otp(phone: str, code: str) -> str:
     digits = text.strip('"').strip()
     if not digits.lstrip("-").isdigit():
         log.warning("melipayamak pattern unexpected body: %s", text[:60])
-        _emit_failure("provider", text[:20])
+        _emit_failure("provider", text[:20], surface)
         raise OtpSendError("provider", text[:20])
     # کدهای خطای مثبت پنل (2/11/12/18/19/22) هم رد هستند؛ فقط recId بلند یعنی پذیرفته شد.
     error_class = classify(digits)
     if not digits.startswith("-") and error_class == "provider" and len(digits) >= 15:
         return digits
     log.warning("melipayamak pattern send failed: code=%s", digits)
-    _emit_failure(error_class, digits)
+    _emit_failure(error_class, digits, surface)
     raise OtpSendError(error_class, digits)
