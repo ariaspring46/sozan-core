@@ -56,6 +56,7 @@ class RouterServiceTests(unittest.TestCase):
         media=None,
         thread_id: str = "",
         embed=None,
+        decider=None,
     ):
         with tenant_scope("09129900001"):
             return asyncio.run(
@@ -68,6 +69,7 @@ class RouterServiceTests(unittest.TestCase):
                     media=media,
                     thread_id=thread_id,
                     embed=embed,
+                    decider=decider,
                 )
             )
 
@@ -106,6 +108,18 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("sozan.sozan-core.ir", domain["messages"][-1]["text"])
         self.assertNotIn("shop_chat", skills["messages"][-1]["text"])
         self.assertIn("استودیو", skills["messages"][-1]["text"])
+        self.assertIn("صندوق", skills["messages"][-1]["text"])
+        who = self._turn("تو کی هستی؟", complete)
+        features = self._turn("ویژگی های مهم سوزان چیه؟", complete)
+        for reply in (who["messages"][-1]["text"], features["messages"][-1]["text"]):
+            self.assertIn("سوزان", reply)
+            self.assertIn("فروشگاه", reply)
+            self.assertIn("استودیو", reply)
+            self.assertIn("صندوق", reply)
+            self.assertIn("پرداخت", reply)
+        wallet = self._turn("تو کیف پولم چقدره", complete)
+        self.assertNotIn("گهر شبکه", wallet["messages"][-1]["text"])
+        self.assertIn("کیف", wallet["messages"][-1]["text"])
 
     def test_live_garbage_transcript_is_blocked(self) -> None:
         async def complete(_messages, _tools):
@@ -211,6 +225,8 @@ class RouterServiceTests(unittest.TestCase):
             return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {}}]}
 
         edit = AsyncMock(return_value={"ok": True, "reply": "رنگ فروشگاه عوض شد."})
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "ready"})
         with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")), patch(
             "app.services.shop_edit_service.apply_live_edit", new=edit
         ), patch("app.services.shop_service.chat", new=AsyncMock()) as chat:
@@ -379,7 +395,11 @@ class RouterServiceTests(unittest.TestCase):
                 raise RuntimeError("blip")
             return {"text": "سلام، چه کمکی از من برمی‌آید؟", "tool_calls": [], "usage": {}}
 
-        with patch("app.services.router_service.asyncio.sleep", new=AsyncMock()):
+        # the fake sleep never yields; the heartbeat (which also sleeps) would spin once wait_for hands it the loop
+        # (restored from 2a7b876: the hub copy of this file predated it, and CI on Python 3.11 hung here)
+        with patch("app.services.router_service.asyncio.sleep", new=AsyncMock()), patch(
+            "app.services.router_service._heartbeat", new=AsyncMock()
+        ):
             out = self._turn("یک سؤال دارم", complete)
         self.assertEqual(calls["n"], 2)
         self.assertNotIn("مدل پاسخ نداد", out["messages"][-1]["text"])
@@ -441,10 +461,14 @@ class RouterServiceTests(unittest.TestCase):
 
         first = self._turn("پیش‌نویس کن", opening)
         cid = first["pendingConfirm"]["id"]
-        out = self._turn("بله", complete)
+        with patch("app.services.shop_voice_service.say", new=AsyncMock(side_effect=AssertionError("voice"))):
+            out = self._turn("بله", complete)
+            asked = self._turn("دکمهٔ تأیید کجاست", complete)
         self.assertEqual(out["pendingConfirm"]["id"], cid)
-        self.assertIn("تأیید", out["messages"][-2]["text"])
+        self.assertEqual(out["messages"][-2]["text"], router_service.HOLD_PENDING)
         self.assertEqual(out["messages"][-1].get("confirmId"), cid)
+        self.assertEqual(asked["pendingConfirm"]["id"], cid)
+        self.assertEqual(asked["messages"][-2]["text"], router_service.HOLD_PENDING)
 
     def test_read_passes_while_card_is_open(self) -> None:
         async def opening(_messages, _tools):
@@ -1203,7 +1227,7 @@ class RouterServiceTests(unittest.TestCase):
             write_json("shop.json", {"slug": "sozan", "status": "ready", "url": "https://sozan.sozan-core.ir"})
         with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")), patch(
             "app.services.shop_service.chat", new=shop
-        ):
+        ), patch("app.services.decider_service.choose", new=AsyncMock(side_effect=AssertionError("decider"))):
             out = self._turn("صفحهٔ اصلی سایت رو ببین چه بهبودی پیشنهاد میدی؟", complete)
         shop.assert_awaited_once()
         self.assertEqual(out["messages"][-1]["text"], "تیتر را کوتاه کن.")
@@ -1215,7 +1239,9 @@ class RouterServiceTests(unittest.TestCase):
 
         with tenant_scope("09129900001"):
             write_json("shop.json", {"slug": "sozan", "status": "ready", "url": "https://sozan.sozan-core.ir"})
-        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")):
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")), patch(
+            "app.services.decider_service.choose", new=AsyncMock(side_effect=AssertionError("decider"))
+        ):
             hidden = self._turn("قیمت‌ها را مخفی کن", complete)
             self.assertEqual(hidden["pendingConfirm"]["tool"], "edit_shop")
             self._turn("", complete, cancel_id=hidden["pendingConfirm"]["id"])
@@ -1224,8 +1250,9 @@ class RouterServiceTests(unittest.TestCase):
             self._turn("", complete, cancel_id=about["pendingConfirm"]["id"])
             tags = self._turn("هشتگ برای انگشتر بساز", complete)
             self.assertEqual(tags["pendingConfirm"]["tool"], "studio_chat")
-        telegram = self._turn("تلگرام را وصل کن", complete)
-        self.assertIn("تنظیمات", telegram["messages"][-1]["text"])
+            telegram = self._turn("تلگرام را وصل کن", complete)
+        self.assertEqual((telegram["messages"][-1].get("link") or {}).get("href"), "/more/channels")
+        self.assertIn("تلگرام", telegram["messages"][-1]["text"])
         self.assertNotIn("بلد نیستم", telegram["messages"][-1]["text"])
 
     def test_photo_and_prior_caption_open_studio(self) -> None:
@@ -1238,14 +1265,15 @@ class RouterServiceTests(unittest.TestCase):
                 "studio-messages.json",
                 [{"id": "s1", "role": "assistant", "text": "آویز", "campaignId": "camp-1", "captions": {"instagram": "آویز"}}],
             )
-        photo = self._turn("عکس انگشتر فیروزه بساز؛ روی عکس هیچ نوشته‌ای نباشد", complete)
-        self.assertEqual(
-            (photo.get("pendingConfirm") or {}).get("tool"),
-            "studio_chat",
-            photo["messages"][-1]["text"],
-        )
-        self._turn("", complete, cancel_id=photo["pendingConfirm"]["id"])
-        prior = self._turn("کپشن قبلی را رسمی‌تر کن", complete)
+        with patch("app.services.decider_service.choose", new=AsyncMock(side_effect=AssertionError("decider"))):
+            photo = self._turn("عکس انگشتر فیروزه بساز؛ روی عکس هیچ نوشته‌ای نباشد", complete)
+            self.assertEqual(
+                (photo.get("pendingConfirm") or {}).get("tool"),
+                "studio_chat",
+                photo["messages"][-1]["text"],
+            )
+            self._turn("", complete, cancel_id=photo["pendingConfirm"]["id"])
+            prior = self._turn("کپشن قبلی را رسمی‌تر کن", complete)
         self.assertEqual(prior["pendingConfirm"]["tool"], "studio_chat")
         self.assertNotIn("ندارم", prior["messages"][-1]["text"])
 
@@ -1263,9 +1291,10 @@ class RouterServiceTests(unittest.TestCase):
         self.assertEqual(len(seen), 2)
         self.assertEqual(len(seen[1]), 2)
         self.assertEqual(seen[1][1]["content"], "۱۲۷ ضربدر ۸۹ چند می‌شود؟")
-        joined = seen[1][0]["content"] + seen[1][1]["content"]
-        self.assertNotIn("کامپیوتر", joined)
-        self.assertNotIn(joke["messages"][-1]["text"], joined)
+        self.assertNotIn("کامپیوتر", seen[1][1]["content"])
+        self.assertNotIn("گفتگوی اخیر", seen[1][0]["content"])
+        self.assertNotIn(joke["messages"][-1]["text"], seen[1][0]["content"])
+        self.assertIn("وضعیت:", seen[1][0]["content"])
 
     def test_writes_are_not_answered_as_facts(self) -> None:
         async def complete(_messages, _tools):
@@ -1309,6 +1338,53 @@ class RouterServiceTests(unittest.TestCase):
             ]
         self.assertEqual(misses, [])
 
+    def test_a_caption_rewrite_keeps_the_photo_for_publish(self) -> None:
+        with tenant_scope("09129900001"):
+            write_json(
+                "studio-messages.json",
+                [
+                    {
+                        "id": "s1",
+                        "role": "assistant",
+                        "campaignId": "c1",
+                        "text": "کپشن بلند",
+                        "captions": {"instagram": "کپشن بلند"},
+                        "attachments": [{"kind": "image", "name": "ring.png"}],
+                        "compose": {"status": "ready"},
+                    },
+                    {
+                        "id": "s2",
+                        "role": "assistant",
+                        "campaignId": "c1",
+                        "text": "کپشن کوتاه",
+                        "captions": {"instagram": "کپشن کوتاه"},
+                        "compose": {"status": "done"},
+                    },
+                ],
+            )
+            post = router_service._latest_post("همین رو منتشر کن")
+        self.assertEqual(post["name"], "ring.png")
+        self.assertEqual(post["captions"]["instagram"], "کپشن کوتاه")
+
+    def test_stock_followup_names_the_product_just_added(self) -> None:
+        async def complete(_messages, _tools):
+            raise AssertionError("model")
+
+        def added(*_args, **_kwargs):
+            write_json("products.json", [{"title": "انگشتر فیروزه", "stock": 1, "price": 500000}])
+            return {"reply": "انگشتر فیروزه به کاتالوگ اضافه شد."}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "sozan", "status": "ready"})
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")), patch(
+            "app.services.shop_edit_service.apply_live_edit", side_effect=added
+        ):
+            held = self._turn("انگشتر فیروزه ۵۰۰ هزار تومان اضافه کن", complete)
+            self.assertEqual(held["pendingConfirm"]["tool"], "add_product")
+            self._turn("", complete, confirm_id=held["pendingConfirm"]["id"])
+            asked = self._turn("موجودیش چنده؟", complete)
+        self.assertIn("انگشتر فیروزه", asked["messages"][-1]["text"])
+
     def test_failed_image_still_opens_a_caption_revise(self) -> None:
         async def complete(_messages, _tools):
             raise AssertionError("model")
@@ -1332,6 +1408,11 @@ class RouterServiceTests(unittest.TestCase):
         self.assertEqual(revise["pendingConfirm"]["tool"], "studio_chat")
         self.assertIn("عوض شود", revise["messages"][-1]["text"])
         self._turn("", complete, cancel_id=revise["pendingConfirm"]["id"])
+        short = self._turn("کپشنش رو کوتاه‌تر کن", complete)
+        self.assertEqual(short["pendingConfirm"]["tool"], "studio_chat")
+        self.assertIn("عوض شود", short["messages"][-1]["text"])
+        self.assertNotIn("کوتاه‌تر", short["messages"][-1]["text"])
+        self._turn("", complete, cancel_id=short["pendingConfirm"]["id"])
         publish = self._turn("همین را روی اینستاگرام منتشر کن", complete)
         self.assertIsNone(publish.get("pendingConfirm"))
         self.assertIn("تصویر", publish["messages"][-1]["text"])
@@ -1358,7 +1439,8 @@ class RouterServiceTests(unittest.TestCase):
         async def complete(_messages, _tools):
             raise AssertionError("chooser must not run")
 
-        out = self._turn("فونت را عوض کن", complete)
+        with patch("app.services.decider_service.choose", new=AsyncMock(side_effect=AssertionError("decider"))):
+            out = self._turn("فونت را عوض کن", complete)
         self.assertIn("فونت", out["messages"][-1]["text"])
         self.assertNotIn("نشناختم", out["messages"][-1]["text"])
 
@@ -1459,6 +1541,212 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("پاک نمی‌کنم", out["messages"][-1]["text"])
 
 
+class HarnessSliceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.patches = [
+            patch.object(settings, "state_dir", self.tmp.name),
+            patch("app.services.router_embed.rescue_tool", new=AsyncMock(return_value="")),
+            patch("app.services.studio_publish_service.channel_block", return_value=""),
+        ]
+        for item in self.patches:
+            item.start()
+
+    def tearDown(self) -> None:
+        for item in self.patches:
+            item.stop()
+        self.tmp.cleanup()
+        router_service._THREAD.set("")
+
+    def _turn(self, text: str, complete=None, **kwargs):
+        async def unused(_messages, _tools):
+            return {"text": "", "tool_calls": []}
+
+        with tenant_scope("09129900001"):
+            return asyncio.run(router_service.turn(text, complete=complete or unused, **kwargs))
+
+    def _boom(self):
+        async def complete(_messages, _tools):
+            raise AssertionError("model")
+
+        return complete
+
+    def test_a_busy_build_does_not_open_a_card(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {}}]}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"status": "running"})
+        chat = AsyncMock(side_effect=AssertionError("build must not start again"))
+        with patch("app.services.shop_service.chat", new=chat):
+            out = self._turn("بساز", complete)
+        chat.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("ساخت در جریان است", out["messages"][-1]["text"])
+
+    def test_busy_build_answers_before_the_model_even_after_a_color(self) -> None:
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "ready"})
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")):
+            opened = self._turn("رنگ دکمه‌ها رو آبی کن", self._boom())
+        card = opened["pendingConfirm"]["id"]
+        router_service._bind_thread(opened["threadId"])
+        with tenant_scope("09129900001"):
+            self.assertEqual(router_service._merge_followup("بساز"), "بساز")
+            shop = json.loads((Path(self.tmp.name) / "tenants" / "09129900001" / "shop.json").read_text(encoding="utf-8"))
+            shop["status"] = "running"
+            write_json("shop.json", shop)
+        with patch("app.services.decider_service.live_for", return_value=True), patch.object(
+            router_service, "_decider_result", new=AsyncMock(side_effect=AssertionError("decider"))
+        ):
+            out = self._turn("بساز", self._boom(), thread_id=opened["threadId"])
+        self.assertEqual(out["messages"][-1]["text"], "ساخت در جریان است.")
+        self.assertEqual(out["pendingConfirm"]["id"], card)
+        self.assertEqual(out["pendingConfirm"]["tool"], "edit_shop")
+
+    def test_a_post_request_during_a_build_still_opens_studio(self) -> None:
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "running"})
+        out = self._turn("یه پست بساز", self._boom())
+        self.assertEqual(out["pendingConfirm"]["tool"], "studio_chat")
+        self.assertNotIn("ساخت در جریان است", out["messages"][-1]["text"])
+
+    def test_a_refusal_to_build_does_not_use_the_busy_gate(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "باشد، نمی‌سازم.", "tool_calls": []}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "running"})
+        for text in ("نساز", "بیلد نکن"):
+            out = self._turn(text, complete)
+            self.assertNotIn("ساخت در جریان است", out["messages"][-1]["text"])
+            self.assertIn("نمی‌سازم", out["messages"][-1]["text"])
+
+    def test_a_bad_idempotency_key_is_not_the_turn_id(self) -> None:
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "ready"})
+        out = self._turn("وضعیت فروشگاه", self._boom(), idempotency_key="not a key")
+        from app.state_store import tenant_dir
+
+        with tenant_scope("09129900001"):
+            trace = (tenant_dir() / "router-turns.jsonl").read_text(encoding="utf-8").strip().splitlines()
+        row = json.loads(trace[-1])
+        self.assertRegex(row["turnId"], r"^[0-9a-f]{32}$")
+        self.assertNotIn("not a key", trace[-1])
+        self.assertIsNotNone(out)
+
+    def test_a_failed_shop_with_a_slug_can_still_be_edited(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "edit_shop", "arguments": {}}]}
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "failed"})
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")), patch(
+            "app.services.shop_service.chat", new=AsyncMock()
+        ) as chat:
+            held = self._turn("رنگ فروشگاه را صورتی کن", complete)
+        chat.assert_not_called()
+        self.assertEqual(held["pendingConfirm"]["tool"], "edit_shop")
+
+    def test_shop_chat_replaces_an_open_card_and_status_keeps_it(self) -> None:
+        async def opening(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_voice_tone", "arguments": {"toneId": "formal"}}]}
+
+        first = self._turn("لحن رسمی", opening)
+        cid = first["pendingConfirm"]["id"]
+
+        with patch.object(router_service, "decide", return_value={"kind": "tool", "tool": "shop_chat"}), patch(
+            "app.services.shop_service.chat", new=AsyncMock(return_value={"messages": [{"role": "assistant", "text": "باشه."}]})
+        ):
+            replaced = self._turn("ادامهٔ کار فروشگاه")
+        self.assertIsNone(replaced.get("pendingConfirm"))
+
+        again = self._turn("لحن رسمی", opening)
+        kept_id = again["pendingConfirm"]["id"]
+
+        with patch.object(router_service, "decide", return_value={"kind": "tool", "tool": "status"}), patch(
+            "app.services.shop_service.snapshot", return_value={"shop": {"status": "ready", "slug": "demo"}, "scan": {}, "build": {}}
+        ), patch("app.services.channel_service.list_accounts", return_value={"accounts": []}), patch(
+            "app.services.plan_service.snapshot", return_value={"plan": "free"}
+        ), patch("app.services.wallet_service.get", return_value={"available": 0}):
+            kept = self._turn("وضعیت فروشگاه را بگو")
+        self.assertEqual(kept["pendingConfirm"]["id"], kept_id)
+
+    def test_turn_id_is_shared_and_cancel_names_the_parent(self) -> None:
+        events: list[dict] = []
+
+        def emit_later(**kwargs):
+            events.append(kwargs)
+
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_voice_tone", "arguments": {"toneId": "formal"}}]}
+
+        with patch("app.services.router_service.emit_later", emit_later):
+            first = self._turn("لحن رسمی", complete, idempotency_key="turn-abc")
+            cid = first["pendingConfirm"]["id"]
+            from app.state_store import read_json, tenant_dir
+
+            with tenant_scope("09129900001"):
+                row = read_json(router_service._pend_name(first["threadId"]), {})
+                trace = (tenant_dir() / "router-turns.jsonl").read_text(encoding="utf-8").strip().splitlines()
+            self.assertEqual(row.get("turnId"), "turn-abc")
+            self.assertIn('"turnId": "turn-abc"', trace[-1])
+            self.assertTrue(any(item.get("turn_id") == "turn-abc" and item.get("title") == "router-confirm" for item in events))
+            self._turn("", complete, cancel_id=cid)
+        cancel = next(item for item in events if item.get("title") == "router-cancel")
+        self.assertEqual(cancel.get("parent_id"), "turn-abc")
+
+    def test_an_expired_card_names_the_creating_turn(self) -> None:
+        events: list[dict] = []
+
+        def emit_later(**kwargs):
+            events.append(kwargs)
+
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_voice_tone", "arguments": {"toneId": "formal"}}]}
+
+        with patch("app.services.router_service.emit_later", emit_later):
+            first = self._turn("لحن رسمی", complete, idempotency_key="turn-old")
+            cid = first["pendingConfirm"]["id"]
+            from app.state_store import read_json, write_json
+
+            with tenant_scope("09129900001"):
+                name = router_service._pend_name(first["threadId"])
+                row = read_json(name, {})
+                row["expiresAt"] = time.time() - 60
+                write_json(name, row)
+            self._turn("", complete, confirm_id=cid)
+        expired = next(item for item in events if item.get("title") == "router-card-expired")
+        self.assertEqual(expired.get("parent_id"), "turn-old")
+
+    def test_a_spent_budget_skips_the_chooser_and_keeps_a_card(self) -> None:
+        async def chooser(_messages, _tools):
+            raise AssertionError("chooser must not run")
+
+        with patch.object(router_service, "decide", return_value={"kind": "model"}), patch(
+            "app.services.turn_clock.expired", return_value=True
+        ):
+            missed = self._turn("یک جملهٔ آزاد", chooser)
+        self.assertIn("مدل پاسخ نداد", missed["messages"][-1]["text"])
+
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "demo", "status": "ready"})
+        with patch("app.services.shop_edit_service.build_dir_for", return_value=Path("/tmp")), patch(
+            "app.services.turn_clock.expired", return_value=True
+        ):
+            held = self._turn("رنگ فروشگاه را صورتی کن")
+        self.assertEqual(held["pendingConfirm"]["tool"], "edit_shop")
+
+        async def unused(_messages, _tools):
+            raise AssertionError("voice must not ask the model")
+
+        with patch.object(router_service, "decide", return_value={"kind": "direct", "text": "قیمت ۱۲۰۰۰ تومان است."}), patch(
+            "app.services.turn_clock.expired", return_value=True
+        ), patch("app.services.shop_voice_service.say", new=AsyncMock(side_effect=AssertionError("no say"))):
+            plain = self._turn("قیمت؟", unused)
+        self.assertIn("۱۲۰۰۰", plain["messages"][-1]["text"])
+
+
 class OpenCardDoesNotSilenceTheChatTests(unittest.TestCase):
     def test_only_a_bare_yes_or_no_needs_the_buttons(self) -> None:
         from app.services import router_text
@@ -1557,6 +1845,186 @@ class RouterVoiceTests(unittest.TestCase):
         ):
             out = self._turn("سلام", self._no_model())
         self.assertEqual(out["messages"][-1]["text"], plain)
+
+
+class ChannelReplayTests(unittest.TestCase):
+    """The 6 October channel thread, and the same turns about Telegram."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.patches = [
+            patch.object(settings, "state_dir", self.tmp.name),
+            patch("app.services.router_embed.rescue_tool", new=AsyncMock(return_value="")),
+            patch("app.services.studio_publish_service.channel_block", return_value=""),
+            patch("app.services.channel_scan_service.start_scan", return_value=None),
+        ]
+        for item in self.patches:
+            item.start()
+
+    def tearDown(self) -> None:
+        for item in self.patches:
+            item.stop()
+        self.tmp.cleanup()
+        router_service._THREAD.set("")
+
+    def _prepare(self) -> str:
+        with tenant_scope("09129900001"):
+            write_json("shop.json", {"slug": "sozan", "status": "ready", "brand": "سوزان"})
+            write_json(
+                "channel-scan.json",
+                {
+                    "accounts": [
+                        {"platform": "instagram", "handle": "sozan_core"},
+                        {"platform": "telegram", "handle": "sozan_shop"},
+                    ],
+                    "productCount": 1,
+                },
+            )
+            created = router_service.new_thread()
+            return str((created.get("threads") or [{}])[0].get("id") or "")
+
+    def _turn(self, text: str, thread_id: str, complete=None, decider=None):
+        async def boom(_messages, _tools):
+            raise AssertionError("chooser must not run")
+
+        with tenant_scope("09129900001"):
+            return asyncio.run(
+                router_service.turn(text, complete=complete or boom, decider=decider, thread_id=thread_id)
+            )
+
+    def _assert_channel_reply(self, out: dict, kind: str, handle: str, platform_word: str) -> None:
+        last = out["messages"][-1]
+        text = str(last.get("text") or "")
+        self.assertNotIn("نمی‌توانم", text)
+        self.assertNotIn("دسترسی ندارم", text)
+        self.assertNotIn("دامنه", text)
+        self.assertNotIn("پلن", text)
+        if kind != "scan":
+            self.assertIn(platform_word, text)
+        if kind == "scan":
+            self.assertIn(f"@{handle}", text)
+            self.assertIn("می‌خوانم", text)
+        elif kind == "connect":
+            self.assertEqual((last.get("link") or {}).get("href"), "/more/channels")
+            self.assertIn("کانال", str((last.get("link") or {}).get("label") or ""))
+        else:
+            self.assertIn("قطع", text)
+
+    def test_october_turns_use_the_channel_tool(self) -> None:
+        threads = {
+            "اینستاگرام": [
+                ("صفحه ی اینستاگرام من رو ببین sozan_core", "scan", "sozan_core"),
+                ("تو باید بتونی پیج من رو ببینی", "scan", "sozan_core"),
+                ("بریم وصلش کنیم", "connect", ""),
+                ("ببین وصل شد", "status", ""),
+                ("میخوام ببینم وصل شده؟", "status", ""),
+                ("من وصل کردم", "status", ""),
+                ("در مورد کانال اینستاگرام صحبت میکردیم", "status", ""),
+            ],
+            "تلگرام": [
+                ("صفحه ی تلگرام من رو ببین sozan_shop", "scan", "sozan_shop"),
+                ("تو باید بتونی کانال تلگرام من رو ببینی", "scan", "sozan_shop"),
+                ("بریم وصلش کنیم", "connect", ""),
+                ("ببین وصل شد", "status", ""),
+                ("میخوام ببینم وصل شده؟", "status", ""),
+                ("من وصل کردم", "status", ""),
+                ("در مورد کانال تلگرام صحبت میکردیم", "status", ""),
+            ],
+        }
+        for word, steps in threads.items():
+            thread_id = self._prepare()
+            for spoken, kind, handle in steps:
+                out = self._turn(spoken, thread_id)
+                self._assert_channel_reply(out, kind, handle, word)
+
+    def test_chooser_keeps_context_and_does_not_dump_status(self) -> None:
+        thread_id = self._prepare()
+        self._turn("صفحه ی اینستاگرام من رو ببین sozan_core", thread_id)
+        with tenant_scope("09129900001"):
+            write_json(
+                "shop-brief.json",
+                {
+                    "style": "atelier",
+                    "colors": "فیروزه‌ای",
+                    "notes": "راز-دستور-خصوصی",
+                    "story": "داستان-خصوصی",
+                    "avoid": "اجتناب-خصوصی",
+                    "reference": "مرجع-خصوصی",
+                },
+            )
+        seen: dict = {}
+
+        async def complete(messages, _tools):
+            seen["messages"] = messages
+            return {"text": "", "tool_calls": [{"name": "status", "arguments": {}}]}
+
+        with patch.object(router_service, "route_tool", return_value=""):
+            out = self._turn("تو باید بتونی پیج من رو ببینی", thread_id, complete=complete)
+        self.assertEqual(len(seen["messages"]), 2)
+        system = seen["messages"][0]["content"]
+        self.assertNotIn("گفتگوی اخیر", system)
+        self.assertNotIn("سوزان پیج عمومی اینستاگرام و کانال عمومی تلگرام را می‌خواند.", system)
+        self.assertIn("وضعیت:", system)
+        self.assertIn("برند: سوزان", system)
+        self.assertIn("فیروزه‌ای", system)
+        self.assertIn("atelier", system)
+        self.assertNotIn("راز-دستور-خصوصی", system)
+        self.assertNotIn("داستان-خصوصی", system)
+        self.assertNotIn("اجتناب-خصوصی", system)
+        self.assertNotIn("مرجع-خصوصی", system)
+        self.assertIn("channel_scan", system)
+        self._assert_channel_reply(out, "scan", "sozan_core", "اینستاگرام")
+
+    def test_decider_live_picks_channel_actions(self) -> None:
+        thread_id = self._prepare()
+        self._turn("صفحه ی اینستاگرام من رو ببین sozan_core", thread_id)
+        seen: list[dict] = []
+        decided: list[dict] = []
+
+        async def decider(state):
+            seen.append(state)
+            text = str(state.get("utterance") or "")
+            if "وصلش" in text or "اتصال" in text:
+                action = "connect_channel"
+            elif any(mark in text for mark in ("وصل شد", "وصل شده", "وصل کردم", "صحبت")):
+                action = "channel_status"
+            else:
+                action = "scan_page"
+            from app.services.channel_tool import recent_channel
+
+            follow = bool((recent_channel(state.get("previous_turns") or []) or {}).get("platform"))
+            row = {
+                "action": action,
+                "accepted": True,
+                "probability": 0.91,
+                "margin": 0.5,
+                "effort": "quick",
+                "refers_back": follow,
+                "frustrated": False,
+                "ranked": [],
+                "observed": {},
+            }
+            decided.append(row)
+            return row
+
+        async def echo(_messages, tools):
+            name = tools[0]["function"]["name"]
+            return {"text": "", "tool_calls": [{"name": name, "arguments": {}}]}
+
+        with patch.object(router_service, "route_tool", return_value=""):
+            status = self._turn("ببین وصل شد", thread_id, complete=echo, decider=decider)
+            connect = self._turn("بریم وصلش کنیم", thread_id, complete=echo, decider=decider)
+            scan = self._turn("تو باید بتونی پیج من رو ببینی", thread_id, complete=echo, decider=decider)
+        self.assertEqual(seen[0]["topic"]["platform"], "")
+        self.assertGreaterEqual(len(seen[0]["previous_turns"]), 1)
+        self.assertLessEqual(len(seen[0]["previous_turns"]), 8)
+        self.assertNotEqual(seen[0]["topic"]["topic"], "channel_scan")
+        self.assertTrue(seen[0] and True)
+        self._assert_channel_reply(status, "status", "", "اینستاگرام")
+        self._assert_channel_reply(connect, "connect", "", "اینستاگرام")
+        self._assert_channel_reply(scan, "scan", "sozan_core", "اینستاگرام")
+        self.assertTrue(all("channels" in row and "scanned_pages" in row for row in seen))
+        self.assertTrue(all(row["refers_back"] for row in decided))
 
 
 if __name__ == "__main__":

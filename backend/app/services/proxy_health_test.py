@@ -88,36 +88,54 @@ class ProxyHealthTests(unittest.TestCase):
                 codes.append(asyncio.run(proxy_health.post(URL, proxy=PROXY, total=10, json={})).status_code)
         return codes
 
-    def test_dead_tunnel_goes_direct_then_is_skipped(self) -> None:
+    def test_direct_answers_and_the_fallback_is_not_used(self) -> None:
         seen: list = []
-        codes = self._post(seen, tunnel=["connect"], direct=["ok"], calls=2)
+        codes = self._post(seen, tunnel=["ok"], direct=["ok"], calls=2)
         self.assertEqual(codes, [200, 200])
-        # one try through the tunnel with a short connect limit, then direct; the next call skips the tunnel
-        self.assertEqual([item["proxy"] for item in seen], [PROXY, None, None])
-        self.assertEqual(seen[0]["timeout"].connect, proxy_health.CONNECT_TIMEOUT)
-        self.assertEqual(seen[0]["timeout"].read, 10)
-        self.assertEqual(seen[1]["timeout"].connect, proxy_health.DIRECT_CONNECT_TIMEOUT)
+        self.assertEqual([item["proxy"] for item in seen], [None, None])
+        self.assertEqual(seen[0]["timeout"].connect, proxy_health.DIRECT_CONNECT_TIMEOUT)
 
-    def test_flapping_tunnel_gets_another_try_when_direct_is_refused(self) -> None:
-        seen: list = []
-        codes = self._post(seen, tunnel=["connect", "ok"], direct=["403"], calls=2)
-        self.assertEqual(codes, [200, 200])
-        self.assertEqual([item["proxy"] for item in seen], [PROXY, None, PROXY, PROXY])
-        self.assertEqual(proxy_health.live(PROXY), PROXY)
-
-    def test_skipped_tunnel_comes_back_when_direct_is_refused(self) -> None:
-        proxy_health.mark_down(PROXY)
+    def test_refused_direct_uses_the_fallback(self) -> None:
         seen: list = []
         codes = self._post(seen, tunnel=["ok"], direct=["403"])
         self.assertEqual(codes, [200])
         self.assertEqual([item["proxy"] for item in seen], [None, PROXY])
-        self.assertEqual(proxy_health.live(PROXY), PROXY)
+        self.assertEqual(seen[1]["timeout"].connect, proxy_health.CONNECT_TIMEOUT)
+
+    def test_connect_failure_uses_the_fallback(self) -> None:
+        seen: list = []
+        codes = self._post(seen, tunnel=["ok"], direct=["connect"])
+        self.assertEqual(codes, [200])
+        self.assertEqual([item["proxy"] for item in seen], [None, PROXY])
+
+    def test_dead_exit_costs_the_connect_timeout_once(self) -> None:
+        # review 2026-10-09: with the WireGuard exit down every call waited 4 s on direct before the fallback
+        seen: list = []
+        codes = self._post(seen, tunnel=["ok"], direct=["connect"], calls=3)
+        self.assertEqual(codes, [200, 200, 200])
+        self.assertEqual([item["proxy"] for item in seen], [None, PROXY, PROXY, PROXY])
+        self.assertTrue(proxy_health.direct_down())
+
+    def test_direct_returns_after_the_pause(self) -> None:
+        seen: list = []
+        self._post(seen, tunnel=["ok"], direct=["connect"])
+        later = proxy_health.time.monotonic() + proxy_health.DOWN_SECONDS + 1
+        with patch("app.services.proxy_health.time.monotonic", return_value=later):
+            self.assertFalse(proxy_health.direct_down())
+
+    def test_fallback_down_while_skipped_still_tries_direct(self) -> None:
+        seen: list = []
+        self._post(seen, tunnel=["connect"], direct=["connect", "ok"], calls=0)
+        proxy_health._mark_direct_down()
+        codes = self._post(seen, tunnel=["connect"], direct=["ok"])
+        self.assertEqual(codes, [200])
+        self.assertEqual([item["proxy"] for item in seen], [PROXY, None])
 
     def test_both_paths_down_raises_for_the_arvan_fallback(self) -> None:
         seen: list = []
         with self.assertRaises(httpx.ConnectTimeout):
             self._post(seen, tunnel=["connect"], direct=["connect"])
-        self.assertEqual([item["proxy"] for item in seen], [PROXY, None, PROXY])
+        self.assertEqual([item["proxy"] for item in seen], [None, PROXY])
 
     def test_tunnel_is_tried_again_after_the_pause(self) -> None:
         proxy_health.mark_down(PROXY)
@@ -126,17 +144,13 @@ class ProxyHealthTests(unittest.TestCase):
         with patch("app.services.proxy_health.time.monotonic", return_value=later):
             self.assertEqual(proxy_health.live(PROXY), PROXY)
 
-    def test_working_tunnel_is_kept(self) -> None:
-        seen: list = []
-        self._post(seen, tunnel=["ok"], direct=["ok"], calls=2)
-        self.assertEqual([item["proxy"] for item in seen], [PROXY, PROXY])
-
     def test_a_reply_that_started_is_never_sent_twice(self) -> None:
         seen: list = []
         slow = httpx.ReadTimeout("slow model", request=httpx.Request("POST", URL))
         with self.assertRaises(httpx.ReadTimeout):
-            self._post(seen, tunnel=[slow], direct=["ok"])
+            self._post(seen, tunnel=["ok"], direct=[slow])
         self.assertEqual(len(seen), 1)
+        self.assertIsNone(seen[0]["proxy"])
 
     def test_no_proxy_keeps_the_callers_timeout(self) -> None:
         seen: list = []
@@ -148,14 +162,14 @@ class ProxyHealthTests(unittest.TestCase):
         self.assertEqual(proxy_health.timeout(120, None, connect=8.0).connect, 8.0)
         self.assertEqual(proxy_health.timeout(2, PROXY).connect, 2)
 
-    def test_sync_image_call_goes_direct_too(self) -> None:
+    def test_sync_image_call_tries_direct_then_fallback(self) -> None:
         seen: list = []
-        _, sync = _clients(seen, tunnel=["connect"], direct=["ok"])
+        _, sync = _clients(seen, tunnel=["ok"], direct=["connect"])
         with patch("app.services.proxy_health.httpx.Client", sync):
             res = proxy_health.post_sync(URL, proxy=PROXY, total=120, connect=8.0, json={})
         self.assertEqual(res.status_code, 200)
-        self.assertEqual([item["proxy"] for item in seen], [PROXY, None])
-        self.assertEqual(seen[1]["timeout"].connect, 8.0)
+        self.assertEqual([item["proxy"] for item in seen], [None, PROXY])
+        self.assertEqual(seen[0]["timeout"].connect, 8.0)
 
     def test_router_reply_skips_arvan_when_direct_works(self) -> None:
         seen: list = []
@@ -170,7 +184,7 @@ class ProxyHealthTests(unittest.TestCase):
                 llm._chat_completion(messages=[{"role": "user", "content": "سلام"}], temperature=0, max_tokens=50, surface="router")
             )
         self.assertEqual(text, "باشه")
-        self.assertEqual([(item["proxy"], "openrouter.ai" in item["url"]) for item in seen], [(PROXY, True), (None, True)])
+        self.assertEqual([(item["proxy"], "openrouter.ai" in item["url"]) for item in seen], [(None, True)])
         self.assertNotIn("cloud-fallback", events)
 
 

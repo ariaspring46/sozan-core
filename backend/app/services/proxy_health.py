@@ -1,15 +1,9 @@
-"""A proxy that stops connecting costs a few seconds once, not the full timeout of every AI call.
+"""OpenRouter leaves the hub directly, through the WireGuard exit. A fallback SOCKS is the second try.
 
-OPENROUTER_PROXY is an SSH tunnel from another machine. When that machine or its VPN drops, the tunnel still accepts
-the TCP connection but never answers, and each call waited the whole primary timeout (10 s) before the Arvan
-fallback. The hub's own IP is refused by OpenRouter only some of the time (403), so the two paths cover each other:
-
-- through the tunnel, connecting gets CONNECT_TIMEOUT;
-- if it does not connect, the same request goes direct; when direct answers, the tunnel is skipped for DOWN_SECONDS;
-- if direct is refused too (403 or no connection), the tunnel gets one more try (it often flaps rather than dies);
-- while the tunnel is skipped, a refused direct call clears that and goes back to the tunnel.
-
-Only requests that never reached a server are sent again, so a reply is never generated twice.
+Direct is first. The fallback proxy (OPENROUTER_PROXY_FALLBACK, a Tailscale SOCKS to another foreign node) is used
+only when direct never connects or OpenRouter answers 403. A reply that already started, including a read timeout,
+is not sent again. When direct does not connect, the fallback goes first for DOWN_SECONDS, so a dead exit costs the
+connect timeout once and not on every call.
 """
 
 from __future__ import annotations
@@ -43,6 +37,27 @@ def mark_down(proxy: str | None) -> None:
         log.warning("proxy did not connect and direct works; direct for %ds", int(DOWN_SECONDS))
     if proxy:
         _down_until[proxy] = time.monotonic() + DOWN_SECONDS
+
+
+_DIRECT = "direct"
+
+
+def direct_down() -> bool:
+    """Direct did not connect a moment ago (the WireGuard exit is down): the fallback goes first until DOWN_SECONDS pass."""
+    return _down_until.get(_DIRECT, 0.0) > time.monotonic()
+
+
+def _mark_direct_down() -> None:
+    if not direct_down():
+        log.warning("direct did not connect; fallback first for %ds", int(DOWN_SECONDS))
+    _down_until[_DIRECT] = time.monotonic() + DOWN_SECONDS
+
+
+def openrouter_fallback() -> str | None:
+    """SOCKS to a second foreign node. Empty means direct only."""
+    import os
+
+    return (os.environ.get("OPENROUTER_PROXY_FALLBACK") or "").strip() or None
 
 
 def mark_up(proxy: str | None) -> None:
@@ -82,32 +97,31 @@ async def post(url: str, *, proxy: str | None, total: float, connect: float | No
         async with httpx.AsyncClient(timeout=limit, trust_env=False, proxy=via) as client:
             return await client.post(url, **kwargs)
 
-    async def direct() -> httpx.Response | None:
-        try:
-            return await send(None)
-        except Exception as exc:
-            if connect_failed(exc):
-                return None
-            raise
-
-    if not proxy:
-        return await send(None)
-    if live(proxy):
+    if proxy and direct_down():
         try:
             return await send(proxy)
         except Exception as exc:
             if not connect_failed(exc):
                 raise
-        res = await direct()
-        if not _refused(res):
-            mark_down(proxy)
-            return res
+        return await send(None)
+    direct_res: httpx.Response | None = None
+    try:
+        direct_res = await send(None)
+    except Exception as exc:
+        if not connect_failed(exc):
+            raise
+        if not proxy:
+            raise
+        _mark_direct_down()
+    else:
+        if not _refused(direct_res) or not proxy:
+            return direct_res
+    try:
         return await send(proxy)
-    res = await direct()
-    if not _refused(res):
-        return res
-    mark_up(proxy)
-    return await send(proxy)
+    except Exception:
+        if direct_res is not None:
+            return direct_res
+        raise
 
 
 def post_sync(url: str, *, proxy: str | None, total: float, connect: float | None = None, **kwargs) -> httpx.Response:
@@ -118,29 +132,28 @@ def post_sync(url: str, *, proxy: str | None, total: float, connect: float | Non
         with httpx.Client(timeout=limit, trust_env=False, proxy=via) as client:
             return client.post(url, **kwargs)
 
-    def direct() -> httpx.Response | None:
-        try:
-            return send(None)
-        except Exception as exc:
-            if connect_failed(exc):
-                return None
-            raise
-
-    if not proxy:
-        return send(None)
-    if live(proxy):
+    if proxy and direct_down():
         try:
             return send(proxy)
         except Exception as exc:
             if not connect_failed(exc):
                 raise
-        res = direct()
-        if not _refused(res):
-            mark_down(proxy)
-            return res
+        return send(None)
+    direct_res: httpx.Response | None = None
+    try:
+        direct_res = send(None)
+    except Exception as exc:
+        if not connect_failed(exc):
+            raise
+        if not proxy:
+            raise
+        _mark_direct_down()
+    else:
+        if not _refused(direct_res) or not proxy:
+            return direct_res
+    try:
         return send(proxy)
-    res = direct()
-    if not _refused(res):
-        return res
-    mark_up(proxy)
-    return send(proxy)
+    except Exception:
+        if direct_res is not None:
+            return direct_res
+        raise

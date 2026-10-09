@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
+import logging
+import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
@@ -10,6 +13,8 @@ from app.config import settings
 from app.phone import normalize_phone
 from app.services import channel_service, inbox_service, plan_service
 from app.state_store import iter_tenants, read_json, tenant_scope, write_json
+
+log = logging.getLogger("sozan.sendbox")
 
 CONNECT_TTL = 30 * 60
 PENDING_FILE = "sendbox-pending.json"
@@ -340,6 +345,31 @@ def tenant_for_sendbox_account(account_id: str) -> str:
     return tenant_index_service.lookup("sendbox", ident, owns) or ""
 
 
+def _same_token(left: str, right: str) -> bool:
+    a = str(left or "")
+    b = str(right or "")
+    if not a or not b or len(a) != len(b):
+        return False
+    return hmac.compare_digest(a, b)
+
+
+def _schedule_activate(account_id: str) -> None:
+    """Turn the Sendbox account on after a bind. A failure does not undo the local row."""
+
+    async def go() -> None:
+        try:
+            await set_account_active(account_id=account_id, active=True)
+        except Exception as exc:
+            log.warning("sendbox activate failed: %s", type(exc).__name__)
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(go())
+        return
+    loop.create_task(go())
+
+
 def bind_instagram(*, account_id: str, phone: str, handle: str = "") -> dict:
     ident = str(account_id or "").strip()
     tenant = str(phone or "").strip()
@@ -362,10 +392,14 @@ def bind_instagram(*, account_id: str, phone: str, handle: str = "") -> dict:
             str(saved["id"]),
             {"ok": True, "connected": True, "handle": name, "display": name, "error": ""},
         )
-        _kick_scan(handle=name, sendbox_id=ident)
         from app.services import tenant_index_service
 
         tenant_index_service.upsert(phone=tenant, sendbox_id=ident)
+        _schedule_activate(ident)
+        _kick_scan(handle=name, sendbox_id=ident)
+        from app.services.channel_tool import announce_connected
+
+        announce_connected("instagram", name)
         return verified
 
 
@@ -414,7 +448,7 @@ def finish_redirect(*, status: str, account_id: str, username: str, seller_id: s
         owner = tenant_for_sendbox_account(ident)
         # حساب تازه فقط با nonce همان نشست رسمی بسته می‌شود؛ حساب خودی بدون آن هم دوباره وصل می‌شود.
         if not owner:
-            if not nonce or not provided_state or not hmac.compare_digest(nonce, provided_state):
+            if not _same_token(nonce, provided_state):
                 return _after_bind_url(phone, username=name, flag="error")
         try:
             bind_instagram(account_id=ident, phone=phone, handle=name)
@@ -422,6 +456,46 @@ def finish_redirect(*, status: str, account_id: str, username: str, seller_id: s
             return _after_bind_url(phone, username=name, flag="error")
         return _after_bind_url(phone, account_id=ident, username=name, flag="ok")
     return _after_bind_url(phone, username=name, flag="exists")
+
+
+async def accept_return(*, phone: str, query: dict) -> dict:
+    """Bind a Sendbox account from the panel return. The seller is already signed in.
+
+    A fresh connect (started from this shop, still inside the window) is required.
+    The account must exist at Sendbox and must not belong to another shop.
+    `state`, when Sendbox echoes it, must match the nonce. Names of the query
+    keys are logged; the values are not.
+    """
+    raw = query if isinstance(query, dict) else {}
+    log.info("sendbox return keys %s", ",".join(sorted(str(key) for key in raw)))
+    account_id = str(raw.get("account_id") or raw.get("accountId") or "").strip()
+    username = str(raw.get("username") or "").lstrip("@").strip()
+    state = str(raw.get("state") or "").strip()
+    flag = str(raw.get("instagram") or raw.get("status") or "").strip().lower()
+    if flag in {"error", "failed", "fail", "denied"} and not account_id:
+        raise ValueError("ورود اینستاگرام کامل نشد. دوباره از کانال‌ها وصل کن.")
+    if not account_id:
+        raise ValueError("شناسه حساب اینستاگرام در بازگشت نیست.")
+    try:
+        tenant = normalize_phone(phone)
+    except ValueError as exc:
+        raise ValueError("فروشنده برای اتصال اینستاگرام شناخته نشد.") from exc
+    fresh, nonce = consume_connect(tenant)
+    if not fresh:
+        raise ValueError("ورود اینستاگرام منقضی شد. دوباره از کانال‌ها وصل کن.")
+    if state and not _same_token(nonce, state):
+        raise ValueError("این بازگشت با همین ورود جور نیست.")
+    remote = await list_remote_accounts()
+    hit = next((row for row in remote if str(row.get("id") or "") == account_id), None)
+    if hit is None:
+        raise ValueError("این حساب در Sendbox نیست.")
+    owner = tenant_for_sendbox_account(account_id)
+    if owner and owner != tenant:
+        raise ValueError("این پیج اینستاگرام به فروشندهٔ دیگری وصل است.")
+    name = username or str(hit.get("username") or "").lstrip("@").strip() or account_id
+    account = bind_instagram(account_id=account_id, phone=tenant, handle=name)
+    with tenant_scope(tenant):
+        return {**channel_service.list_accounts(), "account": account}
 
 
 async def claim_account(*, account_id: str, phone: str, handle: str = "") -> dict:
@@ -492,6 +566,77 @@ async def release_local_account(account_id: str) -> dict:
         except ValueError:
             pass
     return channel_service.remove_account(account_id)
+
+
+def _is_post_event(event: str) -> bool:
+    return "post" in event or event in {"list_posts", "media", "feed"}
+
+
+def store_bound_posts(payload: dict) -> dict | None:
+    """Store a post listing that arrived without a token.
+
+    Sendbox calls ``/channels/boxapi/webhook`` with no signature. Only an account
+    this hub has already bound can be written, and only a post listing — direct
+    messages still need the token. Returns None when this is not a post listing.
+    """
+    body = payload if isinstance(payload, dict) else {}
+    event = str(body.get("event_type") or body.get("event") or "").strip().lower()
+    if not _is_post_event(event):
+        return None
+    account_id = str(body.get("account_id") or "").strip()
+    phone = tenant_for_sendbox_account(account_id) if account_id else ""
+    data = body.get("data") if isinstance(body.get("data"), dict) else {}
+    posts = _posts_from_webhook(body)
+    if not posts:
+        result = data.get("result") if isinstance(data, dict) else None
+        if isinstance(result, dict):
+            result_shape = "dict:" + ",".join(sorted(str(key) for key in result)[:12])
+        elif isinstance(result, list):
+            first = result[0] if result and isinstance(result[0], dict) else {}
+            result_shape = f"list{len(result)}:" + ",".join(sorted(str(key) for key in first)[:12])
+        else:
+            result_shape = type(result).__name__
+        err = data.get("error") if isinstance(data, dict) else None
+        if isinstance(err, str):
+            err_note = re.sub(r"[A-Za-z0-9_\-]{20,}", "…", err)[:100]
+        else:
+            err_note = type(err).__name__
+        log.warning(
+            "sendbox posts empty event=%s success=%s error=%s result=%s",
+            event or "-",
+            data.get("success") if isinstance(data, dict) else None,
+            err_note,
+            result_shape,
+        )
+    if data.get("success") is False and phone:
+        _note_posts_error(account_id, phone, str(data.get("error") or ""))
+    if account_id and posts and phone:
+        with tenant_scope(phone):
+            _store_list_posts(account_id, posts)
+            write_json("sendbox-posts-error.json", {})
+        return {"ok": True, "posts": len(posts)}
+    return {"ok": True, "posts": 0, "ignored": "tenant" if not phone else "empty"}
+
+
+def _note_posts_error(account_id: str, phone: str, error: str) -> None:
+    text = str(error or "").strip()
+    if not account_id or not phone or not text:
+        return
+    with tenant_scope(phone):
+        write_json("sendbox-posts-error.json", {"accountId": account_id, "error": text[:300]})
+
+
+def posts_block_reason(account_id: str) -> str:
+    """A seller-facing line when Sendbox could not list the page. Empty when there is none."""
+    data = read_json("sendbox-posts-error.json", {})
+    if not isinstance(data, dict) or str(data.get("accountId") or "") != str(account_id or ""):
+        return ""
+    text = str(data.get("error") or "").lower()
+    if "checkpoint" in text:
+        return "اینستاگرام یک تأیید امنیتی خواسته. در خود اینستاگرام تأیید را تمام کن، بعد دوباره از کانال‌ها وصل کن."
+    if "access token" in text or "token" in text:
+        return "ورود اینستاگرام منقضی شده. از کانال‌ها دوباره وصل کن."
+    return ""
 
 
 async def accept_webhook(payload: dict) -> dict:

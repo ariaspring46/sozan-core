@@ -35,6 +35,20 @@ class ClaimsGuardTests(unittest.TestCase):
         out = asyncio.run(claims_guard.check("انگشتر نقره.", "انگشتر نقره", complete=complete))
         self.assertEqual(out, [])
 
+    def test_a_slow_check_times_out_instead_of_hanging(self) -> None:
+        from app.services import turn_clock
+
+        async def slow(*_args, **_kwargs):
+            await asyncio.sleep(1)
+            return {"claims": ["نقره"]}
+
+        clock = turn_clock.arm("budget-turn", 0.05)
+        try:
+            with self.assertRaises(TimeoutError):
+                asyncio.run(claims_guard.check("انگشتر نقره است.", "انگشتر", complete=slow))
+        finally:
+            turn_clock.disarm(clock)
+
 
 if __name__ == "__main__":
     unittest.main()

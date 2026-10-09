@@ -28,12 +28,13 @@ def page_prices_reply(spoken: str) -> str:
 
 
 def with_scan(text: str, shop: dict) -> str:
-    """For a shop that is not built yet, the model is told what the page scan really found (so it never promises prices from an empty page)."""
-    if str(shop.get("slug") or "").strip():
-        return text
+    """The model is told what the page scan really found, including after the shop is built."""
     from app.services.channel_scan_service import scan_outcome
 
-    return f"{text} · {scan_outcome()}"
+    found = scan_outcome()
+    if not found:
+        return text
+    return f"{text} · {found}" if text else found
 
 
 def names_a_page(text: str) -> bool:
@@ -81,5 +82,5 @@ async def voice(spoken: str, text: str, situation: str, rows: list[dict]) -> str
         [plain],
         seller_text="" if hostile else spoken,
         fallback=plain,
-        recent=None if hostile else [row for row in rows[-6:] if isinstance(row, dict)],
+        recent=None if hostile else [row for row in rows[-8:] if isinstance(row, dict)],
     )

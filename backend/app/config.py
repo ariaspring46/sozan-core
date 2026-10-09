@@ -98,6 +98,8 @@ class Settings(BaseSettings):
     egress_source_ip: str = ""
     gateway_sozan_url: str = ""
     channel_proxy: str = ""
+    # Second SOCKS when channel_proxy cannot connect. Foreign hosts only; Iranian APIs stay direct.
+    channel_proxy_fallback: str = ""
     sozan_npm_proxy: str = ""
     public_api_url: str = "https://api.sozan-core.ir"
     panel_url: str = "https://app.sozan-core.ir"
@@ -113,6 +115,16 @@ class Settings(BaseSettings):
     sendbox_webhook_secret: str = ""
     # While set to a future ISO date, the old JWT-derived webhook token is accepted too (rotation window).
     sendbox_webhook_legacy_until: str = ""
+    decider_enabled: bool = False
+    decider_tenants: str = "09135409482"
+    decider_model: str = "perplexity/pplx-decider-v1.1-27b"
+    decider_url: str = "https://openrouter.ai/api/alpha/decisions"
+    decider_alt_url: str = "https://openrouter.ai/api/v1/api/alpha/decisions"
+    decider_min_prob: float = 0.6
+    decider_min_margin: float = 0.2
+    decider_pro_model: str = "deepseek/deepseek-v4-pro"
+    # The chat model sees the decider's tool plus the read tools of its groups (router_tools). Off until tried live.
+    decider_tool_groups: bool = False
 
     @property
     def cors_origin_list(self) -> list[str]:

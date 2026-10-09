@@ -1,4 +1,5 @@
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -122,6 +123,38 @@ class StorefrontServiceTests(unittest.TestCase):
             row = out["sale"]
         self.assertEqual(row["source"], "manual")
         self.assertGreater(int(row["at"]), 0)
+
+    def test_placeholder_catalog_rows(self) -> None:
+        self.assertTrue(storefront_service.is_placeholder_catalog("سلام! 👋 این یک پست آزمایشی"))
+        self.assertTrue(storefront_service.is_placeholder_catalog("Winter is coming…"))
+        self.assertTrue(storefront_service.is_placeholder_catalog("آویز فیروزه بازبینی ۱"))
+        self.assertTrue(storefront_service.is_placeholder_catalog("کالای تست بازبینی زنده"))
+        self.assertFalse(storefront_service.is_placeholder_catalog("آویز فیروزه"))
+        self.assertFalse(storefront_service.is_placeholder_catalog("عکس انگشتر فیروزه"))
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", self.root):
+            with self.assertRaises(ValueError):
+                storefront_service.add_product(
+                    title="آویز فیروزه بازبینی ۱",
+                    price=0,
+                    stock=0,
+                    sku="",
+                    description="کالای تست بازبینی زنده",
+                )
+            self.assertEqual(storefront_service.drop_placeholder_products(), [])
+
+
+    def test_add_product_returns_while_catalog_sync_is_slow(self) -> None:
+        def slow(*_args, **_kwargs) -> int:
+            time.sleep(1.2)
+            return 0
+
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", self.root), patch(
+            "app.services.shop_memory_service.backfill_catalog", slow
+        ):
+            started = time.monotonic()
+            storefront_service.add_product(title="انگشتر", price=850000, stock=1, sku="r1")
+            elapsed = time.monotonic() - started
+        self.assertLess(elapsed, 1.0)
 
 
 if __name__ == "__main__":

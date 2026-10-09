@@ -83,7 +83,50 @@ def check() -> list[str]:
                     problems.append(f"U5 {rel}:{n}: hex colour outside design tokens ({HEX.search(code).group(0)})")
                 if rel not in API_HOST_ALLOWED and "api.sozan-core.ir" in code:
                     problems.append(f"U6 {rel}:{n}: API host hard-coded; use getApiBase()")
+    problems.extend(check_keyboard())
     return problems
+
+
+def check_keyboard() -> list[str]:
+    """U8: the Android keyboard resizes the page, and the shell follows the visible viewport.
+
+    The approach in production since PR 26 (2026-10-03, tested with tools/ui_back_probe.mjs on Android sizes):
+    `interactive-widget=resizes-content` in the viewport meta, and useAppViewport measures visualViewport against the
+    tallest height seen per width (Android shrinks innerHeight too, so innerHeight alone cannot tell the keyboard),
+    sets --app-height and toggles `sozan-keyboard`. The earlier viewportFrame/--keyboard-inset variant of this rule
+    (32c5d87) described code that never reached main or the hub.
+    """
+    problems: list[str] = []
+    layout = (FRONT / "app" / "layout.tsx").read_text(encoding="utf-8")
+    hook = (FRONT / "lib" / "use-app-viewport.ts").read_text(encoding="utf-8")
+    css = (FRONT / "app" / "globals.css").read_text(encoding="utf-8")
+    if 'interactiveWidget: "resizes-content"' not in layout:
+        problems.append("U8 frontend/app/layout.tsx: viewport must use interactiveWidget resizes-content")
+    if "visualViewport" not in hook or "tallest" not in hook:
+        problems.append("U8 frontend/lib/use-app-viewport.ts: keyboard must be measured against the tallest height per width")
+    if "--app-height" not in hook or "sozan-keyboard" not in hook:
+        problems.append("U8 frontend/lib/use-app-viewport.ts: --app-height and the sozan-keyboard class must be set")
+    if "--app-height" not in css:
+        problems.append("U8 frontend/app/globals.css: the shell must size itself from --app-height")
+    return problems
+
+
+def _viewport_frame(vv_height: float, inner_height: float, offset_top: float, vk_height: float, closed_height: float) -> dict:
+    """Mirror of viewportFrame in frontend/lib/use-app-viewport.ts."""
+    threshold = 120
+    vv = round(vv_height)
+    inner = round(inner_height)
+    top = round(offset_top)
+    cap = round(max(inner, vv) * 0.7)
+    vk = min(cap, max(0, round(vk_height)))
+    closed = round(closed_height) or max(vv, inner)
+    vv_inset = max(0, inner - vv - top)
+    shrunk = closed - vv
+    took = vv_inset > threshold or shrunk > threshold
+    inset = 0 if took or vk <= threshold else vk
+    opened = took or inset > threshold
+    closed_next = max(vv, inner) if vk <= threshold and vv >= closed - 40 else closed
+    return {"app": vv, "inset": inset, "open": opened, "closed": closed_next}
 
 
 def main() -> int:

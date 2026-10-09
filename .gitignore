@@ -45,3 +45,4 @@ brand/audio/bed.mp3
 
 deploy/shop-upstreams.map
 deploy/shop-custom-names.conf
+backend/data/

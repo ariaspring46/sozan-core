@@ -132,7 +132,7 @@ class ImageCutoverTests(unittest.TestCase):
             "IMAGE_FALLBACK_URL": "",
             "CLOUD_LLM_FALLBACK_URL": "",
             "IMAGE_LOCAL": "",
-            "OPENROUTER_PROXY": "",
+            "OPENROUTER_PROXY_FALLBACK": "",
         }
         with patch.dict("os.environ", env, clear=False), patch(
             "app.services.image_provider_service._post", side_effect=fake_post
@@ -144,7 +144,7 @@ class ImageCutoverTests(unittest.TestCase):
         self.assertEqual(seen["token"], "or-test-key")
         self.assertIn("openrouter.ai", seen["url"])
         self.assertEqual(seen["modalities"], ["image"])
-        with patch.dict("os.environ", {"OPENROUTER_PROXY": "socks5://127.0.0.1:9"}, clear=False):
+        with patch.dict("os.environ", {"OPENROUTER_PROXY_FALLBACK": "socks5://127.0.0.1:9"}, clear=False):
             self.assertEqual(
                 image_provider_service._proxy_for("https://openrouter.ai/api/v1"),
                 "socks5://127.0.0.1:9",

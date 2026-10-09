@@ -51,6 +51,15 @@ class ReplyChecks(unittest.TestCase):
         self.assertTrue(voice.acceptable("انگشتر با 1200000 تومان روی nogre.sozan-core.ir آمد و باز می‌شود.", facts=facts.replace("«انگشتر»", "انگشتر")))
         self.assertFalse(voice.acceptable("انگشتر با قیمتی که گفتی روی سایتت آمد و باز می‌شود.", facts=facts.replace("«انگشتر»", "انگشتر")))
         self.assertFalse(voice.acceptable("انگشتر با 900000 تومان روی nogre.sozan-core.ir آمد و باز می‌شود.", facts=facts.replace("«انگشتر»", "انگشتر")))
+        self.assertTrue(
+            voice.acceptable(
+                "سایز ۵۴ را روی کالا گذاشتم و تمام شد.",
+                facts="کالا به کاتالوگ اضافه شد.",
+                seller_text="انگشتر سایز ۵۴ اضافه کن",
+            )
+        )
+        self.assertFalse(voice.acceptable("سه کالا در کاتالوگ است و تمام.", facts="۲ کالا در کاتالوگ است."))
+        self.assertTrue(voice.acceptable("قیمت ۸۵۰ هزار تومان ثبت شد و تمام.", facts="قیمت ۸۵۰٬۰۰۰ تومان است."))
 
     def test_markdown_and_newlines_are_flattened(self) -> None:
         self.assertEqual(voice.clean_reply("**سلام**\n\nچطوری؟"), "سلام چطوری؟")
@@ -101,10 +110,79 @@ class SayTests(unittest.TestCase):
         with patch.object(voice, "complete_json", new=AsyncMock(return_value=ok)):
             self.assertEqual(_run(voice.say("tool_result", ["پست ارسال نشد؛ تلگرام وصل نیست."], fallback="F")), ok["reply"])
 
+    def test_an_introduction_keeps_the_four_features(self) -> None:
+        brief = voice.about_text()
+        self.assertLess(len(brief), 600)
+        self.assertTrue(voice.covers_about(brief))
+        thin = {"reply": "من سوزانم و فروشگاه را با چند جمله می‌سازم."}
+        with patch.object(voice, "complete_json", new=AsyncMock(return_value=thin)):
+            out = _run(voice.say("about_self", [brief], seller_text="تو کی هستی؟", fallback=brief))
+        self.assertEqual(out, brief)
+        full = {"reply": "من سوزانم. فروشگاه را می‌سازم، در استودیو پست می‌سازم، صندوق را جمع می‌کنم و پرداخت را ثبت می‌کنم."}
+        with patch.object(voice, "complete_json", new=AsyncMock(return_value=full)):
+            kept = _run(voice.say("about_self", [brief], seller_text="تو کی هستی؟", fallback=brief))
+        self.assertEqual(kept, full["reply"])
+
+    def test_a_made_up_count_falls_back_and_is_observed(self) -> None:
+        seen: list[dict] = []
+
+        def emit_later(**kwargs):
+            seen.append(kwargs)
+
+        with patch.object(voice, "complete_json", new=AsyncMock(return_value={"reply": "سه کالا در کاتالوگ است و تمام."})), patch(
+            "app.services.observe_client.emit_later", emit_later
+        ):
+            out = _run(voice.say("tool_result", ["۲ کالا در کاتالوگ است."], fallback="۲ کالا در کاتالوگ است."))
+        self.assertEqual(out, "۲ کالا در کاتالوگ است.")
+        self.assertEqual(seen[-1]["payload"]["reason"], "numbers")
+        self.assertEqual(seen[-1]["title"], "voice-plain")
+
+    def test_the_sellers_own_number_is_kept(self) -> None:
+        reply = {"reply": "سایز ۵۴ را گذاشتم و کالا اضافه شد."}
+        with patch.object(voice, "complete_json", new=AsyncMock(return_value=reply)):
+            out = _run(
+                voice.say(
+                    "tool_result",
+                    ["کالا به کاتالوگ اضافه شد."],
+                    seller_text="انگشتر سایز ۵۴ اضافه کن",
+                    fallback="کالا به کاتالوگ اضافه شد.",
+                )
+            )
+        self.assertEqual(out, reply["reply"])
+
+    def test_an_unbacked_claim_falls_back_to_the_plain_sentence(self) -> None:
+        reply = {"reply": "این انگشتر نقره است و به کاتالوگ آمد."}
+        with patch.object(voice, "complete_json", new=AsyncMock(return_value=reply)), patch(
+            "app.services.claims_guard.check", new=AsyncMock(return_value=["نقره"])
+        ):
+            out = _run(voice.say("tool_result", ["کالا به کاتالوگ اضافه شد."], fallback="کالا به کاتالوگ اضافه شد."))
+        self.assertEqual(out, "کالا به کاتالوگ اضافه شد.")
+
     def test_a_failure_is_never_dressed_up_as_success(self) -> None:
         lie = {"reply": "حله، رنگ را عوض کردم و روی سایت آمد."}
         with patch.object(voice, "complete_json", new=AsyncMock(return_value=lie)):
             self.assertEqual(_run(voice.say("edit_not_done", ["رنگ پیدا نشد."], fallback="F", patched=False)), "F")
+
+    def test_a_slow_model_returns_the_plain_sentence_for_budget(self) -> None:
+        from app.services import turn_clock
+
+        seen: list[dict] = []
+
+        async def slow(*_args, **_kwargs):
+            await asyncio.sleep(1)
+            return {"reply": "این دیر است و نباید دیده شود همین‌جا."}
+
+        def emit_later(**kwargs):
+            seen.append(kwargs)
+
+        clock = turn_clock.arm("budget-turn", 0.05)
+        try:
+            with patch.object(voice, "complete_json", new=slow), patch("app.services.observe_client.emit_later", emit_later):
+                out = _run(voice.say("tool_result", ["کالا اضافه شد."], fallback="کالا اضافه شد."))
+        finally:
+            turn_clock.disarm(clock)
+        self.assertEqual(out, "کالا اضافه شد.")
+        self.assertEqual(seen[-1]["payload"]["reason"], "budget")
 
 
 if __name__ == "__main__":

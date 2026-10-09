@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -44,6 +44,7 @@ class FeedbackIn(BaseModel):
 class SellerTicketIn(BaseModel):
     subject: str = Field(min_length=2, max_length=120)
     text: str = Field(min_length=2, max_length=2000)
+    category: Literal["billing", "technical", "other"] | None = None
 
 
 @router.get("/support/my-tickets")
@@ -57,7 +58,12 @@ async def my_seller_tickets(_user=Depends(require_permission("campaigns:read")))
 async def create_seller_ticket(body: SellerTicketIn, _user=Depends(require_permission("campaigns:write"))):
     from app.services import support_service
 
-    return support_service.create_ticket(subject=body.subject, text=body.text, kind="seller")
+    try:
+        return support_service.create_ticket(
+            subject=body.subject, text=body.text, kind="seller", category=body.category or ""
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.get("/support/hub")

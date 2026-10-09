@@ -8,6 +8,7 @@ from app.repositories.campaign_repository import AssetRepository, CampaignReposi
 from app.services.campaign_service import CampaignService
 from app.services.job_queue import pop
 from app.services import router_service, studio_chat_service
+from app.services.observe_client import emit_later
 from app.state_store import tenant_scope
 
 log = logging.getLogger("sozan.worker")
@@ -38,8 +39,10 @@ async def handle(job: dict) -> None:
                 done = str((out or {}).get("campaignId") or cid)
                 if done:
                     router_service.remember_content({"campaignId": done})
+                _emit_studio(job, message_id, status="ok")
         except Exception:
             log.exception("studio job failed")
+            _emit_studio(job, message_id, status="error")
             if message_id:
                 studio_chat_service.finish_compose(
                     message_id,
@@ -48,6 +51,20 @@ async def handle(job: dict) -> None:
                     error="ساخت انجام نشد. دوباره بگو.",
                     job_id=message_id,
                 )
+
+
+def _emit_studio(job: dict, message_id: str, *, status: str) -> None:
+    parent = str(job.get("turnId") or "")
+    emit_later(
+        kind="llm",
+        title="studio-done",
+        surface="studio",
+        status=status,
+        turn_id=parent,
+        parent_id=parent,
+        job_id=message_id,
+        payload={"campaignId": str(job.get("campaignId") or "")},
+    )
 
 
 async def loop() -> None:

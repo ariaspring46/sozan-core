@@ -13,7 +13,7 @@ from app.config import settings
 
 class AdminServiceTests(unittest.TestCase):
     def setUp(self) -> None:
-        self._tmp = tempfile.TemporaryDirectory()
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # a late observe write into tenants/ raced the cleanup (1 in 5 runs)
         self.addCleanup(self._tmp.cleanup)
         self._state = patch.object(settings, "state_dir", self._tmp.name)
         self._state.start()
@@ -32,6 +32,28 @@ class AdminServiceTests(unittest.TestCase):
         tenant_dir.mkdir(parents=True, exist_ok=True)
         with tenant_scope(phone):
             write_json("plan.json", {"plan": plan, "at": int(_t.time())})
+
+    def test_joined_from_signup_and_last_seen_ignores_logs(self) -> None:
+        import datetime as _dt
+        import os
+        import time as _t
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        from app.services import admin_service
+
+        self._make_tenant("09120000003")
+        root = Path(self._tmp.name) / "tenants" / "09120000003"
+        old = _t.time() - 5 * 86400
+        for path in root.iterdir():
+            os.utime(path, (old, old))
+        (root / "observe-outbox.jsonl").write_text("{}\n")  # a log line now must not count as the seller being here
+        user = SimpleNamespace(created_at=_dt.datetime(2026, 9, 7, tzinfo=_dt.timezone.utc), is_active=True)
+        row = admin_service._user_row("09120000003", user)
+        self.assertEqual(row["joinedAt"], int(_dt.datetime(2026, 9, 7, tzinfo=_dt.timezone.utc).timestamp()))
+        self.assertLess(abs(row["lastSeen"] - int(old)), 2)
+        self.assertEqual(admin_service._joined_at(None, [{"at": 123}]), 123)
+        self.assertEqual(admin_service._joined_at(None, []), 0)
 
     def test_set_plan_requires_reason(self) -> None:
         from app.services import admin_service

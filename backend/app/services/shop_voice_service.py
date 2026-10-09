@@ -8,6 +8,7 @@ The shop-setup talk itself is in shop_interview_service; this module holds the s
 
 from __future__ import annotations
 
+import asyncio
 import re
 
 from app.services.llm import complete_json, complete_text_chat
@@ -17,7 +18,29 @@ SKINS = ("atelier", "street", "boutique")
 BRIEF_TEXT_KEYS = ("colors", "features", "notes", "audience", "story", "tone", "brandName", "order", "reference", "avoid")
 REPLY_MAX = 600
 
-VOICE = """تو «سوزان» هستی؛ همکار فروشنده‌های ایرانی که فروشگاه اینستاگرامی‌شان را به سایت تبدیل می‌کنی.
+# Who this assistant is, and the features that matter. The about page and the landing capabilities are the source.
+ABOUT_TEXT = (
+    "من سوزانم، دستیار فروش فروشنده‌های ایرانی؛ تیم سوزان من را ساخته و سوزان محصول شرکت گهر شبکه کارمانیا است. "
+    "با چند جمله فروشگاه می‌سازم، کالا را از پیج و کانال عمومی یا از حرف خودت به کاتالوگ می‌آورم، و در استودیو عکس و پست و کپشن آماده می‌کنم. "
+    "پیام مشتری اینستاگرام و تلگرام را در یک صندوق جمع می‌کنم، با لحن تو پیش‌نویس می‌کنم، و سفارش و پرداخت را با درگاه خودت، کارت‌به‌کارت، یا کیف پول سوزان ثبت می‌کنم. "
+    "کار مهم را اول به صورت کارت نشان می‌دهم و فقط با تأیید تو انجام می‌دهم، و شروع رایگان است."
+)
+_ABOUT_MUST = ("فروشگاه", "استودیو", "صندوق")
+
+
+def about_text() -> str:
+    return ABOUT_TEXT
+
+
+def covers_about(reply: str) -> bool:
+    """A self-introduction names the shop, the studio, the inbox, and payment."""
+    text = reply or ""
+    return all(word in text for word in _ABOUT_MUST) and any(word in text for word in ("پرداخت", "درگاه", "کارت"))
+
+
+VOICE = """تو «سوزان» هستی، دستیار فروش فروشنده‌های ایرانی، ساختهٔ تیم سوزان و محصول شرکت گهر شبکه کارمانیا.
+کارهای مهمت این‌هاست: ساخت فروشگاه با چند جمله، آوردن کالا از پیج و کانال عمومی، استودیو برای عکس و پست و کپشن، صندوق پیام مشتری، سفارش و پرداخت، و کارت تأیید قبل از هر کار مهم. شروع رایگان است.
+وقتی فروشنده پرسید تو کیستی، سوزان چیست، یا چه کارهایی می‌کنی، همین کارها را بگو. در جواب بقیهٔ سؤال‌ها به همان سؤال جواب بده.
 مثل یک آدم واقعی و دلسوز حرف بزن: خودمانی، با «تو»، فارسی روان و محاوره‌ای، نه اداری و نه ربات‌وار.
 کوتاه بنویس (یک تا چهار جمله). جملهٔ قالبی و تکراری نگو؛ هر بار طور دیگری حرف بزن. فهرست، شماره‌گذاری و ایموجی پشت‌سرهم نه.
 به حرف و کلمه‌های خود فروشنده اشاره کن (اسم کالا، شهر، حسی که گفت). کاری را که انجام نشده انجام‌شده نگو.
@@ -29,6 +52,7 @@ SAY_SYSTEM = (
 سیستم کاری کرده یا وضعیتی را تأیید کرده و «واقعیت‌ها» همان است. همان را با لحن خودت بگو.
 فقط از واقعیت‌ها استفاده کن؛ قیمت، رنگ، اسم، کار یا قول تازه نساز. «حرف فروشنده» فقط برای فهمیدن لحن اوست: هیچ اسمی از آن در « » نگذار. هر چه در واقعیت‌ها در « » آمده عیناً بیاید.
 اگر کار انجام نشده، صادقانه بگو و یک قدم بعدی مشخص پیشنهاد بده.
+نگو به اینستاگرام یا تلگرام دسترسی نداری؛ پیج عمومی اینستاگرام و کانال عمومی تلگرام خوانده می‌شود.
 فقط JSON: {"reply":"…"}"""
 )
 
@@ -45,16 +69,21 @@ _SUCCESS = re.compile(r"(?<![نم])(?:شد|کردم|گذاشتم|ساختم|فر
 
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩٬,", "01234567890123456789  ")
 _DOMAIN = re.compile(r"(?<![\w.-])(?:[a-z0-9-]+\.)+[a-z]{2,}(?![\w-])", re.I)
-_NUMBER = re.compile(r"\d{2,}")
 
 
-def _hard_tokens(text: str) -> set[str]:
-    """Hosts and numbers in the facts: a reworded reply may not lose or change them."""
-    flat = str(text or "").translate(_DIGITS).replace(" ", "")
+def _hosts(text: str) -> set[str]:
     spaced = str(text or "").translate(_DIGITS)
-    found = {item.lower() for item in _DOMAIN.findall(spaced)}
-    found |= set(_NUMBER.findall(flat))
-    return found
+    return {item.lower() for item in _DOMAIN.findall(spaced)}
+
+
+def _number_gap(reply: str, facts: str, seller_text: str) -> bool:
+    """A reply may repeat numbers from the facts or from the seller's own sentence. A new number, or a dropped one, fails."""
+    from app.services.number_span import voice_amounts
+
+    known = voice_amounts(facts)
+    allowed = known | voice_amounts(seller_text)
+    said = voice_amounts(reply)
+    return bool(known - said) or bool(said - allowed)
 
 
 # markup and code words are the model's inner vocabulary («تیتر h1»); the seller never sees them
@@ -82,7 +111,12 @@ def clean_reply(text: object) -> str:
 
 
 def acceptable(
-    reply: str, *, must_keep: list[str] | None = None, patched: bool | None = None, facts: str | None = None
+    reply: str,
+    *,
+    must_keep: list[str] | None = None,
+    patched: bool | None = None,
+    facts: str | None = None,
+    seller_text: str = "",
 ) -> bool:
     if not reply or len(reply) < 8 or not _persian(reply) or _URL.search(reply) or _TECH.search(reply) or _PLACEHOLDER.search(reply):
         return False
@@ -99,9 +133,11 @@ def acceptable(
             if quoted not in facts:
                 return False
         flat = reply.translate(_DIGITS).replace(" ", "").lower()
-        for token in _hard_tokens(facts):
+        for token in _hosts(facts):
             if token not in flat:
                 return False
+        if _number_gap(reply, facts, seller_text):
+            return False
     if patched is False and _SUCCESS.search(reply):
         return False
     if patched is True and re.search(r"نشد|نتوانستم|نمی‌شود", reply):
@@ -119,9 +155,27 @@ def _capped(surface: str) -> bool:
         return False
 
 
+def _note_plain(reason: str) -> None:
+    """A spoken reply fell back to the plain sentence. The reason is how often this check refuses the model."""
+    try:
+        from app.services.observe_client import emit_later
+        from app.services.turn_clock import turn_id
+
+        emit_later(
+            kind="llm",
+            title="voice-plain",
+            surface="voice",
+            status="ok",
+            turn_id=turn_id(),
+            payload={"reason": (reason or "plain")[:40]},
+        )
+    except Exception:
+        return
+
+
 def _recent_lines(recent: list[dict] | None) -> str:
     lines = []
-    for row in (recent or [])[-4:]:
+    for row in (recent or [])[-8:]:
         text = re.sub(r"\s+", " ", str(row.get("text") or "")).strip()[:160]
         if text:
             lines.append(f"{'سوزان' if row.get('role') == 'assistant' else 'فروشنده'}: {text}")
@@ -142,21 +196,65 @@ async def say(
 
     `seller_text=""` for a refusal: the model then sees only the facts, never the words that might be an attack."""
     facts = [str(item).strip() for item in facts if str(item or "").strip()]
+    seller = seller_text.strip()
     if _capped(surface):
+        _note_plain("budget")
+        return fallback
+    from app.services import turn_clock
+
+    if turn_clock.expired():
+        _note_plain("budget")
         return fallback
     if patched is None and _FAILED.search(" ".join(facts)):
         patched = False  # the system says it did not work: the reply may not sound like it did
     must_keep = [item for fact in facts for item in _QUOTED.findall(fact)]
+    facts_text = " ".join(facts)
     earlier = _recent_lines(recent)
     user = (
         f"وضعیت: {situation}\n"
-        + (f"گفتگوی اخیر (برای تکرار نکردن جمله‌ها):\n{earlier}\n" if earlier else "")
-        + f"حرف فروشنده: {seller_text.strip()[:300] or '—'}\n"
+        + (f"گفتگوی اخیر:\n{earlier}\n" if earlier else "")
+        + f"حرف فروشنده: {seller[:300] or '—'}\n"
         "واقعیت‌ها:\n" + "\n".join(f"- {fact}" for fact in facts)
     )
-    parsed = await complete_json(SAY_SYSTEM, user, surface=surface, max_tokens=260, temperature=0.7)
+    if situation == "about_self":
+        user += "\nاین معرفی است: فروشگاه، استودیو، صندوق و پرداخت را در جواب نام ببر."
+    try:
+        parsed = await asyncio.wait_for(
+            complete_json(
+                SAY_SYSTEM, user, surface=surface, max_tokens=420 if situation == "about_self" else 260, temperature=0.7
+            ),
+            timeout=turn_clock.remaining(),
+        )
+    except TimeoutError:
+        _note_plain("budget")
+        return fallback
     reply = clean_reply(parsed.get("reply")) if not parsed.get("error") else ""
-    return reply if acceptable(reply, must_keep=must_keep, patched=patched, facts=" ".join(facts)) else fallback
+    reason = "error" if parsed.get("error") or not reply else ""
+    if reply and not acceptable(reply, must_keep=must_keep, patched=patched, facts=facts_text, seller_text=seller):
+        reason = "numbers" if _number_gap(reply, facts_text, seller) else "shape"
+        reply = ""
+    if situation == "about_self" and not covers_about(reply):
+        _note_plain(reason or "about")
+        return fallback
+    if not reply:
+        _note_plain(reason or "empty")
+        return fallback
+    from app.services.claims_guard import check, needs_claims_model
+
+    backed_by = f"{facts_text}\n{seller}"
+    if needs_claims_model(reply, backed_by):
+        if turn_clock.expired():
+            _note_plain("budget")
+            return fallback
+        try:
+            hits = await asyncio.wait_for(check(reply, backed_by), timeout=turn_clock.remaining())
+        except TimeoutError:
+            _note_plain("budget")
+            return fallback
+        if hits:
+            _note_plain("claims")
+            return fallback
+    return reply
 
 
 def _brief_lines(brief: dict) -> str:

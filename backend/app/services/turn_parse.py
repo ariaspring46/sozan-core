@@ -103,6 +103,10 @@ def _topic(text: str, write: bool) -> str:
     channels = ("اینستاگرام", "تلگرام", "روبیکا", "واتساپ")
     if any(mark in text for mark in channels) and "وصل" in text and "کن" in text:
         return "channel_connect"
+    scan_marks = ("ببین", "ببینم", "ببینی", "بخون", "بخوان", "اسکن")
+    page_marks = ("پیج", "اینستا", "تلگرام", "کانال")
+    if any(mark in text for mark in scan_marks) and any(mark in text for mark in page_marks):
+        return "channel_scan"
     if write:
         return ""
     if any(mark in text for mark in ("ساعت کاری", "آدرس", "تلفن", "شماره تماس")):
@@ -204,11 +208,22 @@ def _platform(text: str) -> str:
     return ""
 
 
+def _bare_caption_change(text: str) -> bool:
+    """«کپشنش رو کوتاه‌تر کن» changes the last caption. A caption for a named product is a new post."""
+    if "کپشن" not in (text or ""):
+        return False
+    if not any(mark in text for mark in ("کوتاه", "بلند", "عوض", "تغییر", "بهتر", "رسمی", "جمع")):
+        return False
+    from app.services.turn_subject import vocab_subject
+
+    return not vocab_subject(text)
+
+
 def parse_turn(text: str) -> Turn:
     data = registry()
     raw = text or ""
     write = _write(raw, data)
-    revise = _has_mark(raw, list(data.get("revise_marks") or [])) and "عکس" not in raw and "تصویر" not in raw
+    revise = (_has_mark(raw, list(data.get("revise_marks") or [])) or _bare_caption_change(raw)) and "عکس" not in raw and "تصویر" not in raw
     topic = _topic(raw, write)
     return Turn(
         raw=raw,

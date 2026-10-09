@@ -1,3 +1,5 @@
+import logging
+
 from pydantic import BaseModel, Field
 
 from app.security import require_permission
@@ -15,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 
 router = APIRouter(prefix="/channels", tags=["channels"])
+log = logging.getLogger("sozan.channels")
 
 
 class ChannelIn(BaseModel):
@@ -28,6 +31,10 @@ class ChannelIn(BaseModel):
 class SendboxClaimIn(BaseModel):
     accountId: str = Field(min_length=4, max_length=80)
     handle: str = Field(default="", max_length=200)
+
+
+class SendboxReturnIn(BaseModel):
+    query: dict[str, str] = Field(default_factory=dict)
 
 
 def _with_oauth(payload: dict) -> dict:
@@ -110,15 +117,40 @@ async def sendbox_callback(
     return RedirectResponse(url, status_code=302)
 
 
-@router.post("/sendbox/webhook")
-async def sendbox_webhook(request: Request, token: str = Query(default="")):
-    if not sendbox_service.valid_webhook_token(token):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "وب‌هوک BoxAPI نامعتبر است")
+async def _webhook_body(request: Request) -> dict:
     try:
         payload = await request.json()
     except Exception:
         payload = {}
-    return await sendbox_service.accept_webhook(payload if isinstance(payload, dict) else {})
+    return payload if isinstance(payload, dict) else {}
+
+
+@router.post("/sendbox/webhook")
+async def sendbox_webhook(request: Request, token: str = Query(default="")):
+    if not sendbox_service.valid_webhook_token(token):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "وب‌هوک BoxAPI نامعتبر است")
+    return await sendbox_service.accept_webhook(await _webhook_body(request))
+
+
+@router.post("/boxapi/webhook")
+async def boxapi_webhook(request: Request, token: str = Query(default="")):
+    payload = await _webhook_body(request)
+    if sendbox_service.valid_webhook_token(token):
+        return await sendbox_service.accept_webhook(payload)
+    stored = sendbox_service.store_bound_posts(payload)
+    if stored is None:
+        log.warning("sendbox webhook rejected token_len=%s", len(str(token or "")))
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "وب‌هوک BoxAPI نامعتبر است")
+    return stored
+
+
+@router.post("/sendbox/return")
+async def sendbox_return(body: SendboxReturnIn, _user=Depends(require_permission("campaigns:write"))):
+    try:
+        result = await sendbox_service.accept_return(phone=current_tenant(), query=dict(body.query))
+        return _with_oauth(result)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.post("/sendbox/claim")
@@ -154,6 +186,9 @@ async def add_channel(body: ChannelIn, _user=Depends(require_permission("campaig
         account = channel_service.apply_verify(str(result["account"]["id"]), probe)
         extra = await _after_connect(account, samples=body.samples, row=row)
         scan = channel_scan_service.start_scan([{"platform": account.get("platform"), "handle": account.get("handle")}])
+        from app.services.channel_tool import announce_connected
+
+        announce_connected(str(account.get("platform") or ""), str(account.get("handle") or ""))
         return {**_with_oauth(channel_service.list_accounts()), "account": account, **extra, "scan": scan}
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

@@ -896,3 +896,189 @@ Z، کامیت `0210895` مشاور (شروع شخصی از بیو اینستا�
 - دور ۴ خرید/تیکت را **برنامه‌ریز زنده اجرا کرد** (سفارش 9S8OZEsxL2s + رسید + OTP واقعی به مالک) — نتیجهٔ تأیید کد و تیکت را همین‌جا می‌نویسم.
 - لیست ۵۰۰ شماره (مأموریت جدید) در جریان است — گزارشش با شمارش‌ها بیاید، بدون شماره.
 قاعدهٔ یادآوری: هر «done» بدون ورودی در این فایل، پذیرشش معلق می‌ماند.
+
+## Z — لیست سرنخ: دور اول ساخته شد (۲۶۴ ردیف)؛ بستهٔ دوم از X3 در راه (۲ اکت ۰۵:۵۷ تهران)
+
+- خروجی X3 (۱۱۶۷ پیج عمومی) پردازش شد: **۲۴۸ سرنخ تازهٔ یکتا** → فایل کمپین الان **۲۶۴ ردیف** (۱۹ قدیمی + ۲۴۸ تازه + حذف ۳ ردیف قدیمیِ غیر ۰۹ طبق قاعدهٔ پاکسازی؛ بک‌آپ‌شان در bak-z-20261002 هست).
+- شمارش پاکسازی: ۹۰۶ بیو بی‌شماره، ۱۳ شمارهٔ تکراری، ۰ DNC (فایل DNC خالی است)، ۳ قدیمیِ نامعتبر حذف. توزیع ۱۷ دسته — بزرگ‌ترین‌ها: کیف و کفش ۴۶، آرایشی ۳۹، خانه و دکور ۳۰، پوشاک زنانه ۲۷، متفرقه ۳۲؛ بقیه بین ۱ تا ۱۸.
+- صحت فایل: ۲۶۴ شمارهٔ یکتا، همگی شکل ۰۹xxxxxxxxx، مجوز ۶۰۰، بیرون از مخزن. برای ممیزی برنامه‌ریز سر جایشان است: `~/local-ai/config/sozan-campaign.json` (+ بک‌آپ). هیچ شماره/آیدی/متنی از لیست این‌جا نمی‌آید.
+- **فاصله تا ۵۰۰:** بازده بیو ~۲۱٪ بود؛ بستهٔ دوم (~۱۵۰۰–۲۰۰۰ پیج) از X3 خواستم در talk-x3.md. با رسیدنش ساخت نهایی یک فرمان است.
+- شاهد خط زنده (برای بند پذیرش برنامه‌ریز): ری‌استارت ۰۰:۴۵ با تأیید بی‌تماسی، ثبت SIP 00:45:21 و هارت‌بیت 00:47:22، باتری ۱۹ پرسونا گرم ۷۶/۷۶ (تازه‌ترین اجرا در همین فایل، بالا).
+- **صفر تماس** در تمام این مأموریت؛ campaign_run اجرا نشده.
+- branch/PR: `z/13-lead-harvest` (۳ کامیت)؛ needs: بستهٔ دوم از X3؛ بقیه none.
+
+## Z — تماس آزمایشی مالک عیب واقعی را باز کرد: فیکس «تماس سرد اول حرف می‌زند» روی خط نشست (۲ اکت ۱۳:۰۵ تهران)
+
+- **شاهد عیب (تماس آزمایشی مالک، ۱۲:۰۲:۱۹، جواب در ۰٫۲ثانیه):** ۳۵ ثانیه سکوت کامل روی خط (فقط ۹۸۰ms صدای خداحافظی پایانی ارسال شد، صفر رکورد STT) بعد «خداحافظ.» و قطع. ریشه در کد: جملهٔ شروعِ فروش **واکنشی** بود (فقط بعد از اولین حرف مخاطب پخش می‌شد) و `_sales_idle` اگر مخاطب ساکت می‌ماند بعد از ۲۵ثانیه فقط خداحافظی و قطع می‌کرد. شبیه‌ساز هرگز نمی‌دیدش: پرسوناهای باتری همه فوراً «الو» می‌گویند و مسیر سکوتِ `_sales_idle` فقط تماس واقعی را می‌گیرد.
+- **فیکس (کامیت `a0edaf1` روی `z/14-cold-call-opening`، فقط main.py +۲۳ خط):** در تماس خروجی فروش، سوزان حالا **لحظهٔ اتصال خودش جملهٔ شروع را پخش می‌کند** (از کش پررندر، صفر تأخیر) و همان دفترچهٔ حالتِ مسیر واکنشی را می‌گذارد (greeted/intro_said/awaiting_permission) تا هیچ‌وقت دوباره‌گویی نشود؛ نوبت شروع هم در لاگ ثبت می‌شود. مخاطب ساکت دیگر تماس بی‌صدا نمی‌گیرد؛ سکوت واقعیِ بعد از شروع همچنان ۲۵ثانیه‌ای مؤدبانه بسته می‌شود.
+- tests: cd voice-gateway && python3 -m unittest test_voice → 47 OK. شاهد شبیه‌ساز: در لاگ گیت‌وی شبیه‌سازی، `say kind=hello` با جملهٔ شروع در لحظهٔ اتصال (tts=0.00 از کش) بدون هیچ حرفی از مخاطب. باتری ۱۹ پرسونا بعد از فیکس: ۱۷×۴ + دو `empty` گذرا (مسابقهٔ زمان‌بندی هارنس، هم‌جنس سردیِ قبلی) — p05 در اجرای دوباره **۴ بدون هیچ پرچمی**؛ جمع ۷۴/۷۶ بدون رگرسیون واقعی. جریان گفتگو یک نوبت جلوتر شد (شروع دیگر منتظر «الو» نمی‌ماند). پرچم `slow` سراسریِ این دور آرتیفکت اندازه‌گیری است (صف پخش جلوی first_audio می‌ایستد؛ امتیاز نمی‌کاهد).
+- استقرار: خط زنده در ۱۲:۵۸ ری‌استارت شد (تأیید بی‌تماسی: صفر dial در ۸ دقیقه قبل) → PID 923247، کش صدا ۷۴ جمله در ۹٫۷ثانیه، ثبت SIP 12:58:29. کد در حال اجرا = a0edaf1 روی `z/14-cold-call-opening`.
+- **یک تماس آزمایشی دیگر لازم است** (اجازهٔ قبلی برای همان یک تماس مصرف شد): همان شمارهٔ مالک بگویم بزنم؟ این بار بلافاصله بعد از جواب‌دادن باید جملهٔ شروع («سلام، وقتتون بخیر! پیج اینستاگرامتون رو دیدم…») شنیده شود، حتی اگر هیچ‌کس حرفی نزند.
+- صفر تماس خروجی دیگر در این بازه؛ نیاز: go مالک برای تماس دوم.
+
+## Z — تماس آزمایشی دوم: فیکس روی خط زنده تأیید شد (۲ اکت ۱۳:۱۰ تهران)
+
+- تماس با اجازهٔ صریح مالک (تک‌تماس آزمایشی؛ ساعت ۱۳:۰۳ — بیرون از پنجرهٔ کمپین، به دستور مستقیم مالک برای آزمون، نه کمپین).
+- **مقایسهٔ قبل/بعد فیکس، شاهد ژورنال و رکورد صدا:**
+  - قبل (۱۲:۰۲): جواب در ۰٫۲ثانیه → **۹۸۰ms** صدای ارسالی در کل تماس (فقط خداحافظی پایانی)، صفر نوبت، سکوت ۳۵ثانیه‌ای.
+  - بعد (۱۳:۰۳): جواب → **در همان میلی‌ثانیه** جملهٔ شروع کامل پخش شد (tts=0.00 از کش پررندر، نوبت hello ثبت شد) → جواب مخاطب ۹ثانیه بعد → جملهٔ ارزش → دو نوبت مدل محلی. کل تماس ۶۴ثانیه، **۲۶٫۶ثانیه گفتار** ارسالی (۲۷ برابر قبل). بستن تماس از سمت مخاطب (BYE عادی، بدون قطع سمت ما).
+- یادداشت‌های کیفی (Minor، دست خودم در شاخهٔ بعدی):
+  1. اولین صدا در نوبت مدل محلی تا ۱۲٫۴ثانیه (qwen3.5-9b همزمان با مدل صدا روی Vulkan1) — برای کاهش، پیش‌ساخت جمله‌بندی/تقدم کش بررسی می‌شود.
+  2. مدل محلی یک نوبت «سلام شما!» را عیناً تکرار کرد و گارد too_alike نگرفت (جملهٔ کوتاه مشابه جملهٔ بلند قبلی) — آستانهٔ too_alike برای جفت کوتاه/بلند سفت‌تر می‌شود.
+- وضعیت: خط زنده روی `z/14-cold-call-opening` (a0edaf1) آماده‌باش. صفر تماس دیگر. «شروع کمپین» همچنان داده نشده.
+- needs: none فوری؛ تصمیم مالک روی merge شاخه‌های z/13 و z/14 و ادامهٔ مأموریت ۵۰۰ (بستهٔ دوم X3).
+## Z — لیست سرنخ: بستهٔ دوم X3 پردازش شد (۴۳۶ ردیف) — به ۵۰۰ نمی‌رسد (۲۲۶-۱۰-۱۰۰۲ ۱۶:۵۷)
+
+- done: بستهٔ دوم X3 (۱۹۴۶ پروفایل یکتا) با `harvest_leads.py --from-jsonl` آفلاین (بدون شبکه) پردازش شد و در فایل کمپین `sozan-campaign.json` (۶۰۰) adغام شد. نهایی **۴۳۶** = ۲۶۴ موجود + ۱۷۲ تازه. ابزار همان شاخهٔ `z/13` است؛ هیچ کد عوض نشد.
+- counts: seen ۱۹۴۶، no_phone ۱۵۱۳ (شمارهٔ معتبر در بیو)، dup_phone ۲۶۱ (تکراری)، dnc ۰ (فایل DNC خالی). نهایی همگی ۰۹xxxxxxxxx، یکتا (شماره و آیدی)، بدون بیو. توزیع ۱۳–۱۳ دسته — بزرگ‌ترین کیف و کفش ۷۴ و آرایشی ۷۳، متفرقه ۶۶.
+- شاهد: `python3 tools/agent_context/build.py --check` → manifests ۰؛ `cd voice-gateway && python3 -m unittest test_voice` → ۴۸ OK.
+- صفر تماس؛ `campaign_run` اجرا نشده. شماره/آیدی/متن از لیست در talk یا مخزن نیست.
+- needs: به ۵۰۰ نمی‌رسد — این از داده است، نه حرص (بستهٔ ۱۵۰۰–۲۰۰۰ پیج فقط ۱۷۲ با شمارهٔ معتبر داد). یک بستهٔ دیگر از X3.
+- branch/PR: none فوری.
+## Z — تماس آزمایشی با تنظیم نهایی (ابر): برزگر ابر مسدود است، fallback به کش (۲۲۶-۱۰-۱۰۰۲ ۱۷:۰۹)
+
+- done: تماس آزمایشی تک از خط زنده (اجازهٔ مالک، ساعت ۱۷:۰۸ — در پنجرهٔ ۱۶–۲۰). کد روی `z/14-cold-call-opening` (a0edaf1). مغز ابر: openrouter + gemini-2.5-flash (LLM_FALLBACK_URL پیش‌فرض محلی).
+- شاهد تماس (۱۷:۰۸:۵۲ تا ۱۷:۱۰:۱۷، ~۱ دقیقه ۲۵ثانیه): جملهٔ شروع (سلام +披露 هوش مصنوعی + درخواست وقت) **همین لحظهٔ پاسخ** پخش شد (tts=0.00 از کش، فیکس تماس سرد ✓). توضیح، پرسش، آدرس، بستن با آدرس — جریان درست.
+- عیب: نوبت مغز ابر `first_token=9.295` → **fallback کامل به کش**._probe: openrouter روی `google/gemini-2.5-flash` و `~google/gemini-flash-latest` و `gemini-2.5-flash-lite` همه **۴۰ۃ/۴۰ۄ** (بدون پراکسی ۴۰ۃ «access blocked»؛ با SOZAN_PROXY=http://127.0.0.1:10871 ۴۰ۄ «no provider serve»). یعنی ابر الان کلید را سرو نمی‌دهد — credits/اکسcess، نه اسم model. benchmark ۳۰ سپ ۱٫۳ثانیه بود، الان مسدود.
+- عیب دوم: ornith-phone **لود نیست** وقتی ابر فعال (llama-swap از Vulkan1 برنمی‌دارد); fallback_url پیش‌فرض ornith-phone → شکست; تنها qwen3.5-9b (سLOT دیگر، کند) ماند و در ۸ثانیه نگفت.
+- شاهد probe: ۴۰ۃ بدون پراکسی، ۴۰ۄ با پراکسی، روی سه model. running محلی: bge-m3 + qwen3.5-9b (ornith-phone نیست).
+- صفر تماس دیگر. campaign_run اجرا نشده.
+- needs: (۱) کلید openrouter را مالک درست کند (credits/اکسcess) — کلید در `~/local-ai/config/sozan-voice.env` مال توست. (۲) fallback محلی را تصمیم: ornith-phone لود بماند، یا LLM_FALLBACK_MODEL به qwen3.5-9b (لود). این env/X5 و تصمیم مالک.
+- branch/PR: none فوری.
+## Z — باز۲ probe ابر: credit هست، کلید مسدود (۲۲۶-۱۰-۱۰۰۲ ۱۷:۱۷)
+
+- پراکسی `SOZAN_PROXY=http://127.0.0.1:10871` کار می‌کند (google ۲۰۰ مستقیم و با پراکسی). پس block از openrouter، نه پراکسی/شبکه.
+- openrouter مستقیم (۴۰ۃ «Access denied by security policy»); با پراکسی (۴۰ۄ «no provider serve»); با header `OpenRouter-Client-ID` (۴۰ۃ). روی gemini-2.5-flash، gemini-flash-latest، gemini-2.5-flash-lite — همه bloque.
+- credit حسب شما وجود دارد؛ پس block از **کلید** است: disabled، spend-limit روزانه، permission-provider (Gemini فعال نیست)، یا geo. از اینجا نمی‌توان حساب openrouter را دید.
+- needs: مالک کلید را در openrouter/settings/keys چک کند و access gemini-2.5-flash را فعال (یا provider دیگر). کلید در `~/local-ai/config/sozan-voice.env` مال توست.
+## Z — باز۳ probe اbr: OpenRouter globally ۴۰ۄ (۲۲۶-۱۰-۱۰۰۲ ۱۷:۲۰)
+
+- gemini-2.0-flash-001، deepseek-r1، gemini-2.5-flash، deepseek-v4.1-flash — **همه ۴۰ۄ «no provider serve»**. کلید ۴۰۱ نیست (auth OK). openrouter الان global سرو نمی‌دهد (outage/provider routing). direct و با v2ray (SOZAN_PROXY=127.0.0.1:10871) هر دو ۴۰ۄ — از OpenRouter، نه v2ray.
+- v2ray conf (~/snap/v2rayx/380/.config/.../tmp.json): routing/rules خالی؛ همه outbound پیش‌فرض. پراکسی جدید ۳۰ۃ→۴۰ۄ را رفع نکرد.
+- needs: url پراکسی هاب (مالک: «هاب با پراکسی reachable»). با SOZAN_PROXY آن probe (۴۰ۄ→۲۰۰)؛ سبز → باتری ۱۹ پرسونا با ebr.
+- صفر تماس； campaign_run executed.
+
+## Z — voice-gateway config report (2026-10-03 19:40)
+
+### A SIP — all vars set live (grep -c '^NAME=' on ~/local-ai/config/sozan-voice.env)
+| var | default (example) | live set |
+|---|---|---|
+| SIP_DOMAIN | phone.telefonchy.com | yes |
+| SIP_PORT | 5060 | yes |
+| SIP_REGISTER | 1 | yes |
+| SIP_USER | (empty) | yes |
+| SIP_PASSWORD | (empty) | yes |
+| LOCAL_SIP_PORT | 5062 | yes |
+| LOCAL_RTP_PORT | 40000 | yes |
+- SIP register state: no SIP listener on 5060/5062 (service not up); dial control 5072 UP (pid 2809). No live call, no BYE in recent logs.
+
+### B LLM — set live (grep -c)
+| var | default (example) | live set |
+|---|---|---|
+| LLM_URL | http://127.0.0.1:19292/v1 | yes (cloud) |
+| LLM_MODEL | ornith-phone | yes (cloud) |
+| LLM_FALLBACK_URL | http://127.0.0.1:19292/v1 | yes |
+| LLM_FALLBACK_MODEL | ornith-phone | yes |
+| LLM_LOCAL_URL | http://127.0.0.1:19292/v1 | yes |
+| LLM_LOCAL_MODEL | qwen3.5-9b | yes |
+| LLM_TIMEOUT_S | 8 | NO (uses code default 8) |
+| LLM_API_KEY | (empty, keep ornith) | yes |
+| LLEM_MODEL | not in example (code reads only if TTS_MODEL set) | NO |
+| TTS_MODEL | (empty) | yes (cloud TTS) |
+| TTS_VOICE | (empty) | yes |
+- Cloud path ACTIVE (LLM_URL / LLEM_MODEL / API_KEY set). Non-local => Bearer API_KEY.
+- Resolution hops (code): cloud -> fallback (ornith-phone@19292) -> local (qwen3.5-9b@19292).
+
+### C STT — all set live
+| var | default (example) | live set |
+|---|---|---|
+| WHISPER_BIN | ~/.final-27b/opt/whisper-194/whisper-cli | yes |
+| WHISPER_LIB | ~/.final-27b/opt/whisper-194 | yes |
+| WHISPER_MODEL | ggml-large-v3-turbo-q5_0 | yes |
+| WHISPER_BEAM | 1 | yes |
+| WHISPER_AC | 512 | yes |
+
+### D TTS — all set live
+| var | default (example) | live set |
+|---|---|---|
+| PIPER_BIN | ~/.final-27b/bin/piper | yes |
+| PIPER_MODEL | fa_IR-mana-medium.onnx | yes |
+| ESPEAK_DATA | ~/.final-27b/bin/espeak-ng-data | yes |
+| PIPER_LENGTH | 0.95 | yes (live 0.88) |
+| PIPER_NOISE | 0.667 | yes (live 0.8) |
+| PIPER_NOISE_W | 0.8 | yes (live 1.0) |
+| VOICE_CHAIN | ffmpeg | yes |
+| VOICE_PITCH | 1.0 | yes |
+| VOICE_GAIN | 1.0 | yes |
+| VOICE_PRESENCE_DB | 5 | yes |
+| VOICE_RMS | 7300 | yes |
+| GIFT_CODE_SPOKEN | (empty) | yes (empty — verified) |
+
+### E Voice/turn — set live except BARGE_MS
+| var | default (code) | live set |
+|---|---|---|
+| VAD_START | 450 | yes |
+| VAD_KEEP | 280 | yes |
+| VAD_SILENCE_MS | 220 | yes |
+| VAD_MAX_MS | 12000 | yes |
+| VAD_COMMIT_MS | 450 | yes |
+| BARGE_MS | 420 | NO (uses code default 420) |
+| ECHO_CORR | 0.55 | yes |
+| PHRASE_MIN | 0.72 | yes |
+| SOZAN_PROXY | (not in example) | yes |
+
+### Live GPU / llama-swap status (section 6)
+- llama-swap RUNNING (pid 79553), port 19292 UP, /health OK, /running EMPTY.
+- Registered models in llama-swap.yaml: bge-m3 (CPU), gpt-oss-20b, qwen3-coder-next, qwen3.8-27b, qwen3.5-4b.
+- qwen3.5-9b, ornith-phone, ornith-1.5-35b = COMMENTED OUT (owner ban 2026-10-03).
+- Both GPUs occupied by Bonsai 27B (port 8080): card1 12.9GB, card2 8.6GB.
+- Local probes @19292:
+  - qwen3.5-9b => 404 "no model id could be identified" (NOT loaded)
+  - ornith-phone => 404 (NOT loaded)
+  - bge-m3 => available (CPU, embeddings only)
+- CONCLUSION: the entire local fallback chain (ornith-phone + qwen3.5-9b) is DEAD. Cloud is the only live brain, and it works ONLY through SOZAN_PROXY.
+
+### Cloud probe (live, no real call)
+- Direct (NO proxy): gemini-2.5-flash = SSL EOF; gemini-flash-latest = SSL EOF; gemini-2.5-flash-lite = 200 (1.11s); deepseek-v4.1-flash = 200 (0.85s).
+- WITH SOZAN_PROXY: gemini-2.5-flash = 200 (0.93s); gemini-flash-latest = 400 invalid model id.
+- Interpretation: OpenRouter now Serves (200) via proxy. Direct path has SSL policy interference. "flash-latest" is a deprecated alias (400).
+- First-token cloud latency via proxy: ~0.9s (healthy, well under the 8s budget).
+
+### Live process note (IMPORTANT)
+- The RUNNING voice process (pid 2809, port 5072) is from the DEPLOYED worktree z/15-human-tone (commit 6537294), NOT z/14-cold-call-opening (a0edaf1) as stated in prior reports.
+- z/15 changed the cloud opener to route through SOZAN_PROXY (that's why with-proxy = 200 now). z/14 (a0edaf1) uses a direct no-proxy opener.
+- The live line is running z/15 code, with z/14's cold-open fix inherited.
+- Both unit suites pass: z/14 (47 OK) and z/15 (48 OK).
+
+### Proposed tuning direction (NO code changes yet — owner approves scope)
+Grouped by knob. Current -> proposed -> reason.
+
+TURN / VAD (low risk, high leverage on latency + barge):
+- BARGE_MS: 420 -> 380..400. Reason: barge interrupt is slightly slow; tighter threshold trims turn-end lag. Must not overbarge the speaker; A/B with sim.
+- VAD_START: 450 -> 430 (optional). Reason: earlier speech onset capture; watch for false triggers on background.
+- ECHO_CORR: 0.55 -> 0.55..0.65 (optional). Reason: echo self-talk is a known bug (self-talk). Slightly raise to be more conservative; A/B.
+- PHRASE_MIN: 0.72 -> 0.72 (hold). Reason: fine-tune too_alike only for short/long pair repeats (see z/14 note "salom shoma!" repeat).
+- BARGE threshold: code falls back to VAD_START when BARGE_RMS unset; consider pinning BARGE_RMS explicitly for predictability.
+
+LATENCY (biggest win, requires owner decision):
+- Cloud LLM is the ONLY live brain (local chain dead). Latency is ~0.9s via proxy — good, but fragile (SSL policy direct, OpenRouter provider routing).
+- Option A: keep routing ALL cloud requests through SOZAN_PROXY (already done in z/15, deployed).
+- Option B (requires owner + X5): unban one local slot for fallback:
+    (a) Re-enable qwen3.5-9b on Vulkan0 as LLM_LOCAL_MODEL fallback. Downside: 9b shares Vulkan0 with Bonsai 27B (VRAM pressure); owner previously banned it.
+    (b) Re-enable ornith-phone on Vulkan1 (serial worker). Downside: ~35B, slow first token, needs Vulkan1 VRAM that Bonsai uses.
+- LLM_TIMEOUT_S: not set live (uses default 8). Recommend setting explicitly to 6..8 for cloud. Keep 8 as safe.
+- Pre-render cache: main.py already prerenders sales lines (cloud TTS). Keep. Ensure cache warm before calls.
+
+VOICE:
+- PIPER_LENGTH 0.88, PIPER_NOISE 0.8, PIPER_NOISE_W 1.0 — current live. Cloud TTS is healthy (tts_model() set). Local piper still used as fallback for lines not in cache.
+- VOICE_GAIN/PRESENCE_DB/RMS/PITCH at defaults (1.0/5/7300/1.0). Hold.
+- GIFT_CODE_SPOKEN empty — confirmed, zero outbound, no campaign.
+
+PROMPT:
+- too_alike guard (z/14 note) needs tightening for short/long pair repeats. Separate task.
+
+### needs (owner decision — required to proceed):
+(a) OpenRouter key / access: credits exist; block is key-side (geo/permission/provider). Owner must check openrouter key access to google models (or provider swap). Currently 200 via proxy but direct SSL-blocked and "flash-latest" deprecated.
+(b) Local fallback policy when cloud active: which slot to unban/re-enable — ornith-phone (Vulkan1 serial) or qwen3.5-9b (Vulkan0, VRAM pressure). This is X5 + owner. Also note the RUNNING process is z/15 not z/14 — confirm the intended live branch.
+
+NO code changes made. NO real call. NO campaign. GIFT_CODE_SPOKEN empty confirmed.

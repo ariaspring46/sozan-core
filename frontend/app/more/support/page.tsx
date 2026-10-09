@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/empty-state";
 import { api, fileUrl } from "@/lib/api";
@@ -16,6 +17,7 @@ type Ticket = {
   orderNo?: string;
   image?: string;
   status: string;
+  category?: string;
   replies?: { text: string; at: number }[];
   at: number;
   tenant?: string;
@@ -36,6 +38,12 @@ const STATUS_LABEL: Record<string, string> = {
   closed: "بسته",
 };
 
+const CATEGORY_LABEL: Record<string, string> = {
+  billing: "مالی",
+  technical: "فنی",
+  other: "متفرقه",
+};
+
 function faTime(at: number) {
   return new Date(at * 1000).toLocaleDateString("fa-IR");
 }
@@ -46,6 +54,7 @@ export default function SupportPage() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [mine, setMine] = useState<Ticket[]>([]);
   const [hubView, setHubView] = useState<Ticket[] | null>(null);
+  const [ticketCategory, setTicketCategory] = useState("");
   const [ticketSubject, setTicketSubject] = useState("");
   const [ticketText, setTicketText] = useState("");
   const [reply, setReply] = useState<Record<string, string>>({});
@@ -101,8 +110,13 @@ export default function SupportPage() {
     try {
       await api("/settings/support/seller-ticket", {
         method: "POST",
-        body: JSON.stringify({ subject: ticketSubject.trim(), text: ticketText.trim() }),
+        body: JSON.stringify({
+          subject: ticketSubject.trim(),
+          text: ticketText.trim(),
+          category: ticketCategory,
+        }),
       });
+      setTicketCategory("");
       setTicketSubject("");
       setTicketText("");
       await load();
@@ -216,6 +230,16 @@ export default function SupportPage() {
             تیکت به پشتیبانی سوزان
           </h2>
           <div className="mt-3 space-y-2">
+            <Select
+              aria-label="دستهٔ تیکت"
+              value={ticketCategory}
+              onChange={(e) => setTicketCategory(e.target.value)}
+            >
+              <option value="">دسته را انتخاب کن</option>
+              <option value="billing">مالی</option>
+              <option value="technical">فنی</option>
+              <option value="other">متفرقه</option>
+            </Select>
             <Input
               placeholder="موضوع"
               aria-label="موضوع تیکت"
@@ -229,7 +253,10 @@ export default function SupportPage() {
               value={ticketText}
               onChange={(e) => setTicketText(e.target.value)}
             />
-            <Button disabled={busy || !ticketSubject.trim() || !ticketText.trim()} onClick={() => void sendToSozan()}>
+            <Button
+              disabled={busy || !ticketCategory || !ticketSubject.trim() || !ticketText.trim()}
+              onClick={() => void sendToSozan()}
+            >
               فرستادن به سوزان
             </Button>
           </div>
@@ -239,7 +266,9 @@ export default function SupportPage() {
                 <li key={row.id} className="rounded-xl border border-line bg-canvas p-3 text-sm">
                   <p className="font-bold">
                     {row.subject}{" "}
-                    <span className="text-xs font-normal text-muted">· {STATUS_LABEL[row.status] || row.status}</span>
+                    <span className="text-xs font-normal text-muted">
+                      · {CATEGORY_LABEL[row.category || "other"] || "متفرقه"} · {STATUS_LABEL[row.status] || row.status}
+                    </span>
                   </p>
                   <p className="mt-1 whitespace-pre-line leading-6">{row.text}</p>
                   {(row.replies || []).map((rep, idx) => (
@@ -308,8 +337,8 @@ export default function SupportPage() {
                     <p className="font-bold">
                       {row.subject}{" "}
                       <span className="text-xs font-normal text-muted">
-                        · {STATUS_LABEL[row.status] || row.status} · فروشندهٔ {String(row.tenant || "").slice(0, 4)}
-                        ***
+                        · {CATEGORY_LABEL[row.category || "other"] || "متفرقه"} · {STATUS_LABEL[row.status] || row.status}{" "}
+                        · فروشندهٔ <bdo dir="ltr">{row.tenant}</bdo>
                       </span>
                     </p>
                     <p className="mt-1 whitespace-pre-line leading-6">{row.text}</p>

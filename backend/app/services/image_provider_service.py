@@ -1160,7 +1160,9 @@ def _token_for(url: str) -> str:
 def _proxy_for(url: str) -> str | None:
     host = _host(url)
     if host == "openrouter.ai" or host.endswith(".openrouter.ai"):
-        return (os.environ.get("OPENROUTER_PROXY") or "").strip() or None
+        from app.services.proxy_health import openrouter_fallback
+
+        return openrouter_fallback()
     if host.endswith("arvancloudai.ir"):
         return None
     fallback_host = _host(os.environ.get("CLOUD_LLM_FALLBACK_URL") or os.environ.get("IMAGE_FALLBACK_URL") or "")

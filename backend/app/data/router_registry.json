@@ -21,6 +21,7 @@
     {"text": "موجودی هودی", "act": "read", "write": false, "topic": "stock"},
     {"text": "کیف پولم چقدره", "act": "read", "write": false, "topic": "wallet"},
     {"text": "کپشن قبلی را رسمی‌تر کن", "act": "studio", "write": true, "revise": true},
+    {"text": "کپشنش رو کوتاه‌تر کن", "act": "studio", "write": true, "revise": true},
     {"text": "عکس انگشتر فیروزه بساز", "act": "studio", "write": true},
     {"text": "یک استوری از گوشواره بساز", "act": "studio", "write": true},
     {"text": "چه بهبودی پیشنهاد میدی؟", "act": "advice", "write": false}

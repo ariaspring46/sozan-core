@@ -197,6 +197,12 @@ class ChannelScanTests(unittest.TestCase):
         merged = channel_scan_service.enrich_scan_products(caption_rows, llm_rows)
         self.assertEqual(merged[0]["price"], 3900)
 
+    def test_a_css_caption_is_not_a_product(self) -> None:
+        from app.services.channel_scan_service import _product_from_caption
+
+        css = ":root, .__ig-light-mode {--fds-black:#000000;--fds-black-alpha-05:rgba(0, 0, 0, 0.05);}"
+        self.assertIsNone(_product_from_caption(css, brand="سوزان"))
+
     def test_factory_prompt_forbids_invented_clothing(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), tenant_scope("09123456789"):
@@ -257,13 +263,25 @@ class ChannelScanTests(unittest.TestCase):
                 hint = captured[0][captured[0].index("--site-type-hint") + 1]
                 self.assertEqual(hint, "bags")
                 self.assertNotEqual(hint, "fashion")
-                self.assertIn("--catalog", captured[0])
-                catalog_path = Path(captured[0][captured[0].index("--catalog") + 1])
-                payload = json.loads(catalog_path.read_text(encoding="utf-8"))
-                self.assertEqual(payload["items"][0]["title"], "کیف دوشی")
-                self.assertEqual(payload["items"][0]["price"], 850000)
-                self.assertTrue(payload.get("lockItems"))
-                self.assertNotIn("مانتو", json.dumps(payload, ensure_ascii=False))
+
+    def test_jewelry_tagline_beats_bag_category(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                from app.state_store import write_json
+                from app.services import storefront_service
+
+                write_json("shop.json", {"brand": "سوزان", "tagline": "جواهر فروش و سنگ های گران قیمت"})
+                storefront_service.add_product(
+                    title="کیف دوشی",
+                    price=850000,
+                    stock=1,
+                    sku="ig",
+                    source="instagram",
+                    category="کیف",
+                )
+                self.assertEqual(channel_scan_service.site_type_hint(), "jewelry")
+                prompt = shop_service._factory_prompt("از نو بساز")
+                self.assertIn("شعار فروشگاه: جواهر فروش و سنگ های گران قیمت", prompt)
 
     def test_site_type_hint_unknown_category_is_general_store(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -318,7 +336,15 @@ class ChannelScanTests(unittest.TestCase):
         )
         self.assertEqual(rows[0]["priceStatus"], "direct")
 
-    def _scan_accounts(self, products: list[dict], *, fetched: bool = True, llm_error: str = "", previous: dict | None = None):
+    def _scan_accounts(
+        self,
+        products: list[dict],
+        *,
+        fetched: bool = True,
+        llm_error: str = "",
+        previous: dict | None = None,
+        import_catalog: bool = True,
+    ):
         account = {
             "platform": "instagram",
             "handle": "optic_day",
@@ -342,7 +368,8 @@ class ChannelScanTests(unittest.TestCase):
             ):
                 out = asyncio.run(
                     channel_scan_service.scan_accounts(
-                        [{"platform": "instagram", "handle": "optic_day"}]
+                        [{"platform": "instagram", "handle": "optic_day"}],
+                        import_catalog=import_catalog,
                     )
                 )
             return out, upsert, remove
@@ -356,6 +383,39 @@ class ChannelScanTests(unittest.TestCase):
         self.assertFalse(out.get("needsReview"))
         self.assertEqual(out["quality"]["imported"], 1)
         self.assertEqual(out["productCount"], 1)
+
+    def test_unnamed_rows_stay_out_of_the_catalog(self) -> None:
+        out, upsert, remove = self._scan_accounts(
+            [
+                {"title": "کالای 1", "description": "", "stableKey": "a", "sourceHandle": "optic_day"},
+                {"title": "کالای ۲", "stableKey": "b", "sourceHandle": "optic_day"},
+            ]
+        )
+        upsert.assert_not_called()
+        remove.assert_not_called()
+        self.assertEqual(out["quality"]["imported"], 0)
+        self.assertEqual(out["productCount"], 0)
+
+    def test_a_named_product_is_imported_beside_unnamed_rows(self) -> None:
+        _out, upsert, remove = self._scan_accounts(
+            [
+                {"title": "کالای 1", "stableKey": "a", "sourceHandle": "optic_day"},
+                {"title": "انگشتر فیروزه", "price": 500000, "stableKey": "b", "sourceHandle": "optic_day"},
+            ]
+        )
+        upsert.assert_called_once()
+        self.assertEqual(upsert.call_args.kwargs["title"], "انگشتر فیروزه")
+        remove.assert_called_once_with("optic_day")
+
+    def test_a_review_keeps_the_catalog_even_when_the_page_has_a_named_product(self) -> None:
+        out, upsert, remove = self._scan_accounts(
+            [{"title": "انگشتر فیروزه", "stableKey": "b", "sourceHandle": "optic_day"}],
+            import_catalog=False,
+        )
+        upsert.assert_not_called()
+        remove.assert_not_called()
+        self.assertEqual(out["quality"]["imported"], 0)
+        self.assertEqual(out["accounts"][0]["products"][0]["title"], "انگشتر فیروزه")
 
     def test_zero_candidates_skips_upsert_and_needs_review(self) -> None:
         with patch("app.services.channel_scan_service.storefront_service.count_scanned_handle", return_value=1) as count:

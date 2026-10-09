@@ -159,9 +159,9 @@ def _proxy_for_url(url: str) -> str | None:
     host = _host_of(url)
     if _is_arvan_url(url) or is_fallback_cloud_host(url):
         return None
-    # OpenRouter در صورت نیاز پروکسی اختصاصی خودش را دارد (مثلاً برای مسیر فیلترینگ).
+    # Direct through the WireGuard exit. The fallback SOCKS is only the second try inside proxy_health.
     if host == "openrouter.ai" or host.endswith(".openrouter.ai"):
-        return (os.environ.get("OPENROUTER_PROXY") or "").strip() or None
+        return proxy_health.openrouter_fallback()
     return _cloud_proxy()
 
 
@@ -368,12 +368,28 @@ def route_for_surface(surface: str) -> dict:
     if surface in SHOP_CLOUD_SURFACES:
         cloud = _shop_cloud_route()
         if cloud:
-            return cloud
+            return _with_effort(surface, cloud)
     if surface in PINNED_SURFACES:
         cloud = _studio_cloud_route()
         if cloud:
             return cloud
     return _local_default_route(surface)
+
+
+def _with_effort(surface: str, route: dict) -> dict:
+    """Heavy shop turns use the Pro id. Studio and every other surface stay on their pinned route."""
+    if surface not in {"shop", "shop-edit"}:
+        return route
+    if "openrouter.ai" not in str(route.get("url") or ""):
+        return route
+    from app.services.decider_service import heavy_model
+
+    model = heavy_model()
+    if not model or model == route.get("model"):
+        return route
+    upgraded = dict(route)
+    upgraded["model"] = model
+    return upgraded
 
 
 def _default_local_model(surface: str) -> str:
@@ -653,11 +669,11 @@ def _usage_counts(payload: dict) -> dict[str, int]:
     if not isinstance(usage, dict):
         return {"promptTokens": 0, "completionTokens": 0}
     try:
-        prompt = int(usage.get("prompt_tokens") or 0)
+        prompt = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
     except (TypeError, ValueError):
         prompt = 0
     try:
-        completion = int(usage.get("completion_tokens") or 0)
+        completion = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
     except (TypeError, ValueError):
         completion = 0
     return {"promptTokens": max(0, prompt), "completionTokens": max(0, completion)}

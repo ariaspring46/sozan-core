@@ -1,3 +1,4 @@
+import time
 import unittest
 from unittest.mock import patch
 
@@ -53,6 +54,43 @@ class ShopMemoryTest(unittest.TestCase):
             )
         self.assertTrue(any(key in url for url in seen))
         self.assertFalse(any("09121110099" in url for url in seen))
+
+    def test_one_row_can_be_deleted(self) -> None:
+        store = mem.MemoryBackend()
+        with patch.object(mem, "backend", return_value=store):
+            mem.upsert(
+                "catalog",
+                [{"id": "a", "document": "انگشتر"}, {"id": "b", "document": "گردنبند"}],
+                phone="09121110099",
+            )
+            mem.delete("catalog", "a", phone="09121110099")
+            left = mem.search("catalog", "", phone="09121110099")
+        self.assertEqual([row["id"] for row in left], ["b"])
+
+    def test_chroma_delete_posts_one_id(self) -> None:
+        seen: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request.url.path)
+            if request.method == "GET":
+                return httpx.Response(200, json={"id": "col-1"})
+            return httpx.Response(200, json={"ok": True})
+
+        with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+            mem.ChromaHttp("http://127.0.0.1:8008", client=http).delete("shopkey", "catalog", "a")
+        self.assertTrue(any(path.endswith("/delete") for path in seen))
+
+    def test_backfill_does_not_block_the_caller(self) -> None:
+        def slow(*_args, **_kwargs) -> int:
+            time.sleep(1.2)
+            return 0
+
+        with patch.object(mem, "backfill_catalog", slow):
+            started = time.monotonic()
+            mem.schedule_backfill([{"id": "1", "title": "انگشتر"}], phone="09120000000")
+            elapsed = time.monotonic() - started
+        self.assertLess(elapsed, 0.5)
+        self.assertFalse(mem.studio_hints_enabled())
 
 
 if __name__ == "__main__":

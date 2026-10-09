@@ -37,6 +37,7 @@ export type ChatMsg = {
   confirmId?: string;
   options?: string[];
   campaignId?: string;
+  link?: { href: string; label?: string };
   platform?: string;
   platformLabel?: string;
   sender?: string;
@@ -379,6 +380,11 @@ export function ChatThread({
                   {msg.campaignId ? (
                     <Link className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warm" href={`/campaigns/${msg.campaignId}`}>
                       باز کردن کمپین
+                    </Link>
+                  ) : null}
+                  {msg.link?.href ? (
+                    <Link className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-warm" href={msg.link.href}>
+                      {msg.link.label || "باز کردن"}
                     </Link>
                   ) : null}
                 </article>

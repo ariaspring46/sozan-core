@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -49,7 +50,11 @@ class AiBudgetTests(unittest.TestCase):
             self._record("09120000001", 0.085)
             self.assertEqual(ai_budget_service.tenant_status("09120000001")["tier"], "warn")
             self._record("09120000001", 0.021)
-            self.assertEqual(ai_budget_service.tenant_status("09120000001")["tier"], "capped")
+            capped = ai_budget_service.tenant_status("09120000001")
+            self.assertEqual(capped["tier"], "capped")
+            self.assertEqual(capped["limit"], "daily")
+            self.assertGreater(capped["resetsAt"], time.time())
+            self.assertEqual((capped["resetsAt"] + ai_budget_service._TZ_OFFSET_SEC) % 86400, 0)
             with tenant_scope("09120000001"):
                 self.assertEqual(ai_budget_service.cloud_blocked(surface="inbox"), "daily")
 
@@ -64,7 +69,9 @@ class AiBudgetTests(unittest.TestCase):
             ledger["2000-01-01"] = {"09120000001": 0.06}
             with ai_budget_service.shared_lock():
                 ai_budget_service._save_ledger(ledger)
-            self.assertEqual(ai_budget_service.tenant_status("09120000001")["tier"], "capped")
+            weekly = ai_budget_service.tenant_status("09120000001")
+            self.assertEqual(weekly["tier"], "capped")
+            self.assertEqual(weekly["limit"], "weekly")
             with tenant_scope("09120000001"):
                 self.assertEqual(ai_budget_service.cloud_blocked(surface="shop"), "weekly")
 

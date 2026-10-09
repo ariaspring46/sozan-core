@@ -138,8 +138,8 @@ def ai() -> dict:
         out["spentTodayUsd"] = None
     token = str(getattr(settings, "open_router_api_token", "") or os.environ.get("open_router_api_token", "")).strip()
     if token:
-        proxy = proxy_health.live((os.environ.get("OPENROUTER_PROXY") or "").strip() or None)
-        for via in dict.fromkeys([proxy, None]):  # the tunnel if it is up, then direct
+        fallback = proxy_health.openrouter_fallback()
+        for via in dict.fromkeys([None, fallback]):  # direct first, then the fallback SOCKS
             try:
                 res = httpx.get(
                     "https://openrouter.ai/api/v1/credits",

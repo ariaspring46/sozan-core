@@ -7,13 +7,17 @@ The reply must still read those numbers live from products and orders.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
+import threading
 from contextlib import nullcontext
 from typing import Any
 
 import httpx
 
 from app.state_store import current_tenant
+
+log = logging.getLogger("sozan.shop_memory")
 
 COLLECTIONS = (
     "catalog",
@@ -63,6 +67,10 @@ class MemoryBackend:
                 scored.append((score, row))
         scored.sort(key=lambda item: item[0], reverse=True)
         return [row for _score, row in scored[:limit]]
+
+    def delete(self, key: str, collection: str, doc_id: str) -> None:
+        bucket = self.docs.get(key, {}).get(collection, {})
+        bucket.pop(str(doc_id or ""), None)
 
     def delete_shop(self, key: str) -> None:
         self.docs.pop(key, None)
@@ -145,6 +153,21 @@ class ChromaHttp:
             )
         return out
 
+    def delete(self, key: str, collection: str, doc_id: str) -> None:
+        if collection not in COLLECTIONS or not str(doc_id or "").strip():
+            return
+        with self._open() as client:
+            found = client.get(f"{self._db(key)}/collections/{collection}", headers=self._headers())
+            if found.status_code == 404:
+                return
+            found.raise_for_status()
+            cid = str((found.json() or {}).get("id") or collection)
+            client.post(
+                f"{self._db(key)}/collections/{cid}/delete",
+                json={"ids": [str(doc_id)]},
+                headers=self._headers(),
+            ).raise_for_status()
+
     def delete_shop(self, key: str) -> None:
         with self._open() as client:
             client.delete(self._db(key), headers=self._headers())
@@ -199,8 +222,50 @@ def search(collection: str, query: str, *, limit: int = 5, phone: str | None = N
     return backend().search(memory_key(phone), collection, query, limit)
 
 
+def delete(collection: str, doc_id: str, *, phone: str | None = None) -> None:
+    backend().delete(memory_key(phone), collection, doc_id)
+
+
 def delete_shop(*, phone: str | None = None) -> None:
     backend().delete_shop(memory_key(phone))
+
+
+def studio_hints_enabled() -> bool:
+    """Studio does not read search hints until it is decided whether Chroma runs on the hub or the home machine."""
+    return False
+
+
+def _phone(phone: str | None) -> str:
+    return current_tenant() if phone is None else phone
+
+
+def schedule_backfill(products: list[dict], *, phone: str | None = None) -> None:
+    """Catalog sync stays off the chat turn. A down Chroma does not slow add_product."""
+    rows = [row for row in products or [] if isinstance(row, dict)]
+    who = _phone(phone)
+
+    def work() -> None:
+        try:
+            backfill_catalog(rows, phone=who)
+        except Exception:
+            log.warning("catalog backfill skipped", exc_info=True)
+
+    threading.Thread(target=work, name="catalog-backfill", daemon=True).start()
+
+
+def schedule_delete(collection: str, doc_id: str, *, phone: str | None = None) -> None:
+    ident = str(doc_id or "").strip()
+    if not ident:
+        return
+    who = _phone(phone)
+
+    def work() -> None:
+        try:
+            delete(collection, ident, phone=who)
+        except Exception:
+            log.warning("catalog delete skipped", exc_info=True)
+
+    threading.Thread(target=work, name="catalog-delete", daemon=True).start()
 
 
 def export_shop(*, phone: str | None = None) -> dict:

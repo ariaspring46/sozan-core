@@ -30,6 +30,18 @@ EDIT_TYPES = {
 }
 
 
+def storefront_ready(shop: dict | None, *, brief_ready: bool) -> bool:
+    """Whether a storefront exists. A failed build that already has a slug is still one."""
+    row = shop if isinstance(shop, dict) else {}
+    state = shop_state(row, brief_ready=brief_ready)
+    slug = str(row.get("slug") or "").strip()
+    if state == FAILED:
+        return bool(slug)
+    if state in {ONBOARDING, READY_TO_BUILD, BUILDING}:
+        return False
+    return True
+
+
 def shop_state(shop: dict, *, brief_ready: bool) -> str:
     status = str(shop.get("status") or "idle")
     slug = str(shop.get("slug") or "")

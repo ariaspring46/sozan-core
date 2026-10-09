@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Awaitable, Callable
 
@@ -16,6 +17,35 @@ claims فهرست عبارت‌هایی از متن است که ویژگی کا�
 
 
 _STOP = frozenset("بودن است دارد دارند شود میشود باشد با که این آن را از در به برای هم تا یا ما شما بگو بنویس".split())
+
+# Product-feature words. Price and stock stay on the number check, not on this model.
+QUALITATIVE = (
+    "اصیل",
+    "طبیعی",
+    "مقاوم",
+    "حکاکی",
+    "ضمانت",
+    "ارسال",
+    "چرم",
+    "طلا",
+    "نقره",
+    "جیب",
+    "قابل تنظیم",
+    "دوام",
+    "اصالت",
+    "جنس",
+)
+
+
+def needs_claims_model(text: str, facts: str) -> bool:
+    """A second model call only when the reply names a product feature that is not already in the facts."""
+    if any(mark in text and mark not in facts for mark in QUALITATIVE):
+        return True
+    if re.search(r"اصل(?!ا)", text) and not re.search(r"اصل(?!ا)", facts):
+        return True
+    if re.search(r'"stock":\s*-?\d+', facts):
+        return False
+    return "موجود" in text or "تموم" in text or "تمام" in text
 
 
 def _flat(text: str) -> str:
@@ -39,13 +69,20 @@ async def check(
         return []
     if complete is None:
         from app.services.llm import complete_json as complete
+    from app.services import turn_clock
+
     try:
-        parsed = await complete(
-            PROMPT,
-            f"facts:\n{facts}\n\nمتن:\n{text}",
-            surface="studio",
-            max_tokens=400,
+        parsed = await asyncio.wait_for(
+            complete(
+                PROMPT,
+                f"facts:\n{facts}\n\nمتن:\n{text}",
+                surface="studio",
+                max_tokens=400,
+            ),
+            timeout=turn_clock.remaining(),
         )
+    except TimeoutError:
+        raise
     except Exception:
         return []
     claims = parsed.get("claims") if isinstance(parsed, dict) else None

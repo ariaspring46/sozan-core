@@ -425,14 +425,10 @@ def _no_overlay_text(spoken: str) -> bool:
 
 
 def _catalog_title(title: str) -> str:
+    from app.services.storefront_service import is_placeholder_catalog
+
     value = str(title or "").strip()
-    if not value:
-        return ""
-    if re.search(r"[✨👋…]", value):
-        return ""
-    if re.search(r"[A-Za-z]{3,}", value) and not re.search(r"[\u0600-\u06FF]", value):
-        return ""
-    if any(mark in value for mark in ("آزمایش", "پست آزمایشی", "انتظارش را نداشتید")):
+    if not value or is_placeholder_catalog(value):
         return ""
     return value
 
@@ -1181,6 +1177,8 @@ async def _rewrite_existing(
             row["captions"] = captions
             if campaign_id:
                 row["campaignId"] = campaign_id
+            if not row.get("attachments") and prior.get("attachments"):
+                row["attachments"] = prior.get("attachments")
             compose = dict(row.get("compose") or {}) if isinstance(row.get("compose"), dict) else {}
             compose["status"] = "done"
             compose.pop("error", None)

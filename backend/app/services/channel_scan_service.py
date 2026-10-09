@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import re
 import subprocess
@@ -13,7 +14,7 @@ from uuid import uuid4
 
 from app.config import settings
 from app.services import storefront_service, voice_service
-from app.services.channel_http import async_client, channel_proxy
+from app.services.channel_http import async_client, proxies_for
 from app.services.llm import complete_json
 from app.services.observe_client import emit_later
 from app.services.settings_service import get_settings
@@ -99,6 +100,16 @@ def parse_caption_sizes(text: str) -> str:
 
 
 def site_type_hint() -> str:
+    """Channel categories suggest bags or shoes. The shop tagline wins when it names a domain."""
+    from app.state_store import read_json
+
+    shop = read_json("shop.json", {})
+    vertical = str(shop.get("vertical") or "").strip() if isinstance(shop, dict) else ""
+    if vertical:
+        return vertical
+    named = f"{shop.get('tagline') or ''} {shop.get('brand') or ''}" if isinstance(shop, dict) else ""
+    if any(token in named for token in ("جواهر", "طلا", "الماس", "زیورآلات", "اکسسوری", "بدلیجات")):
+        return "jewelry"
     scan = get_scan()
     cats = [str(item).strip() for item in (scan.get("categories") or []) if str(item).strip()]
     if not cats:
@@ -232,7 +243,18 @@ def _set_scan_status(*, status: str, product_count: int = 0, error: str = "", ha
     return payload
 
 
-def start_scan(accounts: list[dict]) -> dict:
+async def _call_notify(notify) -> None:
+    if notify is None:
+        return
+    try:
+        result = notify()
+        if inspect.isawaitable(result):
+            await result
+    except Exception:
+        return
+
+
+def start_scan(accounts: list[dict], notify=None, *, import_catalog: bool = True) -> dict:
     import asyncio
 
     from app.state_store import current_tenant, tenant_scope
@@ -246,7 +268,7 @@ def start_scan(accounts: list[dict]) -> dict:
     async def job() -> None:
         with tenant_scope(phone):
             try:
-                out = await scan_accounts(copied)
+                out = await scan_accounts(copied, import_catalog=import_catalog)
                 if str(out.get("error") or "") == SCAN_MODEL_ERROR:
                     _set_scan_status(
                         status="error",
@@ -269,6 +291,7 @@ def start_scan(accounts: list[dict]) -> dict:
                         status="failed",
                         payload={"handles": handles, "errorClass": SCAN_MODEL_ERROR},
                     )
+                    await _call_notify(notify)
                     return
                 count = int(out.get("productCount") or 0)
                 quality = out.get("quality") if isinstance(out.get("quality"), dict) else {}
@@ -305,6 +328,7 @@ def start_scan(accounts: list[dict]) -> dict:
                     title="scan-error",
                     payload={"handles": handles},
                 )
+            await _call_notify(notify)
 
     try:
         asyncio.get_running_loop().create_task(job())
@@ -313,9 +337,44 @@ def start_scan(accounts: list[dict]) -> dict:
     return scan_status()
 
 
-def _save_scan(payload: dict) -> dict:
-    write_json("channel-scan.json", payload)
+OTHER_SCAN_FILE = "channel-scan-other.json"
+
+
+def _save_scan(payload: dict, *, own: bool = True) -> dict:
+    """The seller's own page lives in channel-scan.json (builds, growth facts and the decider read it). Another page
+    lives apart so reading a competitor never replaces it."""
+    write_json("channel-scan.json" if own else OTHER_SCAN_FILE, payload)
     return payload
+
+
+_BACKGROUND: set = set()
+
+
+def start_other_scan(accounts: list[dict], notify=None) -> None:
+    """Read a page that is not the seller's: nothing goes to the catalog, the voice, a build, or the seller's scan
+    status. Review 2026-10-09: «پیج @رقیبم رو ببین» imported that page's products, merged its bio into the seller's
+    voice, overwrote channel-scan.json, and rebuilt a not-yet-ready shop from it."""
+    import asyncio
+
+    from app.state_store import tenant_scope
+
+    phone = current_tenant()
+    copied = [dict(item) for item in accounts]
+
+    async def job() -> None:
+        with tenant_scope(phone):
+            try:
+                await scan_accounts(copied, import_catalog=False, own=False)
+            except Exception:
+                emit_later(kind="scan", surface="scan", title="scan-other-error", payload={"handles": [str(item.get("handle") or "") for item in copied]})
+            await _call_notify(notify)
+
+    try:
+        task = asyncio.get_running_loop().create_task(job())
+        _BACKGROUND.add(task)
+        task.add_done_callback(_BACKGROUND.discard)
+    except RuntimeError:
+        threading.Thread(target=lambda: asyncio.run(job()), daemon=True).start()
 
 
 def _clean_handle(raw: str) -> str:
@@ -373,12 +432,13 @@ def _extract(html: str, base: str) -> dict:
     return {"title": title, "description": description, "images": seen[:12], "text": _plain(html)}
 
 
-def _curl_get(url: str, headers: dict[str, str], timeout: float) -> tuple[int, bytes, str]:
+def _curl_once(url: str, headers: dict[str, str], timeout: float, proxy: str | None) -> tuple[int, bytes, str]:
     dest = Path(tempfile.mkstemp(prefix="sozan-scan-")[1])
     cmd = ["curl", "-sS", "-L", "--max-time", str(max(5, int(timeout))), "-o", str(dest), "-w", "%{http_code} %{url_effective}"]
-    proxy = channel_proxy()
     if proxy:
-        cmd.extend(["--proxy", proxy, "--noproxy", "*"])
+        cmd.extend(["--proxy", proxy])
+    else:
+        cmd.extend(["--noproxy", "*"])
     ua = headers.get("User-Agent") or USER_AGENT
     cmd.extend(["-A", ua])
     for key, value in headers.items():
@@ -397,6 +457,17 @@ def _curl_get(url: str, headers: dict[str, str], timeout: float) -> tuple[int, b
         return 0, b"", url
     finally:
         dest.unlink(missing_ok=True)
+
+
+def _curl_get(url: str, headers: dict[str, str], timeout: float) -> tuple[int, bytes, str]:
+    hops: list[str | None] = list(proxies_for(url)) or [None]
+    last = (0, b"", url)
+    for proxy in hops:
+        status, body, final = _curl_once(url, headers, timeout, proxy)
+        if status:
+            return status, body, final
+        last = (status, body, final)
+    return last
 
 
 async def _http_get(url: str, *, headers: dict[str, str], timeout: float) -> tuple[int, bytes, str]:
@@ -513,7 +584,7 @@ async def _sendbox_page(handle: str, sendbox_id: str) -> dict | None:
     except Exception:
         return None
     posts: list[dict] = []
-    for _ in range(8):
+    for _ in range(12):
         await asyncio.sleep(1.2)
         posts = sendbox_service.take_list_posts(ident)
         if posts:
@@ -803,6 +874,9 @@ def _page_posts(page: dict) -> list[dict]:
 
 
 def _product_from_caption(caption: str, brand: str = "", image_url: str = "", fallback_no: int = 0) -> dict | None:
+    text = str(caption or "")
+    if ":root" in text or "--fds-" in text or (text.count("{") and text.count("}") and len(re.findall(r"[A-Za-z]", text)) > 40):
+        return None
     title = product_title_from_caption(caption, brand=brand)
     if not title:
         # نامی پیدا نشد؛ جملهٔ فراخوان هرگز نام کالا نمی‌شود.
@@ -939,24 +1013,100 @@ def _parse_colors(parsed: dict) -> list[str]:
     return out[:8]
 
 
+def _page_has_body(page: dict | None) -> bool:
+    return bool(page and (page.get("text") or page.get("images") or page.get("captions")))
+
+
+_UNNAMED_TITLE = re.compile(r"^کالای\s*[0-9۰-۹]+$")
+
+
+def unnamed_title(title: str) -> bool:
+    """A caption with no product name becomes «کالای ۳». That row is not a catalog product."""
+    return bool(_UNNAMED_TITLE.match(str(title or "").strip()))
+
+
+def _catalog_row(row: dict) -> bool:
+    title = str(row.get("title") or "").strip()
+    if not title or unnamed_title(title):
+        return False
+    return not storefront_service.is_placeholder_catalog(title, str(row.get("description") or ""))
+
+
+def page_view(platform: str, handle: str) -> dict:
+    """The downloaded page for one handle: bio, captions, and real titles. Login notes stay out of the text."""
+    name = str(handle or "").lstrip("@")
+    hit: dict = {}
+    other = read_json(OTHER_SCAN_FILE, {})
+    # the other page first, so a match in the seller's own scan (read later) wins, as before
+    rows = list((other if isinstance(other, dict) else {}).get("accounts") or []) + list(get_scan().get("accounts") or [])
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("platform") or "") != platform:
+            continue
+        if str(item.get("handle") or "").lstrip("@") != name:
+            continue
+        hit = item
+    captions: list[str] = []
+    titles: list[str] = []
+    for row in hit.get("products") or []:
+        if not isinstance(row, dict):
+            continue
+        title = str(row.get("title") or "").strip()
+        if _catalog_row(row) and title not in titles:
+            titles.append(title)
+        caption = str(row.get("sourceCaption") or row.get("description") or "").strip()
+        if not caption or ":root" in caption or "--fds-" in caption or caption in captions:
+            continue
+        captions.append(caption[:240])
+    return {
+        "fetched": bool(hit.get("fetched")),
+        "about": str(hit.get("about") or "").strip()[:500],
+        "categories": [str(item) for item in (hit.get("categories") or []) if str(item).strip()][:8],
+        "colors": [str(item) for item in (hit.get("colors") or []) if str(item).strip()][:8],
+        "titles": titles[:8],
+        "captions": captions[:8],
+        "images": len([item for item in (hit.get("images") or []) if item]),
+    }
+
+
+def page_seen(view: dict) -> bool:
+    return bool(view.get("fetched") or view.get("about") or view.get("captions") or view.get("images") or view.get("titles"))
+
+
 async def scan_account(*, platform: str, handle: str, brand: str, work: str, sendbox_id: str = "") -> dict:
     pages: list[dict] = []
     notes: list[str] = []
     ident = str(sendbox_id or "").strip()
+    source = ""
     if platform == "instagram":
         page = await _sendbox_page(handle, ident)
-        if not page:
-            page = await _boxapi_page(handle)
-        if not page:
-            page = await _instagram_page(handle)
-        if page and (page.get("text") or page.get("images") or page.get("captions")):
+        if _page_has_body(page):
             pages.append(page)
-        else:
+            source = "sendbox"
+        elif ident:
+            from app.services import sendbox_service
+
+            reason = sendbox_service.posts_block_reason(ident)
+            if reason:
+                notes.append(reason)
+        if not pages:
+            page = await _boxapi_page(handle)
+            if _page_has_body(page):
+                pages.append(page)
+                source = "boxapi"
+        if not pages:
+            page = await _instagram_page(handle)
+            if _page_has_body(page):
+                pages.append(page)
+                source = "instagram-api"
+        if not pages:
             notes.append("فید اینستاگرام خوانده نشد")
     elif platform == "telegram":
         page = await _telegram_channel(handle)
-        if page and (page.get("text") or page.get("images") or page.get("captions")):
+        if _page_has_body(page):
             pages.append(page)
+            source = "telegram"
         else:
             notes.append("کانال تلگرام خوانده نشد")
     for url in _urls_for(platform, handle):
@@ -977,6 +1127,7 @@ async def scan_account(*, platform: str, handle: str, brand: str, work: str, sen
             notes.append(f"{url} صفحهٔ ورود داد")
             continue
         pages.append(extracted)
+        source = source or "html"
         break
     if not pages:
         return {
@@ -1021,11 +1172,7 @@ title نام کوتاه کالاست مثل «صندل لوکا» یا «کفش 
     categories = _parse_categories(parsed, products)
     about = str(parsed.get("about") or pages[0].get("description") if pages else "").strip()[:400]
     imported = []
-    winner = "html"
-    if ident and platform == "instagram":
-        winner = "sendbox"
-    elif platform == "instagram":
-        winner = "instagram-api"
+    winner = source or "html"
     for row in products[:24]:
         if not isinstance(row, dict):
             continue
@@ -1094,7 +1241,10 @@ def _model_unavailable(results: list[dict], candidates: list[dict]) -> bool:
     return bool(fetched) and all(item.get("llmError") for item in fetched)
 
 
-async def scan_accounts(accounts: list[dict]) -> dict:
+async def scan_accounts(accounts: list[dict], *, import_catalog: bool = True, own: bool = True) -> dict:
+    """own=False: a page that is not the seller's. Its result goes to OTHER_SCAN_FILE and never to the voice."""
+    if not own:
+        import_catalog = False
     cfg = get_settings()
     brand = str(cfg.get("storeName") or "")
     work = str(cfg.get("storeTagline") or "")
@@ -1120,7 +1270,8 @@ async def scan_accounts(accounts: list[dict]) -> dict:
                 sendbox_id=sendbox_id,
             )
         )
-    previous = get_scan()
+    other = read_json(OTHER_SCAN_FILE, {}) if not own else {}
+    previous = get_scan() if own else (other if isinstance(other, dict) else {})
     by_key = {}
     for item in previous.get("accounts") or []:
         if isinstance(item, dict) and item.get("handle"):
@@ -1214,28 +1365,44 @@ async def scan_accounts(accounts: list[dict]) -> dict:
         quality["kept"] = storefront_service.count_scanned_handle(
             [str(item.get("handle") or "") for item in results]
         )
-        if payload["about"]:
+        if payload["about"] and own:
             voice_service.merge_summary(str(payload["about"]))
-        return _save_scan(payload)
+        return _save_scan(payload, own=own)
     if poor_coverage:
         payload["needsReview"] = True
+    if not import_catalog:
+        quality["imported"] = 0
+        if payload["about"] and own:
+            voice_service.merge_summary(str(payload["about"]))
+        return _save_scan(payload, own=own)
     seen_keys: set[str] = set()
-    for item in results:
-        handle = str(item.get("handle") or "")
-        if handle:
-            storefront_service.remove_scanned_handle(handle)
-    imported = 0
+    importable: list[dict] = []
     for row in candidates:
         key = str(row.get("stableKey") or "")
         if key and key in seen_keys:
             continue
         if key:
             seen_keys.add(key)
-        title = str(row.get("title") or "").strip()
-        if not title:
-            continue
+        if _catalog_row(row):
+            importable.append(row)
+    if not importable:
+        payload["needsReview"] = True
+        payload["productCount"] = 0
+        quality["imported"] = 0
+        quality["kept"] = storefront_service.count_scanned_handle(
+            [str(item.get("handle") or "") for item in results]
+        )
+        if payload["about"] and own:
+            voice_service.merge_summary(str(payload["about"]))
+        return _save_scan(payload, own=own)
+    for item in results:
+        handle = str(item.get("handle") or "")
+        if handle:
+            storefront_service.remove_scanned_handle(handle)
+    imported = 0
+    for row in importable:
         storefront_service.upsert_scanned_product(
-            title=title,
+            title=str(row.get("title") or "").strip(),
             price=int(row.get("price") or 0),
             description=str(row.get("description") or ""),
             sku=str(row.get("sku") or ""),
@@ -1258,9 +1425,9 @@ async def scan_accounts(accounts: list[dict]) -> dict:
         imported += 1
     quality["imported"] = imported
     payload["productCount"] = imported
-    if payload["about"]:
+    if payload["about"] and own:
         voice_service.merge_summary(str(payload["about"]))
-    return _save_scan(payload)
+    return _save_scan(payload, own=own)
 
 
 _HANDLE_FULL = re.compile(r"(?:https?://)?(?:www\.)?(?:instagram\.com/)?(@?)([A-Za-z0-9._]{3,30})/?")
@@ -1277,6 +1444,14 @@ def handle_in_text(text: str) -> str:
     inside = _HANDLE_IN_SENTENCE.search(value)
     if inside and re.search(r"[_.\d]", inside.group(1)):
         return inside.group(1).strip(".")
+    if re.search(r"پیج|صفحه|اینستا|instagram", value, re.I):
+        marked = [
+            token.strip(".")
+            for token in re.findall(r"@?([A-Za-z][A-Za-z0-9._]{2,29})", value)
+            if re.search(r"[_.\d]", token) and not re.search(r"\.(com|ir|me|net|org)$", token, re.I)
+        ]
+        if len(marked) == 1:
+            return marked[0]
     return ""
 
 

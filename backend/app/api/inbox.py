@@ -77,6 +77,18 @@ async def inbox_dry_reply(body: DryReplyIn, _user=Depends(require_permission("ca
     return {"text": reply or ""}
 
 
+@router.post("/lab-turn")
+async def inbox_lab_turn(body: DryReplyIn, user=Depends(require_permission("campaigns:write"))):
+    """One inbox turn for the lab phone. The reply stays in the response and is never delivered."""
+    from app.lab_account import is_lab_phone
+    from app.services.inbox_agent_service import answer
+
+    if not is_lab_phone(getattr(user, "phone", "")):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "این مسیر فقط برای حساب آزمایشی است")
+    reply = await answer(body.text, thread={"sender": "آزمون"}, source="battery")
+    return {"text": reply or ""}
+
+
 @router.get("/{thread_id}")
 async def get_inbox(thread_id: str, _user=Depends(require_permission("campaigns:read"))):
     try:

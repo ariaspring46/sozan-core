@@ -74,6 +74,8 @@ class DirectNumberGuardTests(_StateCase):
         for text, value in cases.items():
             self.assertIn(value, ia._amounts(text), msg=text)
         self.assertEqual(ia._amounts("سایز ۳۸ و ۲ عدد"), set())
+        self.assertEqual(ia._amounts("سایز ۵۴ دارید؟"), set())
+        self.assertTrue(ia._numbers_ok("سایز ۵۴ موجوده", "سایز ۵۴"))
 
     def test_wrong_formatted_price_after_stock_is_handed_off(self) -> None:
         async def hint(_sentence):
@@ -92,6 +94,19 @@ class DirectNumberGuardTests(_StateCase):
             ):
                 reply = asyncio.run(ia.answer(question, thread={"sender": "x"}, source="battery"))
             self.assertEqual(reply != ia.HANDOFF_LINE, ok, msg=wrong)
+
+    def test_a_size_answer_is_not_handed_off(self) -> None:
+        async def hint(_sentence):
+            return "stock"
+
+        storefront_service.add_product(title="انگشتر", price=850000, stock=2, sku="s54", sizes="54")
+        steps = [("", [_call("stock", product="انگشتر")]), ("سایز ۵۴ موجوده", [])]
+        with patch.object(ia, "_complete", _scripted(steps)), patch.object(ia, "emit_later"), patch.object(
+            ia, "intent_hint", hint
+        ):
+            reply = asyncio.run(ia.answer("سایز ۵۴ دارید؟", thread={"sender": "x"}, source="battery"))
+        self.assertNotEqual(reply, ia.HANDOFF_LINE)
+        self.assertIn("۵۴", reply)
 
 
 class PaymentLinkTests(_StateCase):

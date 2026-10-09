@@ -6,7 +6,7 @@ from pathlib import Path
 from app.config import settings
 
 EVENT_VERSION = 1
-BEHAVIOR_VERSION = "2026.09.16-pipeline"
+BEHAVIOR_VERSION = "2026.10.06-harness"
 
 _HERE = Path(__file__).resolve().parent
 _HUB_FILES = tuple(
@@ -21,7 +21,15 @@ _HUB_FILES = tuple(
         # The agents themselves: a change here must change the release id on their events.
         "router_service.py",
         "router_embed.py",
+        "router_voice.py",
+        "router_text.py",
         "turn_parse.py",
+        "shop_voice_service.py",
+        "number_span.py",
+        "turn_clock.py",
+        "channel_tool.py",
+        "decider_service.py",
+        "router_context.py",
         "llm.py",
         "inbox_agent_service.py",
         "studio_chat_service.py",
