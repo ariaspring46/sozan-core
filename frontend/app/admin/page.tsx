@@ -20,6 +20,8 @@ type UserRow = {
   aiToday: number;
   aiWeek: number;
   lastActivity: number;
+  lastSeen?: number;
+  joinedAt?: number;
   blocked?: boolean;
   name?: string;
   brand?: string;
@@ -260,6 +262,8 @@ export default function AdminPage() {
                         {u.daysLeft > 0 ? ` (${faDate(u.paidUntil)})` : ""}
                         {` · ${fa(u.sites)} سایت · ${fa(u.channels)} کانال`}
                         {` · ابر: $${u.aiToday?.toFixed(3) || 0} امروز`}
+                        {u.lastSeen ? ` · آخرین فعالیت ${faDate(u.lastSeen)}` : ""}
+                        {u.joinedAt ? ` · عضو از ${faDate(u.joinedAt)}` : ""}
                       </p>
                       {u.pages?.length || u.shopHost ? (
                         <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs" dir="ltr">

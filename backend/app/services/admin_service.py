@@ -116,6 +116,36 @@ def _pages(channels, scan, scanned) -> list[str]:
     return out[:6]
 
 
+def _joined_at(user, billing) -> int:
+    """Signup time from the users table; the first payment only for a row the database does not have."""
+    created = getattr(user, "created_at", None) if user is not None else None
+    if created is not None:
+        try:
+            return int(created.timestamp())
+        except (AttributeError, OverflowError, OSError, ValueError):
+            pass
+    return int(billing[0].get("at") or 0) if isinstance(billing, list) and billing and isinstance(billing[0], dict) else 0
+
+
+# files that change only when the seller (or their customers) does something; locks and logs do not count
+_ACTIVITY_SKIP = ("observe-outbox", "sms-usage", "router-usage")
+
+
+def _last_seen(tenant: str) -> int:
+    """Last time anything of this seller's changed (chat, shop, studio, inbox, catalog)."""
+    root = settings.state_path / "tenants" / tenant
+    newest = 0.0
+    try:
+        for path in root.iterdir():
+            name = path.name
+            if not path.is_file() or name.startswith(".") or name.endswith(".lock") or name.startswith(_ACTIVITY_SKIP):
+                continue
+            newest = max(newest, path.stat().st_mtime)
+    except OSError:
+        return 0
+    return int(newest)
+
+
 def _user_row(tenant: str, user=None) -> dict:
     from app.services import plan_service
     from app.state_store import current_tenant, reset_tenant, set_tenant
@@ -159,7 +189,8 @@ def _user_row(tenant: str, user=None) -> dict:
         "aiToday": round(ai["today"], 4),
         "aiWeek": round(ai["week"], 4),
         "lastActivity": last_activity,
-        "joinedAt": int(billing[0].get("at") or 0) if isinstance(billing, list) and billing else 0,
+        "joinedAt": _joined_at(user, billing),
+        "lastSeen": _last_seen(tenant),
         "name": " ".join(x for x in (profile.get("firstName"), profile.get("lastName")) if x).strip(),
         "brand": str(profile.get("brandName") or shop.get("brand") or ""),
         "pages": _pages(channels, scan, scanned),
@@ -178,6 +209,7 @@ async def list_users(session) -> list[dict]:
         if p.name not in user_map:
             continue
         rows.append(_user_row(p.name, user_map[p.name]))
+    rows.sort(key=lambda row: row.get("joinedAt") or 0, reverse=True)  # newest member first
     return rows
 
 
