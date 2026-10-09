@@ -336,7 +336,15 @@ class ChannelScanTests(unittest.TestCase):
         )
         self.assertEqual(rows[0]["priceStatus"], "direct")
 
-    def _scan_accounts(self, products: list[dict], *, fetched: bool = True, llm_error: str = "", previous: dict | None = None):
+    def _scan_accounts(
+        self,
+        products: list[dict],
+        *,
+        fetched: bool = True,
+        llm_error: str = "",
+        previous: dict | None = None,
+        import_catalog: bool = True,
+    ):
         account = {
             "platform": "instagram",
             "handle": "optic_day",
@@ -360,7 +368,8 @@ class ChannelScanTests(unittest.TestCase):
             ):
                 out = asyncio.run(
                     channel_scan_service.scan_accounts(
-                        [{"platform": "instagram", "handle": "optic_day"}]
+                        [{"platform": "instagram", "handle": "optic_day"}],
+                        import_catalog=import_catalog,
                     )
                 )
             return out, upsert, remove
@@ -374,6 +383,39 @@ class ChannelScanTests(unittest.TestCase):
         self.assertFalse(out.get("needsReview"))
         self.assertEqual(out["quality"]["imported"], 1)
         self.assertEqual(out["productCount"], 1)
+
+    def test_unnamed_rows_stay_out_of_the_catalog(self) -> None:
+        out, upsert, remove = self._scan_accounts(
+            [
+                {"title": "کالای 1", "description": "", "stableKey": "a", "sourceHandle": "optic_day"},
+                {"title": "کالای ۲", "stableKey": "b", "sourceHandle": "optic_day"},
+            ]
+        )
+        upsert.assert_not_called()
+        remove.assert_not_called()
+        self.assertEqual(out["quality"]["imported"], 0)
+        self.assertEqual(out["productCount"], 0)
+
+    def test_a_named_product_is_imported_beside_unnamed_rows(self) -> None:
+        _out, upsert, remove = self._scan_accounts(
+            [
+                {"title": "کالای 1", "stableKey": "a", "sourceHandle": "optic_day"},
+                {"title": "انگشتر فیروزه", "price": 500000, "stableKey": "b", "sourceHandle": "optic_day"},
+            ]
+        )
+        upsert.assert_called_once()
+        self.assertEqual(upsert.call_args.kwargs["title"], "انگشتر فیروزه")
+        remove.assert_called_once_with("optic_day")
+
+    def test_a_review_keeps_the_catalog_even_when_the_page_has_a_named_product(self) -> None:
+        out, upsert, remove = self._scan_accounts(
+            [{"title": "انگشتر فیروزه", "stableKey": "b", "sourceHandle": "optic_day"}],
+            import_catalog=False,
+        )
+        upsert.assert_not_called()
+        remove.assert_not_called()
+        self.assertEqual(out["quality"]["imported"], 0)
+        self.assertEqual(out["accounts"][0]["products"][0]["title"], "انگشتر فیروزه")
 
     def test_zero_candidates_skips_upsert_and_needs_review(self) -> None:
         with patch("app.services.channel_scan_service.storefront_service.count_scanned_handle", return_value=1) as count:

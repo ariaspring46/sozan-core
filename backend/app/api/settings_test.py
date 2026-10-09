@@ -10,7 +10,7 @@ from app.api import settings as settings_api
 from app.config import settings
 from app.database import get_session
 from app.security import get_current_user
-from app.state_store import read_json, write_json
+from app.state_store import read_json, set_tenant, tenant_scope, write_json
 
 
 class TenantIsolationTests(unittest.TestCase):
@@ -86,3 +86,42 @@ class SettingsApiGuardTests(unittest.TestCase):
                 stored = read_json("settings.json", {}, shared=True)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(stored.get("mockSms"), True)
+
+    def _ticket_client(self, phone: str) -> TestClient:
+        app = FastAPI()
+        app.include_router(settings_api.router)
+
+        async def fake_user():
+            set_tenant(phone)
+            return SimpleNamespace(phone=phone, role="admin", is_active=True)
+
+        async def fake_session():
+            yield MagicMock()
+
+        app.dependency_overrides[get_current_user] = fake_user
+        app.dependency_overrides[get_session] = fake_session
+        return TestClient(app)
+
+    def test_seller_ticket_without_category_is_stored_as_other(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), patch("threading.Thread"):
+                client = self._ticket_client("09121111111")
+                res = client.post("/settings/support/seller-ticket", json={"subject": "کمک", "text": "متن تیکت"})
+                with tenant_scope("09121111111"):
+                    stored = read_json("support-tickets.json", [])
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(stored[0]["category"], "other")
+        self.assertEqual(stored[0]["kind"], "seller")
+
+    def test_seller_ticket_with_a_bad_category_is_422(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw):
+                client = self._ticket_client("09121111111")
+                res = client.post(
+                    "/settings/support/seller-ticket",
+                    json={"subject": "کمک", "text": "متن تیکت", "category": "spam"},
+                )
+                with tenant_scope("09121111111"):
+                    stored = read_json("support-tickets.json", [])
+        self.assertEqual(res.status_code, 422)
+        self.assertEqual(stored, [])

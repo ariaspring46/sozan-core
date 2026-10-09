@@ -7,7 +7,7 @@ from app.config import settings
 from app.services import decider_service, router_service
 from app.services.shop_edit_service import hero_scene_prompt
 from app.services.shop_service import stated_vertical
-from app.state_store import tenant_scope, write_json
+from app.state_store import read_json, tenant_scope, write_json
 
 
 def setUpModule() -> None:
@@ -74,7 +74,25 @@ class DeciderParseTests(unittest.TestCase):
         )
         self.assertTrue(parsed["refers_back"])
         self.assertFalse(parsed["frustrated"])
+        self.assertTrue(parsed["loopEnough"])
         self.assertEqual(parsed["action"], "scan_page")
+        closed = decider_service.read_decision(
+            {"answers": {"action": {"choice": "read_status", "probabilities": {"read_status": 0.9}}, "loop_enough": {"choice": "false"}}}
+        )
+        self.assertFalse(closed["loopEnough"])
+        self.assertEqual(closed["skill"], "none")
+        picked = decider_service.read_decision(
+            {
+                "answers": {
+                    "action": {"choice": "advise_live_site", "probabilities": {"advise_live_site": 0.9}},
+                    "skill": {"choice": "ui-ux-pro-max"},
+                }
+            }
+        )
+        self.assertEqual(picked["skill"], "ui-ux-pro-max")
+        self.assertEqual(decider_service.tool_names("read_status"), ["status"])
+        self.assertEqual(decider_service.tool_names("studio_image"), ["studio_chat"])
+        self.assertEqual(decider_service.tool_names("identity"), [])
 
     def test_channel_actions_use_the_channel_tool(self) -> None:
         scan = decider_service.plan_for(
@@ -138,8 +156,9 @@ class DeciderTurnTests(unittest.TestCase):
         router_service._THREAD.set("")
 
     def _turn(self, text: str, decider, *, media=None, complete=None, thread_id: str = ""):
-        async def boom(_messages, _tools):
-            raise AssertionError("chooser must not run")
+        async def echo(_messages, tools):
+            name = tools[0]["function"]["name"]
+            return {"text": "", "tool_calls": [{"name": name, "arguments": {}}]}
 
         with tenant_scope("09129900001"):
             write_json("shop.json", {"slug": "sozan-shop", "status": "ready", "brand": "سوزان", "tagline": "جواهر", "url": "https://sozan.sozan-core.ir"})
@@ -148,7 +167,7 @@ class DeciderTurnTests(unittest.TestCase):
             return asyncio.run(
                 router_service.turn(
                     text,
-                    complete=complete or boom,
+                    complete=complete or echo,
                     decider=decider,
                     media=media,
                     thread_id=tid,
@@ -211,11 +230,11 @@ class DeciderTurnTests(unittest.TestCase):
         self.assertIn("تصویر هدر", last.get("options") or [])
         self.assertIn("ویرایش صفحه", last.get("options") or [])
 
-    def test_api_down_uses_the_chooser(self) -> None:
+    def test_api_down_does_not_hand_every_tool_to_the_model(self) -> None:
         seen = []
 
-        async def complete(_messages, _tools):
-            seen.append(1)
+        async def complete(_messages, tools):
+            seen.append([item["function"]["name"] for item in tools])
             return {"text": "", "tool_calls": [{"name": "status", "arguments": {}}]}
 
         async def down(_state):
@@ -228,8 +247,193 @@ class DeciderTurnTests(unittest.TestCase):
             "app.services.plan_service.snapshot", return_value={"plan": "free"}
         ), patch("app.services.wallet_service.get", return_value={"available": 0}):
             out = self._turn("الان کجای کاریم", down, complete=complete)
-        self.assertEqual(seen, [1])
-        self.assertIn("فروشگاه", out["messages"][-1]["text"])
+        self.assertEqual(seen, [])
+        self.assertIn("مدل پاسخ نداد", out["messages"][-1]["text"])
+
+    def test_missing_photo_sentence_reads_then_opens_a_card(self) -> None:
+        given: list[list[str]] = []
+        seen: list[dict] = []
+
+        async def decider(state):
+            seen.append(state)
+            if not state.get("lastTool"):
+                return {**_decision("read_status"), "loopEnough": False}
+            return {**_decision("studio_image"), "loopEnough": True}
+
+        async def complete(_messages, tools):
+            names = [item["function"]["name"] for item in tools]
+            given.append(names)
+            return {"text": "", "tool_calls": [{"name": names[0], "arguments": {}}]}
+
+        with tenant_scope("09129900001"):
+            write_json(
+                "products.json",
+                [
+                    {"title": "ویترین", "image": "hero.jpg", "images": ["hero.jpg"]},
+                    {"title": "انگشتر فیروزه", "image": "", "images": []},
+                    {"title": "انگشتر نقره", "image": "", "images": []},
+                ],
+            )
+        with patch(
+            "app.services.shop_service.snapshot",
+            return_value={"shop": {"status": "ready", "slug": "sozan-shop", "cnameOk": True}, "scan": {}, "build": {"status": "ready"}},
+        ), patch("app.services.channel_service.list_accounts", return_value={"accounts": []}), patch(
+            "app.services.plan_service.snapshot", return_value={"plan": "promax"}
+        ), patch("app.services.wallet_service.get", return_value={"available": 0}):
+            out = self._turn("سایت من رو بررسی کن و جاهایی که عکس نداره براش عکس بساز", decider, complete=complete)
+        self.assertEqual(given, [["status"], ["studio_chat"]])
+        self.assertTrue(all(len(names) == 1 for names in given))
+        self.assertIn("انگشتر فیروزه", str((seen[1].get("lastTool") or {}).get("text") or ""))
+        self.assertIn("انگشتر نقره", str((seen[1].get("lastTool") or {}).get("text") or ""))
+        self.assertEqual((out.get("pendingConfirm") or {}).get("tool"), "studio_chat")
+        self.assertIn("انگشتر فیروزه", str((out.get("pendingConfirm") or {}).get("summary") or ""))
+        self.assertIn("انگشتر نقره", str((out.get("pendingConfirm") or {}).get("summary") or ""))
+
+    def test_website_advice_plans_then_loops_until_the_goal(self) -> None:
+        modes: list[str] = []
+
+        async def decider(state):
+            return {
+                **_decision("advise_live_site"),
+                "loopEnough": False,
+                "skill": "ui-ux-pro-max",
+                "mode": "act",
+                "goalReached": state.get("phase") == "act",
+            }
+
+        async def complete(_messages, tools):
+            name = tools[0]["function"]["name"]
+            return {"text": "", "tool_calls": [{"name": name, "arguments": {}}]}
+
+        async def chat(text, media=None, view_path="", view_target="", confirmed=False, skill="", mode="", goal=""):
+            modes.append(mode)
+            if mode == "suggest":
+                return {"assistant": {"role": "assistant", "text": "دکمه کم‌رنگ است."}}
+            if mode == "revise":
+                return {"assistant": {"role": "assistant", "text": "هدف: دکمهٔ ثبت سفارش مسی شود."}}
+            return {"assistant": {"role": "assistant", "text": "دکمه مسی شد."}}
+
+        with patch("app.services.shop_service.chat", new=chat):
+            out = self._turn("برو سایت خودمون رو ببین و پیشنهاد بهبود بده", decider, complete=complete)
+        self.assertEqual(modes, ["suggest", "revise", "act"])
+        text = "\n".join(str(item.get("text") or "") for item in out["messages"])
+        self.assertIn("پیشنهادها:", text)
+        self.assertIn("پلن اصلاح:", text)
+        self.assertIn("هدف: دکمهٔ ثبت سفارش مسی شود.", text)
+        self.assertIn("دکمه مسی شد.", text)
+        self.assertIsNone(out.get("pendingConfirm"))
+
+    def test_low_sales_reaches_the_growth_skill_and_stores_one_plan(self) -> None:
+        from app.services.shop_intent_service import classify_actions
+        from app.services.skill_catalog import append_business_plan, load_business_plans, prompt_block
+
+        block = prompt_block("ecommerce-growth-mba")[:800]
+        self.assertIn("مسئله", block)
+        self.assertIn("آزمایش", block)
+        self.assertIn("داده نداریم", block)
+        self.assertNotIn("جدول اولویت", block)
+        self.assertEqual(router_service.decide("فروشم کمه", use_decider=True)["kind"], "model")
+        self.assertFalse(router_service._wants_growth("قیمت انگشتر نقره را ۳ میلیون کن"))
+        self.assertIn("انبار", classify_actions("قیمت انگشتر نقره را ۳ میلیون کن")[0]["reply"])
+
+        prompts: list[str] = []
+
+        async def decider(state):
+            return {
+                **_decision("advise_growth"),
+                "loopEnough": False,
+                "skill": "ecommerce-growth-mba",
+                "goalReached": state.get("phase") == "act",
+            }
+
+        async def complete_chat(*, system, turns, surface="shop"):
+            prompts.append(system)
+            if "حالت تشخیص" in system:
+                return "مسئله: بازدید داده نداریم.\n- عکس کالا ضعیف است"
+            if "پلن اصلاح" in system:
+                return "هدف: سنجهٔ بازدید ثبت شود.\nسنجه: تعداد بازدید"
+            return "عدد بازدید را ثبت کن."
+
+        with tenant_scope("09129900001"):
+            write_json(
+                "router-growth-keep-goal.json",
+                {"goal": "دکمه مسی", "skill": "ui-ux-pro-max", "suggestions": "دکمه", "reached": False},
+            )
+            write_json("products.json", [{"title": "انگشتر فیروزه", "price": 500000, "stock": 1, "image": ""}])
+        with patch("app.services.shop_service.complete_chat", new=complete_chat):
+            out = self._turn("فروشم کمه. درآمد ماهانه‌ام ۱۸ میلیون است.", decider, thread_id="growth-keep")
+        text = "\n".join(str(item.get("text") or "") for item in out["messages"])
+        self.assertIn("داده نداریم", text)
+        self.assertIn("هدف: سنجهٔ بازدید ثبت شود.", text)
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertTrue(prompts)
+        self.assertIn("داده نداریم", prompts[0])
+        self.assertNotIn("10000", prompts[0])
+        self.assertNotIn("۱۰٬۰۰۰", prompts[0])
+        self.assertIn("انبار", prompts[1])
+        with tenant_scope("09129900001"):
+            goal = read_json("router-growth-keep-goal.json", {})
+            plans = load_business_plans()
+            product = read_json("products.json", [])[0]
+            self.assertEqual(goal.get("goal"), "دکمه مسی")
+            self.assertEqual(goal.get("skill"), "ui-ux-pro-max")
+            self.assertFalse(goal.get("reached"))
+            self.assertEqual(plans["plans"][0]["experiment"], "سنجهٔ بازدید ثبت شود.")
+            self.assertEqual(plans["plans"][0]["status"], "open")
+            self.assertIn("۱۸", plans["stated"][0]["text"])
+            self.assertEqual(product.get("price"), 500000)
+            self.assertNotIn("۸۵۰", str(plans))
+
+        with tenant_scope("09120000001"):
+            append_business_plan(diagnosis="مسئله الف", revision="هدف: آزمایش الف", goal="آزمایش الف")
+        with tenant_scope("09120000002"):
+            append_business_plan(diagnosis="مسئله ب", revision="هدف: آزمایش ب", goal="آزمایش ب")
+            self.assertEqual(load_business_plans()["plans"][0]["experiment"], "آزمایش ب")
+        with tenant_scope("09120000001"):
+            self.assertEqual(load_business_plans()["plans"][0]["experiment"], "آزمایش الف")
+
+    def test_a_recorded_sale_is_in_the_diagnosis_and_not_copied_into_the_plan_file(self) -> None:
+        from app.services.skill_catalog import load_business_plans
+
+        prompts: list[str] = []
+
+        async def decider(state):
+            return {
+                **_decision("advise_growth"),
+                "loopEnough": False,
+                "skill": "ecommerce-growth-mba",
+                "goalReached": state.get("phase") == "act",
+            }
+
+        async def complete_chat(*, system, turns, surface="shop"):
+            prompts.append(system)
+            if "حالت تشخیص" in system:
+                return "مسئله: بازدید داده نداریم."
+            if "پلن اصلاح" in system:
+                return "هدف: سنجهٔ بازدید ثبت شود."
+            return "عدد بازدید را ثبت کن."
+
+        with tenant_scope("09129900001"):
+            write_json("sales.json", [{"title": "انگشتر", "amount": 850000, "at": 1}])
+        with patch("app.services.shop_service.complete_chat", new=complete_chat):
+            second = self._turn("فروشم کمه", decider, thread_id="growth-sale")
+        self.assertIn("۸۵۰٬۰۰۰", prompts[0])
+        self.assertIsNone(second.get("pendingConfirm"))
+        with tenant_scope("09129900001"):
+            self.assertNotIn("۸۵۰", str(load_business_plans()))
+        again: list[str] = []
+
+        async def complete_again(*, system, turns, surface="shop"):
+            again.append(system)
+            if "حالت تشخیص" in system:
+                return "مسئله: همان سنجه مانده."
+            if "پلن اصلاح" in system:
+                return "هدف: همان سنجه بماند."
+            return "منتظر عدد بازدید."
+
+        with patch("app.services.shop_service.complete_chat", new=complete_again):
+            self._turn("فروشم کمه", decider, thread_id="growth-sale")
+        self.assertIn("سنجهٔ بازدید ثبت شود", again[0])
 
     def test_media_turn_records_media_kind(self) -> None:
         seen = []

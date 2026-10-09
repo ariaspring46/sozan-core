@@ -395,10 +395,7 @@ class RouterServiceTests(unittest.TestCase):
                 raise RuntimeError("blip")
             return {"text": "سلام، چه کمکی از من برمی‌آید؟", "tool_calls": [], "usage": {}}
 
-        # the fake sleep never yields; the heartbeat (which also sleeps) would spin once wait_for hands it the loop
-        with patch("app.services.router_service.asyncio.sleep", new=AsyncMock()), patch(
-            "app.services.router_service._heartbeat", new=AsyncMock()
-        ):
+        with patch("app.services.router_service.asyncio.sleep", new=AsyncMock()):
             out = self._turn("یک سؤال دارم", complete)
         self.assertEqual(calls["n"], 2)
         self.assertNotIn("مدل پاسخ نداد", out["messages"][-1]["text"])
@@ -2006,10 +2003,14 @@ class ChannelReplayTests(unittest.TestCase):
             decided.append(row)
             return row
 
+        async def echo(_messages, tools):
+            name = tools[0]["function"]["name"]
+            return {"text": "", "tool_calls": [{"name": name, "arguments": {}}]}
+
         with patch.object(router_service, "route_tool", return_value=""):
-            status = self._turn("ببین وصل شد", thread_id, decider=decider)
-            connect = self._turn("بریم وصلش کنیم", thread_id, decider=decider)
-            scan = self._turn("تو باید بتونی پیج من رو ببینی", thread_id, decider=decider)
+            status = self._turn("ببین وصل شد", thread_id, complete=echo, decider=decider)
+            connect = self._turn("بریم وصلش کنیم", thread_id, complete=echo, decider=decider)
+            scan = self._turn("تو باید بتونی پیج من رو ببینی", thread_id, complete=echo, decider=decider)
         self.assertEqual(seen[0]["topic"]["platform"], "")
         self.assertGreaterEqual(len(seen[0]["previous_turns"]), 1)
         self.assertLessEqual(len(seen[0]["previous_turns"]), 8)

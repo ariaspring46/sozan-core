@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { money } from "@/lib/digits";
+import { useAiBudget } from "@/lib/use-ai-budget";
+import { QuotaUsage } from "@/components/quota-usage";
 
 type CatalogItem = { id: string; label: string; docs?: string; help?: string };
 type StudioSettings = {
@@ -71,12 +73,30 @@ export function ShopSettingsForm() {
   const [couponAmount, setCouponAmount] = useState<number | null>(null);
   const [plansOpen, setPlansOpen] = useState(false);
   const subRef = useRef<HTMLDetailsElement>(null);
+  const budget = useAiBudget();
 
   useEffect(() => {
-    const jumpToPlans = window.location.hash === "#plans";
+    const revealPlans = () => {
+      if (window.location.hash !== "#plans") return;
+      setPlansOpen(true);
+      const jump = () => {
+        const el = subRef.current;
+        if (!el) return;
+        el.open = true;
+        // بدنهٔ برنامه overflow-hidden است و scrollIntoView را بی‌اثر می‌کند؛ خودمان می‌پریم.
+        const scroller = el.closest(".overflow-y-auto");
+        if (scroller instanceof HTMLElement) {
+          scroller.scrollTop += el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8;
+        } else {
+          el.scrollIntoView({ block: "start" });
+        }
+      };
+      window.setTimeout(jump, 80);
+      window.setTimeout(jump, 900);
+    };
     const pay = new URLSearchParams(window.location.search).get("pay");
     if (pay) {
-      window.history.replaceState({}, "", window.location.pathname);
+      window.history.replaceState({}, "", window.location.pathname + window.location.hash);
       if (pay === "ok") setNotice("پرداخت موفق بود و اشتراک فعال شد.");
       else if (pay === "cancel") setNotice("پرداخت لغو شد.");
       else if (pay === "fail" || pay === "missing") setError("پرداخت کامل نشد. دوباره از همین صفحه اقدام کن.");
@@ -84,26 +104,11 @@ export function ShopSettingsForm() {
     void api<StudioSettings>("/settings")
       .then((data) => {
         setForm({ ...data, smsApiKey: "", paymentApiKey: "" });
-        if (jumpToPlans) {
-          setPlansOpen(true);
-          if (subRef.current) subRef.current.open = true;
-          const jump = () => {
-            const el = subRef.current;
-            if (!el) return;
-            // بدنهٔ برنامه overflow-hidden است و scrollIntoView را بی‌اثر می‌کند؛ خودمان می‌پریم.
-            const scroller = el.closest(".overflow-y-auto");
-            if (scroller instanceof HTMLElement) {
-              scroller.scrollTop += el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8;
-            } else {
-              el.scrollIntoView({ block: "start" });
-            }
-          };
-          // کارت‌های بالای صفحه دیر بالا می‌آیند؛ دوباره تلاش کن تا جا افتاید.
-          window.setTimeout(jump, 80);
-          window.setTimeout(jump, 900);
-        }
+        revealPlans();
       })
       .catch((err) => setError(err.message));
+    window.addEventListener("hashchange", revealPlans);
+    return () => window.removeEventListener("hashchange", revealPlans);
   }, []);
 
   async function save() {
@@ -196,25 +201,26 @@ export function ShopSettingsForm() {
                 className={
                   form.paymentGateway === "mock"
                     ? "text-sm text-muted"
-                    : (form.paymentGateway === "zarinpal" && (form.paymentMerchantId || form.paymentMerchantFromHub)) ||
+                    : (form.paymentGateway === "zarinpal" && form.paymentMerchantId.trim()) ||
                         (form.paymentGateway === "idpay" && (form.paymentApiKeySet || form.paymentApiKey))
                       ? "text-sm text-signal"
                       : "text-sm text-warm"
                 }
               >
                 {form.paymentGateway === "zarinpal"
-                  ? form.paymentMerchantId || form.paymentMerchantFromHub
-                    ? form.paymentMerchantFromHub
-                      ? "پرداخت اشتراک با درگاه خود سوزان آماده است."
-                      : "مرچنت‌آیدی زرین‌پال آماده ذخیره است."
-                    : "مرچنت‌آیدی ۳۶ کاراکتری زرین‌پال را بگذار."
+                  ? form.paymentMerchantId.trim()
+                    ? "مرچنت‌آیدی زرین‌پال آماده ذخیره است."
+                    : "مرچنت‌آیدی ۳۶ کاراکتری زرین‌پال را بگذار؛ وگرنه فروش روی درگاه سوزان با ۲٪ است."
                   : form.paymentGateway === "idpay"
                     ? form.paymentApiKeySet || form.paymentApiKey
                       ? "کلید آیدی‌پی آماده است."
                       : "کلید آیدی‌پی را بگذار."
                     : "فروش آنلاین خاموش است؛ فروش دستی ثبت می‌شود."}
               </p>
-              {form.paymentGateway === "zarinpal" && !form.paymentMerchantFromHub ? (
+              {form.billing?.ready ? (
+                <p className="text-xs leading-6 text-muted">پرداخت اشتراک با درگاه خود سوزان آماده است.</p>
+              ) : null}
+              {form.paymentGateway === "zarinpal" ? (
                 <Field label="مرچنت‌آیدی زرین‌پال">
                   <Input
                     dir="ltr"
@@ -363,6 +369,7 @@ export function ShopSettingsForm() {
                 اشتراک {form.subscription.label}
               </summary>
               <div className="mt-3 space-y-3">
+              {budget ? <QuotaUsage budget={budget} /> : null}
               <p className="text-sm text-muted">
                 وب‌سایت {Number(form.subscription.sitesUsed || 0).toLocaleString("fa-IR")} از {form.subscription.sitesLimit ? Number(form.subscription.sitesLimit).toLocaleString("fa-IR") : "نامحدود"}
               </p>

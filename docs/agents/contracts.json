@@ -270,9 +270,9 @@
  },
  "HTTP POST /settings/support/seller-ticket": {
   "owner": "X5",
-  "shape": "backend/app/api/settings.py: SellerTicketIn {subject: str = Field(min_length=2, max_length=120); text: str = Field(min_length=2, max_length=2000)}; response untyped",
+  "shape": "backend/app/api/settings.py: SellerTicketIn {subject: str = Field(min_length=2, max_length=120); text: str = Field(min_length=2, max_length=2000); category: Literal['billing', 'technical', 'other'] | None = None}; response untyped",
   "signature": "POST /settings/support/seller-ticket  (body: SellerTicketIn)",
-  "since": "2026-10-02",
+  "since": "2026-10-09",
   "users": [
    "C"
   ]
@@ -341,9 +341,10 @@
  },
  "STATE pay-orders.json": {
   "owner": "C",
-  "signature": "state pay-orders.json  writers: C; readers: X5",
-  "since": "2026-10-02",
+  "signature": "state pay-orders.json  writers: C; readers: X1, X5",
+  "since": "2026-10-09",
   "users": [
+   "X1",
    "X5"
   ]
  },
@@ -632,6 +633,70 @@
   "since": "2026-09-18",
   "users": [
    "X2"
+  ]
+ },
+ "backend/app/config.py::settings.decider_alt_url": {
+  "owner": "X5",
+  "signature": "Settings.decider_alt_url: str = 'https://openrouter.ai/api/v1/api/alpha/decisions'",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/config.py::settings.decider_enabled": {
+  "owner": "X5",
+  "signature": "Settings.decider_enabled: bool = False",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/config.py::settings.decider_min_margin": {
+  "owner": "X5",
+  "signature": "Settings.decider_min_margin: float = 0.2",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/config.py::settings.decider_min_prob": {
+  "owner": "X5",
+  "signature": "Settings.decider_min_prob: float = 0.6",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/config.py::settings.decider_model": {
+  "owner": "X5",
+  "signature": "Settings.decider_model: str = 'perplexity/pplx-decider-v1.1-27b'",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/config.py::settings.decider_pro_model": {
+  "owner": "X5",
+  "signature": "Settings.decider_pro_model: str = 'deepseek/deepseek-v4-pro'",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/config.py::settings.decider_tenants": {
+  "owner": "X5",
+  "signature": "Settings.decider_tenants: str = '09135409482'",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/config.py::settings.decider_url": {
+  "owner": "X5",
+  "signature": "Settings.decider_url: str = 'https://openrouter.ai/api/alpha/decisions'",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
   ]
  },
  "backend/app/config.py::settings.factory_script": {
@@ -955,6 +1020,14 @@
   "users": [
    "C",
    "X3"
+  ]
+ },
+ "backend/app/lab_account.py::is_lab_phone": {
+  "owner": "X5",
+  "signature": "def is_lab_phone(phone: str) -> bool",
+  "since": "2026-10-09",
+  "users": [
+   "Y"
   ]
  },
  "backend/app/models/user.py::Asset": {
@@ -1371,6 +1444,7 @@
   "signature": "def get_scan() -> dict",
   "since": "2026-09-18",
   "users": [
+   "X1",
    "X4"
   ]
  },
@@ -1444,8 +1518,8 @@
  },
  "backend/app/services/channel_scan_service.py::start_scan": {
   "owner": "X3",
-  "signature": "def start_scan(accounts: list[dict], notify=None) -> dict",
-  "since": "2026-10-06",
+  "signature": "def start_scan(accounts: list[dict], notify=None, *, import_catalog: bool=True) -> dict",
+  "since": "2026-10-09",
   "users": [
    "X4"
   ]
@@ -1557,6 +1631,46 @@
    "Y"
   ]
  },
+ "backend/app/services/channel_tool.py::choose": {
+  "owner": "X3",
+  "signature": "def choose(spoken: str, rows: list | None=None) -> dict | None",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/channel_tool.py::connected_lines": {
+  "owner": "X3",
+  "signature": "def connected_lines() -> list[str]",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/channel_tool.py::recent_channel": {
+  "owner": "X3",
+  "signature": "def recent_channel(rows: list | None) -> dict | None",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/channel_tool.py::routed": {
+  "owner": "X3",
+  "signature": "def routed(spoken: str) -> bool",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/channel_tool.py::run": {
+  "owner": "X3",
+  "signature": "async def run(spoken: str, args: dict) -> tuple[str, dict]",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/chat_media_service.py::caption": {
   "owner": "X3",
   "signature": "def caption(kind: str) -> str",
@@ -1625,6 +1739,14 @@
   "since": "2026-10-06",
   "users": [
    "X4"
+  ]
+ },
+ "backend/app/services/decider_service.py::heavy_model": {
+  "owner": "X1",
+  "signature": "def heavy_model() -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X5"
   ]
  },
  "backend/app/services/idempotency_service.py::body_stamp": {
@@ -1782,6 +1904,22 @@
    "X4"
   ]
  },
+ "backend/app/services/llm.py::_emit_usage": {
+  "owner": "X5",
+  "signature": "def _emit_usage(*, surface: str, model: str, payload: dict, latency_ms: float=0) -> dict",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/llm.py::_openrouter_token": {
+  "owner": "X5",
+  "signature": "def _openrouter_token() -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/llm.py::auth_scheme": {
   "owner": "X5",
   "signature": "def auth_scheme(value: object) -> str",
@@ -1822,6 +1960,7 @@
   "signature": "async def complete_text_chat(*, system: str, turns: list[dict], surface: str='shop', temperature: float=0.7, max_tokens: int=500) -> str | None",
   "since": "2026-10-06",
   "users": [
+   "X3",
    "X4"
   ]
  },
@@ -1873,6 +2012,30 @@
   "since": "2026-09-29",
   "users": [
    "X5"
+  ]
+ },
+ "backend/app/services/number_span.py::money_amounts": {
+  "owner": "X1",
+  "signature": "def money_amounts(text: str) -> set[str]",
+  "since": "2026-10-09",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/number_span.py::spoken_money": {
+  "owner": "X1",
+  "signature": "def spoken_money(folded: str) -> set[str]",
+  "since": "2026-10-09",
+  "users": [
+   "Y"
+  ]
+ },
+ "backend/app/services/number_span.py::voice_amounts": {
+  "owner": "X1",
+  "signature": "def voice_amounts(text: str) -> set[str]",
+  "since": "2026-10-09",
+  "users": [
+   "X4"
   ]
  },
  "backend/app/services/observe_client.py::emit_later": {
@@ -2027,12 +2190,29 @@
    "C"
   ]
  },
+ "backend/app/services/persian_text.py::REFUSAL_GENERIC": {
+  "owner": "X1",
+  "signature": "REFUSAL_GENERIC = 'این را در چت جواب نمی\\u200cدهم.'",
+  "since": "2026-10-09",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/persian_text.py::SAFE_EMPTY": {
+  "owner": "X1",
+  "signature": "SAFE_EMPTY = 'این را بلد نیستم؛ از فروشگاه یا محتوا بگو.'",
+  "since": "2026-10-09",
+  "users": [
+   "X3"
+  ]
+ },
  "backend/app/services/persian_text.py::guard_output": {
   "owner": "X1",
   "signature": "def guard_output(text: str, *, finish: str='', limit: int=800) -> str",
   "since": "2026-09-24",
   "users": [
    "X2",
+   "X3",
    "Y"
   ]
  },
@@ -2179,6 +2359,7 @@
   "signature": "def openrouter_fallback() -> str | None",
   "since": "2026-10-06",
   "users": [
+   "X1",
    "X2"
   ]
  },
@@ -2214,6 +2395,14 @@
    "Y"
   ]
  },
+ "backend/app/services/router_service.py::_messages": {
+  "owner": "X1",
+  "signature": "def _messages() -> list[dict]",
+  "since": "2026-10-09",
+  "users": [
+   "X3"
+  ]
+ },
  "backend/app/services/router_service.py::bind_thread_id": {
   "owner": "X1",
   "signature": "def bind_thread_id(thread_id: str) -> None",
@@ -2228,6 +2417,30 @@
   "since": "2026-09-21",
   "users": [
    "X5"
+  ]
+ },
+ "backend/app/services/router_service.py::current_thread_id": {
+  "owner": "X1",
+  "signature": "def current_thread_id() -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/router_service.py::latest_thread_id": {
+  "owner": "X1",
+  "signature": "def latest_thread_id() -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X3"
+  ]
+ },
+ "backend/app/services/router_service.py::post_notice": {
+  "owner": "X1",
+  "signature": "def post_notice(thread_id: str, text: str) -> None",
+  "since": "2026-10-09",
+  "users": [
+   "X3"
   ]
  },
  "backend/app/services/router_service.py::remember_content": {
@@ -2495,8 +2708,8 @@
  },
  "backend/app/services/shop_service.py::chat": {
   "owner": "X4",
-  "signature": "async def chat(text: str, media: dict | None=None, view_path: str='', view_target: str='', confirmed: bool=False) -> dict",
-  "since": "2026-10-06",
+  "signature": "async def chat(text: str, media: dict | None=None, view_path: str='', view_target: str='', confirmed: bool=False, skill: str='', mode: str='', goal: str='') -> dict",
+  "since": "2026-10-09",
   "users": [
    "X1"
   ]
@@ -2559,6 +2772,14 @@
    "X3"
   ]
  },
+ "backend/app/services/shop_service.py::remember_vertical": {
+  "owner": "X4",
+  "signature": "def remember_vertical(text: str) -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/shop_service.py::reset_for_brand": {
   "owner": "X4",
   "signature": "def reset_for_brand(*, name: str, tagline: str) -> dict",
@@ -2609,6 +2830,38 @@
    "X2"
   ]
  },
+ "backend/app/services/skill_catalog.py::GROWTH_SKILL": {
+  "owner": "X1",
+  "signature": "GROWTH_SKILL = 'ecommerce-growth-mba'",
+  "since": "2026-10-09",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/skill_catalog.py::business_facts": {
+  "owner": "X1",
+  "signature": "def business_facts() -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/skill_catalog.py::plans_for_prompt": {
+  "owner": "X1",
+  "signature": "def plans_for_prompt() -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/skill_catalog.py::prompt_block": {
+  "owner": "X1",
+  "signature": "def prompt_block(skill_id: str) -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X4"
+  ]
+ },
  "backend/app/services/sms_service.py::PROVIDERS": {
   "owner": "X3",
   "shape": "PROVIDERS = ({'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'}, {'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'})",
@@ -2642,6 +2895,22 @@
   "users": [
    "C",
    "X5"
+  ]
+ },
+ "backend/app/services/storefront_service.py::_list": {
+  "owner": "C",
+  "signature": "def _list(name: str) -> list[dict]",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/storefront_service.py::_row_images": {
+  "owner": "C",
+  "signature": "def _row_images(row: dict | None) -> list[str]",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
   ]
  },
  "backend/app/services/storefront_service.py::add_product": {
@@ -2695,6 +2964,7 @@
   "signature": "def list_sales() -> dict",
   "since": "2026-09-18",
   "users": [
+   "X1",
    "X5"
   ]
  },
@@ -2813,8 +3083,8 @@
  },
  "backend/app/services/support_service.py::create_ticket": {
   "owner": "C",
-  "signature": "def create_ticket(*, subject: str, text: str, phone: str='', order_no: str='', image_name: str='', kind: str='storefront') -> dict",
-  "since": "2026-09-29",
+  "signature": "def create_ticket(*, subject: str, text: str, phone: str='', order_no: str='', image_name: str='', kind: str='storefront', category: str='') -> dict",
+  "since": "2026-10-09",
   "users": [
    "X5"
   ]
@@ -2845,8 +3115,8 @@
  },
  "backend/app/services/telegram_alert_service.py::seller_ticket_alert": {
   "owner": "X3",
-  "signature": "async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str) -> None",
-  "since": "2026-09-29",
+  "signature": "async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str, category: str='') -> None",
+  "since": "2026-10-09",
   "users": [
    "C"
   ]
@@ -2924,12 +3194,46 @@
    "X5"
   ]
  },
+ "backend/app/services/training_log.py::tenant_hash": {
+  "owner": "Y",
+  "signature": "def tenant_hash() -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/turn_clock.py::expired": {
+  "owner": "X1",
+  "signature": "def expired() -> bool",
+  "since": "2026-10-09",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/turn_clock.py::remaining": {
+  "owner": "X1",
+  "signature": "def remaining() -> float",
+  "since": "2026-10-09",
+  "users": [
+   "X4",
+   "Y"
+  ]
+ },
+ "backend/app/services/turn_clock.py::turn_id": {
+  "owner": "X1",
+  "signature": "def turn_id() -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X4"
+  ]
+ },
  "backend/app/services/turn_parse.py::parse_turn": {
   "owner": "X1",
   "signature": "def parse_turn(text: str) -> Turn",
   "since": "2026-09-25",
   "users": [
-   "X2"
+   "X2",
+   "X3"
   ]
  },
  "backend/app/services/voice_service.py::apply_tone": {
@@ -3184,9 +3488,9 @@
  },
  "frontend/components/chat-thread.tsx::ChatMsg": {
   "owner": "X1",
-  "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; /** ابزاری که کارت تأیید برایش آمده (عنوان و نماد کارت از روی آن). */ tool?: string; confirmId?: string; options?: string[]; campaignId?: string; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
+  "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; /** ابزاری که کارت تأیید برایش آمده (عنوان و نماد کارت از روی آن). */ tool?: string; confirmId?: string; options?: string[]; campaignId?: string; link?: { href: string; label?: string }; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
   "signature": "export type ChatMsg =",
-  "since": "2026-10-06",
+  "since": "2026-10-09",
   "users": [
    "Y"
   ]
@@ -3290,6 +3594,15 @@
   "signature": "export function OnboardGate({ children }: { children: React.ReactNode })",
   "since": "2026-09-18",
   "users": [
+   "U"
+  ]
+ },
+ "frontend/components/quota-usage.tsx::QuotaUsage": {
+  "owner": "X5",
+  "signature": "export function QuotaUsage({ budget, compact = false }: { budget: AiBudget; compact?: boolean })",
+  "since": "2026-10-09",
+  "users": [
+   "C",
    "U"
   ]
  },
@@ -3688,11 +4001,20 @@
    "U"
   ]
  },
+ "frontend/lib/use-ai-budget.ts::formatQuota": {
+  "owner": "X5",
+  "signature": "export function formatQuota(percent: number)",
+  "since": "2026-10-09",
+  "users": [
+   "U"
+  ]
+ },
  "frontend/lib/use-ai-budget.ts::useAiBudget": {
   "owner": "X5",
   "signature": "export function useAiBudget(): AiBudget | null",
   "since": "2026-09-28",
   "users": [
+   "C",
    "U"
   ]
  },

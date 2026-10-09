@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.api import inbox as inbox_api
 from app.config import settings
 from app.database import get_session
+from app.lab_account import LAB_PHONE
 from app.security import get_current_user
 
 
@@ -63,6 +64,25 @@ class InboxDryReplyTests(unittest.TestCase):
             res = self._client(self._admin()).post("/inbox/dry-reply", json={"text": "قیمت؟"})
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["text"], "دو عدد موجود است.")
+        deliver.assert_not_called()
+
+    def test_lab_turn_answers_only_the_lab_phone_and_does_not_deliver(self) -> None:
+        async def fake_answer(text, thread=None, source=""):
+            self.assertEqual(text, "قیمت چنده؟")
+            self.assertEqual(source, "battery")
+            self.assertEqual((thread or {}).get("sender"), "آزمون")
+            return "حدود پانصد."
+
+        lab = SimpleNamespace(phone=LAB_PHONE, role="admin", is_active=True)
+        with patch("app.lab_account.lab_login_active", return_value=True), patch(
+            "app.services.inbox_agent_service.answer", new=fake_answer
+        ), patch("app.services.inbox_service.reply") as deliver:
+            ok = self._client(lab).post("/inbox/lab-turn", json={"text": "قیمت چنده؟"})
+            denied = self._client(self._admin()).post("/inbox/lab-turn", json={"text": "قیمت چنده؟"})
+        self.assertEqual(ok.status_code, 200)
+        self.assertEqual(ok.json()["text"], "حدود پانصد.")
+        self.assertEqual(denied.status_code, 403)
+        self.assertNotIn("text", denied.json())
         deliver.assert_not_called()
 
 

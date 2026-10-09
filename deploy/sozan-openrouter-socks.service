@@ -1,0 +1,17 @@
+[Unit]
+Description=Sozan OpenRouter fallback SOCKS via Tailscale (second foreign node)
+After=network-online.target tailscaled.service
+Wants=network-online.target tailscaled.service
+
+[Service]
+Type=simple
+User=ubuntu
+# Direct OpenRouter traffic already leaves through the hub WireGuard exit (front2).
+# This SOCKS is only the backup: Tailscale's own packets stay on the main table, so
+# this path still works when the WireGuard policy route fails closed.
+ExecStart=/usr/bin/ssh -N -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -o IdentitiesOnly=yes -i /home/ubuntu/.ssh/id_ed25519_to_node1 -D 127.0.0.1:10891 root@100.77.73.16
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

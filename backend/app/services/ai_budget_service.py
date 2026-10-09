@@ -46,6 +46,14 @@ def _day_key(when: float | None = None) -> str:
     return _dt.datetime.fromtimestamp(moment + _TZ_OFFSET_SEC, tz=_dt.timezone.utc).strftime("%Y-%m-%d")
 
 
+def _next_tehran_midnight(when: float | None = None) -> int:
+    """Unix time of the next Tehran midnight, when today's quota rolls over."""
+    moment = time.time() if when is None else when
+    shifted = moment + _TZ_OFFSET_SEC
+    next_midnight = (int(shifted) // 86400 + 1) * 86400
+    return int(next_midnight - _TZ_OFFSET_SEC)
+
+
 def _config() -> dict[str, Any]:
     stored = read_json("ai-budget.json", {}, shared=True)
     if not isinstance(stored, dict) or not stored:
@@ -136,7 +144,9 @@ def tenant_status(tenant: str | None = None) -> dict[str, Any]:
     daily_cap = float(caps.get("dailyUsd") or 0.0)
     weekly_cap = float(caps.get("weeklyUsd") or 0.0)
     ratio = float(cfg.get("notifyRatio") or 0.8)
-    capped = (daily_cap > 0 and daily_used >= daily_cap) or (weekly_cap > 0 and weekly_used >= weekly_cap)
+    daily_hit = daily_cap > 0 and daily_used >= daily_cap
+    weekly_hit = weekly_cap > 0 and weekly_used >= weekly_cap
+    capped = daily_hit or weekly_hit
     warn = (daily_cap > 0 and daily_used >= daily_cap * ratio) or (
         weekly_cap > 0 and weekly_used >= weekly_cap * ratio
     )
@@ -148,6 +158,8 @@ def tenant_status(tenant: str | None = None) -> dict[str, Any]:
         "weeklyUsedUsd": weekly_used,
         "weeklyCapUsd": weekly_cap,
         "tier": "capped" if capped else ("warn" if warn else "ok"),
+        "limit": "daily" if daily_hit else ("weekly" if weekly_hit else ""),
+        "resetsAt": _next_tehran_midnight(),
     }
 
 

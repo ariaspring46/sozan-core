@@ -151,32 +151,98 @@ def connect_line(platform: str) -> tuple[str, dict]:
     return f"{label} از صفحهٔ کانال‌ها وصل می‌شود.", {"link": dict(_LINK)}
 
 
+def _login_block(platform: str) -> str:
+    if platform != "instagram":
+        return ""
+    from app.services import channel_service, sendbox_service
+
+    row = channel_service.account_for_platform("instagram") or {}
+    return sendbox_service.posts_block_reason(channel_service.sendbox_account_id(row))
+
+
 def result_sentence(platform: str, handle: str) -> str:
-    from app.services.channel_scan_service import get_scan, scan_status
+    """What the download found. A saved login error is used only when no page came down."""
+    from app.services.channel_scan_service import get_scan, page_seen, page_view, scan_status
 
     label = _LABELS.get(platform, platform)
     name = handle.lstrip("@") or label
-    if platform == "instagram":
-        from app.services import channel_service, sendbox_service
-
-        row = channel_service.account_for_platform("instagram") or {}
-        reason = sendbox_service.posts_block_reason(channel_service.sendbox_account_id(row))
-        if reason:
-            return f"{label} @{name}: {reason}"
+    view = page_view(platform, handle)
     status = scan_status()
+    if page_seen(view):
+        titles = list(view.get("titles") or [])
+        cats = "، ".join(view.get("categories") or []) or "—"
+        colors = "، ".join(view.get("colors") or []) or "—"
+        if titles:
+            names = "، ".join(titles[:6])
+            return (
+                f"پیج @{name} را خواندم: {names}. دسته‌ها: {cats}. رنگ‌ها: {colors}. "
+                "اگر این‌ها روی سایت بیاید بگو."
+            )
+        about = str(view.get("about") or "").strip()
+        caption = str((view.get("captions") or [""])[0] or "").strip()
+        seen = about or caption
+        if seen:
+            return f"پیج @{name} را خواندم. {seen}"
+        images = int(view.get("images") or 0)
+        if images:
+            return f"پیج @{name} را خواندم: {images} عکس، بدون کپشن کالا."
+        scan = get_scan()
+        total = int(scan.get("productCount") or 0)
+        return (
+            f"پیج @{name} را خواندم: {total} کالا. دسته‌ها: {cats}. رنگ‌ها: {colors}. "
+            "اگر این‌ها روی سایت بیاید بگو."
+        )
+    reason = _login_block(platform)
+    if reason:
+        return f"{label} @{name}: {reason}"
     if status.get("status") == "error" and status.get("error"):
         return f"{label} @{name}: {status.get('error')}"
-    scan = get_scan()
-    count = int(scan.get("productCount") or 0)
-    cats = "، ".join(str(item) for item in (scan.get("categories") or []) if item) or "—"
-    colors = "، ".join(str(item) for item in (scan.get("colors") or []) if item) or "—"
-    return (
-        f"پیج @{name} را خواندم: {count} کالا. دسته‌ها: {cats}. رنگ‌ها: {colors}. "
-        "اگر این‌ها روی سایت بیاید بگو."
+    return f"پیج @{name} خوانده نشد."
+
+
+def _review_brief(platform: str, handle: str, view: dict) -> str:
+    lines = [f"پلتفرم: {platform}", f"حساب: @{handle.lstrip('@')}"]
+    if view.get("about"):
+        lines.append(f"معرفی: {view['about']}")
+    if view.get("categories"):
+        lines.append("دسته‌ها: " + "، ".join(view["categories"]))
+    if view.get("titles"):
+        lines.append("کالاها: " + "، ".join(view["titles"]))
+    if view.get("captions"):
+        lines.append("کپشن‌ها:\n" + "\n".join(f"- {item}" for item in view["captions"]))
+    if view.get("images"):
+        lines.append(f"تعداد عکس: {view['images']}")
+    return "\n".join(lines)[:3500]
+
+
+async def review_sentence(platform: str, handle: str) -> str:
+    """An opinion on the page that was just downloaded, the same text the shop build reads."""
+    from app.services.channel_scan_service import page_seen, page_view
+    from app.services.llm import complete_text_chat
+    from app.services.persian_text import REFUSAL_GENERIC, SAFE_EMPTY, guard_output
+
+    view = page_view(platform, handle)
+    if not page_seen(view):
+        return result_sentence(platform, handle)
+    reply = await complete_text_chat(
+        system=(
+            "پیج فروشنده همین الان دانلود شده، همان مسیری که برای ساخت سایت پیج اینستاگرام یا کانال تلگرام خوانده می‌شود. "
+            "نظر کوتاه فارسی بده: پیج چه می‌گوید، لحنش چیست، و یک کمبود مشخص. فقط از متن داده‌شده. "
+            "نگو صفحه باز نمی‌شود و از ورود یا توکن حرف نزن."
+        ),
+        turns=[{"role": "user", "text": _review_brief(platform, handle, view)}],
+        surface="scan",
+        temperature=0.4,
+        max_tokens=280,
     )
+    guarded = guard_output(reply or "") if reply else ""
+    refused = guarded in {REFUSAL_GENERIC, SAFE_EMPTY, "این را در چت نمی‌گویم."}
+    if guarded and not refused and all(mark not in guarded for mark in ("نمی‌توانم", "منقضی", "توکن")):
+        return guarded
+    return result_sentence(platform, handle)
 
 
-def _watch(platform: str, handle: str) -> None:
+def _watch(platform: str, handle: str, *, review: bool = False):
     from app.state_store import current_tenant
 
     from app.services import router_service
@@ -184,13 +250,17 @@ def _watch(platform: str, handle: str) -> None:
     phone = current_tenant()
     thread_id = router_service.current_thread_id()
 
-    def notify() -> None:
+    def notify():
         from app.state_store import tenant_scope
 
-        with tenant_scope(phone):
-            router_service.post_notice(thread_id, result_sentence(platform, handle))
+        async def post() -> None:
+            text = await review_sentence(platform, handle) if review else result_sentence(platform, handle)
+            with tenant_scope(phone):
+                router_service.post_notice(thread_id, text)
 
-    return notify  # type: ignore[return-value]
+        return post()
+
+    return notify
 
 
 def announce_connected(platform: str, handle: str) -> None:
@@ -232,9 +302,11 @@ async def run(spoken: str, args: dict) -> tuple[str, dict]:
         handle = _handle_of(platform, handle)
         if not handle:
             return "اسم پیج یا کانال را بگو تا بخوانم.", {"link": dict(_LINK)}
+        review = "نظر" in spoken
         start_scan(
             [{"platform": platform, "handle": handle}],
-            notify=_watch(platform, handle),
+            notify=_watch(platform, handle, review=review),
+            import_catalog=not review,
         )
         return f"دارم پیج @{handle} را می‌خوانم.", {}
     line = status_line(platform)

@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     sendbox_webhook_legacy_until: str = ""
     decider_enabled: bool = False
     decider_tenants: str = "09135409482"
-    decider_model: str = "perplexity/pplx-decider-v1-27b"
+    decider_model: str = "perplexity/pplx-decider-v1.1-27b"
     decider_url: str = "https://openrouter.ai/api/alpha/decisions"
     decider_alt_url: str = "https://openrouter.ai/api/v1/api/alpha/decisions"
     decider_min_prob: float = 0.6

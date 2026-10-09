@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.7k tokens. Your core files total 31.8k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.9k tokens. Your core files total 31.8k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -67,9 +67,9 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 31.8k | the files most tasks touch; read the relevant one first |
-| active | 66.1k | yours to edit; read only what the task needs |
+| active | 66.3k | yours to edit; read only what the task needs |
 | rare | 19.8k | yours; read only when the task names it |
-| tests | 36.7k | read only the test of the module you change |
+| tests | 37.0k | read only the test of the module you change |
 
 **Core:**
 
@@ -79,7 +79,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Active (you may edit):**
 
-- `backend/app/api/`: `inbox.py` (1.6k)
+- `backend/app/api/`: `inbox.py` (1.8k)
 - `backend/app/services/`: `inbox_agent_service.py` (15.7k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (3.5k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (1.2k), `pii_mask.py` (0.5k)
 - `frontend/app/inbox/`: `page.tsx` (4.4k)
 - `frontend/app/inbox/[id]/`: `page.tsx` (2.3k)
@@ -163,6 +163,11 @@ export function takeIdempotencyKey(slot: IdempotencySlot, stamp: string): string
 ```
 export function cn(...inputs: ClassValue[])  # changed 2026-09-18
 ```
+**`backend/app/services/number_span.py`** — owner X1
+```
+def money_amounts(text: str) -> set[str]  # Inbox scope: a price, a spoken price, or a percent. A size such as ۵۴ is not an amount.  # changed 2026-10-09
+def spoken_money(folded: str) -> set[str]  # «یک و نیم میلیون»، «۲.۵ میلیون»، «دو میلیون و پانصد هزار» -> their integer value, when it is at least 1000.  # changed 2026-10-09
+```
 **`backend/app/services/persian_text.py`** — owner X1
 ```
 def guard_output(text: str, *, finish: str='', limit: int=800) -> str  # changed 2026-09-24
@@ -171,9 +176,13 @@ def guard_output(text: str, *, finish: str='', limit: int=800) -> str  # changed
 ```
 def cosine(left: list[float], right: list[float]) -> float  # changed 2026-09-22
 ```
+**`backend/app/services/turn_clock.py`** — owner X1
+```
+def remaining() -> float  # changed 2026-10-09
+```
 **`frontend/components/chat-thread.tsx`** — owner X1
 ```
-export type ChatMsg =  # changed 2026-10-06
+export type ChatMsg =  # changed 2026-10-09
 export function ChatThread(  # changed 2026-10-06
 ```
 **`backend/app/services/channel_outbound_service.py`** — owner X3
@@ -212,6 +221,10 @@ settings = Settings()  # changed 2026-09-18
 Settings.jwt_secret: str = 'change-me-to-a-long-random-secret'  # changed 2026-09-18
 Settings.local_llm_token: str = 'sk-local'  # changed 2026-09-18
 Settings.local_llm_url: str = 'http://127.0.0.1:9292/v1'  # changed 2026-09-18
+```
+**`backend/app/lab_account.py`** — owner X5
+```
+def is_lab_phone(phone: str) -> bool  # changed 2026-10-09
 ```
 **`backend/app/security.py`** — owner X5
 ```
@@ -310,7 +323,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X1, X4, X5
 - `backend/app/services/sales_policy_service.py`: `public_policy` (changed 2026-09-27) ← X5; `save_policy` (changed 2026-09-27) ← X5
 - `backend/app/services/shop_memory_service.py`: `schedule_backfill` (changed 2026-10-06) ← C; `schedule_delete` (changed 2026-10-06) ← C
-- `backend/app/services/training_log.py`: `log_example` (changed 2026-09-28) ← X1, X2, X4; `log_label` (changed 2026-09-28) ← X5
+- `backend/app/services/training_log.py`: `log_example` (changed 2026-09-28) ← X1, X2, X4; `log_label` (changed 2026-09-28) ← X5; `tenant_hash` (changed 2026-10-09) ← X1
 - `backend/app/services/voice_service.py`: `apply_tone` (changed 2026-09-18) ← X1, X3; `get_voice` (changed 2026-09-18) ← X3, X5; `learn` (changed 2026-09-18) ← X3; `merge_summary` (changed 2026-09-18) ← X3
 - `frontend/components/sales-policy-form.tsx`: `SalesPolicyForm` (changed 2026-09-27) ← X5
 - `frontend/components/training-choice.tsx`: `TrainingChoice` (changed 2026-09-28) ← X5

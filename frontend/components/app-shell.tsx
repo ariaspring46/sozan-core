@@ -10,7 +10,8 @@ import { api } from "@/lib/api";
 import { useAppViewport } from "@/lib/use-app-viewport";
 import { useBackClose, useBackGuard } from "@/lib/back-stack";
 import { usePlan } from "@/lib/use-plan";
-import { useAiBudget } from "@/lib/use-ai-budget";
+import { formatQuota, useAiBudget } from "@/lib/use-ai-budget";
+import { QuotaUsage } from "@/components/quota-usage";
 import { applyTheme, readTheme } from "@/lib/theme";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -60,6 +61,12 @@ const PAGE_TITLES: readonly [string, string][] = [
 function unreadLabel(count: number) {
   if (count > 9) return "۹+";
   return count.toLocaleString("fa-IR");
+}
+
+function openPlansHere(pathname: string) {
+  if (pathname !== "/more/settings") return;
+  if (window.location.hash !== "#plans") window.location.hash = "plans";
+  else window.dispatchEvent(new HashChangeEvent("hashchange"));
 }
 
 function Badge({ count }: { count: number }) {
@@ -181,15 +188,16 @@ export function AppShell({
         })}
         <ThemeToggle compact className="mt-auto" />
         {plan ? (
-          <div className="mt-2 rounded-2xl border border-line bg-paper p-3 text-sm">
+          <Link href="/more/settings#plans" onClick={() => openPlansHere(pathname)} className="mt-2 block rounded-2xl border border-line bg-paper p-3 text-sm">
             <p className="text-xs text-muted">پلن فعلی</p>
             <p className="font-bold text-ink">{plan.label}</p>
+            {aiBudget ? <p className="mt-1 text-xs text-muted">سهمیهٔ امروز {formatQuota(aiBudget.dailyPercent)}</p> : null}
             {plan.canUpgrade ? (
-              <Link href="/more/settings#plans" className="mt-2 flex min-h-11 items-center justify-center rounded-xl bg-accentStrong px-3 text-xs font-bold text-onAccent mouse:min-h-9">
+              <span className="mt-2 flex min-h-11 items-center justify-center rounded-xl bg-accentStrong px-3 text-xs font-bold text-onAccent mouse:min-h-9">
                 ارتقای پلن
-              </Link>
+              </span>
             ) : null}
-          </div>
+          </Link>
         ) : null}
       </nav>
 
@@ -210,14 +218,9 @@ export function AppShell({
           </button>
           <div className="min-w-0 flex-1">{header}</div>
         </header>
-        {aiBudget && aiBudget.tier !== "ok" && aiBudget.note ? (
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-paper px-4 py-2 text-xs text-warm">
-            <span className="min-w-0">{aiBudget.note}</span>
-            {aiBudget.tier === "capped" ? (
-              <Link href="/more/settings" className="shrink-0 rounded-lg bg-accentStrong px-3 py-1 font-bold text-onAccent">
-                ارتقای پلن
-              </Link>
-            ) : null}
+        {aiBudget && aiBudget.tier !== "ok" ? (
+          <div className="shrink-0 border-b border-line bg-paper px-4 py-2.5">
+            <QuotaUsage budget={aiBudget} compact />
           </div>
         ) : null}
         <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", !scene && "bg-paper")}>{children}</div>
@@ -278,19 +281,23 @@ export function AppShell({
             })}
             <ThemeToggle compact className="mt-auto" />
             {plan ? (
-              <div className="mt-2 rounded-2xl border border-line bg-paper p-3 text-sm">
+              <Link
+                href="/more/settings#plans"
+                onClick={() => {
+                  setMenuOpen(false);
+                  openPlansHere(pathname);
+                }}
+                className="mt-2 block rounded-2xl border border-line bg-paper p-3 text-sm"
+              >
                 <p className="text-xs text-muted">پلن فعلی</p>
                 <p className="font-bold text-ink">{plan.label}</p>
+                {aiBudget ? <p className="mt-1 text-xs text-muted">سهمیهٔ امروز {formatQuota(aiBudget.dailyPercent)}</p> : null}
                 {plan.canUpgrade ? (
-                  <Link
-                    href="/more/settings#plans"
-                    onClick={() => setMenuOpen(false)}
-                    className="mt-2 flex min-h-11 items-center justify-center rounded-xl bg-accentStrong px-3 text-sm font-bold text-onAccent"
-                  >
+                  <span className="mt-2 flex min-h-11 items-center justify-center rounded-xl bg-accentStrong px-3 text-sm font-bold text-onAccent">
                     ارتقای پلن
-                  </Link>
+                  </span>
                 ) : null}
-              </div>
+              </Link>
             ) : null}
           </nav>
         </div>

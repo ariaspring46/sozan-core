@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.9k tokens. Your core files total 20.4k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.1k tokens. Your core files total 20.4k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -67,9 +67,9 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 20.4k | the files most tasks touch; read the relevant one first |
-| active | 58.5k | yours to edit; read only what the task needs |
+| active | 59.1k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
-| tests | 16.7k | read only the test of the module you change |
+| tests | 18.6k | read only the test of the module you change |
 
 **Core:**
 
@@ -81,11 +81,11 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 **Active (you may edit):**
 
 - `backend/app/api/`: `pay.py` (3.7k), `storefront.py` (2.9k)
-- `backend/app/services/`: `pay_service.py` (7.7k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `shop_otp_service.py` (1.8k), `support_service.py` (1.6k)
+- `backend/app/services/`: `pay_service.py` (7.7k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
-- `frontend/app/more/support/`: `page.tsx` (4.4k)
+- `frontend/app/more/support/`: `page.tsx` (4.7k)
 - `frontend/app/p/[id]/`: `page.tsx` (0.8k)
-- `frontend/components/`: `shop-settings-form.tsx` (8.7k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.4k), `domain-menu.tsx` (4.3k)
+- `frontend/components/`: `shop-settings-form.tsx` (8.8k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.4k), `domain-menu.tsx` (4.3k)
 - `frontend/lib/`: `site-host.ts` (0.1k)
 
 **Rare (yours; only when the task names it):**
@@ -186,7 +186,7 @@ async def send_otp(*, provider: str, api_key: str, template_id: str, token_name:
 ```
 **`backend/app/services/telegram_alert_service.py`** — owner X3
 ```
-async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str) -> None  # changed 2026-09-29
+async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str, category: str='') -> None  # changed 2026-10-09
 ```
 **`backend/app/services/shop_edit_service.py`** — owner X4
 ```
@@ -292,6 +292,14 @@ def tenant_scope(phone: str) -> Iterator[None]  # changed 2026-09-18
 def update_json(name: str, mutate, default: Any, *, lock: str) -> Any  # Read-modify-write one tenant file under its tenant_file_lock.  # changed 2026-10-01
 def write_json(name: str, payload: Any, *, shared: bool=False) -> None  # changed 2026-09-18
 ```
+**`frontend/components/quota-usage.tsx`** — owner X5
+```
+export function QuotaUsage({ budget, compact = false }: { budget: AiBudget; compact?: boolean })  # changed 2026-10-09
+```
+**`frontend/lib/use-ai-budget.ts`** — owner X5
+```
+export function useAiBudget(): AiBudget | null  # changed 2026-09-28
+```
 **`backend/app/services/shop_memory_service.py`** — owner Y
 ```
 def schedule_backfill(products: list[dict], *, phone: str | None=None) -> None  # Catalog sync stays off the chat turn. A down Chroma does not slow add_product.  # changed 2026-10-06
@@ -317,14 +325,14 @@ POST /billing/subscribe  (body: SubscribeIn)  # owner X5, changed 2026-10-02
     backend/app/api/billing.py: SubscribeIn {plan: str = Field(min_length=2, max_length=16); code: str = ''}; response untyped
 POST /settings/support/hub/{ticket_id}/reply  (ticket_id: str, body: dict)  # owner X5, changed 2026-10-02
     backend/app/api/settings.py: response untyped
-POST /settings/support/seller-ticket  (body: SellerTicketIn)  # owner X5, changed 2026-10-02
-    backend/app/api/settings.py: SellerTicketIn {subject: str = Field(min_length=2, max_length=120); text: str = Field(min_length=2, max_length=2000)}; response untyped
+POST /settings/support/seller-ticket  (body: SellerTicketIn)  # owner X5, changed 2026-10-09
+    backend/app/api/settings.py: SellerTicketIn {subject: str = Field(min_length=2, max_length=120); text: str = Field(min_length=2, max_length=2000); category: Literal['billing', 'technical', 'other'] | None = None}; response untyped
 ```
 
 **Shared runtime state files** (other roles depend on these keys; changing a key is a contract change):
 
 - `channel-scan.json`: writers: X3; readers: C, X5 — top-level keys per role: C: {categories}
-- `pay-orders.json`: writers: C; readers: X5
+- `pay-orders.json`: writers: C; readers: X1, X5
 - `shop.json`: writers: C, X4, X5; readers: X1, X3 — top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, url}; X3: {brand, tagline, vertical}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}
 - `support-tickets.json`: writers: C; readers: X5
 
@@ -346,8 +354,8 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `backend/app/services/arvan_dns_service.py`: `check_cname` (changed 2026-09-18) ← X4; `cname_target` (changed 2026-09-18) ← X4; `edge_dry` (changed 2026-09-27) ← X4, X5, Y; `ensure_shop_record` (changed 2026-09-18) ← X4; `hostname` (changed 2026-09-18) ← X4; `is_zone_host` (changed 2026-09-18) ← X4; `public_host` (changed 2026-09-18) ← X4; `start_cname_setup` (changed 2026-09-18) ← X4; `zone` (changed 2026-09-18) ← X4
 - `backend/app/services/catalog_sync_service.py`: `sync_live` (changed 2026-09-18) ← X1, X4
 - `backend/app/services/pay_service.py`: `create_order` (changed 2026-09-19) ← Y; `ensure_pay_secret` (changed 2026-09-18) ← X4; `get_order` (changed 2026-09-18) ← Y; `public_order` (changed 2026-09-18) ← Y
-- `backend/app/services/storefront_service.py`: `add_product` (changed 2026-09-18) ← X4; `clear_scanned_catalog` (changed 2026-09-18) ← X3; `count_scanned_handle` (changed 2026-09-19) ← X3; `is_placeholder_catalog` (changed 2026-10-06) ← X2, X3, X4; `list_products` (changed 2026-09-18) ← X1, X2, X3, X4, Y; `list_sales` (changed 2026-09-18) ← X5; `price_label` (changed 2026-09-18) ← X4; `referenced_image_names` (changed 2026-09-18) ← X2; `remove_product_by_title` (changed 2026-09-18) ← X1, X4; `remove_scanned_handle` (changed 2026-09-18) ← X3; `retitle_scanned_from_captions` (changed 2026-09-18) ← X5; `update_product` (changed 2026-10-06) ← X4; `upsert_scanned_product` (changed 2026-09-18) ← X3
-- `backend/app/services/support_service.py`: `create_ticket` (changed 2026-09-29) ← X5; `list_all_tickets_for_hub_admin` (changed 2026-09-29) ← X5; `list_tickets` (changed 2026-09-29) ← X5; `reply_hub_ticket` (changed 2026-10-01) ← X5
+- `backend/app/services/storefront_service.py`: `_list` (changed 2026-10-09) ← X1; `_row_images` (changed 2026-10-09) ← X1; `add_product` (changed 2026-09-18) ← X4; `clear_scanned_catalog` (changed 2026-09-18) ← X3; `count_scanned_handle` (changed 2026-09-19) ← X3; `is_placeholder_catalog` (changed 2026-10-06) ← X2, X3, X4; `list_products` (changed 2026-09-18) ← X1, X2, X3, X4, Y; `list_sales` (changed 2026-09-18) ← X1, X5; `price_label` (changed 2026-09-18) ← X4; `referenced_image_names` (changed 2026-09-18) ← X2; `remove_product_by_title` (changed 2026-09-18) ← X1, X4; `remove_scanned_handle` (changed 2026-09-18) ← X3; `retitle_scanned_from_captions` (changed 2026-09-18) ← X5; `update_product` (changed 2026-10-06) ← X4; `upsert_scanned_product` (changed 2026-09-18) ← X3
+- `backend/app/services/support_service.py`: `create_ticket` (changed 2026-10-09) ← X5; `list_all_tickets_for_hub_admin` (changed 2026-09-29) ← X5; `list_tickets` (changed 2026-09-29) ← X5; `reply_hub_ticket` (changed 2026-10-01) ← X5
 - `frontend/components/domain-menu.tsx`: `DomainMenu` (changed 2026-09-18) ← X4; `ShopState` (changed 2026-10-06) ← X4; `shopHostLabel` (changed 2026-09-18) ← X4; `shopPublicUrl` (changed 2026-09-18) ← X4
 - `frontend/components/shop-settings-form.tsx`: `ShopSettingsForm` (changed 2026-09-18) ← X5
 - `frontend/lib/site-host.ts`: `isPanelHost` (changed 2026-09-18) ← U; `panelOriginFromHost` (changed 2026-09-18) ← U
@@ -515,7 +523,7 @@ cd frontend && npm run build 2>&1 | tail -15
 | file | writers | readers | your rule |
 |---|---|---|---|
 | `channel-scan.json` | X3 | C, X5 | read-only for you; never write it |
-| `pay-orders.json` | C | X5 | you are the only writer; keep the shape stable for the readers |
+| `pay-orders.json` | C | X1, X5 | you are the only writer; keep the shape stable for the readers |
 | `shop.json` | C, X4, X5 | X1, X3 | write only with `update_json(..., lock=...)` or inside `tenant_file_lock` |
 | `support-tickets.json` | C | X5 | you are the only writer; keep the shape stable for the readers |
 

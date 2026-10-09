@@ -42,6 +42,19 @@ type PaymentsData = {
 
 const STATUS_LABEL: Record<string, string> = { active: "فعال", blocked: "مسدود", expired: "منقضی" };
 
+type HubTicket = {
+  id: string;
+  subject: string;
+  text: string;
+  status: string;
+  category?: string;
+  tenant?: string;
+  replies?: { text: string }[];
+};
+
+const TICKET_STATUS: Record<string, string> = { open: "باز", working: "در حال بررسی", closed: "بسته" };
+const TICKET_CATEGORY: Record<string, string> = { billing: "مالی", technical: "فنی", other: "متفرقه" };
+
 function fa(n: number) {
   return Number(n || 0).toLocaleString("fa-IR");
 }
@@ -52,7 +65,7 @@ function faDate(ts: number) {
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"health" | "users" | "payments" | "audit">("health");
+  const [tab, setTab] = useState<"health" | "users" | "payments" | "audit" | "tickets">("health");
   const [users, setUsers] = useState<UserRow[]>([]);
   const [payments, setPayments] = useState<PaymentsData | null>(null);
   const [audit, setAudit] = useState<{ action: string; target: string; reason: string; at: number }[]>([]);
@@ -61,6 +74,9 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [planForm, setPlanForm] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
+  const [hubTickets, setHubTickets] = useState<HubTicket[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<"" | "billing" | "technical" | "other">("");
+  const [ticketReply, setTicketReply] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -78,9 +94,24 @@ export default function AdminPage() {
     }
   }, []);
 
+  const loadTickets = useCallback(async () => {
+    try {
+      const hub = await api<{ tickets: HubTicket[] }>("/settings/support/hub");
+      setHubTickets(hub.tickets || []);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    }
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (tab !== "tickets") return;
+    void loadTickets();
+  }, [tab, loadTickets]);
 
   async function openDetail(phone: string) {
     try {
@@ -131,7 +162,21 @@ export default function AdminPage() {
     }
   }
 
+  async function hubReply(id: string, text: string, status: string) {
+    setBusy(true);
+    try {
+      await api(`/settings/support/hub/${id}/reply`, { method: "POST", body: JSON.stringify({ text, status }) });
+      setTicketReply((rows) => ({ ...rows, [id]: "" }));
+      await loadTickets();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const needle = search.trim().toLowerCase();
+  const visibleTickets = hubTickets.filter((row) => !ticketFilter || (row.category || "other") === ticketFilter);
   const filtered = users.filter(
     (u) =>
       !needle ||
@@ -176,14 +221,14 @@ export default function AdminPage() {
         {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
 
         <div className="flex flex-wrap gap-2">
-          {(["health", "users", "payments", "audit"] as const).map((t) => (
+          {(["health", "users", "payments", "audit", "tickets"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
               className={`min-h-11 rounded-xl px-4 text-sm ${tab === t ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted"}`}
             >
-              {t === "health" ? "سلامت" : t === "users" ? "کاربران" : t === "payments" ? "پرداخت‌ها" : "اقدامات"}
+              {t === "health" ? "سلامت" : t === "users" ? "کاربران" : t === "payments" ? "پرداخت‌ها" : t === "audit" ? "اقدامات" : "تیکت‌ها"}
             </button>
           ))}
         </div>
@@ -319,6 +364,73 @@ export default function AdminPage() {
                 </li>
               ))}
             </ul>
+          </>
+        ) : null}
+
+        {tab === "tickets" ? (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["", "همه"],
+                  ["billing", "مالی"],
+                  ["technical", "فنی"],
+                  ["other", "متفرقه"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value || "all"}
+                  type="button"
+                  onClick={() => setTicketFilter(value)}
+                  className={`min-h-11 rounded-xl px-3 text-sm ${ticketFilter === value ? "border border-accent/40 bg-accent/15 text-warm" : "border border-line text-muted"}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {visibleTickets.length ? (
+              <ul className="space-y-3">
+                {visibleTickets.map((row) => (
+                  <li key={`${row.tenant}-${row.id}`} className="rounded-xl border border-line bg-canvas p-3 text-sm">
+                    <p className="font-bold">
+                      {row.subject}{" "}
+                      <span className="text-xs font-normal text-muted">
+                        · {TICKET_CATEGORY[row.category || "other"] || "متفرقه"} · {TICKET_STATUS[row.status] || row.status}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-muted">
+                      فروشندهٔ <bdo dir="ltr">{row.tenant}</bdo>
+                    </p>
+                    <p className="mt-1 whitespace-pre-line leading-6">{row.text}</p>
+                    {(row.replies || []).map((rep, idx) => (
+                      <p key={idx} className="mt-2 rounded-lg bg-paper p-2 text-xs leading-6">
+                        پاسخ قبلی: {rep.text}
+                      </p>
+                    ))}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Input
+                        className="min-w-40 flex-1"
+                        placeholder="پاسخ پشتیبانی"
+                        aria-label="پاسخ پشتیبانی"
+                        value={ticketReply[row.id] || ""}
+                        onChange={(e) => setTicketReply((rows) => ({ ...rows, [row.id]: e.target.value }))}
+                      />
+                      <Button
+                        disabled={busy || !(ticketReply[row.id] || "").trim()}
+                        onClick={() => void hubReply(row.id, ticketReply[row.id] || "", "working")}
+                      >
+                        پاسخ
+                      </Button>
+                      <Button variant="ghost" disabled={busy} onClick={() => void hubReply(row.id, "", "closed")}>
+                        بستن
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="تیکتی نیست" detail="تیکت‌های فروشندگان به سوزان اینجا می‌آید." />
+            )}
           </>
         ) : null}
 

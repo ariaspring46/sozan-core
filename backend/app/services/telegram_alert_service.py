@@ -46,13 +46,18 @@ async def send(text: str) -> bool:
         return False
 
 
-async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str) -> None:
+_CATEGORY_LABEL = {"billing": "مالی", "technical": "فنی", "other": "متفرقه"}
+
+
+async def seller_ticket_alert(ticket_id: str, subject: str, tenant: str, category: str = "") -> None:
+    label = _CATEGORY_LABEL.get(str(category or "").strip().lower(), "متفرقه")
     ok = await send(
         "تیکت تازه از فروشنده\n"
         f"شناسه: {ticket_id}\n"
         f"موضوع: {subject[:80]}\n"
+        f"دسته: {label}\n"
         f"فروشنده: {str(tenant)[:4]}***\n"
-        "پاسخ در پنل ← پشتیبانی و رسیدها."
+        "پاسخ در پیشخوان مدیر، زبانهٔ تیکت‌ها (/admin)."
     )
     emit_later(
         kind="support",

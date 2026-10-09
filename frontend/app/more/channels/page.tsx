@@ -131,15 +131,20 @@ export default function ChannelsPage() {
     void (async () => {
       try {
         const params = new URLSearchParams(window.location.search);
-        const raw = params.get("instagram");
-        const status = (params.get("status") || "").toLowerCase();
-        const accountId = (params.get("account_id") || "").trim();
-        const username = (params.get("username") || "").trim();
-        if (raw || status) window.history.replaceState({}, "", window.location.pathname);
-        if (status === "success" && accountId) {
+        const query: Record<string, string> = {};
+        params.forEach((value, key) => {
+          if (value) query[key] = value;
+        });
+        const raw = query.instagram || "";
+        const status = (query.status || "").toLowerCase();
+        const accountId = (query.account_id || query.accountId || "").trim();
+        if (raw || status || accountId || query.error || query.username) {
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+        if (accountId || status === "success") {
           const data = await api<{ platforms: Platform[]; accounts: Account[]; voice?: Voice }>(
-            "/channels/sendbox/claim",
-            { method: "POST", body: JSON.stringify({ accountId, handle: username }) },
+            "/channels/sendbox/return",
+            { method: "POST", body: JSON.stringify({ query }) },
           );
           setPlatforms(data.platforms || []);
           setAccounts(data.accounts || []);

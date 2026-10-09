@@ -3,14 +3,14 @@
  "owned_source_max": 80000,
  "roles": [
   {
-   "active": 121230,
-   "core": 47772,
-   "core_pct": 106,
+   "active": 147253,
+   "core": 53251,
+   "core_pct": 118,
    "id": "X1",
    "loose_contracts": 2,
-   "manifest": 10007,
+   "manifest": 11035,
    "rare": 9881,
-   "tests": 45779
+   "tests": 53481
   },
   {
    "active": 82797,
@@ -23,44 +23,44 @@
    "tests": 32474
   },
   {
-   "active": 79967,
+   "active": 85152,
    "core": 18023,
    "core_pct": 40,
    "id": "X3",
-   "loose_contracts": 19,
-   "manifest": 10699,
+   "loose_contracts": 22,
+   "manifest": 11169,
    "rare": 1208,
-   "tests": 38756
+   "tests": 40848
   },
   {
-   "active": 108529,
+   "active": 110356,
    "core": 31930,
    "core_pct": 71,
    "id": "X4",
    "loose_contracts": 15,
-   "manifest": 10098,
+   "manifest": 10380,
    "rare": 2323,
    "tests": 48789
   },
   {
-   "active": 89711,
+   "active": 96395,
    "core": 22585,
    "core_pct": 50,
    "id": "X5",
-   "loose_contracts": 30,
-   "manifest": 12472,
-   "rare": 20373,
-   "tests": 54824
+   "loose_contracts": 31,
+   "manifest": 12763,
+   "rare": 20610,
+   "tests": 55505
   },
   {
-   "active": 66062,
+   "active": 66259,
    "core": 31757,
    "core_pct": 71,
    "id": "Y",
    "loose_contracts": 12,
-   "manifest": 9686,
+   "manifest": 9909,
    "rare": 19762,
-   "tests": 36668
+   "tests": 37035
   },
   {
    "active": 79109,
@@ -73,32 +73,32 @@
    "tests": 14831
   },
   {
-   "active": 58450,
+   "active": 59117,
    "core": 20442,
    "core_pct": 45,
    "id": "C",
-   "loose_contracts": 15,
-   "manifest": 10932,
+   "loose_contracts": 16,
+   "manifest": 11082,
    "rare": 11609,
-   "tests": 16734
+   "tests": 18588
   },
   {
-   "active": 90265,
-   "core": 15575,
+   "active": 90380,
+   "core": 15690,
    "core_pct": 35,
    "id": "U",
    "loose_contracts": 0,
-   "manifest": 9402,
+   "manifest": 9479,
    "rare": 34504,
    "tests": 0
   },
   {
-   "active": 206587,
+   "active": 222248,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",
    "loose_contracts": 0,
-   "manifest": 3446,
+   "manifest": 3458,
    "rare": 0,
    "tests": 0
   }
