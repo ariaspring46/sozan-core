@@ -49,6 +49,15 @@
    "Y"
   ]
  },
+ "HTTP GET /events/unseen": {
+  "owner": "X1",
+  "shape": "backend/app/api/events.py: returns keys {count}",
+  "signature": "GET /events/unseen  ()",
+  "since": "2026-10-09",
+  "users": [
+   "U"
+  ]
+ },
  "HTTP GET /health": {
   "owner": "X5",
   "shape": "backend/app/main.py: returns keys {edgeDry, ok, paymentReady}",
@@ -241,6 +250,15 @@
    "Y"
   ]
  },
+ "HTTP POST /events/seen": {
+  "owner": "X1",
+  "shape": "backend/app/api/events.py: returns keys {count}",
+  "signature": "POST /events/seen  ()",
+  "since": "2026-10-09",
+  "users": [
+   "U"
+  ]
+ },
  "HTTP POST /sales": {
   "owner": "C",
   "shape": "backend/app/api/storefront.py: SaleIn {title: str = Field(min_length=1, max_length=200); amount: int = Field(ge=0); customer: str = Field(default='', max_length=200); channel: str = Field(default='فروشگاه', max_length=80)}; response untyped",
@@ -416,6 +434,14 @@
   "users": [
    "X2",
    "X4"
+  ]
+ },
+ "backend/app/api/events.py::router": {
+  "owner": "X1",
+  "signature": "router = APIRouter(prefix='/events', tags=['events'])",
+  "since": "2026-10-09",
+  "users": [
+   "X5"
   ]
  },
  "backend/app/api/inbox.py::router": {
@@ -2185,6 +2211,22 @@
    "X1"
   ]
  },
+ "backend/app/services/pay_service.py::_orders": {
+  "owner": "C",
+  "signature": "def _orders() -> list[dict]",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/pay_service.py::_save_orders": {
+  "owner": "C",
+  "signature": "def _save_orders(rows: list[dict]) -> None",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/pay_service.py::create_order": {
   "owner": "C",
   "signature": "async def create_order(*, title: str='', amount: int=0, product_id: str='', qty: int=1, customer: str='', channel: str='دایرکت', thread_id: str='', mobile: str='', lines: list[dict] | None=None, address: str='') -> dict",
@@ -2212,6 +2254,14 @@
  "backend/app/services/pay_service.py::list_orders": {
   "owner": "C",
   "signature": "def list_orders(limit: int=40) -> list[dict]",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/pay_service.py::log_event": {
+  "owner": "C",
+  "signature": "def log_event(row: dict, event: str, note: str='') -> None",
   "since": "2026-10-09",
   "users": [
    "X1"
@@ -2531,7 +2581,6 @@
   "signature": "def latest_thread_id() -> str",
   "since": "2026-10-09",
   "users": [
-   "C",
    "X3"
   ]
  },
@@ -2540,7 +2589,6 @@
   "signature": "def post_notice(thread_id: str, text: str) -> None",
   "since": "2026-10-09",
   "users": [
-   "C",
    "X3"
   ]
  },
@@ -2582,6 +2630,38 @@
   "since": "2026-09-27",
   "users": [
    "X5"
+  ]
+ },
+ "backend/app/services/seller_events.py::loop": {
+  "owner": "X1",
+  "signature": "async def loop() -> None",
+  "since": "2026-10-09",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/seller_events.py::order_paid": {
+  "owner": "X1",
+  "signature": "def order_paid(row: dict, text: str) -> None",
+  "since": "2026-10-09",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/seller_events.py::receipt_arrived": {
+  "owner": "X1",
+  "signature": "def receipt_arrived(row: dict) -> None",
+  "since": "2026-10-09",
+  "users": [
+   "C"
+  ]
+ },
+ "backend/app/services/seller_events.py::shortage": {
+  "owner": "X1",
+  "signature": "def shortage(row: dict, text: str) -> None",
+  "since": "2026-10-09",
+  "users": [
+   "C"
   ]
  },
  "backend/app/services/sendbox_service.py::send_message": {

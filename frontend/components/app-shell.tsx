@@ -91,6 +91,8 @@ export function AppShell({
   const router = useRouter();
   useAppViewport();
   const [unread, setUnread] = useState(0);
+  /** پیام‌هایی که سوزان خودش در چت گذاشته (سفارش تازه، رسید، یادآوری) و فروشنده هنوز ندیده. */
+  const [events, setEvents] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -137,6 +139,18 @@ export function AppShell({
           if (!cancelled) setUnread(Number(data.count) || 0);
         })
         .catch(() => undefined);
+      const onChat = pathname === "/chat" || pathname.startsWith("/chat/");
+      void api<{ count: number }>("/events/unseen")
+        .then((data) => {
+          const count = Number(data.count) || 0;
+          if (cancelled) return;
+          if (!onChat || !count) return setEvents(count);
+          // در خود چت: پیام تازهٔ سوزان را همان‌جا نشان بده و دیده‌شده بزن
+          window.dispatchEvent(new Event("sozan:events"));
+          setEvents(0);
+          void api("/events/seen", { method: "POST" }).catch(() => undefined);
+        })
+        .catch(() => undefined);
     };
     tick();
     const timer = window.setInterval(tick, 15000);
@@ -151,7 +165,12 @@ export function AppShell({
     };
   }, [pathname]);
 
-  const label = (tab: Tab) => (tab.href === "/inbox" && unread > 0 ? `${tab.label}، ${unread} خوانده‌نشده` : tab.label);
+  const label = (tab: Tab) =>
+    tab.href === "/inbox" && unread > 0
+      ? `${tab.label}، ${unread} خوانده‌نشده`
+      : tab.href === "/chat" && events > 0
+        ? `${tab.label}، ${events} پیام تازه از سوزان`
+        : tab.label;
 
   return (
     <div className={cn("sozan-app-shell flex w-full overflow-hidden", scene ? "sozan-chat" : "bg-canvas")}>
@@ -181,6 +200,7 @@ export function AppShell({
               <span className="relative">
                 <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
                 {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
+                {tab.href === "/chat" && events > 0 ? <Badge count={events} /> : null}
               </span>
               <span className="truncate">{tab.label}</span>
             </Link>
@@ -206,7 +226,7 @@ export function AppShell({
           <button
             ref={menuButton}
             type="button"
-            aria-label={unread > 0 ? `منو، ${unread} خوانده‌نشده` : "منو"}
+            aria-label={unread > 0 ? `منو، ${unread} خوانده‌نشده` : events > 0 ? `منو، ${events} پیام تازه از سوزان` : "منو"}
             aria-haspopup="dialog"
             aria-expanded={menuOpen}
             aria-controls="app-menu"
@@ -214,7 +234,7 @@ export function AppShell({
             className={cn("relative inline-flex h-11 w-11 shrink-0 items-center justify-center text-ink md:hidden", scene ? "sozan-glass rounded-full" : "rounded-xl hover:bg-canvas")}
           >
             <Menu size={24} aria-hidden />
-            {unread > 0 ? <span aria-hidden className="absolute end-2 top-2 h-2.5 w-2.5 rounded-full bg-accentStrong ring-2 ring-paper" /> : null}
+            {unread > 0 || events > 0 ? <span aria-hidden className="absolute end-2 top-2 h-2.5 w-2.5 rounded-full bg-accentStrong ring-2 ring-paper" /> : null}
           </button>
           <div className="min-w-0 flex-1">{header}</div>
         </header>
@@ -274,6 +294,7 @@ export function AppShell({
                   <span className="relative">
                     <Icon size={22} strokeWidth={active ? 2.4 : 1.8} aria-hidden />
                     {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
+                {tab.href === "/chat" && events > 0 ? <Badge count={events} /> : null}
                   </span>
                   <span className="truncate">{tab.label}</span>
                 </Link>

@@ -9,6 +9,7 @@ import { CHAT_STARTERS, greeting } from "@/components/chat-welcome";
 import { ChatHeader, type ThreadRow } from "@/components/chat-header";
 import type { PublishPayload, PublishTarget, StudioCaptions } from "@/components/studio-publish";
 import { api, timeoutSignal } from "@/lib/api";
+import { useSozanEvents } from "@/lib/use-sozan-events";
 import { emptyIdempotencySlot, finishIdempotencyKey, takeIdempotencyKey } from "@/lib/idempotency";
 
 type ChatPayload = {
@@ -84,6 +85,8 @@ export default function ChatPage() {
     }, 2000);
     return () => window.clearInterval(timer);
   }, [messages, load]);
+
+  useSozanEvents(load, busyRef);
 
   /** true = جواب رسید (یا گفتگو عوض شد)؛ false = ارسال نشد و متن باید به کادر برگردد. */
   async function send(text: string, file?: File, confirmId?: string, cancelId?: string): Promise<boolean> {

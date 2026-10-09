@@ -532,15 +532,11 @@ def _take_stock(row: dict) -> tuple[list[dict], list[str]]:
 
 
 def _tell_receipt(row: dict) -> None:
-    amount = f"{int(row.get('amount') or 0):,}".replace(",", "٬").translate(_FA_DIGITS)
-    text = (
-        f"رسید کارت‌به‌کارت برای «{row.get('title') or 'سفارش'}» ({amount} تومان) آمد. "
-        "اگر پول به حسابت نشسته بگو «رسید رو تأیید کن»؛ اگر نه «رسید رو رد کن»."
-    )
+    """The seller's chat gets the receipt with a ready «approve?» card (seller_events)."""
     try:
-        from app.services import router_service
+        from app.services import seller_events
 
-        router_service.post_notice(router_service.latest_thread_id(), text)
+        seller_events.receipt_arrived(row)
     except Exception:
         log.exception("receipt notice failed order=%s", row.get("id"))
 
@@ -572,9 +568,9 @@ def _tell_seller(row: dict, short: list[dict], sold_out: list[str]) -> None:
             names = "، ".join(f"«{title}»" for title in sold_out)
             text += f" موجودی {names} با این فروش تمام شد؛ اگر هنوز داری بگو «موجودی {sold_out[0]} رو ۱۰ کن»."
     try:
-        from app.services import router_service
+        from app.services import seller_events
 
-        router_service.post_notice(router_service.latest_thread_id(), text)
+        (seller_events.shortage if short else seller_events.order_paid)(row, text)
     except Exception:
         log.exception("seller notice failed order=%s", row.get("id"))
 
