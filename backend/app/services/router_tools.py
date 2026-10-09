@@ -143,7 +143,7 @@ _SCHEMAS = [
         "type": "function",
         "function": {
             "name": "inbox_status",
-            "description": "صندوق، خوانده‌نشده و پاسخ خودکار. پرسش وضعیت فروشگاه نیست.",
+            "description": "صندوق، خوانده‌نشده و پاسخ خودکار. پرسش وضعیت فروشگاه نیست. فرستادن پیام به مشتری reply_customer است.",
             "parameters": {"type": "object", "properties": {}},
         },
     },
