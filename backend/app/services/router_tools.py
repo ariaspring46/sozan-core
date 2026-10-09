@@ -260,9 +260,21 @@ for _schema in _SCHEMAS:
     register(Tool(name=_name, schema=_schema, level=_level, rank=_rank, groups=_groups, run=_HANDLERS.get(_name)))
 
 from app.services import seller_tools  # noqa: E402,F401  registers orders, sales, catalog edits and customer replies
+from app.services import order_tools  # noqa: E402,F401  registers order stages and receipt review
 
-TOOLS = schemas()
-WRITE_TOOLS = names("write")
-READ_TOOLS = names("read")
-PASSTHROUGH = names("pass")
-TOOL_RANK = {name: rank(name) for name in names()}
+
+
+def __getattr__(attr: str):
+    """TOOLS, WRITE_TOOLS, READ_TOOLS, PASSTHROUGH and TOOL_RANK are read when first imported, not when this module
+    loads: a tool module imported before the router (order_tools in a test) starts this file, and its own tools
+    register only after this file ends. Built here they would miss them and the router would refuse the tool."""
+    built = {
+        "TOOLS": schemas,
+        "WRITE_TOOLS": lambda: names("write"),
+        "READ_TOOLS": lambda: names("read"),
+        "PASSTHROUGH": lambda: names("pass"),
+        "TOOL_RANK": lambda: {name: rank(name) for name in names()},
+    }.get(attr)
+    if built is None:
+        raise AttributeError(attr)
+    return built()

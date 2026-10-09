@@ -111,7 +111,8 @@ class AfterPaymentTests(_Shop):
         paid = self._pay(self._checkout([{"productId": self.bag["id"], "qty": 1}]))
         self.assertNotIn("needsAction", paid)
         self.assertEqual(self._stock(self.bag), 3)
-        self.assertEqual(self.notices, [])
+        self.assertIn("سفارش تازه پرداخت شد", self.notices[-1])
+        self.assertFalse(any("موجودی کم بود" in text or "تمام شد" in text for text in self.notices))
 
 
 class StorefrontTests(_Shop):

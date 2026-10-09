@@ -111,13 +111,24 @@ def orders_text(now: float | None = None) -> str:
     if need:
         titles = "، ".join(_quote(str(row.get("title") or "سفارش")[:30]) for row in need[:3])
         lines.insert(0, f"نیازمند اقدام: {fa_digits(len(need))} سفارش پرداخت‌شده که موجودی کافی نداشت ({titles}). شماره و نام مشتری در صفحهٔ «فروش» است.")
+    from app.services.order_flow_service import STAGE_FA, stage_line
+
+    todo: dict[str, int] = {}
+    for row in rows:
+        stage = str(row.get("stage") or "")
+        if row.get("status") == "paid" and stage in {"", "preparing"}:
+            todo[stage] = todo.get(stage, 0) + 1
+    if todo:
+        lines.append("کار مانده: " + "، ".join(f"{fa_digits(n)} {STAGE_FA[stage]}" for stage, n in sorted(todo.items())) + ".")
     lines.append("آخرین‌ها:")
     for row in rows[:5]:
-        label = _ORDER_FA.get(str(row.get("status") or ""), "در انتظار پرداخت")
+        label = stage_line(row) or _ORDER_FA.get(str(row.get("status") or ""), "در انتظار پرداخت")
         title = str(row.get("title") or "سفارش")[:40]
-        lines.append(f"• {title} — {fa_money(row.get('amount'))} تومان — {label} — {_ago(int(row.get('at') or 0), now)}")
+        who = str(row.get("customer") or "").strip()
+        who = f" — {who}" if who and who != "مشتری" else ""
+        lines.append(f"• {title} — {fa_money(row.get('amount'))} تومان — {label}{who} — {_ago(int(row.get('at') or 0), now)}")
     if counts.get("awaiting_receipt"):
-        lines.append(f"{fa_digits(counts['awaiting_receipt'])} رسید منتظر تأیید توست؛ از صفحهٔ سفارش‌ها بررسی کن.")
+        lines.append(f"{fa_digits(counts['awaiting_receipt'])} رسید منتظر تأیید توست؛ اگر پول رسیده بگو «رسید … رو تأیید کن».")
     return "\n".join(lines)
 
 
@@ -534,6 +545,11 @@ def route(spoken: str) -> str:
             return "reply_customer"  # before the question check: «به مریم بگو آدرس رو می‌فرستی؟» is still a reply
     if "؟" in text or "?" in text or _STOCK_ASK.search(text):  # a question never opens a write card
         return _read_route(text)
+    from app.services import order_tools
+
+    order = order_tools.route(text)
+    if order:
+        return order
     if "تخفیف" in text and (_CHANGE.search(text) or "بده" in text) and (_percent_in(text) is not None or _NO_DISCOUNT.search(text)):
         return "set_discount"
     if not _PAGE.search(text):

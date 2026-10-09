@@ -46,6 +46,18 @@ class ShopCheckoutIn(BaseModel):
     name: str = Field(default="", max_length=80)
     phone: str = Field(default="", max_length=20)
     lines: list[ShopLine] = Field(default_factory=list)
+    address: str = Field(default="", max_length=400)
+
+
+class OrderStageIn(BaseModel):
+    stage: str = Field(min_length=1, max_length=16)
+    tracking: str = Field(default="", max_length=40)
+    carrier: str = Field(default="", max_length=40)
+    note: str = Field(default="", max_length=200)
+
+
+class OrderAddressIn(BaseModel):
+    address: str = Field(min_length=1, max_length=400)
 
 
 class ShopOtpSendIn(BaseModel):
@@ -204,6 +216,7 @@ async def shop_checkout(request: Request, body: ShopCheckoutIn):
             phone=body.phone,
             lines=[item.model_dump() for item in body.lines],
             ip=client_ip(request),
+            address=body.address,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
@@ -255,6 +268,34 @@ async def shop_otp_verify(body: ShopOtpVerifyIn):
         return await shop_otp_service.verify(slug=body.slug, phone=body.phone, code=body.code)
     except shop_otp_service.OtpLimitError as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.post("/p/orders/{order_id}/address")
+async def order_address(order_id: str, body: OrderAddressIn, request: Request):
+    if not _status_rate_allow(client_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "درخواست‌ها زیاد است؛ کمی بعد دوباره")
+    from app.services import order_flow_service
+
+    try:
+        return order_flow_service.set_address(order_id, body.address)
+    except KeyError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "سفارش پیدا نشد") from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+
+@router.post("/pay/orders/{order_id}/stage")
+async def order_stage(order_id: str, body: OrderStageIn, _user=Depends(require_permission("campaigns:write"))):
+    from app.services import order_flow_service
+
+    try:
+        return await order_flow_service.advance_order(
+            order_id, body.stage, tracking=body.tracking, carrier=body.carrier, note=body.note
+        )
+    except KeyError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 

@@ -16,11 +16,15 @@ class RegistryTests(unittest.TestCase):
                 "channel", "status", "inbox_status", "ask_user", "set_auto_reply", "set_voice_tone", "shop_chat", "edit_shop",
                 "add_product", "studio_chat", "publish_post",
                 "orders", "sales_report", "products", "edit_product", "set_discount", "reply_customer",
+                "update_order", "approve_receipt",
             ],
         )
         self.assertEqual(
             router_service.WRITE_TOOLS,
-            {"set_auto_reply", "set_voice_tone", "edit_shop", "add_product", "studio_chat", "publish_post", "edit_product", "set_discount", "reply_customer"},
+            {
+                "set_auto_reply", "set_voice_tone", "edit_shop", "add_product", "studio_chat", "publish_post", "edit_product",
+                "set_discount", "reply_customer", "update_order", "approve_receipt",
+            },
         )
         self.assertEqual(router_service.READ_TOOLS, {"status", "ask_user", "inbox_status", "channel", "orders", "sales_report", "products"})
         self.assertEqual(router_service.PASSTHROUGH, {"shop_chat"})
@@ -53,6 +57,22 @@ class RegistryTests(unittest.TestCase):
             self.assertTrue(not tool or router_tools.get(tool) is not None, action)
             self.assertIn(action, decider_service._LABELS)
             self.assertIn(action, decider_service._CRITERIA)
+
+    def test_a_tool_module_imported_first_still_reaches_the_router(self) -> None:
+        # order_tools imported before the router used to freeze WRITE_TOOLS without its own tools (2026-10-09)
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        code = (
+            "import app.services.order_tools\n"
+            "from app.services import router_service as r\n"
+            "assert {'update_order', 'approve_receipt'} <= r.ALLOWED, sorted(r.ALLOWED)\n"
+            "assert [t['function']['name'] for t in r.TOOLS][:2] == ['channel', 'status']\n"
+        )
+        backend = Path(__file__).resolve().parents[2]
+        done = subprocess.run([sys.executable, "-c", code], cwd=backend, capture_output=True, text=True, timeout=120)
+        self.assertEqual(done.returncode, 0, done.stderr[-800:])
 
     def test_a_check_answers_before_the_card(self) -> None:
         self.assertIsNone(router_tools.check("status", {}, "وضعیت"))

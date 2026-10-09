@@ -219,7 +219,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `frontend/components/ui/textarea.tsx`: `Textarea` (changed 2026-09-18) ← C, X2, X3
 - `frontend/lib/api.ts`: `ApiError` (changed 2026-09-21) ← X3, X5; `Brand` (changed 2026-09-18) ← X2; `Campaign` (changed 2026-09-18) ← X2; `api` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-18) ← C; `chatMediaUrl` (changed 2026-09-18) ← X1; `clearToken` (changed 2026-09-18) ← X5; `fileUrl` (changed 2026-09-18) ← C; `getApiBase` (changed 2026-09-18) ← C, X2; `getOnboarded` (changed 2026-09-18) ← X3, X5; `getToken` (changed 2026-09-18) ← X1, X2, X3, X5; `refreshSession` (changed 2026-10-06) ← X3; `setOnboarded` (changed 2026-09-18) ← X3, X5; `setToken` (changed 2026-09-18) ← X5; `timeoutSignal` (changed 2026-10-06) ← X1, X3
 - `frontend/lib/back-stack.ts`: `useBackClose` (changed 2026-10-06) ← C, X1, X4
-- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← X2, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← X5
+- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← C, X2, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← C, X5
 - `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-20) ← X1, X4, Y; `finishIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y; `takeIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y
 - `frontend/lib/utils.ts`: `cn` (changed 2026-09-18) ← X1, X2, X4, Y
 

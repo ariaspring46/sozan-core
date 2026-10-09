@@ -128,7 +128,7 @@ def get_order(order_id: str) -> dict | None:
 
 def list_orders(limit: int = 40) -> list[dict]:
     rows = _orders()
-    return [public_order(row) for row in reversed(rows[-max(1, limit) :])]
+    return [seller_order(row) for row in reversed(rows[-max(1, limit) :])]
 
 
 def locate_order(order_id: str) -> tuple[str, dict] | None:
@@ -160,19 +160,37 @@ def public_order(row: dict) -> dict:
         "at": int(row.get("at") or 0),
         "payUrl": public_pay_url(str(row.get("id") or "")),
         "startPayUrl": row.get("startPayUrl") or "",
-        **_action_fields(row),
+        # what the shopper may see on the public order page: never their name, number or address
+        "stage": str(row.get("stage") or ""),
+        "tracking": str(row.get("tracking") or ""),
+        "carrier": str(row.get("carrier") or ""),
+        "hasAddress": bool(str(row.get("address") or "").strip()),
     }
 
 
-def _action_fields(row: dict) -> dict:
+def seller_order(row: dict) -> dict:
+    """The order as its seller sees it (panel and chat): customer, number, address, timeline, what needs action."""
+    out = public_order(row)
+    out.update(
+        {
+            "customer": str(row.get("customer") or ""),
+            "customerMobile": str(row.get("customerMobile") or ""),
+            "address": str(row.get("address") or ""),
+            "threadId": str(row.get("threadId") or ""),
+            "history": list(row.get("history") or [])[-30:],
+        }
+    )
     need = row.get("needsAction")
-    if not isinstance(need, dict) or not need.get("reason"):
-        return {}
-    return {
-        "needsAction": {"reason": str(need.get("reason")), "items": list(need.get("items") or [])},
-        "customer": str(row.get("customer") or ""),
-        "customerMobile": str(row.get("customerMobile") or ""),
-    }
+    if isinstance(need, dict) and need.get("reason"):
+        out["needsAction"] = {"reason": str(need.get("reason")), "items": list(need.get("items") or [])}
+    return out
+
+
+def log_event(row: dict, event: str, note: str = "") -> None:
+    """One line of the order's timeline (the operation log the seller reads)."""
+    history = row.get("history") if isinstance(row.get("history"), list) else []
+    history.append({"at": int(time()), "event": event, "note": str(note or "")[:200]})
+    row["history"] = history[-30:]
 
 
 _FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
@@ -228,6 +246,7 @@ async def create_order(
     thread_id: str = "",
     mobile: str = "",
     lines: list[dict] | None = None,
+    address: str = "",
 ) -> dict:
     product, from_product = _product_amount(product_id, qty)
     total = int(amount or 0) or from_product
@@ -252,6 +271,7 @@ async def create_order(
         "lines": packed,
         "customer": (customer or "مشتری").strip()[:80],
         "customerMobile": str(mobile or "").strip()[:20],
+        "address": str(address or "").strip()[:400],
         "channel": channel.strip() or "دایرکت",
         "threadId": thread_id,
         "gateway": route["id"],
@@ -266,6 +286,7 @@ async def create_order(
         "at": int(time()),
         "phone": phone,
     }
+    log_event(row, "created", channel.strip() or "دایرکت")
     if route.get("id") == "receipt":
         # بی‌درگاه: سفارش ثبت و خریدار به صفحهٔ رسید کارت‌به‌کارت فرستاده می‌شود.
         url = f"/p/{order_id}"
@@ -391,6 +412,7 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
             return panel_pay_url(order_id, "ok")
         if not ok:
             row["status"] = "failed"
+            log_event(row, "failed")
             _save_orders(orders)
             _drop_pending(key)
             return panel_pay_url(order_id, "cancel")
@@ -468,10 +490,12 @@ def _mark_paid(row: dict, *, ref_id: str) -> None:
         channel=str(row.get("channel") or "دایرکت"),
         source="gateway",
     )
+    log_event(row, "paid", str(row.get("gateway") or ""))
     short, sold_out = _take_stock(row)
     if short:
         # paid but not fully in stock (two shoppers on the last one, or a receipt approved late): the seller decides
         row["needsAction"] = {"reason": "stock", "items": short, "at": int(time())}
+        log_event(row, "needsAction", "موجودی کم بود")
     _resync_storefront_after_paid()
     _tell_seller(row, short, sold_out)
 
@@ -507,6 +531,20 @@ def _take_stock(row: dict) -> tuple[list[dict], list[str]]:
     return short, sold_out
 
 
+def _tell_receipt(row: dict) -> None:
+    amount = f"{int(row.get('amount') or 0):,}".replace(",", "٬").translate(_FA_DIGITS)
+    text = (
+        f"رسید کارت‌به‌کارت برای «{row.get('title') or 'سفارش'}» ({amount} تومان) آمد. "
+        "اگر پول به حسابت نشسته بگو «رسید رو تأیید کن»؛ اگر نه «رسید رو رد کن»."
+    )
+    try:
+        from app.services import router_service
+
+        router_service.post_notice(router_service.latest_thread_id(), text)
+    except Exception:
+        log.exception("receipt notice failed order=%s", row.get("id"))
+
+
 def _tell_seller(row: dict, short: list[dict], sold_out: list[str]) -> None:
     """A line in the seller's chat. The customer's number stays on the sales page, out of the chat and the model."""
     fa = lambda value: str(value).translate(_FA_DIGITS)  # noqa: E731
@@ -518,11 +556,21 @@ def _tell_seller(row: dict, short: list[dict], sold_out: list[str]) -> None:
             f"ولی موجودی کم بود: {what}. با مشتری هماهنگ کن: کالای جایگزین یا برگرداندن پول. "
             "شماره و نام مشتری در صفحهٔ «فروش» زیر «نیازمند اقدام» است."
         )
-    elif sold_out:
-        names = "، ".join(f"«{title}»" for title in sold_out)
-        text = f"موجودی {names} با این فروش تمام شد و در فروشگاه دیگر خریدنی نیست. اگر هنوز داری بگو «موجودی {sold_out[0]} رو ۱۰ کن»."
     else:
-        return
+        amount = fa(f"{int(row.get('amount') or 0):,}".replace(",", "٬"))
+        who = str(row.get("customer") or "").strip()
+        text = (
+            f"سفارش تازه پرداخت شد: «{row.get('title') or 'سفارش'}»، {amount} تومان"
+            + (f"، {who}" if who and who != "مشتری" else "")
+            + ". وقتی فرستادی بگو «سفارش "
+            + (who if who and who != "مشتری" else str(row.get("title") or ""))
+            + " رو فرستادم، کد رهگیری …»."
+        )
+        if not str(row.get("address") or "").strip() and str(row.get("channel") or "") == "فروشگاه":
+            text += " آدرس هنوز ثبت نشده؛ مشتری در صفحهٔ سفارشش می‌نویسد."
+        if sold_out:
+            names = "، ".join(f"«{title}»" for title in sold_out)
+            text += f" موجودی {names} با این فروش تمام شد؛ اگر هنوز داری بگو «موجودی {sold_out[0]} رو ۱۰ کن»."
     try:
         from app.services import router_service
 
@@ -588,6 +636,7 @@ async def shop_checkout(
     phone: str = "",
     lines: list[dict] | None = None,
     ip: str = "",
+    address: str = "",
 ) -> dict:
     tenant = verify_pay_secret(slug, secret)
     from app.redis_client import redis_client
@@ -627,6 +676,7 @@ async def shop_checkout(
             mobile = ""
         first = packed[0]
         order = await create_order(
+            address=address,
             title="، ".join(titles)[:120],
             amount=total,
             product_id=str(first["productId"]),
@@ -692,7 +742,9 @@ async def attach_receipt(*, slug: str, secret: str, order_no: str, upload) -> di
         row["status"] = "awaiting_receipt"
         row["receipt"] = image_name
         row["receiptStatus"] = "waiting"
+        log_event(row, "receipt")
         _save_orders(orders)
+        _tell_receipt(row)
         from app.services import support_service
 
         support_service.create_ticket(
@@ -733,9 +785,10 @@ def review_receipt(*, order_no: str, approve: bool | None = None, note: str = ""
         else:
             row["status"] = "receipt_rejected"
             row["receiptStatus"] = "rejected"
+            log_event(row, "receipt_rejected", note)
         row["receiptNote"] = str(note or "").strip()[:300]
         _save_orders(orders)
-        out = public_order(row)
+        out = seller_order(row)
         if not approve:
             out["status"] = "receipt_rejected"
         return out

@@ -785,6 +785,14 @@
    "X3"
   ]
  },
+ "backend/app/config.py::settings.melipayamak_order_body_id": {
+  "owner": "X5",
+  "signature": "Settings.melipayamak_order_body_id: str = ''",
+  "since": "2026-10-09",
+  "users": [
+   "C"
+  ]
+ },
  "backend/app/config.py::settings.melipayamak_otp_apikey": {
   "owner": "X5",
   "signature": "Settings.melipayamak_otp_apikey: str = ''",
@@ -1844,6 +1852,7 @@
   "signature": "async def reply(thread_id: str, text: str, *, deliver: bool=True, draft_id: str='', as_draft: bool=False, auto: bool=False) -> dict",
   "since": "2026-10-09",
   "users": [
+   "C",
    "X1"
   ]
  },
@@ -2022,6 +2031,14 @@
    "X5"
   ]
  },
+ "backend/app/services/melipayamak_otp_service.py::send_pattern": {
+  "owner": "X3",
+  "signature": "async def send_pattern(phone: str, text: str, *, body_id: str, surface: str='auth') -> str",
+  "since": "2026-10-09",
+  "users": [
+   "C"
+  ]
+ },
  "backend/app/services/number_span.py::money_amounts": {
   "owner": "X1",
   "signature": "def money_amounts(text: str) -> set[str]",
@@ -2110,10 +2127,68 @@
    "X4"
   ]
  },
+ "backend/app/services/order_flow_service.py::STAGES": {
+  "owner": "C",
+  "signature": "STAGES = ('preparing', 'shipped', 'delivered', 'cancelled')",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/order_flow_service.py::STAGE_FA": {
+  "owner": "C",
+  "shape": "STAGE_FA = {'': 'str', 'preparing': 'str', 'shipped': 'str', 'delivered': 'str', 'cancelled': 'str'}",
+  "signature": "STAGE_FA = {'': 'منتظر ارسال', 'preparing': 'در حال آماده\\u200cسازی', 'shipped': 'ارسال\\u200cشده', 'delivered': 'تحویل\\u200cشده', 'cancelled': 'لغوشده'}",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/order_flow_service.py::TELLS_SHOPPER": {
+  "owner": "C",
+  "signature": "TELLS_SHOPPER = frozenset({'shipped', 'cancelled'})",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/order_flow_service.py::advance_order": {
+  "owner": "C",
+  "signature": "async def advance_order(order_id: str, stage: str, *, tracking: str='', carrier: str='', note: str='') -> dict",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/order_flow_service.py::notify_channel": {
+  "owner": "C",
+  "signature": "def notify_channel(row: dict, stage: str) -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
+ "backend/app/services/order_flow_service.py::stage_line": {
+  "owner": "C",
+  "signature": "def stage_line(row: dict) -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X1",
+   "Y"
+  ]
+ },
+ "backend/app/services/order_flow_service.py::stage_problem": {
+  "owner": "C",
+  "signature": "def stage_problem(row: dict, stage: str, tracking: str='') -> str",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/pay_service.py::create_order": {
   "owner": "C",
-  "signature": "async def create_order(*, title: str='', amount: int=0, product_id: str='', qty: int=1, customer: str='', channel: str='دایرکت', thread_id: str='', mobile: str='', lines: list[dict] | None=None) -> dict",
-  "since": "2026-09-19",
+  "signature": "async def create_order(*, title: str='', amount: int=0, product_id: str='', qty: int=1, customer: str='', channel: str='دایرکت', thread_id: str='', mobile: str='', lines: list[dict] | None=None, address: str='') -> dict",
+  "since": "2026-10-09",
   "users": [
    "Y"
   ]
@@ -2148,6 +2223,14 @@
   "since": "2026-09-18",
   "users": [
    "Y"
+  ]
+ },
+ "backend/app/services/pay_service.py::review_receipt": {
+  "owner": "C",
+  "signature": "def review_receipt(*, order_no: str, approve: bool | None=None, note: str='', decision: str='') -> dict",
+  "since": "2026-10-09",
+  "users": [
+   "X1"
   ]
  },
  "backend/app/services/payment_service.py::PAYMENT_LATER": {
@@ -3624,6 +3707,23 @@
    "U"
   ]
  },
+ "frontend/components/order-flow-card.tsx::FlowOrder": {
+  "owner": "C",
+  "shape": "export type FlowOrder = { id: string; title: string; amount: number; status: string; channel: string; at?: number; stage?: string; tracking?: string; carrier?: string; customer?: string; customerMobile?: string; address?: string; history?: OrderEvent[]; }",
+  "signature": "export type FlowOrder =",
+  "since": "2026-10-09",
+  "users": [
+   "Y"
+  ]
+ },
+ "frontend/components/order-flow-card.tsx::OrderFlowCard": {
+  "owner": "C",
+  "signature": "export function OrderFlowCard({ orders, onChanged }: { orders: FlowOrder[]; onChanged: (row: FlowOrder) => void })",
+  "since": "2026-10-09",
+  "users": [
+   "Y"
+  ]
+ },
  "frontend/components/quota-usage.tsx::QuotaUsage": {
   "owner": "X5",
   "signature": "export function QuotaUsage({ budget, compact = false }: { budget: AiBudget; compact?: boolean })",
@@ -3941,6 +4041,7 @@
   "signature": "export function formatWhen(at: number): string",
   "since": "2026-09-18",
   "users": [
+   "C",
    "X2",
    "X5",
    "Y"
@@ -3979,6 +4080,7 @@
   "signature": "export function toLatinDigits(raw: string): string",
   "since": "2026-09-18",
   "users": [
+   "C",
    "X5"
   ]
  },
