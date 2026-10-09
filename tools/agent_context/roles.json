@@ -617,6 +617,7 @@
         "backend/app/services/storefront_service.py",
         "backend/app/services/catalog_sync_service.py",
         "backend/app/services/pay_service.py",
+        "backend/app/services/pay_stock_test.py",
         "backend/app/services/arvan_dns_service.py",
         "backend/app/services/shop_otp_service.py",
         "backend/app/api/storefront.py",

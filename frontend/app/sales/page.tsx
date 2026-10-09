@@ -22,7 +22,20 @@ type Sale = {
   at: number;
 };
 
-type Order = { id: string; title: string; amount: number; status: string; channel: string; payUrl?: string };
+type ShortItem = { productId: string; title: string; wanted: number; had: number };
+
+type Order = {
+  id: string;
+  title: string;
+  amount: number;
+  status: string;
+  channel: string;
+  payUrl?: string;
+  /** پرداخت شده ولی موجودی کافی نبود؛ فقط همین سفارش‌ها نام و شمارهٔ مشتری دارند. */
+  needsAction?: { reason: string; items: ShortItem[] };
+  customer?: string;
+  customerMobile?: string;
+};
 
 type Account = { id: string; label: string; handle: string };
 
@@ -80,6 +93,7 @@ export default function SalesPage() {
     { label: "۳۰ روز اخیر", value: sumSince(sales, now - 30 * DAY) },
   ];
   const pending = orders.filter((row) => row.status === "pending");
+  const needsAction = orders.filter((row) => row.needsAction?.items?.length);
   const shown = sales;
 
   async function addSale(event: FormEvent) {
@@ -150,6 +164,46 @@ export default function SalesPage() {
             </div>
           ))}
         </section>
+
+        {needsAction.length ? (
+          <Card className="border border-danger/40">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-bold text-danger">نیازمند اقدام</h2>
+              <span className="shrink-0 rounded-full bg-paper px-2.5 py-0.5 text-xs text-danger">{needsAction.length.toLocaleString("fa-IR")} سفارش</span>
+            </div>
+            <p className="mt-1 text-sm leading-6 text-muted">
+              پول این سفارش‌ها رسیده ولی موجودی کافی نبود. با مشتری هماهنگ کن: کالای جایگزین یا برگرداندن پول.
+            </p>
+            <ul className="mt-2 divide-y divide-line">
+              {needsAction.map((row) => (
+                <li key={row.id} className="space-y-1 py-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate font-medium">{row.title || "سفارش"}</span>
+                    <span className="shrink-0 text-muted">{money(row.amount)} تومان</span>
+                  </div>
+                  <p className="wrap-any text-xs leading-5 text-muted">
+                    {(row.needsAction?.items || [])
+                      .map((item) => `«${item.title}»: ${item.wanted.toLocaleString("fa-IR")} خواسته، ${item.had.toLocaleString("fa-IR")} داشتی`)
+                      .join(" · ")}
+                  </p>
+                  <p className="text-xs leading-5">
+                    {row.customer || "مشتری"}
+                    {row.customerMobile ? (
+                      <>
+                        {" · "}
+                        <a dir="ltr" className="text-warm underline" href={`tel:${row.customerMobile}`}>
+                          {row.customerMobile}
+                        </a>
+                      </>
+                    ) : (
+                      <span className="text-muted"> · شماره ندارد؛ از دایرکت همان گفتگو پیام بده</span>
+                    )}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
 
         {pending.length ? (
           <Card>

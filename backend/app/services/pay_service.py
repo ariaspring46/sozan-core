@@ -160,7 +160,48 @@ def public_order(row: dict) -> dict:
         "at": int(row.get("at") or 0),
         "payUrl": public_pay_url(str(row.get("id") or "")),
         "startPayUrl": row.get("startPayUrl") or "",
+        **_action_fields(row),
     }
+
+
+def _action_fields(row: dict) -> dict:
+    need = row.get("needsAction")
+    if not isinstance(need, dict) or not need.get("reason"):
+        return {}
+    return {
+        "needsAction": {"reason": str(need.get("reason")), "items": list(need.get("items") or [])},
+        "customer": str(row.get("customer") or ""),
+        "customerMobile": str(row.get("customerMobile") or ""),
+    }
+
+
+_FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def _wanted(lines: list[dict]) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for line in lines:
+        product_id = str(line.get("productId") or "").strip()
+        if product_id:
+            out[product_id] = out.get(product_id, 0) + max(1, int(line.get("qty") or 1))
+    return out
+
+
+def stock_problem(lines: list[dict]) -> str:
+    """The sentence a shopper sees when the cart asks for more than the shop has; empty when it can be sold.
+    Checked before a payment link exists, so nobody pays for a product that is gone."""
+    rows = {str(row.get("id") or ""): row for row in storefront_service.list_products().get("products") or []}
+    for product_id, qty in _wanted(lines).items():
+        row = rows.get(product_id)
+        if row is None:
+            continue  # a link the seller made with a free amount names no catalog product
+        stock = int(row.get("stock") or 0)
+        title = str(row.get("title") or "این کالا")
+        if stock <= 0:
+            return f"«{title}» تمام شده است."
+        if stock < qty:
+            return f"از «{title}» فقط {str(stock).translate(_FA_DIGITS)} عدد مانده است."
+    return ""
 
 
 def _product_amount(product_id: str, qty: int) -> tuple[dict | None, int]:
@@ -193,6 +234,10 @@ async def create_order(
     if total <= 0:
         raise ValueError("مبلغ پرداخت مشخص نیست")
     label = title.strip() or str((product or {}).get("title") or "سفارش")
+    packed = _checkout_lines(lines, product_id=str((product or {}).get("id") or product_id or ""), qty=max(1, int(qty or 1)))
+    short = stock_problem(packed)
+    if short:
+        raise ValueError(short)
     route = payment_service.resolve_sale_gateway(get_settings())
     order_id = _new_id()
     phone = current_tenant()
@@ -204,8 +249,9 @@ async def create_order(
         "amount": total,
         "productId": str((product or {}).get("id") or product_id or ""),
         "qty": max(1, int(qty or 1)),
-        "lines": _checkout_lines(lines, product_id=str((product or {}).get("id") or product_id or ""), qty=max(1, int(qty or 1))),
+        "lines": packed,
         "customer": (customer or "مشتری").strip()[:80],
+        "customerMobile": str(mobile or "").strip()[:20],
         "channel": channel.strip() or "دایرکت",
         "threadId": thread_id,
         "gateway": route["id"],
@@ -422,20 +468,67 @@ def _mark_paid(row: dict, *, ref_id: str) -> None:
         channel=str(row.get("channel") or "دایرکت"),
         source="gateway",
     )
+    short, sold_out = _take_stock(row)
+    if short:
+        # paid but not fully in stock (two shoppers on the last one, or a receipt approved late): the seller decides
+        row["needsAction"] = {"reason": "stock", "items": short, "at": int(time())}
     _resync_storefront_after_paid()
-    for line in _stock_lines(row):
-        product_id = str(line["productId"])
-        try:
-            storefront_service.adjust_stock(product_id, -int(line["qty"]))
-        except (KeyError, ValueError):
+    _tell_seller(row, short, sold_out)
+
+
+def _take_stock(row: dict) -> tuple[list[dict], list[str]]:
+    """Take what the shop has for each line. Returns the lines it could not fill and the products this sale emptied."""
+    rows = {str(item.get("id") or ""): item for item in storefront_service.list_products().get("products") or []}
+    short: list[dict] = []
+    sold_out: list[str] = []
+    for product_id, qty in _wanted(_stock_lines(row)).items():
+        item = rows.get(product_id)
+        stock = int((item or {}).get("stock") or 0)
+        title = str((item or {}).get("title") or row.get("title") or "کالا")
+        take = min(max(stock, 0), qty)
+        if take:
+            try:
+                storefront_service.adjust_stock(product_id, -take)
+            except (KeyError, ValueError):
+                take = 0
+            else:
+                if stock - take == 0:
+                    sold_out.append(title)
+        if take < qty:
+            short.append({"productId": product_id, "title": title, "wanted": qty, "had": take})
             log.warning("stock-shortage productId=%s", product_id)
             emit_later(
                 kind="shop",
                 title="stock-shortage",
                 surface="shop",
                 status="failed",
-                payload={"productId": product_id},
+                payload={"productId": product_id, "orderId": str(row.get("id") or ""), "wanted": qty, "had": take},
             )
+    return short, sold_out
+
+
+def _tell_seller(row: dict, short: list[dict], sold_out: list[str]) -> None:
+    """A line in the seller's chat. The customer's number stays on the sales page, out of the chat and the model."""
+    fa = lambda value: str(value).translate(_FA_DIGITS)  # noqa: E731
+    if short:
+        what = "، ".join(f"«{item['title']}» ({fa(item['wanted'])} خواسته، {fa(item['had'])} داشتی)" for item in short)
+        amount = fa(f"{int(row.get('amount') or 0):,}".replace(",", "٬"))
+        text = (
+            f"سفارش «{row.get('title') or 'سفارش'}» به مبلغ {amount} تومان پرداخت شد "
+            f"ولی موجودی کم بود: {what}. با مشتری هماهنگ کن: کالای جایگزین یا برگرداندن پول. "
+            "شماره و نام مشتری در صفحهٔ «فروش» زیر «نیازمند اقدام» است."
+        )
+    elif sold_out:
+        names = "، ".join(f"«{title}»" for title in sold_out)
+        text = f"موجودی {names} با این فروش تمام شد و در فروشگاه دیگر خریدنی نیست. اگر هنوز داری بگو «موجودی {sold_out[0]} رو ۱۰ کن»."
+    else:
+        return
+    try:
+        from app.services import router_service
+
+        router_service.post_notice(router_service.latest_thread_id(), text)
+    except Exception:
+        log.exception("seller notice failed order=%s", row.get("id"))
 
 
 def find_tenant_by_slug(slug: str) -> str | None:

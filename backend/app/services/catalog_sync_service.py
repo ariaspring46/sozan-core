@@ -95,6 +95,8 @@ def catalog_rows(shop: dict, *, prior_cats: dict[str, str], prior_subs: dict[str
         discount = int(row.get("discount") or 0)
         if discount:
             item["discount"] = discount
+        if int(row.get("stock") or 0) <= 0:
+            item["stock"] = 0  # only sold out is published; a count stays the seller's
         if label:
             item["priceLabel"] = label
         if sub_slug:
