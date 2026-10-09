@@ -472,5 +472,69 @@ class DeciderTurnTests(unittest.TestCase):
         self.assertIn("run", tasks)
 
 
+class DeciderReviewFixTests(unittest.TestCase):
+    """Review 2026-10-09: keyword order inverted two settings, and a failed live call had no second chance."""
+
+    def test_turning_auto_send_off_is_off(self) -> None:
+        for spoken in ("ارسال خودکار رو خاموش کن", "پاسخ ارسال رو غیرفعال کن", "پیش‌نویس رو خاموش کن"):
+            self.assertEqual(decider_service.auto_reply_mode(spoken), "", spoken)
+        self.assertEqual(decider_service.auto_reply_mode("فقط پیش‌نویس بنویسه"), "draft")
+        self.assertEqual(decider_service.auto_reply_mode("ارسال خودکار رو روشن کن"), "send")
+        self.assertIsNone(decider_service.auto_reply_mode("پاسخ خودکار رو عوض کن"))
+        plan = decider_service.plan_for("set_auto_reply", "ارسال خودکار رو خاموش کن", frustrated=False, effort="quick")
+        self.assertEqual(plan["arguments"]["mode"], "")
+
+    def test_informal_is_not_formal(self) -> None:
+        self.assertEqual(decider_service.voice_tone("لحن غیررسمی باشه"), "warm")
+        self.assertEqual(decider_service.voice_tone("لحن خودمونی"), "warm")
+        self.assertEqual(decider_service.voice_tone("لحن رسمی"), "formal")
+        self.assertEqual(decider_service.voice_tone("لوکس و شیک"), "luxury")
+        self.assertEqual(decider_service.voice_tone("یه چیز دیگه"), "")
+
+    def test_a_failed_live_call_gets_one_slower_try(self) -> None:
+        calls = []
+
+        async def flaky(state, *, timeout=decider_service.LIVE_TIMEOUT):
+            calls.append(timeout)
+            return None if len(calls) == 1 else {"action": "identity", "accepted": True}
+
+        with patch.object(decider_service, "choose", new=flaky), patch(
+            "app.services.turn_clock.remaining", return_value=25.0
+        ):
+            out = asyncio.run(decider_service.choose_with_retry({}))
+        self.assertEqual(out["action"], "identity")
+        self.assertEqual(calls, [decider_service.LIVE_TIMEOUT, decider_service.RETRY_TIMEOUT])
+
+    def test_no_retry_when_the_turn_is_almost_out_of_time(self) -> None:
+        calls = []
+
+        async def dead(state, *, timeout=decider_service.LIVE_TIMEOUT):
+            calls.append(timeout)
+            return None
+
+        with patch.object(decider_service, "choose", new=dead), patch("app.services.turn_clock.remaining", return_value=7.0):
+            self.assertIsNone(asyncio.run(decider_service.choose_with_retry({})))
+        self.assertEqual(len(calls), 1)
+
+    def test_the_working_url_is_remembered_across_turns(self) -> None:
+        import httpx
+
+        seen = []
+
+        async def fake_post(url, **_kw):
+            seen.append(url)
+            code = 404 if url == settings.decider_url else 200
+            return httpx.Response(code, json={"answers": {}}, request=httpx.Request("POST", url))
+
+        decider_service._WORKING_URL = ""
+        self.addCleanup(setattr, decider_service, "_WORKING_URL", "")
+        with patch.object(decider_service.proxy_health, "post", new=fake_post), patch.object(
+            decider_service, "_openrouter_token", return_value="t"
+        ):
+            asyncio.run(decider_service._post({}, 3.0))
+            asyncio.run(decider_service._post({}, 3.0))
+        self.assertEqual(seen, [settings.decider_url, settings.decider_alt_url, settings.decider_alt_url])
+
+
 if __name__ == "__main__":
     unittest.main()

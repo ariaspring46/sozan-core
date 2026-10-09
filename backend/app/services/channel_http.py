@@ -89,15 +89,14 @@ class FailoverProxyTransport(httpx.AsyncBaseTransport):
 
     def __init__(self, proxies: list[str]) -> None:
         self._pool = [httpx.AsyncHTTPTransport(proxy=proxy) for proxy in proxies if proxy]
+        # no proxy configured: one direct transport, closed with this one (closing it per request dropped the body
+        # before the client could read it)
+        self._direct = None if self._pool else httpx.AsyncHTTPTransport()
         self._closed = False
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        if not self._pool:
-            direct = httpx.AsyncHTTPTransport()
-            try:
-                return await direct.handle_async_request(request)
-            finally:
-                await direct.aclose()
+        if self._direct is not None:
+            return await self._direct.handle_async_request(request)
         last: BaseException | None = None
         for index, transport in enumerate(self._pool):
             saved = request.extensions.get("timeout")
@@ -125,6 +124,8 @@ class FailoverProxyTransport(httpx.AsyncBaseTransport):
         self._closed = True
         for transport in self._pool:
             await transport.aclose()
+        if self._direct is not None:
+            await self._direct.aclose()
 
 
 def async_client(*, timeout: float = 20, **kwargs) -> httpx.AsyncClient:

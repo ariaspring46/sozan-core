@@ -103,6 +103,35 @@ def _handle_of(platform: str, named: str = "") -> str:
     return ""
 
 
+_MINE = re.compile(r"پیج\s*(?:من|خودم)|پیجم|صفحه\s*(?:ی\s*|‌ی\s*)?(?:من|خودم)|صفحه‌ام|کانال\s*(?:من|خودم)|کانالم|مال\s*منه")
+
+
+def own_page(platform: str, handle: str, spoken: str = "") -> bool:
+    """Only the seller's own page may fill the catalog, the voice, or a build from the chat.
+
+    Own means: the seller says so («پیج من …»), it is the connected account, it is the page already in the seller's
+    scan file, or its products are already in the catalog. Any other handle (a competitor, an example page) is only
+    read. Review 2026-10-09: «پیج @رقیبم رو ببین» imported that page into the seller's shop.
+    """
+    name = str(handle or "").strip().lstrip("@").lower()
+    if not name:
+        return False
+    if _MINE.search(spoken or ""):
+        return True
+    connected = str(_account(platform).get("handle") or "").strip().lstrip("@").lower()
+    if connected and connected == name:
+        return True
+    from app.services.channel_scan_service import get_scan
+
+    for item in get_scan().get("accounts") or []:
+        if isinstance(item, dict) and str(item.get("handle") or "").strip().lstrip("@").lower() == name:
+            return True
+    from app.services.storefront_service import count_scanned_handle
+
+    raw = str(handle or "").strip()
+    return count_scanned_handle([raw, raw.lstrip("@"), "@" + raw.lstrip("@")]) > 0
+
+
 def _scan_clause(platform: str, handle: str) -> str:
     from app.services.channel_scan_service import get_scan, scan_status
 
@@ -302,6 +331,14 @@ async def run(spoken: str, args: dict) -> tuple[str, dict]:
         handle = _handle_of(platform, handle)
         if not handle:
             return "اسم پیج یا کانال را بگو تا بخوانم.", {"link": dict(_LINK)}
+        if not own_page(platform, handle, spoken):
+            from app.services.channel_scan_service import start_other_scan
+
+            start_other_scan([{"platform": platform, "handle": handle}], notify=_watch(platform, handle, review=True))
+            return (
+                f"دارم پیج @{handle} را می‌خوانم. چون پیج خودت نیست، فقط نظرم را می‌گویم و چیزی به کاتالوگ یا لحنت اضافه نمی‌کنم.",
+                {},
+            )
         review = "نظر" in spoken
         start_scan(
             [{"platform": platform, "handle": handle}],

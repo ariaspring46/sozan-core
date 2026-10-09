@@ -108,6 +108,29 @@ class ProxyHealthTests(unittest.TestCase):
         self.assertEqual(codes, [200])
         self.assertEqual([item["proxy"] for item in seen], [None, PROXY])
 
+    def test_dead_exit_costs_the_connect_timeout_once(self) -> None:
+        # review 2026-10-09: with the WireGuard exit down every call waited 4 s on direct before the fallback
+        seen: list = []
+        codes = self._post(seen, tunnel=["ok"], direct=["connect"], calls=3)
+        self.assertEqual(codes, [200, 200, 200])
+        self.assertEqual([item["proxy"] for item in seen], [None, PROXY, PROXY, PROXY])
+        self.assertTrue(proxy_health.direct_down())
+
+    def test_direct_returns_after_the_pause(self) -> None:
+        seen: list = []
+        self._post(seen, tunnel=["ok"], direct=["connect"])
+        later = proxy_health.time.monotonic() + proxy_health.DOWN_SECONDS + 1
+        with patch("app.services.proxy_health.time.monotonic", return_value=later):
+            self.assertFalse(proxy_health.direct_down())
+
+    def test_fallback_down_while_skipped_still_tries_direct(self) -> None:
+        seen: list = []
+        self._post(seen, tunnel=["connect"], direct=["connect", "ok"], calls=0)
+        proxy_health._mark_direct_down()
+        codes = self._post(seen, tunnel=["connect"], direct=["ok"])
+        self.assertEqual(codes, [200])
+        self.assertEqual([item["proxy"] for item in seen], [PROXY, None])
+
     def test_both_paths_down_raises_for_the_arvan_fallback(self) -> None:
         seen: list = []
         with self.assertRaises(httpx.ConnectTimeout):

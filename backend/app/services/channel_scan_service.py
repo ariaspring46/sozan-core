@@ -337,9 +337,44 @@ def start_scan(accounts: list[dict], notify=None, *, import_catalog: bool = True
     return scan_status()
 
 
-def _save_scan(payload: dict) -> dict:
-    write_json("channel-scan.json", payload)
+OTHER_SCAN_FILE = "channel-scan-other.json"
+
+
+def _save_scan(payload: dict, *, own: bool = True) -> dict:
+    """The seller's own page lives in channel-scan.json (builds, growth facts and the decider read it). Another page
+    lives apart so reading a competitor never replaces it."""
+    write_json("channel-scan.json" if own else OTHER_SCAN_FILE, payload)
     return payload
+
+
+_BACKGROUND: set = set()
+
+
+def start_other_scan(accounts: list[dict], notify=None) -> None:
+    """Read a page that is not the seller's: nothing goes to the catalog, the voice, a build, or the seller's scan
+    status. Review 2026-10-09: «پیج @رقیبم رو ببین» imported that page's products, merged its bio into the seller's
+    voice, overwrote channel-scan.json, and rebuilt a not-yet-ready shop from it."""
+    import asyncio
+
+    from app.state_store import tenant_scope
+
+    phone = current_tenant()
+    copied = [dict(item) for item in accounts]
+
+    async def job() -> None:
+        with tenant_scope(phone):
+            try:
+                await scan_accounts(copied, import_catalog=False, own=False)
+            except Exception:
+                emit_later(kind="scan", surface="scan", title="scan-other-error", payload={"handles": [str(item.get("handle") or "") for item in copied]})
+            await _call_notify(notify)
+
+    try:
+        task = asyncio.get_running_loop().create_task(job())
+        _BACKGROUND.add(task)
+        task.add_done_callback(_BACKGROUND.discard)
+    except RuntimeError:
+        threading.Thread(target=lambda: asyncio.run(job()), daemon=True).start()
 
 
 def _clean_handle(raw: str) -> str:
@@ -1001,7 +1036,10 @@ def page_view(platform: str, handle: str) -> dict:
     """The downloaded page for one handle: bio, captions, and real titles. Login notes stay out of the text."""
     name = str(handle or "").lstrip("@")
     hit: dict = {}
-    for item in get_scan().get("accounts") or []:
+    other = read_json(OTHER_SCAN_FILE, {})
+    # the other page first, so a match in the seller's own scan (read later) wins, as before
+    rows = list((other if isinstance(other, dict) else {}).get("accounts") or []) + list(get_scan().get("accounts") or [])
+    for item in rows:
         if not isinstance(item, dict):
             continue
         if str(item.get("platform") or "") != platform:
@@ -1203,7 +1241,10 @@ def _model_unavailable(results: list[dict], candidates: list[dict]) -> bool:
     return bool(fetched) and all(item.get("llmError") for item in fetched)
 
 
-async def scan_accounts(accounts: list[dict], *, import_catalog: bool = True) -> dict:
+async def scan_accounts(accounts: list[dict], *, import_catalog: bool = True, own: bool = True) -> dict:
+    """own=False: a page that is not the seller's. Its result goes to OTHER_SCAN_FILE and never to the voice."""
+    if not own:
+        import_catalog = False
     cfg = get_settings()
     brand = str(cfg.get("storeName") or "")
     work = str(cfg.get("storeTagline") or "")
@@ -1229,7 +1270,8 @@ async def scan_accounts(accounts: list[dict], *, import_catalog: bool = True) ->
                 sendbox_id=sendbox_id,
             )
         )
-    previous = get_scan()
+    other = read_json(OTHER_SCAN_FILE, {}) if not own else {}
+    previous = get_scan() if own else (other if isinstance(other, dict) else {})
     by_key = {}
     for item in previous.get("accounts") or []:
         if isinstance(item, dict) and item.get("handle"):
@@ -1323,16 +1365,16 @@ async def scan_accounts(accounts: list[dict], *, import_catalog: bool = True) ->
         quality["kept"] = storefront_service.count_scanned_handle(
             [str(item.get("handle") or "") for item in results]
         )
-        if payload["about"]:
+        if payload["about"] and own:
             voice_service.merge_summary(str(payload["about"]))
-        return _save_scan(payload)
+        return _save_scan(payload, own=own)
     if poor_coverage:
         payload["needsReview"] = True
     if not import_catalog:
         quality["imported"] = 0
-        if payload["about"]:
+        if payload["about"] and own:
             voice_service.merge_summary(str(payload["about"]))
-        return _save_scan(payload)
+        return _save_scan(payload, own=own)
     seen_keys: set[str] = set()
     importable: list[dict] = []
     for row in candidates:
@@ -1350,9 +1392,9 @@ async def scan_accounts(accounts: list[dict], *, import_catalog: bool = True) ->
         quality["kept"] = storefront_service.count_scanned_handle(
             [str(item.get("handle") or "") for item in results]
         )
-        if payload["about"]:
+        if payload["about"] and own:
             voice_service.merge_summary(str(payload["about"]))
-        return _save_scan(payload)
+        return _save_scan(payload, own=own)
     for item in results:
         handle = str(item.get("handle") or "")
         if handle:
@@ -1383,9 +1425,9 @@ async def scan_accounts(accounts: list[dict], *, import_catalog: bool = True) ->
         imported += 1
     quality["imported"] = imported
     payload["productCount"] = imported
-    if payload["about"]:
+    if payload["about"] and own:
         voice_service.merge_summary(str(payload["about"]))
-    return _save_scan(payload)
+    return _save_scan(payload, own=own)
 
 
 _HANDLE_FULL = re.compile(r"(?:https?://)?(?:www\.)?(?:instagram\.com/)?(@?)([A-Za-z0-9._]{3,30})/?")

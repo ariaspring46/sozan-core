@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import logging
+import re
 import time
 
 import httpx
@@ -24,10 +25,15 @@ from app.services.training_log import tenant_hash
 log = logging.getLogger("sozan.decider")
 
 _EFFORT: contextvars.ContextVar[str] = contextvars.ContextVar("decider_effort", default="")
-_URL: contextvars.ContextVar[str] = contextvars.ContextVar("decider_url", default="")
+# The Decisions URL that answered last. Module level: a ContextVar set inside the request task never reached the next turn.
+_WORKING_URL = ""
+_BACKGROUND: set = set()
 
 IDENTITY_FACT = about_text()
 LIVE_TIMEOUT = 3.0
+# One slower try after a failed live call, while the turn still has this much left for the chat model after it.
+RETRY_TIMEOUT = 8.0
+RETRY_RESERVE = 6.0
 
 # id -> (tool, arguments). Empty tool means a direct sentence, not a tool call.
 _ACTIONS: dict[str, tuple[str, dict]] = {
@@ -417,6 +423,37 @@ def tool_names(action: str) -> list[str]:
     return [tool]
 
 
+_OFF = re.compile(r"خاموش|غیرفعال|غیر\s*فعال|قطع|نمی\s*‌?خوام|نمیخوام|نباشه|بردار")
+_NOT_FORMAL = re.compile(r"غیر\s*‌?رسمی|خودمونی|صمیمی|دوستانه")
+
+
+def auto_reply_mode(spoken: str) -> str | None:
+    """off ("") before draft before send: «ارسال خودکار رو خاموش کن» turned auto-send ON when «ارسال» was checked first.
+    None means the sentence does not say which, and the seller is asked."""
+    text = spoken or ""
+    if _OFF.search(text):
+        return ""
+    if "پیش‌نویس" in text or "پیش نویس" in text or "پیشنویس" in text:
+        return "draft"
+    if "ارسال" in text or "خودکار بفرست" in text or "خودش جواب" in text:
+        return "send"
+    return None
+
+
+def voice_tone(spoken: str) -> str:
+    """«لحن غیررسمی» used to become formal because it contains «رسمی». Empty means ask."""
+    text = spoken or ""
+    if _NOT_FORMAL.search(text) or "گرم" in text:
+        return "warm"
+    if "لوکس" in text:
+        return "luxury"
+    if any(word in text for word in ("کوچه", "جوان", "خیابانی")):
+        return "street"
+    if "رسمی" in text:
+        return "formal"
+    return ""
+
+
 def plan_for(action: str, spoken: str, *, frustrated: bool, effort: str) -> dict:
     """Tool, arguments, and the direct sentence. correct_category writes the brief field first."""
     tool, base = _ACTIONS.get(action, ("", {}))
@@ -430,7 +467,7 @@ def plan_for(action: str, spoken: str, *, frustrated: bool, effort: str) -> dict
 
         args["rebuild"] = "full" if _wants_full_rebuild(spoken) or "ساخته" in (spoken or "") else "revise"
     if action == "set_auto_reply":
-        mode = "send" if "ارسال" in spoken else "draft" if "پیش" in spoken else "" if "خاموش" in spoken else None
+        mode = auto_reply_mode(spoken)
         if mode is None:
             return {"tool": "ask_user", "arguments": {"question": "پاسخ خودکار خاموش، پیش‌نویس، یا ارسال؟", "options": ["خاموش", "پیش‌نویس", "ارسال"]}, "direct": "", "frustrated": frustrated, "effort": effort, "action": action}
         args["mode"] = mode
@@ -441,7 +478,7 @@ def plan_for(action: str, spoken: str, *, frustrated: bool, effort: str) -> dict
         elif any(word in spoken for word in ("اینستا", "پیج", "صفحه")):
             args["platform"] = "instagram"
     if action == "set_voice_tone":
-        tone = "warm" if "گرم" in spoken else "formal" if "رسمی" in spoken else "street" if any(word in spoken for word in ("کوچه", "جوان")) else "luxury" if "لوکس" in spoken else ""
+        tone = voice_tone(spoken)
         if not tone:
             return {"tool": "ask_user", "arguments": {"question": "لحن دایرکت کدام باشد؟", "options": ["گرم", "رسمی", "جوان و خیابانی", "لوکس"]}, "direct": "", "frustrated": frustrated, "effort": effort, "action": action}
         args["toneId"] = tone
@@ -506,7 +543,8 @@ async def _post(state: dict, timeout: float) -> dict:
     token = _openrouter_token()
     if not token:
         raise RuntimeError("openrouter token missing")
-    urls = [str(_URL.get() or settings.decider_url)]
+    global _WORKING_URL
+    urls = [str(_WORKING_URL or settings.decider_url)]
     alt = str(settings.decider_alt_url or "").strip()
     if alt and alt not in urls:
         urls.append(alt)
@@ -528,7 +566,7 @@ async def _post(state: dict, timeout: float) -> dict:
         if res.status_code >= 500:
             raise RuntimeError(f"decider {res.status_code}")
         res.raise_for_status()
-        _URL.set(url)
+        _WORKING_URL = url
         data = res.json()
         return data if isinstance(data, dict) else {}
     if last:
@@ -579,6 +617,25 @@ async def choose(state: dict, *, timeout: float = LIVE_TIMEOUT) -> dict | None:
     return decision
 
 
+async def choose_with_retry(state: dict) -> dict | None:
+    """The live call, then one slower try when it failed and the turn still has time.
+
+    Review 2026-10-09: 9 of about 26 live calls failed in three days (4 at the 3 s limit), and each one told the
+    seller «مدل پاسخ نداد». The fallback to the full tool list stays off on purpose; this only gives the same
+    decider a second chance.
+    """
+    from app.services.turn_clock import remaining
+
+    decision = await choose(state)
+    if decision is not None:
+        return decision
+    left = remaining() - RETRY_RESERVE
+    if left < 2.0:
+        return None
+    log.warning("decider retry")
+    return await choose(state, timeout=min(RETRY_TIMEOUT, left))
+
+
 def schedule_shadow(state: dict) -> None:
     """After the reply. The seller does not wait for this."""
 
@@ -588,7 +645,9 @@ def schedule_shadow(state: dict) -> None:
             return
         _log_shadow(state, decision)
 
-    asyncio.create_task(run())
+    task = asyncio.create_task(run())
+    _BACKGROUND.add(task)  # a task nobody references can be collected before it finishes
+    task.add_done_callback(_BACKGROUND.discard)
 
 
 def _log_shadow(state: dict, decision: dict) -> None:

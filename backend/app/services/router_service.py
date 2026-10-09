@@ -2130,7 +2130,7 @@ async def _decider_result(spoken: str, media: dict | None, card_open: bool, deci
 
     state = _decider_state(spoken, media, card_open)
     try:
-        decision = await decider(state) if decider is not None else await decider_service.choose(state)
+        decision = await decider(state) if decider is not None else await decider_service.choose_with_retry(state)
     except Exception:
         return None
     if not isinstance(decision, dict):
@@ -2261,7 +2261,7 @@ async def _steer_decider(spoken: str, media: dict | None, card_open: bool, decid
             _emit("router-llm-fail", {"error": "budget"}, status="error")
             return None
         try:
-            decision = await decider(state) if decider is not None else await decider_service.choose(state)
+            decision = await decider(state) if decider is not None else await decider_service.choose_with_retry(state)
         except Exception:
             decision = None
         if not isinstance(decision, dict):

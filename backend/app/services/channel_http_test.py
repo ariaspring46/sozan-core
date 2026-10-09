@@ -104,6 +104,34 @@ class ChannelHttpTests(unittest.TestCase):
                 asyncio.run(transport.handle_async_request(read_request))
         self.assertEqual(len(channel_http_seen), 1)
 
+    def test_without_proxies_the_body_is_still_readable(self) -> None:
+        # review 2026-10-09: the direct transport was closed right after the headers, before the body was read
+        import http.server
+        import threading
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b"x" * 70000
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                return None
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.shutdown)
+        url = f"http://127.0.0.1:{server.server_address[1]}/"
+
+        async def fetch() -> int:
+            async with httpx.AsyncClient(transport=channel_http.FailoverProxyTransport([])) as client:
+                res = await client.get(url)
+                return len(res.content)
+
+        self.assertEqual(asyncio.run(fetch()), 70000)
+
 
 if __name__ == "__main__":
     unittest.main()

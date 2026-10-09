@@ -2,7 +2,8 @@
 
 Direct is first. The fallback proxy (OPENROUTER_PROXY_FALLBACK, a Tailscale SOCKS to another foreign node) is used
 only when direct never connects or OpenRouter answers 403. A reply that already started, including a read timeout,
-is not sent again.
+is not sent again. When direct does not connect, the fallback goes first for DOWN_SECONDS, so a dead exit costs the
+connect timeout once and not on every call.
 """
 
 from __future__ import annotations
@@ -36,6 +37,20 @@ def mark_down(proxy: str | None) -> None:
         log.warning("proxy did not connect and direct works; direct for %ds", int(DOWN_SECONDS))
     if proxy:
         _down_until[proxy] = time.monotonic() + DOWN_SECONDS
+
+
+_DIRECT = "direct"
+
+
+def direct_down() -> bool:
+    """Direct did not connect a moment ago (the WireGuard exit is down): the fallback goes first until DOWN_SECONDS pass."""
+    return _down_until.get(_DIRECT, 0.0) > time.monotonic()
+
+
+def _mark_direct_down() -> None:
+    if not direct_down():
+        log.warning("direct did not connect; fallback first for %ds", int(DOWN_SECONDS))
+    _down_until[_DIRECT] = time.monotonic() + DOWN_SECONDS
 
 
 def openrouter_fallback() -> str | None:
@@ -82,6 +97,13 @@ async def post(url: str, *, proxy: str | None, total: float, connect: float | No
         async with httpx.AsyncClient(timeout=limit, trust_env=False, proxy=via) as client:
             return await client.post(url, **kwargs)
 
+    if proxy and direct_down():
+        try:
+            return await send(proxy)
+        except Exception as exc:
+            if not connect_failed(exc):
+                raise
+        return await send(None)
     direct_res: httpx.Response | None = None
     try:
         direct_res = await send(None)
@@ -90,6 +112,7 @@ async def post(url: str, *, proxy: str | None, total: float, connect: float | No
             raise
         if not proxy:
             raise
+        _mark_direct_down()
     else:
         if not _refused(direct_res) or not proxy:
             return direct_res
@@ -109,6 +132,13 @@ def post_sync(url: str, *, proxy: str | None, total: float, connect: float | Non
         with httpx.Client(timeout=limit, trust_env=False, proxy=via) as client:
             return client.post(url, **kwargs)
 
+    if proxy and direct_down():
+        try:
+            return send(proxy)
+        except Exception as exc:
+            if not connect_failed(exc):
+                raise
+        return send(None)
     direct_res: httpx.Response | None = None
     try:
         direct_res = send(None)
@@ -117,6 +147,7 @@ def post_sync(url: str, *, proxy: str | None, total: float, connect: float | Non
             raise
         if not proxy:
             raise
+        _mark_direct_down()
     else:
         if not _refused(direct_res) or not proxy:
             return direct_res
