@@ -47,7 +47,7 @@ HELLO_SMS_LINE = f"{GREET_OPEN} احتمالاً پیامک سوزان به دس
 DM_HOW = "جواب دایرکت‌ها رو من می‌نویسم، شما فقط تأیید می‌کنید"
 VALUE_GENERIC = f"{DM_HOW}؛ یعنی کمتر پای گوشی می‌مونید! الان چطوری بهشون می‌رسید؟"
 PAIN_LINE = VALUE_GENERIC
-BUSY_LINE = f"چشم، مزاحمتون نمی‌شم! هر وقت فرصت شد، رایگان امتحانش کنید توی {SPOKEN_ADDRESS}؛ خدا قوت!"
+BUSY_LINE = f"چشم، مزاحمتون نمی‌شم! هر وقت فرصت شد، سر بزنید به {SPOKEN_ADDRESS}؛ خدا قوت!"
 DECLINE_LINE = "چشم، اصلاً اشکالی نداره! ببخشید مزاحم شدم؛ روزتون خوش!"
 # Never start with «بله»: to «آدمی؟» that would sound like "yes, human" for a moment.
 ROBOT_LINE = "دستیار هوش مصنوعی‌ام، آدم نیستم؛ جالبش همینه! بگم برای پیجتون چی کار می‌کنم؟"
@@ -57,7 +57,7 @@ ROBOT_AGAIN_LINE = "من همون سوزانم، دستیار هوش مصنوع�
 QUICK_OPEN_LINE = f"سلام، چشم! پیجتون رو دیدم؛ من سوزانم، یه هوش مصنوعی که از همین پیج رایگان فروشگاه می‌سازم. آدرسش: {SPOKEN_ADDRESS}."
 QUICK_PITCH_LINE = f"چشم، خلاصه: از همین پیج رایگان فروشگاه می‌سازم، جواب دایرکت‌ها رو هم می‌نویسم. آدرسش: {SPOKEN_ADDRESS}."
 # First words are already "no time": the AI is still named, the address is said once, and the call ends.
-BUSY_OPEN_LINE = f"چشم، مزاحمتون نمی‌شم! من سوزانم، یه هوش مصنوعی؛ هر وقت فرصت شد رایگان امتحانم کنید: {SPOKEN_ADDRESS}."
+BUSY_OPEN_LINE = f"چشم، مزاحمتون نمی‌شم! من سوزانم، یه هوش مصنوعی؛ هر وقت فرصت شد سر بزنید: {SPOKEN_ADDRESS}."
 DNC_LINE = "چشم، ببخشید که مزاحم شدم! دیگه تماس نمی‌گیرم؛ روزتون خوش!"
 # The model already apologised before its [زنگ‌نزن] tag: no second apology.
 DNC_SHORT_LINE = "چشم، دیگه تماس نمی‌گیرم؛ روزتون خوش!"
@@ -67,6 +67,8 @@ SOURCE_LINE = "از بین پیج‌های فروشگاهی اینستاگرام
 FIRST_DISCLOSE = "سلام، من سوزانم، یه هوش مصنوعی."
 ROBOT_SHORT = "هوش مصنوعی‌ام، آدم نیستم!"
 PRICE_UNKNOWN_LINE = f"راستش الان قیمت‌ها دستم نیست، نمی‌خوام اشتباه بگم! ولی شروعش رایگانه؛ سر بزنید به {SPOKEN_ADDRESS}."
+# A yes that names DMs: the opening already offered DM replies, so this answers its «چطوری؟».
+DM_YES_LINE = f"{DM_HOW}! الان کی جوابشون رو می‌ده، خودتون؟"
 DM_LINE = "جواب دایرکت‌های اینستا و تلگرام رو من با لحن خودتون می‌نویسم؛ روزی حدوداً چندتا دایرکت دارید؟"
 CONTENT_LINE = "پست و استوری و کپشن تبلیغ رو هم من براتون می‌سازم؛ الان محتوا رو خودتون درست می‌کنید؟"
 ORDER_LINE = "سفارش‌ها و فروش و موجودی انبار رو هم براتون نگه می‌دارم؛ الان سفارش‌ها رو کجا ثبت می‌کنید؟"
@@ -107,6 +109,9 @@ _BAN_CLAIM = (
     "سال تجربه",
     "سال سابقه",
 )
+_BAN_EXPERIENCE = re.compile(
+    r"سال[\s\u200c]*ها[\s\u200c]*(?:تجربه|سابقه)|(?:تجربه|سابقه)[\u0654\s\u200cی]*(?:\S+[\s\u200c]*)?ساله|(?:تجربه|سابقه) دارم"
+)
 _PRICE_NUM = re.compile(r"[0-9۰-۹٠-٩]{3,}")
 _LATIN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 _PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
@@ -137,14 +142,14 @@ _STAGE_DO = {
     "greet": "اگر پیامک گفته شد دوباره نپرس. وگرنه معرفی کوتاه بگو.",
     "discover": "اگر درد را نگفته، یک سؤال: دایرکت بی‌جواب، محتوا، یا سایت. اگر گفته، فقط همان یک قابلیت.",
     "pitch": "فقط همان یک قابلیتِ مربوط را بگو. بقیه را نریز. دعوت سایت نکن مگر بپرسد.",
-    "cta": "آدرس sozan-core.ir، دکمهٔ ورود و رایگان بودن را فقط یک بار بگو.",
+    "cta": "اگر آماده است، [آدرس] را فقط یک بار بنویس؛ آدرس را خودت هجی نکن.",
     "confirm": "آدرس را تکرار نکن مگر بپرسد. نگرانی‌اش را جواب بده.",
     "close": "تشکر گرم و خداحافظی.",
 }
 # What a seasoned seller does with the objection the caller raised last (one short line, added to the model's turn note).
 _OBJECTION_DO = {
-    "time": "عجله دارد: فقط یک جملهٔ کوتاه.",
-    "later": "الان وقت ندارد: فشار نیاور، آدرس یک بار و خداحافظی گرم.",
+    "time": "عجله دارد: فقط یک جملهٔ کوتاه، قابلیت تازه نگو.",
+    "later": "الان وقت ندارد: فشار نیاور، خداحافظی گرم و [پایان].",
     "trust": "مشکوک است: حق بده، رایگان امتحان کردن را بگو، ادعا نکن.",
     "cant": "نگران سختی است: بگو کاری لازم نیست بلد باشد.",
     "price": "دربارهٔ پول است: عدد را خودت نگو، [قیمت] بنویس، بعد ارزش برای خودش.",
@@ -219,20 +224,48 @@ _FA = "\u0600-\u06FF"
 # «پرو» the plan, not «پروانه»، «پروین» or «پروفایل».
 _PRO_WORD = re.compile(rf"(?<![{_FA}])پرو(?![{_FA}])")
 # «بعداً» and «الان نه» as words, not inside «بعدازظهر» or «الان نهار».
-_LATER = re.compile(rf"(?<![{_FA}])بعد(?:ا|اً)(?![{_FA}])|(?<![{_FA}])الان نه(?![{_FA}])")
+_LATER = re.compile(rf"(?<![{_FA}])(?:بعد(?:ا|اً)|الان نه|فعل(?:ا|اً) نه)(?![{_FA}])")
 # Busy but still listening: an imperative "say it quickly" wants the short version, not a hang-up.
 # Only «بگو/بگید/بگین»: «خلاصه بگم» is the caller's own filler, «سریع بگیرن» is about their customers.
 _QUICK = re.compile(rf"(?:سریع|خلاصه|خلاصهش رو|خلاصشو|کوتاه|زود|مختصر|فقط)\s*(?:بگو|بگید|بگین)(?![{_FA}])")
-_DNC_WORDS = (
-    "زنگ نزن",
-    "تماس نگیر",
-    "مزاحم نش",
-    "از لیستتون",
-    "از لیست پاک",
-    "شمارمو پاک",
-    "شماره منو پاک",
-    "شمارهمو پاک",
+# Do-not-call in its common wordings; «مزاحم نشدید» (polite "no bother") and «از لیستتون زنگ زدید؟» are not.
+# Asked of us, not «پیامای منو پاک کنه؟» or «از لیست پاکش می‌کنم».
+_YOU_DO = rf"(?:کنید|کنین|کن|بکنید|بکنین|بزنید|بزنین|بزن)(?![{_FA}])"
+_DNC = re.compile(
+    rf"زنگ(?:م)? نزن(?:ید|ین|یدا)?(?![{_FA}])|تماس نگیر(?:ید|ین)?(?![{_FA}])|(?<![{_FA}])مزاحم(?:م)? نش(?:ید|ین|و)(?![{_FA}])"
+    r"|از لیست(?:تون|تان|ت)\s+(?:\S+\s+)?(?:پاک|حذف|خارج|بیرون|بردار|دربیار|در بیار|خط)"
+    rf"|از لیست\s+(?:پاک|حذف|خارج)\s*(?:م\s+)?{_YOU_DO}"
+    rf"|(?:شمارمو|شمارهمو|شماره مو|شماره منو|شماره من رو|شمارم رو|شماره ام رو)\s+(?:\S+\s+)?(?:پاک|حذف)\s*{_YOU_DO}"
+    rf"|(?<![{_FA}])نمیخوام\s+(?:\S+\s+){{0,3}}(?:زنگ بزنید|زنگ بزنین|زنگ بزنی|تماس بگیرید|تماس بگیرین)(?![{_FA}])"
 )
+# STT punctuation inside a turn («،» «؛» «؟») is a space, so word-boundary patterns still match before it.
+_PUNCT = re.compile(r"[\u060C\u061B\u061F\u066A-\u066D\u06D4]")
+_INVITE = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید|بفرمائید|بفرما)(?![{_FA}])")
+# «وقت ندارم» alone is busy; «وقت ندارم به دایرکتا برسم» is the very pain Sozan answers.
+_NO_TIME = re.compile(rf"وقت ندار(?:م|یم)?(?![{_FA}])(?!\s*(?:به|برای|واسه|که|جواب|پاسخ)(?![{_FA}]))")
+_CANT_TALK = ("نمیتونم صحبت", "نمیتونم حرف", "تو جلسه", "توی جلسه", "جلسه ام", "درگیرم", "پشت فرمونم", "دارم رانندگی")
+# Busy words inside a pain answer («کل روز درگیرم با دایرکتا», «وقت ندارم دایرکتا رو جواب بدم») are the pain, not busy.
+_PAIN = re.compile(r"دایرکت|پیام|مشتری|جواب|سفارش|پست|استوری")
+_CALL_BACK = re.compile(
+    r"(?:بعدازظهر|بعد از ظهر|عصر|فردا|شب|یه ساعت دیگه|یه وقت دیگه|یه روز دیگه|هفته بعد)\s+(?:\S+\s+)?"
+    rf"(?:زنگ بزنید|زنگ بزنین|زنگ بزن|تماس بگیرید|تماس بگیرین)(?![{_FA}])"
+)
+_HOW_LONG = re.compile(rf"(?<![{_FA}])(?:چقدر|چقد|چند)(?![{_FA}])")
+_REFUSE = re.compile(
+    rf"(?<![{_FA}])(?:نمیخوام(?:ش|شون)?|لازم نیست|لازم ندارم|نیازی نیست|نیازی ندارم|نیاز ندارم|علاقه ای ندارم|علاقه ندارم|ولش کن)(?![{_FA}])"
+)
+# «الان نه، ممنون» is a not-now (the busy line with the address), not a no.
+_NO_THANKS = re.compile(rf"(?<![{_FA}])(?<!الان )(?<!فعلا )(?<!فعلاً )(?:نه|نخیر)\s+(?:ممنون|مرسی|متشکرم|سپاس)")
+# Words that may follow a refusal in its clause and keep it one: «لازم نیست، ممنون» yes, «لازم نیست تکرار کنید» no.
+_REFUSE_TAIL = frozenset(
+    ("ممنون", "مرسی", "متشکرم", "سپاس", "خیلی", "اصلا", "اصلاً", "فعلا", "فعلاً", "دیگه", "خداحافظ", "آقا", "خانم",
+     "خانوم", "جان", "عزیزم", "واقعا", "واقعاً", "نه", "حالا", "بابا", "کن", "اینو", "اونو", "این", "اون", "رو")
+)
+# Still listening: «نه مرسی، بگید»; or a «but» that turns to what they do want: «فروشگاه نمی‌خوام، فقط دایرکت‌هام مهمه».
+_STILL_IN = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید|بفرما|چطور|چطوری|چجوری)(?![{_FA}])")
+_BUT = re.compile(rf"(?<![{_FA}])(?:ولی|اما|فقط)(?![{_FA}])")
+_WANTS = re.compile(r"دایرکت|پیام|محتوا|پست|استوری|سایت|سفارش|فروشگاه|قیمت|چنده|چقدر")
+_BARE_NO = frozenset(("نه", "نه نه", "نخیر", "نه خیر", "نه بابا", "نوچ"))
 _START_WORDS = (
     "سلام",
     "سوزان",
@@ -554,7 +587,7 @@ def sales_open() -> str:
         "اگر پرسیدند ربات یا آدمی: «هوش مصنوعی‌ام، آدم نیستم!» و برگرد سر بحث؛ با «بله» یا «آره» شروع نکن. نگو با مشتری‌هایشان تلفنی حرف می‌زنی.\n"
         "هدف تماس: طرف دلش بخواد خودش سوزان رو رایگان امتحان کنه (sozan-core.ir، دکمهٔ ورود). فروش زوری نه؛ کمک.\n"
         "روش یه فروشندهٔ خبره:\n"
-        "۱. کمتر از طرف حرف بزن: هر نوبت حداکثر دو جملهٔ کوتاه و یک سؤال.\n"
+        "۱. کمتر از طرف حرف بزن: هر نوبت حداکثر دو جملهٔ کوتاه که دومی سؤال باشد.\n"
         "۲. اول با حرف خودش جواب بده: کلمهٔ خودش را تکرار کن («پس دایرکت‌ها زیاده...»)، بعد همان سؤالش را جواب بده.\n"
         "۳. قبل از فایده بپرس: «الان دایرکت‌ها رو کی جواب می‌ده؟» بعد «کجاش بیشتر وقتتون رو می‌گیره؟» منوی چندگزینه‌ای نده.\n"
         "۴. حسش را بگو («انگار حسابی وقتتون رو می‌گیره») و جمع‌بندی کن تا بگوید «دقیقاً». حرفش نامفهوم بود، حدس نزن؛ مؤدبانه دوباره بپرس.\n"
@@ -588,8 +621,8 @@ def sales_open() -> str:
         "نمونهٔ لحن (از بر تکرار نکن):\n"
         "مشتری: آره، دایرکتام زیاده. → آهان، پس وقت زیادی پاش می‌ره! الان کی جوابشون رو می‌ده، خودتون؟\n"
         "مشتری: خودم، شبا تا دیروقت. → حق دارید خسته بشید! جواب‌ها رو من آماده می‌کنم، شما فقط تأیید می‌کنید.\n"
-        "مشتری: سایت دارم. → چه خوب! سوزان جای سایتتون نمیاد، کنارش دایرکت و محتوا رو جلو می‌بره. الان پست‌ها رو کی می‌سازه؟\n"
-        "مشتری: گرونه. → حق دارید! با چی مقایسه می‌کنید؟ ساخت وبسایت که کلاً رایگانه.\n"
+        "مشتری: سایت دارم. → چه خوب، سوزان کنار سایتتون دایرکت و محتوا رو جلو می‌بره! الان پست‌ها رو کی می‌سازه؟\n"
+        "مشتری: گرونه. → حق دارید، ساخت فروشگاه که کلاً رایگانه! با چی مقایسه می‌کنید؟\n"
         "مشتری: بلد نیستم. → لازم نیست بلد باشید؛ فقط اسم پیجتون رو می‌زنید، بقیه‌ش با منه.\n"
         "مشتری: واقعاً رباتی؟ → هوش مصنوعی‌ام، آدم نیستم! جالبش همینه، دایرکت‌هاتون رو هم همین‌طوری جواب می‌نویسم.\n"
         "مشتری: باشه، از کجا شروع کنم؟ → عالیه! همین امروز رایگان شروع کنید. [آدرس]\n"
@@ -663,6 +696,10 @@ class SalesState:
             job = "آدرس را تکرار نکن مگر بپرسد. " + job
         if self.turn_objection == "refuse":
             job = _OBJECTION_DO["refuse"]
+        elif self.turn_objection in {"time", "later"}:
+            # Busy now: the stage's "pitch one feature" would keep them on the phone.
+            where = "آدرس را گفته‌ای، تکرار نکن." if self.linked else "[آدرس] را یک بار بنویس."
+            job = f"{_OBJECTION_DO[self.turn_objection]} {where}"
         elif self.turn_objection in _OBJECTION_DO:
             job = _OBJECTION_DO[self.turn_objection] + " " + job
         return (
@@ -699,6 +736,7 @@ class Signals:
     wrong: bool = False
     quick: bool = False
     dnc: bool = False
+    no: bool = False
 
 
 @dataclass(frozen=True)
@@ -721,8 +759,8 @@ def read_signals(heard: str) -> Signals:
     # Speech-to-text writes «می‌شه» and «میشه» alike: join the half-space after «می/نمی» so one spelling matches
     # both; any other half-space becomes a space as before («زنگ‌نزنید» → «زنگ نزنید»).
     joined = re.sub(rf"(?<![{_FA}])(ن?می)\u200c", r"\1", heard or "")
-    blob = re.sub(r"[^\u0600-\u06FFA-Za-z\s]", " ", joined)
-    blob = re.sub(r"\s+", " ", blob).strip()
+    blob = _plain_words(joined)
+    question = bool(re.search(r"[؟?]", heard or ""))
     trade = next((item for item in _TRADES if item in blob), "")
     howdy = any(
         part in blob
@@ -733,21 +771,37 @@ def read_signals(heard: str) -> Signals:
     source = any(part in blob for part in ("شماره من", "از کجا آورد", "از کجا شماره"))
     price = any(part in blob for part in ("گرون", "گران", "هزینه", "قیمت", "پول", "مبلغ", "تخفیف", "تومان", "تومن"))
     price = price or bool(_PRO_WORD.search(blob)) or any(part in blob for part in _HOW_MUCH) or bool(_HOW_MUCH_END.search(blob))
-    if "پول" in blob and any(part in blob for part in ("نه", "نمی", "نمی‌")) and "گرون" not in blob:
+    if "پول" in blob and re.search(rf"(?<![{_FA}])(?:نه(?![{_FA}])|نمی)", blob) and "گرون" not in blob:
         price = False
-    later = bool(_LATER.search(blob)) or any(part in blob for part in ("وقت ندارم", "سردم"))
+    pain = bool(_PAIN.search(blob))
+    no_time = bool(_NO_TIME.search(blob)) and not pain
+    callback = bool(_LATER.search(blob)) or bool(_CALL_BACK.search(blob))
+    later = callback or no_time or "سردم" in blob or (any(part in blob for part in _CANT_TALK) and not pain)
     trust = any(part in blob for part in ("اعتماد", "کلاه", "مطمئن", "درست میگی"))
-    agree = any(part in blob for part in ("باشه", "چشم", "اوکی", "میرم", "می‌رم", "باز کردم", "زدم ورود", "آره میام"))
-    robot = any(part in blob for part in ("ربات", "ماشینی", "واقعی هستی", "آدمی", "آدم هستی", "ضبط شده"))
-    # The opening itself says «هوش مصنوعی»: echoing it with a yes («آره بگید، هوش مصنوعی جالبه») is not the question.
-    if "هوش مصنوعی" in blob and not any(part in blob for part in ("آره", "بله", "بگید", "بگو", "باشه", "بفرمایید", "جالبه")):
+    agree = any(part in blob for part in ("باشه", "چشم", "اوکی", "باز کردم", "زدم ورود", "آره میام"))
+    agree = agree or bool(re.search(rf"(?<![{_FA}])میرم", blob))
+    robot = any(
+        part in blob
+        for part in ("ربات", "ماشینی", "واقعی هستی", "آدمی", "آدم هستی", "ضبط شده", "آدم نیستی", "یا آدم", "انسان هستی")
+    )
+    # The opening itself says «هوش مصنوعی»: echoing it with a yes («آره بگید، هوش مصنوعی جالبه») is not the question,
+    # but «بله؟ هوش مصنوعی؟» and «یعنی هوش مصنوعی هستی؟ بگو ببینم» are.
+    asks = question or bool(re.search(rf"هستی|هستید|هستین|(?<![{_FA}])آدم|انسان|واقعا", blob))
+    yes = any(part in blob for part in ("آره", "بله", "بگید", "بگو", "باشه", "بفرمایید", "جالبه"))
+    if "هوش مصنوعی" in blob and (asks or not yes):
         robot = True
     has_site = any(part in blob for part in ("سایت دارم", "سایتم هست", "وبسایت دارم"))
-    cant = any(part in blob for part in ("بلد نیست", "نمی‌دونم", "نمیدونم", "سخته", "سختِ"))
-    time = any(part in blob for part in ("وقت ندار", "سرم شلوغ", "طول می‌کشه", "طول میکشه", "عجله دارم"))
-    refuse = any(part in blob for part in ("نمیخوام", "نمی‌خوام", "لازم نیست", "ولش کن"))
-    quick = bool(_QUICK.search(blob))
-    dnc = any(part in blob for part in _DNC_WORDS)
+    cant = any(part in blob for part in ("بلد نیست", "سخته", "سختِ"))
+    cant = cant or bool(re.search(r"نمیدونم\s+(?:چطور|چجوری|چطوری|چی کار|چیکار|از کجا)", blob))
+    # «طول می‌کشه» is busy; «چقدر طول می‌کشه؟» is an interested question.
+    slow = "طول میکشه" in blob and not (question or _HOW_LONG.search(blob))
+    time = no_time or slow or any(part in blob for part in ("سرم شلوغ", "عجله دارم"))
+    refuse = _refuses(joined)
+    # «سرم شلوغه، ولی بگید» and «وقت ندارم، سریع بگو» want the short version, not a hang-up; «بعداً زنگ بزنید» does not.
+    quick = (bool(_QUICK.search(blob)) or ((time or later) and bool(_INVITE.search(blob)))) and not callback
+    if quick:
+        later = False
+    dnc = bool(_DNC.search(blob))
     wrong = dnc or any(
         part in blob for part in ("مغازه ندار", "اشتباه گرفت", "فروشنده نیست", "فروشگاهی ندار", "اینستاگرام ندار")
     )
@@ -769,7 +823,36 @@ def read_signals(heard: str) -> Signals:
         wrong=wrong,
         quick=quick,
         dnc=dnc,
+        no=blob in _BARE_NO,
     )
+
+
+def _plain_words(text: str) -> str:
+    blob = re.sub(r"[^\u0600-\u06FFA-Za-z\s]", " ", text or "")
+    blob = _PUNCT.sub(" ", blob).replace("ي", "ی").replace("ك", "ک")
+    return re.sub(r"\s+", " ", blob).strip()
+
+
+def _refuses(text: str) -> bool:
+    """A no to the offer itself, not «یعنی لازم نیست کاری بکنم؟» or «نمی‌خوام تا نصف شب بیدار بمونم»."""
+    plain = _plain_words(text)
+    if _STILL_IN.search(plain):
+        return False
+    but = _BUT.search(plain)
+    if but and _WANTS.search(plain[but.end():]):
+        return False
+    if _NO_THANKS.search(plain):
+        return True
+    for clause in re.findall(r"[^،,.!؛;؟?]+[؟?]?", text or ""):
+        if clause.rstrip().endswith(("؟", "?")):
+            continue
+        words = _plain_words(clause)
+        if words.startswith("یعنی"):
+            continue
+        for match in _REFUSE.finditer(words):
+            if set(words[match.end():].split()) <= _REFUSE_TAIL:
+                return True
+    return False
 
 
 def pain_kind(heard: str) -> str:
@@ -824,6 +907,9 @@ def cached_sales_lines() -> list[str]:
         PRICE_UNKNOWN_LINE,
         f"{FIRST_DISCLOSE} {PRICE_UNKNOWN_LINE}",
         f"{ROBOT_SHORT} {PRICE_UNKNOWN_LINE}",
+        f"{ROBOT_SHORT} {DECLINE_LINE}",
+        f"{ROBOT_SHORT} {ADDRESS_LINE}",
+        DM_YES_LINE,
     ]
     for heard in ("قیمت", "پرو مکس"):
         priced = price_spoken_line(heard)
@@ -991,8 +1077,9 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         if signals.wrong:
             return TurnPlan(kind="close", line=DNC_LINE if signals.dnc else BYE_LINE, hangup=True, signals=signals, dnc=True)
         if signals.bye:
-            return TurnPlan(kind="close", line=CLOSE_LINE, hangup=True, signals=signals)
-        busy_first = (signals.time or signals.later) and not carrier
+            # «نمی‌خوام، خداحافظ» gets thanks, not the address.
+            return TurnPlan(kind="close", line=DECLINE_LINE if signals.refuse else CLOSE_LINE, hangup=True, signals=signals)
+        busy_first = (signals.time or signals.later) and not carrier and not signals.quick
         if not (signals.hello or signals.howdy or signals.quick or busy_first or person_started(heard)):
             return TurnPlan(kind="hold", signals=signals)
         state.greeted = True
@@ -1004,6 +1091,13 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
                 state.stage = "cta"
                 return TurnPlan(kind="address", line=f"{FIRST_DISCLOSE} {priced}", signals=signals)
             return TurnPlan(kind="address", line=f"{FIRST_DISCLOSE} {PRICE_UNKNOWN_LINE}", signals=signals)
+        objecting = signals.source or any(part in (heard or "") for part in ("کلاه", "اعتماد", "بلد نیست", "واتس"))
+        fixed = objection_line(signals, heard) if objecting and not carrier else None
+        if fixed:
+            # «سلام، شماره منو از کجا آوردید؟»: who is calling, then the answer, not the pitch.
+            state.intro_said = True
+            state.stage = "confirm"
+            return TurnPlan(kind="address", line=f"{FIRST_DISCLOSE} {fixed}", signals=signals)
         if signals.quick and not signals.later:
             # The short version still names the AI and ends with the address.
             state.intro_said = True
@@ -1019,15 +1113,28 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
     if signals.wrong:
         # "Don't call me" is promised back in words; a wrong number just gets a goodbye. Both go to the DNC file.
         return TurnPlan(kind="close", line=DNC_LINE if signals.dnc else BYE_LINE, hangup=True, signals=signals, dnc=True)
-    if signals.refuse and SOURCE_LINE in state.said:
+    if signals.refuse and state.said and state.said[-1].endswith(SOURCE_LINE):
         # We just said "if you don't want it, we won't call again": hold to it.
         return TurnPlan(kind="close", line=DNC_LINE, hangup=True, signals=signals, dnc=True)
     if signals.bye:
         line = BYE_LINE if (state.refused_cta or not state.linked or signals.refuse) else CLOSE_LINE
         return TurnPlan(kind="close", line=line, hangup=True, signals=signals)
+    if signals.robot and signals.refuse:
+        # «رباتی؟ نمی‌خوام»: the AI answer still comes, then thanks.
+        return TurnPlan(kind="close", line=f"{ROBOT_SHORT} {DECLINE_LINE}", hangup=True, signals=signals)
+    if state.awaiting_permission and signals.no:
+        # A bare «نه» to «بگم چطوری؟» is a no, not a dropped line.
+        state.awaiting_permission = False
+        return TurnPlan(kind="close", line=DECLINE_LINE, hangup=True, signals=signals)
     if len((heard or "").strip()) < 4:
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
-    if signals.robot and not (signals.price or signals.refuse):
+    if signals.robot and not signals.price and any(part in (heard or "") for part in _ADDRESS_HINTS):
+        # «رباتی؟ آدرس سایتتون چیه؟»: both answers, without asking for the question again.
+        state.robot_answers += 1
+        state.awaiting_permission = False
+        state.stage = "cta"
+        return TurnPlan(kind="address", line=f"{ROBOT_SHORT} {ADDRESS_LINE}", signals=signals)
+    if signals.robot and not signals.price:
         robot = robot_line(state)
         if robot:
             state.robot_answers += 1
@@ -1059,6 +1166,8 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             state.awaiting_permission = False
             kind = pain_kind(heard)
             line = feature_line(kind) or state.value_line or VALUE_GENERIC
+            if kind == "dm":
+                line = DM_YES_LINE
             state.pitched.update([kind] if kind else state.value_kind.split(","))
             state.intro_said = True
             state.pain_asked = True
@@ -1076,6 +1185,9 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
     fixed = objection_line(signals, heard)
     if fixed:
         state.stage = "confirm"
+        if any(fixed in said for said in state.said):
+            # Asked again: the model answers in fresh words instead of the same sentence.
+            return TurnPlan(kind="model", cue=state.cue(heard), signals=signals)
         return TurnPlan(kind="address", line=fixed, signals=signals)
     if signals.agree and (state.linked or state.cta_count > 0):
         state.agreed = True
@@ -1087,6 +1199,9 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         else:
             state.stage = "cta"
             return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
+    if signals.refuse and not state.pain_asked:
+        # «نمی‌خوام» before anything was pitched: thanks, not the pitch.
+        return TurnPlan(kind="close", line=DECLINE_LINE, hangup=True, signals=signals)
     kind = pain_kind(heard)
     line = feature_line(kind) if kind not in state.pitched else ""
     if line:
@@ -1154,10 +1269,14 @@ def extract_tags(raw: str) -> tuple[str, set[str]]:
     return text, tags
 
 
+_DOMAIN_SAID = re.compile(
+    r"sozan-core|سوزان[\s\u200c،,\-]*(?:خط\s*تیره[\s،,]*)?(?:کُر|کور|کر)(?![\u0600-\u06FF])|(?:کُر|کر)[،,]?\s*دات"
+)
+
+
 def mentions_address(text: str) -> bool:
     """The domain itself was spoken; «دکمهٔ ورود» alone does not tell them where to go."""
-    blob = text or ""
-    return any(part in blob for part in ("sozan-core", "سوزان کور", "سوزان کُر", "کُر، دات", "کُر دات"))
+    return bool(_DOMAIN_SAID.search(text or ""))
 
 
 def tool_followups(tags: set[str], state: SalesState, heard: str, spoken: str) -> tuple[list[str], bool, bool]:
@@ -1291,8 +1410,16 @@ def strip_invented_names(reply: str, heard: str) -> str:
 _TOMAN = re.compile(r"توم[اآ]?ن")
 
 
+_AMOUNT = re.compile(
+    rf"(?:هزار|میلیون|ملیون)(?:ه|ی|و)?(?![{_FA}])(?!\s*(?:تا|نفر|سفارش|دایرکت|مشتری|پیام|شهر|محصول|کالا|بار|فالوور))"
+)
+_MONEY_CONTEXT = re.compile(rf"(?<![{_FA}])(?:ماهی|ماهانه|ماهیانه|سالی|سالانه|قیمت\S*|هزینه\S*|پرو|پلن|اشتراک|پرداخت|تخفیف|پول)(?![{_FA}])")
+
+
 def _price_sentence_ok(sent: str) -> bool:
-    has_toman = bool(_TOMAN.search(sent))
+    # «پرو ماهی پونصد هزاره» is a price even without «تومان».
+    amount = _AMOUNT.search(sent) and _MONEY_CONTEXT.search(sent)
+    has_toman = bool(_TOMAN.search(sent)) or bool(amount)
     long_nums = []
     for num in _PRICE_NUM.findall(sent):
         latin = num.translate(_LATIN_DIGITS)
@@ -1324,7 +1451,7 @@ def guard_reply(reply: str, heard: str) -> str:
     for sent in split_sentences(text) or ([text] if text else []):
         if any(mark in sent for mark in PITCH_MARKS):
             continue
-        if any(part in sent for part in _BAN_CLAIM):
+        if any(part in sent for part in _BAN_CLAIM) or _BAN_EXPERIENCE.search(sent):
             continue
         if "رزرو" in sent or "نوبت‌دهی" in sent or "نوبت دهی" in sent:
             continue
@@ -1344,10 +1471,17 @@ def sentence_done(text: str) -> bool:
     return bool(re.search(r"[.!?؟]$", (text or "").strip()))
 
 
+_DANGLING = re.compile(r"(?:^|\s)(?:که|و|تا|اگه|اگر|ولی|اما|چون|با|از|به|برای|رو|را|یعنی)$")
+
+
 def stream_tail(buf: str) -> str:
     """Only a finished sentence may be spoken after the token stream stops."""
     tail = (buf or "").strip()
     if tail and sentence_done(tail):
+        return tail
+    # «ممنون از وقتتون [پایان]»: the tag ends the sentence, so it is spoken; «عرض کنم که [پایان]» is cut off, so it is not.
+    text, tags = extract_tags(tail)
+    if tags and tail.endswith("]") and text.strip() and "[" not in text and not _DANGLING.search(text.strip()):
         return tail
     return ""
 

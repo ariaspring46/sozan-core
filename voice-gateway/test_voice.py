@@ -892,8 +892,10 @@ class OpeningAndProfileTest(unittest.TestCase):
         note_spoken(robot_state, robot.line or "")
         after = plan_turn(robot_state, "باشه بگو")
         self.assertEqual(after.line, sales.value_for(card))
+        # The opening already offered DM replies: a yes about DMs hears how it works, not the offer again.
         pain = plan_turn(fresh(), "آره دایرکتام خیلی زیاده")
-        self.assertEqual(pain.line, sales.DM_LINE)
+        self.assertEqual(pain.line, sales.DM_YES_LINE)
+        self.assertNotEqual(pain.line, sales.DM_LINE)
         # A topic already pitched is never pitched again: their answer goes to the model.
         told = fresh()
         told.value_kind = "dm"
@@ -1251,6 +1253,289 @@ class ReviewFindingsTest(unittest.TestCase):
         self.assertIn("[پایان]", refuse.cue)
         self.assertNotIn("آدرس sozan", refuse.cue)
 
+
+
+class SecondReviewTest(unittest.TestCase):
+    """Second and third review rounds of the phone marketer change: each case failed before its fix."""
+
+    def setUp(self) -> None:
+        set_plans_fetcher(lambda: PLAN_FIXTURE)
+        set_payment_fetcher(lambda: False)
+
+    def tearDown(self) -> None:
+        reset_plan_cache()
+
+    def opened(self) -> SalesState:
+        import sales
+
+        card = ShopCard("x", "کیف")
+        state = SalesState(opening=sales.hello_for(card), value_line=sales.value_for(card), value_kind=sales.value_kind_for(card))
+        note_spoken(state, plan_turn(state, "الو بفرمایید").line or "")
+        return state
+
+    def valued(self) -> SalesState:
+        state = self.opened()
+        note_spoken(state, plan_turn(state, "بله بگید").line or "")
+        return state
+
+    def test_punctuation_does_not_hide_words(self) -> None:
+        import sales
+
+        self.assertEqual(plan_turn(self.opened(), "الان نه، ممنون").line, sales.BUSY_LINE)
+        for heard in ("خب چقدر میشه؟", "کلاً چقدر درمیاد؟", "پرو؟"):
+            self.assertTrue(read_signals(heard).price, heard)
+        self.assertEqual(plan_turn(self.opened(), "سریع بگید، وقت کمه").line, sales.QUICK_PITCH_LINE)
+
+    def test_dnc_wordings_and_polite_lookalikes(self) -> None:
+        import sales
+
+        for heard in (
+            "شماره‌مو پاک کنید",
+            "شمارمو حذف کنید",
+            "منو از لیست حذف کنید",
+            "شماره منو حذف کنید لطفاً",
+            "نمی‌خوام دیگه بهم زنگ بزنید",
+        ):
+            plan = plan_turn(self.opened(), heard)
+            self.assertTrue(plan.dnc and plan.hangup, heard)
+            self.assertEqual(plan.line, sales.DNC_LINE, heard)
+            self.assertTrue(plan_turn(SalesState(), heard).dnc, heard)
+        for heard in ("نه بابا مزاحم نشدید، بفرمایید", "شما از لیستتون زنگ زدید؟"):
+            plan = plan_turn(self.opened(), heard)
+            self.assertFalse(plan.dnc or plan.hangup, heard)
+
+    def test_pain_answers_are_not_busy_or_goodbye(self) -> None:
+        import sales
+
+        yes = plan_turn(self.opened(), "آره بگید، من اصلاً وقت ندارم به دایرکتا برسم")
+        self.assertFalse(yes.hangup)
+        self.assertEqual(yes.line, sales.DM_YES_LINE)
+        for heard in ("راستش وقت ندارم به همه‌شون جواب بدم", "فعلاً خودم جواب می‌دم", "تمام روز خودم پای گوشی‌ام"):
+            plan = plan_turn(self.valued(), heard)
+            self.assertFalse(plan.hangup, heard)
+            self.assertNotIn("[پایان]", plan.cue, heard)
+        for heard in ("باشه فعلاً", "فعلاً با اجازه", "همین، تمام"):
+            self.assertTrue(wants_bye(heard), heard)
+        self.assertEqual(plan_turn(SalesState(), "الو، فعلاً سرم شلوغه").line, sales.BUSY_OPEN_LINE)
+
+    def test_robot_questions_with_yes_words_get_the_ai_answer(self) -> None:
+        import sales
+
+        for heard in ("جالبه، هوش مصنوعی‌ای یا آدم؟", "بله؟ هوش مصنوعی؟", "یعنی تو هوش مصنوعی هستی؟ بگو ببینم"):
+            self.assertEqual(plan_turn(self.opened(), heard).line, sales.ROBOT_LINE, heard)
+        self.assertFalse(read_signals("آره بگید، هوش مصنوعی جالبه").robot)
+        for heard in ("رباتی؟ نه نمی‌خوام", "آدمی یا ربات؟ اگه رباتی لازم نیست"):
+            plan = plan_turn(self.opened(), heard)
+            self.assertTrue(plan.hangup, heard)
+            self.assertIn("هوش مصنوعی", plan.line or "", heard)
+        both = plan_turn(self.valued(), "رباتی؟ خب آدرس سایتتون چیه؟")
+        self.assertEqual(both.line, f"{sales.ROBOT_SHORT} {ADDRESS_LINE}")
+
+    def test_interested_questions_are_not_refusals_or_busy(self) -> None:
+        import sales
+
+        first = plan_turn(SalesState(), "سلام، ساختش چقدر طول می‌کشه؟")
+        self.assertEqual(first.kind, "hello")
+        self.assertFalse(plan_turn(self.opened(), "چقدر طول می‌کشه تا آماده بشه؟").hangup)
+        for heard in ("یعنی لازم نیست کاری بکنم؟", "فروشگاه نمی‌خوام، فقط دایرکت‌هام مهمه", "پول زیادی نمی‌خوام بدم، چی داره؟", "لازم نیست تکرار کنید"):
+            self.assertFalse(read_signals(heard).refuse, heard)
+        asked = self.opened()
+        note_spoken(asked, plan_turn(asked, "شماره منو از کجا آوردید").line or "")
+        note_spoken(asked, "سؤال خوبیه!")
+        self.assertFalse(plan_turn(asked, "یعنی لازم نیست کاری بکنم؟").dnc)
+        linked = self.valued()
+        note_spoken(linked, ADDRESS_LINE)
+        self.assertNotEqual(plan_turn(linked, "من تو سایت نمی‌رم، شما برام بسازید").line, CLOSE_LINE)
+        self.assertFalse(read_signals("نمی‌دونم، بگید").cant)
+        for heard in ("ماهانه چقدر پول باید بدم", "هزینه‌ش پول زیادیه؟"):
+            self.assertTrue(read_signals(heard).price, heard)
+        self.assertEqual(plan_turn(SalesState(), "سرم شلوغه ولی بگید").line, sales.QUICK_OPEN_LINE)
+
+    def test_plain_no_and_busy_wordings(self) -> None:
+        import sales
+
+        for heard in ("نه ممنون", "نه مرسی", "نه، نیازی نیست", "نه، علاقه‌ای ندارم", "نه"):
+            plan = plan_turn(self.opened(), heard)
+            self.assertEqual(plan.line, sales.DECLINE_LINE, heard)
+            self.assertTrue(plan.hangup, heard)
+        for heard in ("الان نمی‌تونم صحبت کنم", "تو جلسه‌ام", "الان درگیرم", "بعدازظهر زنگ بزنید"):
+            self.assertEqual(plan_turn(self.opened(), heard).line, sales.BUSY_LINE, heard)
+        self.assertEqual(plan_turn(SalesState(), "الو سلام، بعدازظهر بخیر").kind, "hello")
+        self.assertEqual(plan_turn(SalesState(), "نه ممنون، لازم نیست، خداحافظ").line, sales.DECLINE_LINE)
+        busy = plan_turn(self.valued(), "سرم شلوغه")
+        self.assertIn("[آدرس]", busy.cue)
+        self.assertNotIn("دعوت سایت نکن", busy.cue)
+
+    def test_first_words_objection_is_answered_after_the_ai_line(self) -> None:
+        import sales
+
+        for heard in ("سریع بگو شماره منو از کجا آوردی", "الو سریع بگو من بلد نیستم"):
+            plan = plan_turn(SalesState(), heard)
+            self.assertTrue((plan.line or "").startswith(sales.FIRST_DISCLOSE), heard)
+            self.assertNotEqual(plan.line, sales.QUICK_OPEN_LINE, heard)
+        state = SalesState()
+        note_spoken(state, plan_turn(state, "سلام، کلاهبرداری نیست؟").line or "")
+        self.assertEqual(plan_turn(state, "کلاهبرداری نیست این؟ از کجا معلوم").kind, "model")
+
+    def test_spoken_lines_and_prompt_stay_honest(self) -> None:
+        import sales
+
+        for line in (sales.BUSY_LINE, sales.BUSY_OPEN_LINE):
+            self.assertNotIn("رایگان", line)
+        self.assertTrue(sales.mentions_address("برید سوزان کر دات آی آر"))
+        self.assertFalse(sales.mentions_address("گوشم کر شد"))
+        for reply in ("پرو ماهی پونصد هزاره.", "پرو ماهی ۵۰۰ هزاره.", "من سال‌ها تجربهٔ فروش دارم.", "با تجربهٔ بیست‌ساله‌م می‌گم."):
+            self.assertEqual(guard_reply(reply, "چنده"), "", reply)
+        self.assertEqual(guard_reply("روزی هزار تا دایرکت جواب می‌دیم.", "خب"), "روزی هزار تا دایرکت جواب می‌دیم.")
+        for row in sales_open().splitlines():
+            if row.startswith("مشتری:") and "→" in row:
+                said, _tags = sales.extract_tags(row.split("→", 1)[1])
+                self.assertLessEqual(len(split_sentences(said)), 2, row)
+        for line in cached_sales_lines():
+            self.assertEqual(speakable(line, 3), speakable(line, 9), line)
+
+    def test_trailing_tag_closes_an_unpunctuated_sentence(self) -> None:
+        self.assertEqual(stream_tail("ممنون از وقتتون [پایان]"), "ممنون از وقتتون [پایان]")
+        self.assertEqual(stream_tail("خدمتتون عرض کنم که [پایان]"), "")
+        self.assertEqual(stream_tail("ممنون از وقتتون"), "")
+
+    def test_busy_dnc_and_refusal_wordings_without_false_hits(self) -> None:
+        import sales
+
+        for heard in ("کل روز درگیرم با دایرکتا", "اگه مشتری شب زنگ بزنه کی جواب میده؟", "وقت ندارم دایرکتا رو جواب بدم", "خودم وقت ندارم، شوهرم جواب میده"):
+            self.assertFalse(plan_turn(self.opened(), heard).hangup, heard)
+        for heard in ("الو سلام، تو جلسه‌ام ولی بگید", "وقت ندارم، سریع بگو"):
+            self.assertEqual(plan_turn(SalesState(), heard).line, sales.QUICK_OPEN_LINE, heard)
+        self.assertEqual(plan_turn(self.opened(), "بعداً زنگ بزنید، سریع بگید").line, sales.BUSY_LINE)
+        for heard in ("فعلاً نه", "فعلاً نه، ممنون", "عصر زنگ بزنید"):
+            self.assertEqual(plan_turn(self.opened(), heard).line, sales.BUSY_LINE, heard)
+        for heard in ("یعنی پیامای منو پاک کنه؟", "تموم که شد از لیست پاکش می‌کنم", "من نمی‌خوام خودم به مشتریا زنگ بزنم", "اگه مشتری زنگ نزنه چی"):
+            self.assertFalse(read_signals(heard).dnc, heard)
+        for heard in ("منو از لیستتون خارج کنید", "منو از لیستتون در بیارید", "دیگه زنگم نزنید", "میشه شماره منو پاک کنید؟"):
+            self.assertTrue(read_signals(heard).dnc, heard)
+        for heard in ("نه، ممنون", "نخیر، ممنون", "نمی‌خوام، ولی ممنون", "نه نمی‌خوام، فقط وقتمو گرفتی", "نمی‌خوامش"):
+            self.assertEqual(plan_turn(self.opened(), heard).line, sales.DECLINE_LINE, heard)
+        # The first words asked where the number came from: «نمی‌خوام» next holds Sozan to "we won't call again".
+        state = SalesState()
+        note_spoken(state, plan_turn(state, "شماره منو از کجا آوردید").line or "")
+        self.assertTrue(plan_turn(state, "نه نمی‌خوام").dnc)
+        self.assertEqual(plan_turn(SalesState(), "الو، صداتون نمیاد، سخته بشنوم").kind, "hello")
+
+    def test_counts_and_cut_off_replies(self) -> None:
+        for reply in ("ماهی هزار تا سفارش، یعنی حسابی سرتون شلوغه!", "به هزار تا شهر ارسال دارید؟"):
+            self.assertEqual(guard_reply(reply, "خب"), reply)
+        self.assertEqual(guard_reply("پلنش سالی دو میلیونه.", "خب"), "")
+        for tail in ("[آدرس] اگه سؤالی داشتید، من", "عالیه! [آدرس] [پای", "عالیه [آدرس] همین امروز ثبت"):
+            self.assertEqual(stream_tail(tail), "", tail)
+
+    def test_gateway_keeps_dnc_and_late_words(self) -> None:
+        import queue
+        import threading
+
+        import main as main_module
+        import sales
+
+        saved: list[str] = []
+
+        class Session:
+            def __init__(self) -> None:
+                self.playing = threading.Event()
+                self._play = queue.Queue()
+                self._speech = False
+                self.last_was_barge = False
+                self.played: list[str] = []
+
+            def play(self, pcm: bytes, end: bool = False) -> None:
+                if pcm:
+                    self.played.append(pcm.decode("utf-8"))
+
+            def wait_done(self, _seconds: float) -> None:
+                pass
+
+        class Voice:
+            def __init__(self, replies: list[str]) -> None:
+                self.replies = list(replies)
+
+            def commit_assistant(self, _text: str) -> None:
+                pass
+
+            def pop_last_user(self) -> None:
+                pass
+
+            def synthesize(self, text: str, cloud: bool = True) -> tuple[bytes, float]:
+                return text.encode("utf-8"), 0.0
+
+            def sales_stream(self, _cue: str, _cancel=None):
+                # Like brain._sales_events: an unfinished piece reaches the gateway only as raw text.
+                for piece in self.replies.pop(0).split("|"):
+                    said = piece if sales.sentence_done(piece) else sales.stream_tail(piece)
+                    yield {"sentence": said, "raw": piece}
+
+        class Phone:
+            hung = False
+
+            def hangup(self) -> None:
+                Phone.hung = True
+
+        def gateway(state: SalesState, replies: list[str], pending: list[str]):
+            gw = main_module.Gateway.__new__(main_module.Gateway)
+            gw._sales, gw._voice, gw.brain, gw.ua = state, {}, Voice(replies), Phone()
+            gw._peer_number, gw._sales_turn_seq, gw._last_kind = "09120000000", 0, "wait"
+            gw._call_generation, gw._sales_cancel, gw._sim_call = 1, None, True
+            gw._last_line, gw._spoke_at, gw._step = "", 0.0, False
+            gw._pending_heard = lambda _session: pending.pop(0) if pending else ""
+            gw._end_call = lambda _call: setattr(gw, "_peer_number", "")
+            gw._ahead_sales = lambda gen, _cancel, _generation: gen
+            gw._log_sales_turn = lambda *_args, **_kw: None
+            return gw
+
+        original = main_module.remember_dnc
+        main_module.remember_dnc = saved.append
+        try:
+            # «زنگ نزنید» said while the model was thinking: its own goodbye, and the number is saved.
+            session = Session()
+            gateway(self.valued(), ["الان براتون می‌گم.|بیشتر بگم؟"], ["", "نه، زنگ نزنید"])._sales_speak(session, 1, "خب، بیشتر بگید")
+            self.assertEqual(session.played, [sales.DNC_LINE])
+            self.assertEqual(saved, ["09120000000"])
+            # Said over the first sentence: the next turn, not noise.
+            saved.clear()
+            session = Session()
+            gateway(self.valued(), ["آهان، پس دایرکت زیاده!|الان کی جواب می‌ده؟"], ["", "", "زنگ نزنید دیگه"])._sales_speak(
+                session, 1, "جالبه، بیشتر توضیح بدید"
+            )
+            self.assertEqual(session.played[-1], sales.DNC_LINE)
+            self.assertEqual(saved, ["09120000000"])
+            # A refusal answered with only [پایان] still gets thanks and ends the call.
+            session = Session()
+            Phone.hung = False
+            gateway(self.valued(), ["[پایان]"], [])._sales_speak(session, 1, "نه ممنون، نیازی ندارم")
+            self.assertEqual(session.played, [sales.DECLINE_LINE])
+            self.assertTrue(Phone.hung)
+            # The number is written before the goodbye plays, so hanging up during it loses nothing.
+            saved.clear()
+            gw = gateway(self.opened(), [], [])
+            speak = gw._speak
+
+            def hang_up_while_speaking(*args, **kwargs) -> None:
+                gw._peer_number = ""
+                speak(*args, **kwargs)
+
+            gw._speak = hang_up_while_speaking
+            gw._sales_speak(Session(), 1, "زنگ نزنید لطفاً")
+            self.assertEqual(saved, ["09120000000"])
+            # A cut-off reply is never spoken; the closing line ends the call instead.
+            session = Session()
+            gateway(self.valued(), ["خدمتتون عرض کنم که [پایان]"], [])._sales_speak(session, 1, "جالبه، بیشتر توضیح بدید")
+            self.assertEqual(session.played, [CLOSE_LINE])
+            # The line's own echo heard over the first sentence is not the caller's next turn.
+            session = Session()
+            echo = "جواب دایرکت‌ها رو من با لحن خودتون می‌نویسم!"
+            gateway(self.valued(), [f"{echo}|الان کی جواب می‌ده؟"], ["", "", echo.rstrip("!")])._sales_speak(
+                session, 1, "جالبه، بیشتر توضیح بدید"
+            )
+            self.assertEqual(session.played, [echo])
+        finally:
+            main_module.remember_dnc = original
 
 if __name__ == "__main__":
     unittest.main()
