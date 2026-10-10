@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     melipayamak_body_id: str = "547036"
     # approved template for «order shipped» ({0} title, {1} shop, {2} tracking, {3} link); empty = no order SMS
     melipayamak_order_body_id: str = ""
+    # approved template for the seller when no device has notifications on ({0} = «سفارش تازه» …); empty = off
+    melipayamak_seller_body_id: str = ""
     melipayamak_pattern_base: str = "https://api.payamak-panel.com/post/send.asmx"
     otp_fixed_accounts: str = ""
     sms_provider: str = "smsir"

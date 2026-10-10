@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { formatWhen, money, parseNonNegativeInt } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
 import { FlowOrder, OrderFlowCard } from "@/components/order-flow-card";
+import { PushToggle } from "@/components/push-toggle";
 
 type Sale = {
   id: string;
@@ -198,6 +199,8 @@ export default function SalesPage() {
             </ul>
           </Card>
         ) : null}
+
+        <PushToggle compact />
 
         <OrderFlowCard
           orders={orders}

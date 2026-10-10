@@ -9,5 +9,7 @@ python-multipart==0.0.18
 Pillow==12.3.0
 rembg==2.0.67
 httpx==0.28.1
+cryptography==50.0.2  # web push to the seller: VAPID (ES256) and aes128gcm
+http-ece==1.2.1
 socksio==1.0.0
 onnxruntime==1.30.0  # rembg needs it at import; without it the cutout path and its test fail

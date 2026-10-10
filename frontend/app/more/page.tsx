@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { clearToken } from "@/lib/api";
 import { usePlan } from "@/lib/use-plan";
+import { PushToggle } from "@/components/push-toggle";
 
 const HUB = [
   { href: "/more/inventory", title: "انبار", hint: "کالا، قیمت و موجودی" },
@@ -52,6 +53,7 @@ export default function MorePage() {
             </Link>
           ))}
         </div>
+        <PushToggle />
         <section aria-labelledby="theme-title" className="rounded-2xl bg-canvas p-4 shadow-card">
           <p id="theme-title" className="font-bold">ظاهر پنل</p>
           <p className="mt-1 text-[13px] leading-6 text-muted">«خودکار» همان روشن یا تیرهٔ گوشی/سیستم را دنبال می‌کند.</p>
