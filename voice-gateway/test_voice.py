@@ -1256,7 +1256,7 @@ class ReviewFindingsTest(unittest.TestCase):
 
 
 class SecondReviewTest(unittest.TestCase):
-    """Second and third review rounds of the phone marketer change: each case failed before its fix."""
+    """Second to fourth review rounds of the phone marketer change: each case failed before its fix."""
 
     def setUp(self) -> None:
         set_plans_fetcher(lambda: PLAN_FIXTURE)
@@ -1420,6 +1420,37 @@ class SecondReviewTest(unittest.TestCase):
         note_spoken(state, plan_turn(state, "شماره منو از کجا آوردید").line or "")
         self.assertTrue(plan_turn(state, "نه نمی‌خوام").dnc)
         self.assertEqual(plan_turn(SalesState(), "الو، صداتون نمیاد، سخته بشنوم").kind, "hello")
+
+    def test_fourth_round_wordings(self) -> None:
+        import main as main_module
+        import sales
+
+        for heard in (
+            "منو از لیست‌تون حذف کنید",
+            "منو از لیست بردارید",
+            "لطفاً منو از لیست مخاطبینتون حذف کنید",
+            "می‌خوام از لیست حذف بشم",
+            "اسممو پاک کنید",
+            "منو حذف کنید از لیستتون",
+            "دیگه زنگ نزنی",
+            "دیگه تماس نگیری",
+            "شمارمو پاکش کنید",
+        ):
+            self.assertTrue(read_signals(heard).dnc, heard)
+        self.assertFalse(read_signals("عکسای منو حذف کنی چی میشه").dnc)
+        sourced = self.opened()
+        note_spoken(sourced, plan_turn(sourced, "شماره منو از کجا آوردید").line or "")
+        for heard in ("نمی‌خوام، ولی آدرستون چیه؟", "نه ممنون، ولی رایگانه؟", "نه، ممنون می‌شم بیشتر توضیح بدید"):
+            self.assertFalse(read_signals(heard).refuse, heard)
+        self.assertFalse(plan_turn(sourced, "لازم ندارم، ولی آدرستونو بدید").dnc)
+        self.assertFalse(plan_turn(self.opened(), "آره بگید، فعلاً نه سایت دارم نه فروشگاه").hangup)
+        for heard in ("الو، وقت ندارم، مشتری دارم", "سلام، الان نمی‌تونم صحبت کنم، پیام بدید", "تو جلسه‌ام، بعد بگید", "پشت فرمونم، فردا بگید"):
+            self.assertEqual(plan_turn(self.opened(), heard).line, sales.BUSY_LINE, heard)
+        self.assertTrue(plan_turn(SalesState(), "سلام، از كجا معلوم كلاهبرداری نيستين؟").line.startswith(sales.FIRST_DISCLOSE))
+        for reply in ("پلنش دو میلیونه.", "پولش پونصد هزاره.", "سالیانه دو میلیون می‌شه."):
+            self.assertEqual(guard_reply(reply, "خب"), "", reply)
+        self.assertFalse(main_module.late_echo("درسته، ولی دیگه به من زنگ نزنید", ["درسته!"]))
+        self.assertTrue(main_module.late_echo("جواب دایرکت‌ها رو من با لحن خودتون می‌نویسم", ["جواب دایرکت‌ها رو من با لحن خودتون می‌نویسم!"]))
 
     def test_counts_and_cut_off_replies(self) -> None:
         for reply in ("ماهی هزار تا سفارش، یعنی حسابی سرتون شلوغه!", "به هزار تا شهر ارسال دارید؟"):

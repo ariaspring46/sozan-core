@@ -223,20 +223,33 @@ _HOW_MUCH_END = re.compile(r"(?:چقدر|چقد|چند)\s*(?:میشه|درمیا
 _FA = "\u0600-\u06FF"
 # «پرو» the plan, not «پروانه»، «پروین» or «پروفایل».
 _PRO_WORD = re.compile(rf"(?<![{_FA}])پرو(?![{_FA}])")
-# «بعداً» and «الان نه» as words, not inside «بعدازظهر» or «الان نهار».
-_LATER = re.compile(rf"(?<![{_FA}])(?:بعد(?:ا|اً)|الان نه|فعل(?:ا|اً) نه)(?![{_FA}])")
+# «بعداً» as a word, not inside «بعدازظهر».
+_LATER = re.compile(rf"(?<![{_FA}])بعد(?:ا|اً)(?![{_FA}])")
+# «الان نه» / «فعلاً نه» as a whole answer, not «الان نهار» or «فعلاً نه سایت دارم نه فروشگاه».
+_NOT_NOW = re.compile(
+    rf"(?<![{_FA}])(?:الان|فعلا|فعلاً) نه(?=\s*(?:$|[،؛؟?!.,]|(?:ممنون|مرسی|خداحافظ|بعدا|بعداً|حالا|دیگه|وقت)(?![{_FA}])))"
+)
+# «تو جلسه‌ام، بعد بگید»: tell me later, not tell me now.
+_LATER_SAY = re.compile(
+    rf"(?<![{_FA}])(?:بعد|بعدا|بعداً|فردا|بعدازظهر|بعد از ظهر|عصر|شب|یه ساعت دیگه|یه وقت دیگه|یه روز دیگه)\s+(?:بگید|بگین|بگو)$"
+)
 # Busy but still listening: an imperative "say it quickly" wants the short version, not a hang-up.
 # Only «بگو/بگید/بگین»: «خلاصه بگم» is the caller's own filler, «سریع بگیرن» is about their customers.
 _QUICK = re.compile(rf"(?:سریع|خلاصه|خلاصهش رو|خلاصشو|کوتاه|زود|مختصر|فقط)\s*(?:بگو|بگید|بگین)(?![{_FA}])")
 # Do-not-call in its common wordings; «مزاحم نشدید» (polite "no bother") and «از لیستتون زنگ زدید؟» are not.
-# Asked of us, not «پیامای منو پاک کنه؟» or «از لیست پاکش می‌کنم».
-_YOU_DO = rf"(?:کنید|کنین|کن|بکنید|بکنین|بزنید|بزنین|بزن)(?![{_FA}])"
+# The verb is asked of us (کنید، کنی، بردارید...), not «پیامای منو پاک کنه؟» or «از لیست پاکش می‌کنم».
+_REMOVE = (
+    rf"(?:(?:پاک|حذف|خارج|بیرون)(?:ش|م|مون)?\s*(?:کنید|کنین|کنی|کن|بکنید|بکنین|بکنی|بکن)"
+    rf"|(?:بردار|دربیار|در بیار)(?:ید|ین|ی)?|خط\s*(?:بزنید|بزنین|بزنی|بزن|بکشید))(?![{_FA}])"
+)
 _DNC = re.compile(
-    rf"زنگ(?:م)? نزن(?:ید|ین|یدا)?(?![{_FA}])|تماس نگیر(?:ید|ین)?(?![{_FA}])|(?<![{_FA}])مزاحم(?:م)? نش(?:ید|ین|و)(?![{_FA}])"
-    r"|از لیست(?:تون|تان|ت)\s+(?:\S+\s+)?(?:پاک|حذف|خارج|بیرون|بردار|دربیار|در بیار|خط)"
-    rf"|از لیست\s+(?:پاک|حذف|خارج)\s*(?:م\s+)?{_YOU_DO}"
-    rf"|(?:شمارمو|شمارهمو|شماره مو|شماره منو|شماره من رو|شمارم رو|شماره ام رو)\s+(?:\S+\s+)?(?:پاک|حذف)\s*{_YOU_DO}"
-    rf"|(?<![{_FA}])نمیخوام\s+(?:\S+\s+){{0,3}}(?:زنگ بزنید|زنگ بزنین|زنگ بزنی|تماس بگیرید|تماس بگیرین)(?![{_FA}])"
+    rf"زنگ(?:م|مون)? نزن(?:ید|ین|ی)?(?:ها|ا)?(?![{_FA}])|تماس نگیر(?:ید|ین|ی)?(?:ها|ا)?(?![{_FA}])"
+    rf"|(?<![{_FA}])مزاحم(?:م)? نش(?:ید|ین|ی|و)(?![{_FA}])"
+    rf"|(?:اسممو|اسم منو|شمارمو|شمارهمو|شماره مو|شماره منو|شماره من رو|شمارم رو|شماره ام رو)\s+(?:\S+\s+){{0,3}}{_REMOVE}"
+    rf"|از (?:لیست|سیستم)\S*\s+(?:\S+\s+){{0,2}}{_REMOVE}"
+    rf"|از (?:لیست|سیستم)\S*\s+(?:\S+\s+)?(?:پاک|حذف|خارج)\s*(?:بشم|شم)(?![{_FA}])"
+    rf"|(?<![{_FA}])منو\s+(?:\S+\s+)?(?:پاک|حذف)(?:ش)?\s*(?:کنید|کنین|بکنید|بکنین)(?![{_FA}])"
+    rf"|(?<![{_FA}])نمیخوام\s+(?:\S+\s+){{0,3}}(?:زنگ بزنید|زنگ بزنین|زنگ بزنی|تماس بگیرید|تماس بگیرین|تماس بگیری)(?![{_FA}])"
 )
 # STT punctuation inside a turn («،» «؛» «؟») is a space, so word-boundary patterns still match before it.
 _PUNCT = re.compile(r"[\u060C\u061B\u061F\u066A-\u066D\u06D4]")
@@ -245,7 +258,8 @@ _INVITE = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید
 _NO_TIME = re.compile(rf"وقت ندار(?:م|یم)?(?![{_FA}])(?!\s*(?:به|برای|واسه|که|جواب|پاسخ)(?![{_FA}]))")
 _CANT_TALK = ("نمیتونم صحبت", "نمیتونم حرف", "تو جلسه", "توی جلسه", "جلسه ام", "درگیرم", "پشت فرمونم", "دارم رانندگی")
 # Busy words inside a pain answer («کل روز درگیرم با دایرکتا», «وقت ندارم دایرکتا رو جواب بدم») are the pain, not busy.
-_PAIN = re.compile(r"دایرکت|پیام|مشتری|جواب|سفارش|پست|استوری")
+# «مشتری دارم»، «پیام بدید» and «نمی‌تونم جواب بدم» stay busy.
+_PAIN = re.compile(r"دایرکت|پیاما|پیامها|پیام ها|پیامای|پیامهای|استوری|کپشن|پست|جواب میده|جواب میدن|جواب نمیده")
 _CALL_BACK = re.compile(
     r"(?:بعدازظهر|بعد از ظهر|عصر|فردا|شب|یه ساعت دیگه|یه وقت دیگه|یه روز دیگه|هفته بعد)\s+(?:\S+\s+)?"
     rf"(?:زنگ بزنید|زنگ بزنین|زنگ بزن|تماس بگیرید|تماس بگیرین)(?![{_FA}])"
@@ -255,7 +269,10 @@ _REFUSE = re.compile(
     rf"(?<![{_FA}])(?:نمیخوام(?:ش|شون)?|لازم نیست|لازم ندارم|نیازی نیست|نیازی ندارم|نیاز ندارم|علاقه ای ندارم|علاقه ندارم|ولش کن)(?![{_FA}])"
 )
 # «الان نه، ممنون» is a not-now (the busy line with the address), not a no.
-_NO_THANKS = re.compile(rf"(?<![{_FA}])(?<!الان )(?<!فعلا )(?<!فعلاً )(?:نه|نخیر)\s+(?:ممنون|مرسی|متشکرم|سپاس)")
+# «نه، ممنون می‌شم توضیح بدید» is a polite yes.
+_NO_THANKS = re.compile(
+    rf"(?<![{_FA}])(?<!الان )(?<!فعلا )(?<!فعلاً )(?:نه|نخیر)\s+(?:ممنون|مرسی|متشکرم|سپاس)(?![{_FA}])(?!\s+(?:میشم|میشیم|بشم))"
+)
 # Words that may follow a refusal in its clause and keep it one: «لازم نیست، ممنون» yes, «لازم نیست تکرار کنید» no.
 _REFUSE_TAIL = frozenset(
     ("ممنون", "مرسی", "متشکرم", "سپاس", "خیلی", "اصلا", "اصلاً", "فعلا", "فعلاً", "دیگه", "خداحافظ", "آقا", "خانم",
@@ -264,7 +281,7 @@ _REFUSE_TAIL = frozenset(
 # Still listening: «نه مرسی، بگید»; or a «but» that turns to what they do want: «فروشگاه نمی‌خوام، فقط دایرکت‌هام مهمه».
 _STILL_IN = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید|بفرما|چطور|چطوری|چجوری)(?![{_FA}])")
 _BUT = re.compile(rf"(?<![{_FA}])(?:ولی|اما|فقط)(?![{_FA}])")
-_WANTS = re.compile(r"دایرکت|پیام|محتوا|پست|استوری|سایت|سفارش|فروشگاه|قیمت|چنده|چقدر")
+_WANTS = re.compile(r"دایرکت|پیام|محتوا|پست|استوری|سایت|سفارش|فروشگاه|قیمت|چنده|چقدر|آدرس|لینک|بفرست|رایگان|چی کار|چیکار|چیه|بعدا|توضیح")
 _BARE_NO = frozenset(("نه", "نه نه", "نخیر", "نه خیر", "نه بابا", "نوچ"))
 _START_WORDS = (
     "سلام",
@@ -775,7 +792,9 @@ def read_signals(heard: str) -> Signals:
         price = False
     pain = bool(_PAIN.search(blob))
     no_time = bool(_NO_TIME.search(blob)) and not pain
-    callback = bool(_LATER.search(blob)) or bool(_CALL_BACK.search(blob))
+    soft = re.sub(r"\s+", " ", re.sub(r"[^؀-ۿA-Za-z\s,.!?]", " ", joined)).strip()
+    soft = soft.replace("ي", "ی").replace("ك", "ک")
+    callback = any(pattern.search(blob) for pattern in (_LATER, _CALL_BACK, _LATER_SAY)) or bool(_NOT_NOW.search(soft))
     later = callback or no_time or "سردم" in blob or (any(part in blob for part in _CANT_TALK) and not pain)
     trust = any(part in blob for part in ("اعتماد", "کلاه", "مطمئن", "درست میگی"))
     agree = any(part in blob for part in ("باشه", "چشم", "اوکی", "باز کردم", "زدم ورود", "آره میام"))
@@ -839,7 +858,8 @@ def _refuses(text: str) -> bool:
     if _STILL_IN.search(plain):
         return False
     but = _BUT.search(plain)
-    if but and _WANTS.search(plain[but.end():]):
+    if but and (_WANTS.search(plain[but.end():]) or re.search(r"[؟?]", text or "")):
+        # «نمی‌خوام، ولی آدرستون چیه؟»: the «but» is where they lean in.
         return False
     if _NO_THANKS.search(plain):
         return True
@@ -1091,7 +1111,8 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
                 state.stage = "cta"
                 return TurnPlan(kind="address", line=f"{FIRST_DISCLOSE} {priced}", signals=signals)
             return TurnPlan(kind="address", line=f"{FIRST_DISCLOSE} {PRICE_UNKNOWN_LINE}", signals=signals)
-        objecting = signals.source or any(part in (heard or "") for part in ("کلاه", "اعتماد", "بلد نیست", "واتس"))
+        words = _plain_words(heard)
+        objecting = signals.source or any(part in words for part in ("کلاه", "اعتماد", "بلد نیست", "واتس"))
         fixed = objection_line(signals, heard) if objecting and not carrier else None
         if fixed:
             # «سلام، شماره منو از کجا آوردید؟»: who is calling, then the answer, not the pitch.
@@ -1413,7 +1434,9 @@ _TOMAN = re.compile(r"توم[اآ]?ن")
 _AMOUNT = re.compile(
     rf"(?:هزار|میلیون|ملیون)(?:ه|ی|و)?(?![{_FA}])(?!\s*(?:تا|نفر|سفارش|دایرکت|مشتری|پیام|شهر|محصول|کالا|بار|فالوور))"
 )
-_MONEY_CONTEXT = re.compile(rf"(?<![{_FA}])(?:ماهی|ماهانه|ماهیانه|سالی|سالانه|قیمت\S*|هزینه\S*|پرو|پلن|اشتراک|پرداخت|تخفیف|پول)(?![{_FA}])")
+_MONEY_CONTEXT = re.compile(
+    rf"(?<![{_FA}])(?:ماه\S*|سال(?:ی|انه|یانه|یه)|قیمت\S*|هزینه\S*|پرو|پلن\S*|اشتراک\S*|پرداخت\S*|تخفیف\S*|پول\S*)(?![{_FA}])"
+)
 
 
 def _price_sentence_ok(sent: str) -> bool:

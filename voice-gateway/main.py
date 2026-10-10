@@ -1385,7 +1385,7 @@ class Gateway:
                 finally:
                     retry_gen.close()
         session.play(b"", end=True)
-        if late_heard and any(looks_like_echo(late_heard, part) for part in spoken_parts):
+        if late_heard and late_echo(late_heard, spoken_parts):
             log.info("dropped echo text=%s", late_heard[:80])
             late_heard = ""
         generated_text = " ".join(generated).strip()
@@ -1622,6 +1622,18 @@ class Gateway:
             session.play(pcm, end=False)
         self._last_line = line
         self._spoke_at = time.monotonic()
+
+
+def late_echo(late: str, spoken_parts: list[str]) -> bool:
+    """Words heard over a sentence that are mostly that sentence; a «درسته، ولی زنگ نزنید» over «درسته!» is the caller."""
+    signals = read_signals(late)
+    if signals.wrong or signals.refuse or signals.bye:
+        return False
+    for part in spoken_parts:
+        said = len(part.split())
+        if said >= 3 and looks_like_echo(late, part) and len(late.split()) <= said + 2:
+            return True
+    return False
 
 
 def load_env_file() -> None:
