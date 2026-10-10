@@ -2824,6 +2824,14 @@
    "X1"
   ]
  },
+ "backend/app/services/shop_interview_service.py::awaits_answer": {
+  "owner": "X4",
+  "signature": "def awaits_answer(rows: list[dict]) -> bool",
+  "since": "2026-10-10",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/shop_memory_service.py::schedule_backfill": {
   "owner": "Y",
   "signature": "def schedule_backfill(products: list[dict], *, phone: str | None=None) -> None",
