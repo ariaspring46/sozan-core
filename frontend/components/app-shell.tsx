@@ -27,6 +27,9 @@ const TABS: readonly Tab[] = [
   { href: "/more", label: "بیشتر", icon: MoreHorizontal },
 ];
 
+/** نوار پایین گوشی: پنج بخشی که هر روز باز می‌شوند؛ بقیه در منو و «بیشتر». */
+const BOTTOM_TABS = ["/chat", "/shop", "/sales", "/inbox", "/more"];
+
 function tabActive(pathname: string, href: string) {
   if (href === "/studio") {
     return pathname.startsWith("/studio") || pathname.startsWith("/campaigns");
@@ -52,7 +55,7 @@ const PAGE_TITLES: readonly [string, string][] = [
   ["/more/inventory", "انبار"],
   ["/more/channels", "کانال‌ها"],
   ["/more/wallet", "کیف پول"],
-  ["/more/settings", "پرداخت و پیامک"],
+  ["/more/settings", "پرداخت، ارسال و پیامک"],
   ["/more/support", "پشتیبانی"],
   ["/more/docs", "اسناد آموزشی"],
   ["/more", "بیشتر"],
@@ -221,7 +224,7 @@ export function AppShell({
         ) : null}
       </nav>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:pb-[env(safe-area-inset-bottom,0px)]">
         <header className={cn("relative z-20 flex shrink-0 items-center gap-2 px-3 py-2.5 sm:px-4 sm:py-3", scene ? "bg-transparent" : "bg-paper/80 backdrop-blur-md")}>
           <button
             ref={menuButton}
@@ -244,6 +247,34 @@ export function AppShell({
           </div>
         ) : null}
         <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden", !scene && "bg-paper")}>{children}</div>
+        <nav
+          aria-label="بخش‌های اصلی"
+          className="sozan-tabbar flex shrink-0 border-t border-line/70 bg-paper/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md md:hidden"
+        >
+          {TABS.filter((tab) => BOTTOM_TABS.includes(tab.href)).map((tab) => {
+            const active = tabActive(pathname, tab.href);
+            const Icon = tab.icon;
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                aria-current={active ? "page" : undefined}
+                aria-label={label(tab)}
+                className={cn(
+                  "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px]",
+                  active ? "font-bold text-warm" : "text-muted",
+                )}
+              >
+                <span className={cn("relative flex h-7 w-12 items-center justify-center rounded-full", active && "bg-accent/15")}>
+                  <Icon size={20} strokeWidth={active ? 2.3 : 1.8} />
+                  {tab.href === "/inbox" && unread > 0 ? <Badge count={unread} /> : null}
+                  {tab.href === "/chat" && events > 0 ? <Badge count={events} /> : null}
+                </span>
+                <span>{tab.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
 
       {menuOpen ? (

@@ -32,23 +32,23 @@
 /* تم پنل: پیش‌فرض از تنظیم دستگاه؛ انتخاب کاربر روی <html data-theme> می‌نشیند. */
 :root,
 :root[data-theme="dark"] {
-  --c-ink: 243 238 230;
-  --c-muted: 180 176 168;
-  --c-paper: 58 58 64;
-  --c-canvas: 47 47 51;
-  --c-surface: 58 58 64;
-  --c-line: 82 82 90;
-  --c-accent: 196 92 38;
-  --c-accentStrong: 176 82 31;
-  --c-field: 142 142 152;
-  --c-onAccent: 255 246 238;
-  --c-warm: 232 168 124;
+  --c-ink: 240 236 232;
+  --c-muted: 162 154 148;
+  --c-paper: 21 19 18;
+  --c-canvas: 29 27 25;
+  --c-surface: 36 33 31;
+  --c-line: 56 51 48;
+  --c-accent: 200 136 98;
+  --c-accentStrong: 150 90 56;
+  --c-field: 128 120 114;
+  --c-onAccent: 255 255 255;
+  --c-warm: 226 176 146;
   --c-signal: 126 184 176;
   --c-danger: 250 160 152;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 28%), 0 10px 28px rgb(0 0 0 / 22%);
   /* صحنهٔ چت: زمینهٔ عمیق، شدت هالهٔ مسی، و دو رنگ گوی سوزان (نقطه‌های جلو و پشت کره) */
-  --c-chatbg: 20 19 22;
-  --glow: 0.3;
+  --c-chatbg: 17 15 14;
+  --glow: 0.16;
   --orb-front: 255 204 166;
   --orb-back: 176 82 31;
   color-scheme: dark;
@@ -56,22 +56,22 @@
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --c-ink: 42 38 34;
-    --c-muted: 103 95 86;
-    --c-paper: 244 239 232;
+    --c-ink: 28 25 23;
+    --c-muted: 104 98 92;
+    --c-paper: 246 245 242;
     --c-canvas: 255 255 255;
     --c-surface: 255 255 255;
-    --c-line: 220 211 199;
-    --c-accent: 196 92 38;
-    --c-accentStrong: 166 74 27;
-    --c-field: 140 131 120;
-    --c-onAccent: 255 248 242;
-    --c-warm: 156 74 28;
+    --c-line: 231 227 222;
+    --c-accent: 160 90 54;
+    --c-accentStrong: 138 76 44;
+    --c-field: 158 150 142;
+    --c-onAccent: 255 255 255;
+    --c-warm: 138 76 44;
     --c-signal: 39 112 106;
     --c-danger: 185 58 46;
     --shadow-card: 0 1px 2px rgb(60 40 20 / 8%), 0 8px 24px rgb(60 40 20 / 8%);
-    --c-chatbg: 252 249 245;
-    --glow: 0.22;
+    --c-chatbg: 249 248 246;
+    --glow: 0.1;
     --orb-front: 166 74 27;
     --orb-back: 236 168 128;
     color-scheme: light;
@@ -79,22 +79,22 @@
 }
 
 :root[data-theme="light"] {
-  --c-ink: 42 38 34;
-  --c-muted: 103 95 86;
-  --c-paper: 244 239 232;
+  --c-ink: 28 25 23;
+  --c-muted: 104 98 92;
+  --c-paper: 246 245 242;
   --c-canvas: 255 255 255;
   --c-surface: 255 255 255;
-  --c-line: 220 211 199;
-  --c-accent: 196 92 38;
-  --c-accentStrong: 166 74 27;
-  --c-field: 140 131 120;
-  --c-onAccent: 255 248 242;
-  --c-warm: 156 74 28;
+  --c-line: 231 227 222;
+  --c-accent: 160 90 54;
+  --c-accentStrong: 138 76 44;
+  --c-field: 158 150 142;
+  --c-onAccent: 255 255 255;
+  --c-warm: 138 76 44;
   --c-signal: 39 112 106;
   --c-danger: 185 58 46;
   --shadow-card: 0 1px 2px rgb(60 40 20 / 8%), 0 8px 24px rgb(60 40 20 / 8%);
-  --c-chatbg: 252 249 245;
-  --glow: 0.22;
+  --c-chatbg: 249 248 246;
+  --glow: 0.1;
   --orb-front: 166 74 27;
   --orb-back: 236 168 128;
   color-scheme: light;
@@ -103,22 +103,22 @@
 /* لندینگ، ورود و آنبورد همیشه تیره می‌مانند (صحنه‌های برند با رنگ ثابت). */
 .sozan-landing,
 .sozan-lamp {
-  --c-ink: 243 238 230;
-  --c-muted: 180 176 168;
-  --c-paper: 58 58 64;
-  --c-canvas: 47 47 51;
-  --c-surface: 58 58 64;
-  --c-line: 82 82 90;
-  --c-accent: 196 92 38;
-  --c-accentStrong: 176 82 31;
-  --c-field: 142 142 152;
-  --c-onAccent: 255 246 238;
-  --c-warm: 232 168 124;
+  --c-ink: 240 236 232;
+  --c-muted: 162 154 148;
+  --c-paper: 21 19 18;
+  --c-canvas: 29 27 25;
+  --c-surface: 36 33 31;
+  --c-line: 56 51 48;
+  --c-accent: 200 136 98;
+  --c-accentStrong: 150 90 56;
+  --c-field: 128 120 114;
+  --c-onAccent: 255 255 255;
+  --c-warm: 226 176 146;
   --c-signal: 126 184 176;
   --c-danger: 250 160 152;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 28%), 0 10px 28px rgb(0 0 0 / 22%);
-  --c-chatbg: 20 19 22;
-  --glow: 0.3;
+  --c-chatbg: 17 15 14;
+  --glow: 0.16;
   --orb-front: 255 204 166;
   --orb-back: 176 82 31;
   color-scheme: dark;
@@ -640,10 +640,17 @@ html:has(.sozan-landing) {
   box-shadow: 0 0 10px 2px rgb(var(--c-accent) / 0.7);
 }
 
-/* حباب فروشنده: مس با عمق و درخشش؛ پایه accentStrong می‌ماند تا کنتراست متن ≥۴٫۵ باشد. */
+/* حباب فروشنده: رنگ ملایم مسی با متن معمولی؛ یک‌دست نارنجی همهٔ صفحه را پر می‌کرد (بازبینی رابط ۲۰۲۶-۱۰-۱۰). */
 .sozan-me {
-  background-image: linear-gradient(155deg, color-mix(in srgb, rgb(var(--c-accent)) 45%, rgb(var(--c-accentStrong))), rgb(var(--c-accentStrong)) 48%, color-mix(in srgb, rgb(var(--c-accentStrong)) 80%, black));
-  box-shadow: 0 12px 26px -14px rgb(var(--c-accent) / 0.75), inset 0 1px 0 rgb(255 255 255 / 0.14);
+  background-color: rgb(var(--c-accent) / 0.13);
+  background-image: none;
+  color: rgb(var(--c-ink));
+  border: 1px solid rgb(var(--c-accent) / 0.24);
+  box-shadow: none;
+}
+
+.sozan-me .text-onAccent\/90 {
+  color: rgb(var(--c-muted));
 }
 
 /* حباب سوزان: شیشهٔ روشن روی زمینهٔ عمیق */
@@ -946,3 +953,9 @@ html:has(.sozan-landing) {
     animation: none;
   }
 }
+
+/* نوار پایین گوشی وقتی کیبورد باز است جا نمی‌گیرد؛ فیلد نوشتن بالای کیبورد بماند. */
+.sozan-keyboard .sozan-tabbar {
+  display: none;
+}
+

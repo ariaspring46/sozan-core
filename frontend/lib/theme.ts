@@ -1,7 +1,7 @@
 export type ThemeChoice = "light" | "dark" | "system";
 
 export const THEME_KEY = "sozan_theme";
-export const THEME_BAR = { light: "#F4EFE8", dark: "#2F2F33" } as const;
+export const THEME_BAR = { light: "#F6F5F2", dark: "#1D1B19" } as const;
 
 /** اسکریپت پیش از رندر در <head>: تم ذخیره‌شده را بدون چشمک روی <html> می‌نشاند. */
 export const THEME_BOOT = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);var c=t==="light"?"${THEME_BAR.light}":"${THEME_BAR.dark}";document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute("content",c)})}}catch(e){}})();`;

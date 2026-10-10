@@ -81,10 +81,10 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 - `backend/app/api/`: `inbox.py` (1.8k)
 - `backend/app/services/`: `inbox_agent_service.py` (15.8k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (3.5k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (1.2k), `pii_mask.py` (0.5k)
-- `frontend/app/inbox/`: `page.tsx` (4.4k)
+- `frontend/app/inbox/`: `page.tsx` (4.5k)
 - `frontend/app/inbox/[id]/`: `page.tsx` (2.3k)
 - `frontend/app/sales/`: `page.tsx` (4.1k)
-- `frontend/components/`: `sales-policy-form.tsx` (1.3k), `training-choice.tsx` (0.5k)
+- `frontend/components/`: `sales-policy-form.tsx` (1.4k), `training-choice.tsx` (0.5k)
 - `tools/`: `sales100_battery.py` (7.8k), `train_nightly.py` (3.4k)
 
 **Rare (yours; only when the task names it):**
@@ -130,7 +130,7 @@ export function AppShell(  # changed 2026-10-06
 ```
 **`frontend/components/empty-state.tsx`** — owner U
 ```
-export function EmptyState(  # changed 2026-09-18
+export function EmptyState(  # changed 2026-10-10
 ```
 **`frontend/components/field.tsx`** — owner U
 ```

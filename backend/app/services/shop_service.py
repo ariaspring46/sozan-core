@@ -66,7 +66,7 @@ SHOP_LIVE_HINT = """فروشگاه همین الان زنده است. مصاحب
 اگر پیج اسکن‌شده و کالا در داده آمده، همان را استفاده کن. نگو به اینستاگرام یا پیج دسترسی نداری.
 کار انجام‌نشده را موفق نگو.
 درخواست تغییر متن، رنگ یا تصویر همان صفحهٔ پیش‌نمایش است نه ساخت سایت جدید. تغییر همان لحظه در کادر دیده می‌شود؛ کارخانه را راه نینداز.
-سلام را کوتاه جواب بده. دکمهٔ بیلد فقط سایت را با next build تازه می‌کند. کارخانهٔ کامل فقط اگر صریح گفت از نو بساز."""
+سلام را کوتاه جواب بده. دکمهٔ «انتشار» فقط سایت را با next build تازه می‌کند. کارخانهٔ کامل فقط اگر صریح گفت از نو بساز."""
 
 PRICE_MISSING = "بدون قیمت تومان، ویترین فروش نمی‌شود — فقط استعلام."
 PRICE_HINT = "اگر قیمت نداری بگو «بدون قیمت بساز» تا ویترین فقط استعلام بگیرد."
@@ -979,7 +979,7 @@ _INTERNAL_URL_IN_TEXT = re.compile(
 def _seller_words(text: str, public_url: str = "") -> str:
     """The model sometimes repeats what it was given: an internal address or «بیلد: ready». The seller reads neither."""
     value = _INTERNAL_URL_IN_TEXT.sub(public_url, str(text or ""))
-    value = re.sub(r"(وضعیت\s*)بیلد", r"\1ساخت", value)  # «بیلد» is the name of a panel button; only the status label is jargon
+    value = re.sub(r"(وضعیت\s*)بیلد", r"\1ساخت", value)  # only the status label is jargon; the panel button is «انتشار»
     return re.sub(r"\b(ready|done|running|queued|failed|idle)\b", lambda m: _STATUS_WORD[m.group(1).lower()], value, flags=re.I)
 
 
@@ -1707,7 +1707,7 @@ def _catalog_from_page_reply() -> str:
     if not products:
         if handle:
             channel_scan_service.start_scan([{"platform": "instagram", "handle": handle}])
-            return f"کالاهای {handle} را دوباره از پیج می‌خوانم. بعد بیلد بزن تا روی سایت بیایند."
+            return f"کالاهای {handle} را دوباره از پیج می‌خوانم. بعد «انتشار» را بزن تا روی سایت بیایند."
         return "هنوز پیجی برای اسکن ثبت نشده."
     titles = "، ".join(str(row.get("title") or "") for row in products[:12])
     return f"{len(products)} مدل از پیج {handle} در کاتالوگ است: {titles}. روی سایت نمی‌آیند تا بیلد بزنی."
@@ -2253,7 +2253,7 @@ async def chat(
                     patched=bool(result.get("patched")),
                 )
                 if result.get("patched") and result.get("needsRebuild", True) and "بیلد" not in reply:
-                    reply = reply.rstrip(". ") + " تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «بیلد» را بزن."
+                    reply = reply.rstrip(". ") + " تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «انتشار» را بزن."
             assistant = {
                 "id": str(uuid4()),
                 "role": "assistant",

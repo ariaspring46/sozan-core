@@ -106,7 +106,7 @@ class CatalogSyncServiceTests(unittest.TestCase):
             out = catalog_sync_service.sync_live()
             shop = shop_service._shop()
         self.assertTrue(out["pendingMenu"])
-        self.assertIn("بیلد", out["hint"])
+        self.assertIn("«انتشار»", out["hint"])
         self.assertEqual(int(shop.get("pendingBuild") or 0), 1)
 
     def test_skips_protected_and_idle(self) -> None:
@@ -157,7 +157,7 @@ class CatalogSyncServiceTests(unittest.TestCase):
             shop = shop_service._shop()
         self.assertFalse(out["live"])
         self.assertEqual(out.get("reason"), "no-runtime")
-        self.assertIn("بیلد", out.get("hint") or "")
+        self.assertIn("«انتشار»", out.get("hint") or "")
         self.assertGreaterEqual(int(shop.get("pendingBuild") or 0), 1)
         publish.assert_not_called()
 

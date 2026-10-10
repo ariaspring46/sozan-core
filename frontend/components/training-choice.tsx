@@ -13,7 +13,7 @@ export function TrainingChoice() {
   }, []);
 
   return (
-    <section aria-label="کمک به بهتر شدن سوزان" className="rounded-2xl bg-canvas p-4 shadow-card">
+    <section aria-label="کمک به بهتر شدن سوزان" className="rounded-2xl border border-line/80 bg-surface p-4 shadow-card">
       <label className="flex min-h-11 items-start gap-3 text-sm">
         <input
           type="checkbox"

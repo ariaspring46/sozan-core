@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/empty-state";
+import { Share2 } from "lucide-react";
 import { api } from "@/lib/api";
 
 type Field = { key: string; label: string; secret: boolean; required: boolean };
@@ -268,7 +269,7 @@ export default function ChannelsPage() {
     >
       <div className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
         <p className="text-sm text-muted">
-          اینستاگرام را با ورود رسمی اینستاگرام وصل کن تا دایرکت مشتری‌ها به صندوق بیاید؛ رمز پیج را هیچ‌جا وارد نکن. برای تلگرام، بات سوزان را ادمین کانالت کن و نام کانال را بنویس تا پست‌ها همان‌جا منتشر شوند.
+          کانال را وصل کن تا پیام مشتری‌ها به صندوق بیاید و پست‌ها همان‌جا منتشر شوند.
         </p>
         {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
         {notice ? <p className="text-sm text-signal" role="status">{notice}</p> : null}
@@ -358,7 +359,7 @@ export default function ChannelsPage() {
         {loading && accounts.length === 0 ? (
           <p className="text-sm text-muted">در حال خواندن حساب‌ها…</p>
         ) : accounts.length === 0 ? (
-          <EmptyState title="حسابی وصل نیست" detail="پلتفرم و مشخصات اتصال را بالا بگذار تا کانال به فروشگاه وصل شود." />
+          <EmptyState icon={Share2} title="حسابی وصل نیست" detail="پلتفرم و مشخصات اتصال را بالا بگذار تا کانال به فروشگاه وصل شود." />
         ) : (
           <ul className="space-y-2">
             {accounts.map((account) => (

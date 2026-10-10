@@ -7,8 +7,8 @@ from pathlib import Path
 from app.services import shop_edit_service, shop_service, storefront_service
 from app.services.observe_client import emit_later
 
-HINT_NEW_CATEGORY = "دستهٔ جدید در منو بعد از بیلد می‌آید"
-HINT_NEEDS_RUNTIME = "برای نمایش کالاها روی سایت، بیلد بزن"
+HINT_NEW_CATEGORY = "دستهٔ جدید بعد از «انتشار» در منو می‌آید"
+HINT_NEEDS_RUNTIME = "برای نمایش کالاها روی سایت، «انتشار» را بزن"
 
 
 def _prior_slugs(root: Path) -> tuple[dict[str, str], dict[str, str]]:
