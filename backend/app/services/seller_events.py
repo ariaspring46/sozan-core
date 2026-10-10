@@ -111,6 +111,9 @@ def announce(key: str, text: str, *, card: tuple[str, dict] | None = None) -> bo
     row["unseen"] = int(row.get("unseen") or 0) + 1
     _save(row)
     emit_later(kind="agent", title="seller-event", surface="router", status="ok", payload={"event": key.split(":")[0], "card": carded})
+    from app.services import seller_alerts
+
+    seller_alerts.alert_soon(key.split(":")[0], text)  # outside the panel: push, else SMS for urgent ones
     return True
 
 

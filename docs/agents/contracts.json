@@ -835,6 +835,14 @@
    "X3"
   ]
  },
+ "backend/app/config.py::settings.melipayamak_seller_body_id": {
+  "owner": "X5",
+  "signature": "Settings.melipayamak_seller_body_id: str = ''",
+  "since": "2026-10-10",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/config.py::settings.melipayamak_username": {
   "owner": "X5",
   "signature": "Settings.melipayamak_username: str = ''",
@@ -2062,7 +2070,8 @@
   "signature": "async def send_pattern(phone: str, text: str, *, body_id: str, surface: str='auth') -> str",
   "since": "2026-10-09",
   "users": [
-   "C"
+   "C",
+   "X1"
   ]
  },
  "backend/app/services/number_span.py::money_amounts": {
@@ -3552,6 +3561,7 @@
   "since": "2026-09-20",
   "users": [
    "C",
+   "X1",
    "X2",
    "X4"
   ]
@@ -3728,6 +3738,14 @@
    "X4"
   ]
  },
+ "frontend/components/drop-stale-workers.tsx::PUSH_WORKER": {
+  "owner": "U",
+  "signature": "export const PUSH_WORKER = \"/sozan-push-sw.js\";",
+  "since": "2026-10-10",
+  "users": [
+   "X1"
+  ]
+ },
  "frontend/components/empty-state.tsx::EmptyState": {
   "owner": "U",
   "shape": "export function EmptyState({ title, detail, action, }: { title: string; detail?: string; action?: ReactNode; })",
@@ -3801,6 +3819,15 @@
   "signature": "export function OrderFlowCard({ orders, onChanged }: { orders: FlowOrder[]; onChanged: (row: FlowOrder) => void })",
   "since": "2026-10-09",
   "users": [
+   "Y"
+  ]
+ },
+ "frontend/components/push-toggle.tsx::PushToggle": {
+  "owner": "X1",
+  "signature": "export function PushToggle({ compact = false }: { compact?: boolean })",
+  "since": "2026-10-10",
+  "users": [
+   "X5",
    "Y"
   ]
  },
