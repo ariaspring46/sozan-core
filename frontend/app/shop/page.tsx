@@ -46,7 +46,7 @@ function lastReply(rows?: ShopMsg[]) {
   return row ? row.text : "";
 }
 
-/** دو دکمهٔ پایین پیش‌نمایش موبایل: «بیلد» سایت را با تغییرها می‌سازد، «برگشت» یک تغییر را پس می‌گیرد؛ بعد از بیلد برگشت قفل می‌شود. */
+/** دو دکمهٔ پایین پیش‌نمایش موبایل: «انتشار» سایت را با تغییرها می‌سازد، «برگشت» یک تغییر را پس می‌گیرد؛ بعد از انتشار برگشت قفل می‌شود. */
 function ShopActionBar({
   pending,
   undoDepth,
@@ -67,7 +67,7 @@ function ShopActionBar({
   const canBuild = !working && (pending > 0 || failed);
   const canUndo = !working && undoDepth > 0;
   return (
-    <div className="flex shrink-0 gap-2 border-t border-line bg-paper px-3 py-2" role="group" aria-label="بیلد و برگشت">
+    <div className="flex shrink-0 gap-2 border-t border-line bg-paper px-3 py-2" role="group" aria-label="انتشار و برگشت">
       <button
         type="button"
         onClick={onBuild}
@@ -78,7 +78,7 @@ function ShopActionBar({
         )}
       >
         <Hammer size={18} aria-hidden />
-        {building ? "در حال بیلد…" : failed ? "بیلد دوباره" : "بیلد"}
+        {building ? "در حال انتشار…" : failed ? "انتشار دوباره" : "انتشار"}
         {pending > 0 && !building ? (
           <span className="rounded-full bg-onAccent/20 px-2 text-sm leading-6">{pending.toLocaleString("fa-IR")}</span>
         ) : null}

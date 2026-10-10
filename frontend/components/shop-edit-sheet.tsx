@@ -239,7 +239,7 @@ export function ShopEditSheet({
         {busy ? (
           <span className="text-warm">در حال اعمال…</span>
         ) : locked ? (
-          <span className="text-warm">سایت در حال بیلد است؛ کمی صبر کن.</span>
+          <span className="text-warm">سایت در حال انتشار است؛ کمی صبر کن.</span>
         ) : error ? (
           <span className="text-danger" role="alert">
             {error}

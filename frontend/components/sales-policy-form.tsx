@@ -55,7 +55,7 @@ export function SalesPolicyForm() {
   }
 
   return (
-    <section id="shipping" aria-label="ارسال و مرجوعی" className="rounded-2xl bg-canvas p-4 shadow-card">
+    <section id="shipping" aria-label="ارسال و مرجوعی" className="scroll-mt-16 rounded-2xl border border-line/80 bg-surface p-4 shadow-card">
       <h2 className="text-base font-bold">ارسال و مرجوعی</h2>
       <p className="mt-1 text-sm text-muted">فیلد خالی یعنی هنوز ثبت نشده و دایرکت همان موضوع را به خودت می‌سپارد.</p>
       <div className="mt-3 space-y-3">

@@ -3756,9 +3756,9 @@
  },
  "frontend/components/empty-state.tsx::EmptyState": {
   "owner": "U",
-  "shape": "export function EmptyState({ title, detail, action, }: { title: string; detail?: string; action?: ReactNode; })",
+  "shape": "export function EmptyState({ title, detail, action, icon: Icon, }: { title: string; detail?: string; action?: ReactNode; icon?: LucideIcon; })",
   "signature": "export function EmptyState(",
-  "since": "2026-09-18",
+  "since": "2026-10-10",
   "users": [
    "C",
    "X2",
