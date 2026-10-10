@@ -538,6 +538,7 @@ class Gateway:
         self._greet_pcm = b""
         self._clip_dir = Path.home() / "local-ai" / "sozan-voice-clips"
         self._voice: dict[str, bytes] = {}
+        self._prefetching = threading.Event()
         self._helloed = False
         self._step = False
         self._last_kind = ""
@@ -704,6 +705,27 @@ class Gateway:
                     self._pending_sales = None
                     self._outbound_pitch = False
                 conn.send(f"{placed or 'busy'}\n".encode())
+
+    def _prefetch_sales_lines(self) -> None:
+        """Load or render the sales lines behind the call, so the caller's «الو» never waits on them. A line the cloud
+        cannot make is skipped, not the rest: lines already on disk still load, and the voice's own breaker keeps a
+        402 (no credit) to one request."""
+        if self._prefetching.is_set():
+            return
+        self._prefetching.set()
+
+        def run() -> None:
+            try:
+                for line in cached_sales_lines():
+                    if line in self._voice:
+                        continue
+                    pcm = self.brain.prefetch_cloud(line)
+                    if pcm:
+                        self._voice[line] = pcm
+            finally:
+                self._prefetching.clear()
+
+        threading.Thread(target=run, name="sozan-sales-prefetch", daemon=True).start()
 
     def _reload_campaign(self) -> None:
         """enrich_campaign.py rewrites the file between calls; pick up its profiles without a restart."""
@@ -889,12 +911,7 @@ class Gateway:
             self._end_call(None)
             return
         if self._sales_state and tts_model():
-            for line in cached_sales_lines():
-                if line in self._voice:
-                    continue
-                pcm = self.brain.prefetch_cloud(line)
-                if pcm:
-                    self._voice[line] = pcm
+            self._prefetch_sales_lines()
         deadline = time.monotonic() + 15 * 60
         while self.ua.running and time.monotonic() < deadline and generation == self._call_generation:
             try:

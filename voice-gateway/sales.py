@@ -246,17 +246,19 @@ _DNC = re.compile(
     rf"زنگ(?:م|مون)? نزن(?:ید|ین|ی)?(?:ها|ا)?(?![{_FA}])|تماس نگیر(?:ید|ین|ی)?(?:ها|ا)?(?![{_FA}])"
     rf"|(?<![{_FA}])مزاحم(?:م)? نش(?:ید|ین|ی|و)(?![{_FA}])"
     rf"|(?:اسممو|اسم منو|شمارمو|شمارهمو|شماره مو|شماره منو|شماره من رو|شمارم رو|شماره ام رو)\s+(?:\S+\s+){{0,3}}{_REMOVE}"
+    rf"|(?<![{_FA}])(?:پاک|حذف)م\s*(?:کنید|کنین|کن|بکنید|بکنین)(?![{_FA}])"
     rf"|از (?:لیست|سیستم)\S*\s+(?:\S+\s+){{0,2}}{_REMOVE}"
     rf"|از (?:لیست|سیستم)\S*\s+(?:\S+\s+)?(?:پاک|حذف|خارج)\s*(?:بشم|شم)(?![{_FA}])"
     rf"|(?<![{_FA}])منو\s+(?:\S+\s+)?(?:پاک|حذف)(?:ش)?\s*(?:کنید|کنین|بکنید|بکنین)(?![{_FA}])"
-    rf"|(?<![{_FA}])نمیخوام\s+(?:\S+\s+){{0,3}}(?:زنگ بزنید|زنگ بزنین|زنگ بزنی|تماس بگیرید|تماس بگیرین|تماس بگیری)(?![{_FA}])"
+    # Only «دیگه، هیچ‌وقت، دوباره، به من، به این شماره» may sit between: «نمی‌خوام معطلتون کنم، بعداً تماس بگیرید» is a call-back.
+    rf"|(?<![{_FA}])نمیخوا(?:م|یم|هم|هیم)\s+(?:(?:دیگه|دیگر|اصلا|اصلاً|هیچوقت|هیچ|وقت|دوباره|شما|بهم|به|با|من|ما|این|شماره|رو|هم|لطفا|لطفاً)\s+){{0,4}}(?:زنگ بزنید|زنگ بزنین|زنگ بزنی|تماس بگیرید|تماس بگیرین|تماس بگیری)(?![{_FA}])"
 )
 # STT punctuation inside a turn («،» «؛» «؟») is a space, so word-boundary patterns still match before it.
 _PUNCT = re.compile(r"[\u060C\u061B\u061F\u066A-\u066D\u06D4]")
 _INVITE = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید|بفرمائید|بفرما)(?![{_FA}])")
 # «وقت ندارم» alone is busy; «وقت ندارم به دایرکتا برسم» is the very pain Sozan answers.
 _NO_TIME = re.compile(rf"وقت ندار(?:م|یم)?(?![{_FA}])(?!\s*(?:به|برای|واسه|که|جواب|پاسخ)(?![{_FA}]))")
-_CANT_TALK = ("نمیتونم صحبت", "نمیتونم حرف", "تو جلسه", "توی جلسه", "جلسه ام", "درگیرم", "پشت فرمونم", "دارم رانندگی")
+_CANT_TALK = ("نمیتونم صحبت", "نمیتونم حرف بزن", "تو جلسه", "توی جلسه", "جلسه ام", "درگیرم", "پشت فرمونم", "دارم رانندگی")
 # Busy words inside a pain answer («کل روز درگیرم با دایرکتا», «وقت ندارم دایرکتا رو جواب بدم») are the pain, not busy.
 # «مشتری دارم»، «پیام بدید» and «نمی‌تونم جواب بدم» stay busy.
 _PAIN = re.compile(r"دایرکت|پیاما|پیامها|پیام ها|پیامای|پیامهای|استوری|کپشن|پست|جواب میده|جواب میدن|جواب نمیده")
@@ -275,13 +277,22 @@ _NO_THANKS = re.compile(
 )
 # Words that may follow a refusal in its clause and keep it one: «لازم نیست، ممنون» yes, «لازم نیست تکرار کنید» no.
 _REFUSE_TAIL = frozenset(
-    ("ممنون", "مرسی", "متشکرم", "سپاس", "خیلی", "اصلا", "اصلاً", "فعلا", "فعلاً", "دیگه", "خداحافظ", "آقا", "خانم",
+    ("ممنون", "ممنونم", "مرسی", "متشکرم", "متشکر", "سپاس", "خیلی", "اصلا", "اصلاً", "فعلا", "فعلاً", "دیگه", "خداحافظ", "آقا", "خانم",
      "خانوم", "جان", "عزیزم", "واقعا", "واقعاً", "نه", "حالا", "بابا", "کن", "اینو", "اونو", "این", "اون", "رو")
 )
 # Still listening: «نه مرسی، بگید»; or a «but» that turns to what they do want: «فروشگاه نمی‌خوام، فقط دایرکت‌هام مهمه».
 _STILL_IN = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید|بفرما|چطور|چطوری|چجوری)(?![{_FA}])")
 _BUT = re.compile(rf"(?<![{_FA}])(?:ولی|اما|فقط)(?![{_FA}])")
 _WANTS = re.compile(r"دایرکت|پیام|محتوا|پست|استوری|سایت|سفارش|فروشگاه|قیمت|چنده|چقدر|آدرس|لینک|بفرست|رایگان|چی کار|چیکار|چیه|بعدا|توضیح")
+# These count only as the whole clause («نه، نمی‌خواد ممنون»): «اجازه نمی‌خواد»، «مشتری کاتالوگ نمی‌خواد»،
+# «مگه ما مشتری بیشتر نمی‌خوایم» and «دیگه منشی لازم نداریم» are a yes or the seller's own pain.
+_BARE_REFUSE = re.compile(
+    rf"(?<![{_FA}])(?:نمیخواد|نمیخوا(?:یم|هم|هیم)(?:ش|شون)?|(?:لازم|نیاز|نیازی|علاقه ای|علاقه) نداریم)(?![{_FA}])"
+)
+_THANKS = frozenset(("ممنون", "ممنونم", "مرسی", "متشکرم", "متشکر", "سپاس"))
+# «اونو نمی‌خواد، بذارش اونجا» is said to someone in the shop.
+_BARE_TAIL = (_REFUSE_TAIL - {"اینو", "اونو", "این", "اون", "رو", "کن"}) | {"ما"}
+_NOT_SAID = re.compile(rf"(?<![{_FA}])(?:نه اینکه|نه این که|نگفتم|کی گفته|کی گفت|نمیگم|نمی گم)\s*$")
 _BARE_NO = frozenset(("نه", "نه نه", "نخیر", "نه خیر", "نه بابا", "نوچ"))
 _START_WORDS = (
     "سلام",
@@ -773,9 +784,9 @@ def person_started(heard: str) -> bool:
 
 
 def read_signals(heard: str) -> Signals:
-    # Speech-to-text writes «می‌شه» and «میشه» alike: join the half-space after «می/نمی» so one spelling matches
-    # both; any other half-space becomes a space as before («زنگ‌نزنید» → «زنگ نزنید»).
-    joined = re.sub(rf"(?<![{_FA}])(ن?می)\u200c", r"\1", heard or "")
+    # Speech-to-text writes «می‌شه», «میشه» and «می شه» alike: join the half-space or space after «می/نمی» so one
+    # spelling matches all three; any other half-space becomes a space as before («زنگ‌نزنید» → «زنگ نزنید»).
+    joined = re.sub(rf"(?<![{_FA}])(ن?می)[\u200c ]+(?=[{_FA}])", r"\1", (heard or "").replace("ي", "ی").replace("ك", "ک"))
     blob = _plain_words(joined)
     question = bool(re.search(r"[؟?]", heard or ""))
     trade = next((item for item in _TRADES if item in blob), "")
@@ -863,6 +874,10 @@ def _refuses(text: str) -> bool:
         return False
     if _NO_THANKS.search(plain):
         return True
+    tokens = set(plain.split())
+    if tokens & {"نه", "نخیر"} and tokens & _THANKS and tokens <= _BARE_TAIL - {"فعلا", "فعلاً"}:
+        # «نه، خیلی ممنونم» on its own; «نه، ممنونم، خیلی هم خوبه» is a yes after it, «فعلاً نه، ممنون» a not-now.
+        return True
     for clause in re.findall(r"[^،,.!؛;؟?]+[؟?]?", text or ""):
         if clause.rstrip().endswith(("؟", "?")):
             continue
@@ -870,7 +885,13 @@ def _refuses(text: str) -> bool:
         if words.startswith("یعنی"):
             continue
         for match in _REFUSE.finditer(words):
+            if _NOT_SAID.search(words[: match.start()]):
+                # «نه اینکه نمی‌خوام، الان سرم شلوغه»: the no itself is denied.
+                continue
             if set(words[match.end():].split()) <= _REFUSE_TAIL:
+                return True
+        for match in _BARE_REFUSE.finditer(words):
+            if set((words[: match.start()] + " " + words[match.end():]).split()) <= _BARE_TAIL:
                 return True
     return False
 
@@ -1099,6 +1120,11 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         if signals.bye:
             # «نمی‌خوام، خداحافظ» gets thanks, not the address.
             return TurnPlan(kind="close", line=DECLINE_LINE if signals.refuse else CLOSE_LINE, hangup=True, signals=signals)
+        aside = bool(re.search(r"(?:الو|بله|بفرمایید|بفرمائید|سلام)[\s.!،؟?]*$", heard or ""))
+        if signals.refuse and not signals.source and not aside:
+            # «سلام، لازم نیست»: no pitch after a no; one line says who called and where to look, then goodbye.
+            # «یه لحظه... نه نمی‌خوام. الو؟» was said to someone in the shop before turning to the phone.
+            return TurnPlan(kind="close", line=BUSY_OPEN_LINE, hangup=True, signals=signals)
         busy_first = (signals.time or signals.later) and not carrier and not signals.quick
         if not (signals.hello or signals.howdy or signals.quick or busy_first or person_started(heard)):
             return TurnPlan(kind="hold", signals=signals)

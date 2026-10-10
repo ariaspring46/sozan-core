@@ -1568,5 +1568,162 @@ class SecondReviewTest(unittest.TestCase):
         finally:
             main_module.remember_dnc = original
 
+
+class LiveSimTest(unittest.TestCase):
+    """Live persona run on the home machine (real speech-to-text and model): each case failed before its fix."""
+
+    def setUp(self) -> None:
+        set_plans_fetcher(lambda: PLAN_FIXTURE)
+
+    def opened(self) -> SalesState:
+        import sales
+
+        card = ShopCard("yasaman_kids", "اسباب‌بازی")
+        state = SalesState(opening=sales.hello_for(card), value_line=sales.value_for(card))
+        note_spoken(state, plan_turn(state, "الو بفرمایید").line or "")
+        return state
+
+    def test_refusal_written_with_a_space(self) -> None:
+        import sales
+
+        # Speech-to-text wrote «نمی خوام» with a plain space; the pitch went on after a clear no.
+        for heard in ("لازم نیست ممنون نمی خوام", "نمی خوام", "نمی خوام ممنون", "نمی‌خواهم", "نمیخوایم"):
+            self.assertTrue(read_signals(heard).refuse, heard)
+        plan = plan_turn(self.opened(), "لازم نیست ممنون نمی خوام")
+        self.assertEqual((plan.line, plan.hangup), (sales.DECLINE_LINE, True))
+        self.assertFalse(read_signals("نمی خوام تا نصف شب بیدار بمونم").refuse)
+        self.assertFalse(read_signals("فروشگاه نمی خوام، فقط دایرکت‌هام مهمه").refuse)
+        self.assertFalse(read_signals("نه، ممنون می شم توضیح بدید").refuse)
+        self.assertTrue(read_signals("دیگه نمی خوام زنگ بزنید").dnc)
+        self.assertTrue(read_signals("الان نمی تونم صحبت کنم").later)
+
+    def test_review_of_the_live_fix(self) -> None:
+        import sales
+
+        # Arabic letters from speech-to-text, plural and formal verbs, and «...م کنید» are a no or a DNC as well.
+        for heard in ("نمي خوام", "نمي‌خوام", "لازم نداریم", "نه لازم نداریم ممنون", "علاقه‌ای نداریم", "نه نمی خواد ممنون", "نمی خوام ممنونم", "نه، خیلی ممنونم"):
+            self.assertTrue(read_signals(heard).refuse, heard)
+        for heard in ("نمي خوام ديگه زنگ بزنيد", "نمی خوایم دیگه زنگ بزنید", "نمی‌خواهم دیگر با من تماس بگیرید", "نمی‌خوام دیگه هیچوقت زنگ بزنید", "سلام، لازم نیست. حذفم کنید"):
+            self.assertTrue(read_signals(heard).dnc, heard)
+            self.assertTrue(plan_turn(SalesState(), heard).dnc, heard)
+        # A denied no is not a no.
+        self.assertEqual(plan_turn(self.opened(), "نه اینکه نمی خوام، الان سرم شلوغه").line, sales.BUSY_LINE)
+        # «X نمی‌خواد»، «دیگه منشی لازم نداریم» and «مگه ... نمی‌خوایم» are a yes or the seller's own pain; a polite
+        # call-back is not a DNC; and talk about their own orders, numbers or photos is not about this call.
+        for heard in (
+            "اجازه نمی‌خواد",
+            "آره، توضیح نمی‌خواد، آدرس سایتتون چیه؟",
+            "مشتری جواب ربات نمی‌خواد",
+            "اونو نمی‌خواد، بذارش اونجا",
+            "اگه این کارو بکنه دیگه منشی لازم نداریم",
+            "مگه ما مشتری بیشتر نمی‌خوایم",
+            "نه، ممنونم، خیلی هم خوبه",
+            "نمی‌خوایم معطلتون کنیم، بعدا تماس بگیرید",
+            "نمی خوام فراموش کنم، فردا زنگ بزنید",
+            "نگفتم نمی خوام",
+            "مشتری نمی خواد صبر کنه",
+            "عکسامو حذف کنید",
+            "سفارشو اشتباهی گرفتیم، مشتری ناراحت شد",
+            "کد نیومد، شماره رو پاک کن دوباره بزن؟",
+            "دیگه نمی تونم حرف شما رو رد کنم",
+        ):
+            signals = read_signals(heard)
+            self.assertFalse(signals.refuse or signals.dnc or signals.wrong, heard)
+        self.assertFalse(read_signals("دیگه نمی تونم حرف شما رو رد کنم").later)
+
+    def test_no_before_the_pitch(self) -> None:
+        import sales
+
+        # «سلام، لازم نیست» got the whole opening; now one line with who is calling and the address, then goodbye.
+        plan = plan_turn(SalesState(), "سلام لازم نیست")
+        self.assertEqual(plan.line, sales.BUSY_OPEN_LINE)
+        self.assertTrue(plan.hangup)
+        self.assertIn("هوش مصنوعی", speakable(plan.line, 3))
+        self.assertEqual(speakable(plan.line, 3), speakable(plan.line, 9))
+        self.assertIn(plan.line, sales.cached_sales_lines())
+        # A no said to someone in the shop before «الو؟» is not said to us.
+        self.assertFalse(plan_turn(SalesState(), "الو سلام، یه لحظه... نه نمی‌خوام، الو؟").hangup)
+        # «از کجا آوردید؟ نمی‌خوام» still gets the answer, and the next no goes to the DNC file.
+        self.assertFalse(plan_turn(SalesState(), "از کجا شماره منو آوردید؟ نمی خوام").hangup)
+
+    def test_cloud_voice_without_credit_stops_asking(self) -> None:
+        import urllib.error
+        from unittest import mock
+
+        import brain as brain_module
+
+        calls: list[int] = []
+
+        def refuse(code: int):
+            def open_(_req, timeout=0):
+                calls.append(code)
+                raise urllib.error.HTTPError("https://openrouter.ai", code, "no", {}, None)
+
+            return open_
+
+        with mock.patch.dict(os.environ, {"TTS_MODEL": "m", "LLM_API_KEY": "k"}):
+            voice = Brain.__new__(Brain)
+            voice._cloud_off_until = 0.0
+            with mock.patch.object(brain_module._DIRECT, "open", refuse(402)):
+                self.assertEqual(voice.cloud_pcm("سلام", 1.0), b"")
+                self.assertEqual(voice.cloud_pcm("سلام", 1.0), b"")
+            # One refused request, then Piper speaks without waiting on the cloud again.
+            self.assertEqual(calls, [402])
+            calls.clear()
+            voice._cloud_off_until = 0.0
+            with mock.patch.object(brain_module._DIRECT, "open", refuse(503)):
+                voice.cloud_pcm("سلام", 1.0)
+                voice.cloud_pcm("سلام", 1.0)
+            # A passing server error is tried again.
+            self.assertEqual(calls, [503, 503])
+
+    def test_sales_lines_render_behind_the_call(self) -> None:
+        import threading
+
+        import main as main_module
+        import sales
+
+        lines = sales.cached_sales_lines()
+
+        class Voice:
+            """prefetch_cloud as in brain: a line on disk loads; a new line needs the cloud, which has no credit."""
+
+            def __init__(self, on_disk: set[str], hold: threading.Event | None = None) -> None:
+                self.on_disk, self.hold, self.asked, self.started = on_disk, hold, 0, threading.Event()
+
+            def prefetch_cloud(self, line: str) -> bytes:
+                self.asked += 1
+                self.started.set()
+                if self.hold:
+                    self.hold.wait(5)
+                return b"pcm" if line in self.on_disk else b""
+
+        def run(voice: Voice) -> main_module.Gateway:
+            gw = main_module.Gateway.__new__(main_module.Gateway)
+            gw._voice, gw._prefetching, gw.brain = {}, threading.Event(), voice
+            gw._prefetch_sales_lines()
+            return gw
+
+        def settle(gw: main_module.Gateway) -> None:
+            deadline = time.monotonic() + 5
+            while gw._prefetching.is_set() and time.monotonic() < deadline:
+                time.sleep(0.01)
+
+        # One new line the cloud cannot make (402) does not keep the recordings after it on disk from loading.
+        new_line = lines[len(lines) // 2]
+        gw = run(Voice(set(lines) - {new_line}))
+        settle(gw)
+        self.assertEqual(set(gw._voice), set(lines) - {new_line})
+        # The call does not wait on the pass, and a second call while it runs does not start another.
+        hold = threading.Event()
+        gw = run(Voice(set(lines), hold))
+        self.assertTrue(gw.brain.started.wait(5))
+        gw._prefetch_sales_lines()
+        time.sleep(0.05)
+        self.assertEqual(gw.brain.asked, 1)
+        hold.set()
+        settle(gw)
+        self.assertEqual(set(gw._voice), set(lines))
+
 if __name__ == "__main__":
     unittest.main()

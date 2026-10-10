@@ -76,6 +76,8 @@ def chat_completions_url(url: str) -> str:
 
 
 TTS_STYLE = "خانم، گرم، دوستانه و آرام، فروشندهٔ مؤدب، با مکث طبیعی؛ نه خبرخوان"
+# No credit (402) or a refused key (401/403) does not fix itself mid-call: Piper speaks until this has passed.
+CLOUD_OFF_S = 300.0
 
 
 def cloud_speech_body(model: str, voice: str, text: str) -> dict:
@@ -698,6 +700,7 @@ class Brain:
             os.environ.get("LLM_URL", "http://127.0.0.1:19292/v1")
         )
         self.llm_model = os.environ.get("LLM_MODEL", "ornith-phone")
+        self._cloud_off_until = 0.0
         self.llm_fallback_url = chat_completions_url(
             os.environ.get("LLM_FALLBACK_URL", "http://127.0.0.1:19292/v1")
         )
@@ -1285,7 +1288,7 @@ class Brain:
     def cloud_pcm(self, text: str, first_s: float) -> bytes:
         model = tts_model()
         key = os.environ.get("LLM_API_KEY", "").strip()
-        if not model or not key or not text:
+        if not model or not key or not text or time.monotonic() < self._cloud_off_until:
             return b""
         voice = os.environ.get("TTS_VOICE", "Kore").strip()
         body = cloud_speech_body(model, voice, mask_private(text))
@@ -1301,6 +1304,8 @@ class Brain:
         except Exception as exc:
             # HTTPError carries the status (402 = no OpenRouter credit, 400 = bad model id); log it, never the body.
             log.warning("tts cloud failed %s %s", type(exc).__name__, getattr(exc, "code", ""))
+            if getattr(exc, "code", None) in (401, 402, 403):
+                self._cloud_off_until = time.monotonic() + CLOUD_OFF_S
             return b""
         try:
             ctype = res.headers.get("content-type") or ""
