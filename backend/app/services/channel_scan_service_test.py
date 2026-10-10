@@ -427,6 +427,12 @@ class ChannelScanTests(unittest.TestCase):
         self.assertEqual(out["quality"]["imported"], 0)
         self.assertEqual(out["quality"]["kept"], 1)
 
+    def test_each_scanned_product_keeps_its_own_key(self) -> None:
+        # 2026-10-10: every row got the last row's key, so a new seller's six products became one in the catalog
+        products = [{"title": f"کیف {i}", "price": 0, "image": "", "stableKey": f"k{i}", "sourceHandle": "optic_day"} for i in range(3)]
+        _out, upsert, _remove = self._scan_accounts(products)
+        self.assertEqual([item.kwargs["stableKey"] for item in upsert.call_args_list], ["k0", "k1", "k2"])
+
     def test_large_low_image_scan_imports_with_soft_review(self) -> None:
         products = [{"title": f"کالا {i}", "price": 0, "image": "", "stableKey": f"k{i}"} for i in range(6)]
         out, upsert, remove = self._scan_accounts(products)

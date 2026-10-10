@@ -290,6 +290,39 @@ class Turns(unittest.TestCase):
         self.assertFalse(out["build"])
         self.assertEqual(out["mode"], "ask")
 
+    def test_the_build_button_under_an_old_proposal_still_builds(self) -> None:
+        # 2026-10-10: a new seller left the proposal open for over an hour; «آره، بساز» then got the summary again
+        onboard_service.save_brief({"style": "boutique", "colors": "کرم"})
+        proposal = "جمع‌بندی من: حس سایت: بوتیک گرم و خانوادگی؛ رنگ‌ها: قهوه‌ای، کرم. همین را بسازم یا چیزی را عوض کنم؟"
+        loop._save_state({"mode": "propose", "turns": 4, "at": time.time() - loop.PROPOSAL_TTL - 3600, "said": loop._squash(proposal)[:24]})
+        rows = [{"id": "a", "role": "assistant", "text": proposal}, {"id": "9", "role": "user", "text": "آره، بساز"}]
+        out, _ = self._turn({"confidence": 40, "missing": []}, "x", rows=rows)
+        self.assertTrue(out["build"])
+
+    def test_an_answer_to_the_interview_question_goes_back_to_the_interview(self) -> None:
+        from app.services import router_service
+        from app.state_store import write_json
+
+        question = "حالا رنگ‌های اصلی سایت را همان قهوه‌ای و کرم بگذارم یا رنگ دیگری در ذهن داری؟"
+        write_json("shop-messages.json", [{"role": "user", "text": "بوتیک گرم"}, {"role": "assistant", "text": question, "kind": "ask"}])
+        loop._save_state({"mode": "ask", "turns": 2})
+        asked = {"role": "assistant", "text": question, "kind": "ask", "options": ["کرم و قهوه‌ای", "سفید و مینیمال"]}
+
+        def answer(text: str) -> list[dict]:
+            return [asked, {"role": "user", "text": text}]
+
+        self.assertTrue(loop.awaits_answer(answer("کرم و قهوه‌ای")))
+        self.assertTrue(loop.awaits_answer(answer("سبز تیره")))
+        self.assertFalse(loop.awaits_answer(answer("فروش امروز چقدر بود؟")))
+        self.assertFalse(loop.awaits_answer([{**asked, "text": "کدام کالا حذف شود؟"}, {"role": "user", "text": "کیف"}]))  # the router's own question
+        # the tapped chip has no build word: the router still hands it to the interview, not to the shop editor
+        with patch.object(router_service, "_messages", return_value=answer("کرم و قهوه‌ای")), patch(
+            "app.services.shop_service.current_shop", return_value={"brand": "ایران‌دخت", "slug": ""}
+        ):
+            self.assertEqual(router_service.route_tool("کرم و قهوه‌ای"), "shop_chat")
+        loop._save_state({"mode": "build", "turns": 3})
+        self.assertFalse(loop.awaits_answer(answer("کرم و قهوه‌ای")))
+
     def test_a_proposal_is_answered_only_when_it_is_still_the_last_thing_sozan_said(self) -> None:
         onboard_service.save_brief({"style": "boutique", "colors": "کرم"})
         proposal = "پیشنهاد من یک سایت گرم است. همین را بسازم یا چیزی را عوض کنم؟"

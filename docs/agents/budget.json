@@ -3,12 +3,12 @@
  "owned_source_max": 80000,
  "roles": [
   {
-   "active": 174744,
-   "core": 44953,
+   "active": 174781,
+   "core": 44990,
    "core_pct": 100,
    "id": "X1",
    "loose_contracts": 5,
-   "manifest": 12208,
+   "manifest": 12283,
    "rare": 9618,
    "tests": 70007
   },
@@ -23,24 +23,24 @@
    "tests": 32474
   },
   {
-   "active": 86599,
+   "active": 86608,
    "core": 18023,
    "core_pct": 40,
    "id": "X3",
    "loose_contracts": 22,
    "manifest": 11207,
    "rare": 1208,
-   "tests": 42297
+   "tests": 42450
   },
   {
-   "active": 110575,
+   "active": 110974,
    "core": 31943,
    "core_pct": 71,
    "id": "X4",
    "loose_contracts": 15,
-   "manifest": 10393,
+   "manifest": 10423,
    "rare": 2323,
-   "tests": 49124
+   "tests": 49980
   },
   {
    "active": 97468,
@@ -93,7 +93,7 @@
    "tests": 0
   },
   {
-   "active": 226843,
+   "active": 227012,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",
