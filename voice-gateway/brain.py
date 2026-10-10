@@ -194,6 +194,12 @@ def open_llm(url: str, req: urllib.request.Request, timeout: float):
     return _DIRECT.open(req, timeout=timeout)
 
 
+def _has_tool_tag(raw: str) -> bool:
+    from sales import extract_tags
+
+    return bool(extract_tags(raw)[1])
+
+
 def speakable(text: str, sentences: int = 1) -> str:
     cleaned = THINK.sub("", text or "")
     cleaned = FENCE.sub("", cleaned)
@@ -1107,11 +1113,11 @@ class Brain:
                 log.info("sales llm fallback")
             try:
                 for bit in self._sales_events(url, model, messages, cancel, started):
-                    if str(bit.get("sentence") or "").strip():
+                    if str(bit.get("sentence") or "").strip() or _has_tool_tag(str(bit.get("raw") or "")):
                         spoke = True
                     yield bit
             except Exception as exc:
-                log.warning("sales stream failed %s", type(exc).__name__)
+                log.warning("sales stream failed %s %s", type(exc).__name__, getattr(exc, "code", ""))
             if spoke or (cancel is not None and cancel.is_set()):
                 return
         elapsed = time.monotonic() - started
@@ -1199,15 +1205,16 @@ class Brain:
                     except Exception:
                         continue
                     take_usage(body)
-                    if sent_count >= 2:
-                        continue
                     delta = ((body.get("choices") or [{}])[0].get("delta") or {})
                     piece = str(delta.get("content") or "")
                     if not piece:
                         continue
                     if not first_token_s and piece.strip():
                         first_token_s = time.monotonic() - started
+                    # Keep reading after two sentences: a tool tag ([پایان]، [آدرس]...) usually comes last.
                     raw += piece
+                    if sent_count >= 2:
+                        continue
                     buf += piece
                     ready, buf = take_ready_sentences(buf)
                     for sentence in ready:
@@ -1218,6 +1225,9 @@ class Brain:
         tail = stream_tail(buf) if sent_count < 2 else ""
         if tail:
             yield pack(tail)
+        if "[" in raw:
+            # Nothing more to say, but the full text carries the tags the gateway acts on.
+            yield pack("")
         self.last_sales_stats = {
             "first_token_s": first_token_s,
             "prompt_n": prompt_n,
@@ -1287,7 +1297,8 @@ class Brain:
         try:
             res = _DIRECT.open(req, timeout=first_s + 8)
         except Exception as exc:
-            log.warning("tts cloud failed %s", type(exc).__name__)
+            # HTTPError carries the status (402 = no OpenRouter credit, 400 = bad model id); log it, never the body.
+            log.warning("tts cloud failed %s %s", type(exc).__name__, getattr(exc, "code", ""))
             return b""
         try:
             ctype = res.headers.get("content-type") or ""

@@ -76,6 +76,7 @@ from sales import (
     gift_line,
     guard_reply,
     load_campaign,
+    mentions_address,
     note_spoken,
     plan_turn,
     remember_dnc,
@@ -87,6 +88,7 @@ from sales import (
     value_kind_for,
     cached_sales_lines,
     too_alike,
+    tool_followups,
     wait_line,
 )
 from sip import Call, SipUA, env_flag, normalize_dial
@@ -1276,7 +1278,7 @@ class Gateway:
             log.info("sales llm=0.00 kind=%s line=%s", plan.kind, line)
             self._log_sales_turn(heard, plan.kind, line, 0.0, 0.0, state.gifted, plan.hangup)
             self._speak(session, generation, line, "bye" if plan.hangup else "meaning")
-            if plan.hangup and plan.signals.wrong:
+            if plan.hangup and (plan.signals.wrong or plan.dnc):
                 remember_dnc(self._peer_number)
                 log.info("sales outcome dnc")
             if plan.hangup and state.agreed:
@@ -1397,13 +1399,27 @@ class Gateway:
         if not spoken:
             spoken, more_tags = finish_spoken(raw_all or generated_text, state, heard)
             tags |= more_tags
-        offer_gift = plan.allow_gift and not state.gifted and (plan.signals.price or plan.signals.later or "gift" in tags)
+        refused = plan.signals.refuse or state.refused_cta
+        offer_gift = (
+            plan.allow_gift
+            and not state.gifted
+            and not refused
+            and (plan.signals.price or plan.signals.later or "gift" in tags)
+        )
+        tool_lines, tool_end, tool_dnc = tool_followups(tags, state, heard, spoken)
+        for extra in tool_lines:
+            self._speak_more(session, generation, extra)
+            spoken = f"{spoken} {extra}".strip()
+        if tool_dnc:
+            offer_gift = False
+            remember_dnc(self._peer_number)
+            log.info("sales outcome dnc")
         if not spoken and not offer_gift:
             spoken = fallback_line(state, heard)
             tags = set()
             self._speak(session, generation, spoken, "meaning")
-        if (plan.signals.price or plan.signals.later) and "sozan-core" not in spoken and "ورود" not in spoken:
-            extra = "برید sozan-core.ir، دکمهٔ ورود رو بزنید، رایگانه."
+        if (plan.signals.price or plan.signals.later) and not (tool_dnc or refused) and not mentions_address(spoken):
+            extra = BUY_LINE
             self._speak_more(session, generation, extra)
             spoken = f"{spoken} {extra}".strip()
         if offer_gift:
@@ -1425,7 +1441,7 @@ class Gateway:
             cost = float(usage.get("cost") or 0)
         if usage.get("prompt"):
             prompt_n = int(usage.get("prompt") or prompt_n)
-        hangup = plan.hangup or "end" in tags or sales_ended(heard, spoken)
+        hangup = plan.hangup or "end" in tags or tool_end or sales_ended(heard, spoken)
         log.info(
             "sales llm=%.2f first_token=%.2f first_audio=%.2f prompt_n=%s cost=%.6f model=%s kind=%s line=%s",
             took,
@@ -1446,8 +1462,12 @@ class Gateway:
         self._last_line = spoken
         self._spoke_at = time.monotonic()
         if hangup:
-            if CLOSE_LINE not in spoken:
-                self._speak(session, generation, CLOSE_LINE, "bye")
+            # A refusal or do-not-call ends with thanks, never one more pitch of the address;
+            # an address already given this turn is not repeated by the closing line.
+            if CLOSE_LINE not in spoken and not tool_dnc and not refused:
+                closing = BYE_LINE if mentions_address(spoken) else CLOSE_LINE
+                if not (closing == BYE_LINE and wants_bye(spoken)):
+                    self._speak(session, generation, closing, "bye")
             session.wait_done(8)
             self.ua.hangup()
             self._end_call(None)
