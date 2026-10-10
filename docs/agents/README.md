@@ -13,7 +13,7 @@ Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Eac
 | X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (12.9k) | 22.7k | 97.4k | 20.6k | 56.4k | `talk-x5.md` |
 | Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (10.1k) | 31.8k | 67.2k | 19.8k | 37.0k | `sales-agent-talk.md` |
 | Z | Phone voice agent | [Z.md](Z.md) (4.9k) | 33.4k | 79.1k | 29.4k | 14.8k | `voice-agent-talk.md` |
-| C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (11.7k) | 23.2k | 68.7k | 11.6k | 23.4k | `storefront-talk.md` |
+| C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (11.7k) | 23.2k | 68.7k | 11.6k | 29.7k | `storefront-talk.md` |
 | U | UI/UX: design system and frontend platform | [U.md](U.md) (9.5k) | 16.1k | 90.6k | 34.5k | 0.0k | `talk-u.md` |
 
 Token counts are conservative estimates. Context 128.0k; 30.0k reserved for the agent's own prompt; core kept under 45.0k, active source under 80.0k.
