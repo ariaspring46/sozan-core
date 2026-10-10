@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/empty-state";
+import { LifeBuoy } from "lucide-react";
 import { api, fileUrl } from "@/lib/api";
 
 type Ticket = {
@@ -322,7 +323,7 @@ export default function SupportPage() {
               ))}
             </ul>
           ) : (
-            <EmptyState title="تیکتی نیست" detail="پیام‌های پشتیبانی مشتریان اینجا می‌آید." />
+            <EmptyState icon={LifeBuoy} title="تیکتی نیست" detail="پیام‌های پشتیبانی مشتریان اینجا می‌آید." />
           )}
         </section>
         {hubView !== null ? (

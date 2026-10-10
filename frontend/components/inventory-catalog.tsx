@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { api, catalogImageUrl } from "@/lib/api";
 import { money, priceText } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
-import { ImageOff } from "lucide-react";
+import { ImageOff, Package } from "lucide-react";
 
 function missingPhoto(product: Product) {
   const thumb = product.images?.[0] || product.image || "";
@@ -204,6 +204,7 @@ export function InventoryCatalog() {
           </ul>
         ) : visible.length === 0 ? (
           <EmptyState
+            icon={Package}
             title={products.length ? "چیزی مطابق جستجو پیدا نشد" : "هنوز کالایی نیست"}
             detail={products.length ? "عبارت دیگری را امتحان کن." : "کانال را وصل کن یا کالا را دستی اضافه کن."}
             action={

@@ -78,7 +78,9 @@ function tagLabel(tag: string) {
 export function friendlyReply(text: string) {
   return String(text || "")
     .replace(/\s*https?:\/\/(?:localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?\S*/g, "")
-    .replace(/«?انتشار تغییرات»?/g, "«بیلد»");
+    .replace(/«?انتشار تغییرات»?/g, "«انتشار»")
+    .replace(/«?بیلد»?\s+بزن/g, "«انتشار» را بزن")
+    .replace(/«?بیلد»?/g, "«انتشار»");
 }
 
 function cleanQuote(text: string) {
@@ -187,10 +189,10 @@ export function ShopEditor({
       {pending > 0 ? (
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-accent/30 bg-accent/10 px-3 py-2">
           <p className="min-w-0 text-sm leading-6 text-ink">
-            <span className="font-bold">{pending.toLocaleString("fa-IR")} تغییر</span> در پیش‌نمایش است؛ با «بیلد» روی سایت می‌رود.
+            <span className="font-bold">{pending.toLocaleString("fa-IR")} تغییر</span> در پیش‌نمایش است؛ با «انتشار» روی سایت می‌رود.
           </p>
           <Button type="button" className="shrink-0 px-3 text-sm" disabled={buildBusy} onClick={onPublish}>
-            بیلد
+            انتشار
           </Button>
         </div>
       ) : null}
@@ -409,7 +411,7 @@ export function ShopEditor({
         {busy ? (
           <span className="text-warm">در حال اعمال…</span>
         ) : buildBusy ? (
-          <span className="text-warm">سایت در حال بیلد است؛ کمی صبر کن.</span>
+          <span className="text-warm">سایت در حال انتشار است؛ کمی صبر کن.</span>
         ) : lastReply ? (
           <span className="line-clamp-1 text-muted sm:line-clamp-2">
             سوزان: <LinkText text={friendlyReply(lastReply.text)} />

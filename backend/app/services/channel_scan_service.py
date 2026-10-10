@@ -1419,7 +1419,7 @@ async def scan_accounts(accounts: list[dict], *, import_catalog: bool = True, ow
             confidence=float(row.get("confidence") or 0),
             priceStatus=str(row.get("priceStatus") or ""),
             priceUnit=str(row.get("priceUnit") or "toman"),
-            stableKey=key,
+            stableKey=str(row.get("stableKey") or ""),
             stock=int(row["stock"]) if str(row.get("stock") or "").isdigit() else 24,
         )
         imported += 1

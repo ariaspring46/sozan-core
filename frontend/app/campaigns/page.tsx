@@ -59,7 +59,7 @@ export default function CampaignsPage() {
     <main className="h-full space-y-4 overflow-y-auto p-4 [&>*]:mx-auto [&>*]:max-w-3xl">
       <StudioNav current="campaigns" />
       {isAdmin ? (
-      <details className="rounded-2xl bg-canvas px-4 py-3 text-sm shadow-card">
+      <details className="rounded-2xl border border-line/80 bg-surface px-4 py-3 text-sm shadow-card">
         <summary className="flex min-h-11 cursor-pointer items-center text-muted">ورود کمپین از پوشهٔ دیسک (فقط مدیر)</summary>
         <div className="mt-3 flex flex-col gap-3 sm:flex-row">
           <Input

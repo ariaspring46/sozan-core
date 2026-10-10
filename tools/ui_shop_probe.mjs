@@ -71,7 +71,7 @@ async function open(browser, { w = 390, h = 844, dark = false, shopStub = null, 
       return route.fulfill({
         status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" },
         body: JSON.stringify({ ...real, shop: { ...real.shop, pendingBuild: 1 }, patched: true, preview: { colors: { primary: "#7A1F2B" } },
-          messages: [...(real.messages || []), { id: "u1", role: "user", text }, { id: "a1", role: "assistant", text: "رنگ اصلی زرشکی شد. تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «بیلد» را بزن." }] }),
+          messages: [...(real.messages || []), { id: "u1", role: "user", text }, { id: "a1", role: "assistant", text: "رنگ اصلی زرشکی شد. تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «انتشار» را بزن." }] }),
       });
     }
     if (stubWrites && url.startsWith(API) && req.method() === "POST" && isPathname(url, "/shop/build")) {

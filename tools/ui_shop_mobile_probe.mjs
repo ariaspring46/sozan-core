@@ -124,7 +124,7 @@ async function boot(browser, { w = 390, h = 844 } = {}) {
       return route.fulfill(json(await view({
         patched: true,
         preview: find ? { find, replace: "زیورآلات نقرهٔ نیشابور" } : { reload: true },
-        messages: [{ id: `a${S.undo}`, role: "assistant", text: "عوض کردم؛ همین‌طوری که می‌بینی. هر وقت راضی بودی «بیلد» را بزن." }],
+        messages: [{ id: `a${S.undo}`, role: "assistant", text: "عوض کردم؛ همین‌طوری که می‌بینی. هر وقت راضی بودی «انتشار» را بزن." }],
       })));
     }
     if (isPathname(url, "/shop/undo") && method === "POST") {
@@ -198,8 +198,8 @@ async function swipe(cdp, from, to) {
   await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await sleep(300);
 }
-// the build button carries the pending count in its name («بیلد ۲») and says «در حال بیلد…» while it runs
-const btn = (page, name) => (name === "بیلد" ? page.getByRole("button", { name: /^(در حال )?بیلد/ }) : page.getByRole("button", { name, exact: true }));
+// the publish button carries the pending count in its name («انتشار ۲») and says «در حال انتشار…» while it runs
+const btn = (page, name) => (name === "انتشار" ? page.getByRole("button", { name: /^(در حال )?انتشار/ }) : page.getByRole("button", { name, exact: true }));
 const enabled = async (page, name) => (await btn(page, name).count()) > 0 && (await btn(page, name).isEnabled());
 const sheet = (page) => page.getByRole("dialog", { name: "ویرایش این بخش" });
 const closeSheet = (page) => sheet(page).getByRole("button", { name: "بستن", exact: true }).click();
@@ -228,8 +228,8 @@ async function main() {
   rec("layout.preview-share", layout.frameH / layout.vh >= 0.6, `iframe ${layout.frameW}x${layout.frameH} of ${layout.vh}px (${Math.round((100 * layout.frameH) / layout.vh)}%)`);
   rec("layout.real-phone-width", Math.abs(layout.frameW - 390) <= 2, `iframe width ${layout.frameW} (a 390px phone shows the site at its own size)`);
   rec("layout.no-mode-or-tabs", !/(^| )طراحی( |$)|(^| )مرور( |$)|خانه کالاها سبد/.test(layout.text), "no design/browse toggle or page chips");
-  rec("bar.two-buttons", (await btn(page, "بیلد").count()) === 1 && (await btn(page, "برگشت").count()) === 1, "«بیلد» and «برگشت» exist once");
-  rec("bar.disabled-at-start", !(await enabled(page, "بیلد")) && !(await enabled(page, "برگشت")), "nothing to build or undo yet");
+  rec("bar.two-buttons", (await btn(page, "انتشار").count()) === 1 && (await btn(page, "برگشت").count()) === 1, "«انتشار» and «برگشت» exist once");
+  rec("bar.disabled-at-start", !(await enabled(page, "انتشار")) && !(await enabled(page, "برگشت")), "nothing to build or undo yet");
   rec("hint.shown-once", /انگشتت را رویش نگه دار/.test(layout.text), "first-time hold hint is visible");
 
   // 2) browsing inside the site: tapping a link navigates and opens nothing
@@ -282,8 +282,8 @@ async function main() {
   rec("edit.sheet-closes-and-notice", (await sheet(page).count()) === 0 && /عوض کردم/.test(await page.evaluate(() => document.body.innerText)), "result is shown over the preview");
   const patched = await shopFrame(page).evaluate(() => document.querySelector("#title")?.textContent || "");
   rec("edit.preview-patched", patched === "زیورآلات نقرهٔ نیشابور", patched);
-  rec("bar.build-and-undo-enabled-after-edit", (await enabled(page, "بیلد")) && (await enabled(page, "برگشت")), "both buttons wake up after one edit");
-  const badge = await btn(page, "بیلد").innerText();
+  rec("bar.build-and-undo-enabled-after-edit", (await enabled(page, "انتشار")) && (await enabled(page, "برگشت")), "both buttons wake up after one edit");
+  const badge = await btn(page, "انتشار").innerText();
   rec("bar.pending-count", /[1۱]/.test(badge), badge.replace(/\s+/g, " "));
   await shot(page, "03-after-edit");
 
@@ -379,25 +379,25 @@ async function main() {
     await btn(page, "برگشت").click();
     await sleep(1800);
   }
-  rec("undo.disabled-at-bottom", !(await enabled(page, "برگشت")) && !(await enabled(page, "بیلد")), `undo=${S.undo} pending=${S.pending}`);
+  rec("undo.disabled-at-bottom", !(await enabled(page, "برگشت")) && !(await enabled(page, "انتشار")), `undo=${S.undo} pending=${S.pending}`);
 
   // 10) build: both buttons lock, then برگشت stays locked
   await hold(cdp, await framePoint(page, "#title"));
   await page.locator("#shop-sheet-command").fill("رنگ تیتر را گرم‌تر کن");
   await page.getByRole("button", { name: "بفرست" }).click();
   await sleep(1800);
-  rec("build.ready-with-pending", await enabled(page, "بیلد"), `pending=${S.pending}`);
-  await btn(page, "بیلد").click();
+  rec("build.ready-with-pending", await enabled(page, "انتشار"), `pending=${S.pending}`);
+  await btn(page, "انتشار").click();
   await sleep(900);
-  const building = { build: await enabled(page, "بیلد"), undo: await enabled(page, "برگشت"), label: await page.locator('[role="group"]').innerText() };
+  const building = { build: await enabled(page, "انتشار"), undo: await enabled(page, "برگشت"), label: await page.locator('[role="group"]').innerText() };
   await shot(page, "07-building");
   rec("build.sent-as-revise", S.builds.length === 1 && S.builds[0].rebuild === true && S.builds[0].reviseOnly === true, JSON.stringify(S.builds[0] || {}));
-  rec("build.locks-both-buttons", !building.build && !building.undo && /در حال بیلد/.test(building.label), building.label.replace(/\s+/g, " "));
+  rec("build.locks-both-buttons", !building.build && !building.undo && /در حال انتشار/.test(building.label), building.label.replace(/\s+/g, " "));
   const cover = await page.evaluate(() => ({ text: document.body.innerText.replace(/\s+/g, " "), bars: document.querySelectorAll('[role="progressbar"] > span').length }));
   rec("build.progress-cover-shows-the-steps", /در حال طراحی ظاهر/.test(cover.text) && /فهم نوع فروشگاه/.test(cover.text) && cover.bars === 4, `bars=${cover.bars}`);
   rec("build.cover-blocks-holding-the-half-built-site", (await sheet(page).count()) === 0, "no sheet while building");
   await sleep(7500);
-  const done = { build: await enabled(page, "بیلد"), undo: await enabled(page, "برگشت") };
+  const done = { build: await enabled(page, "انتشار"), undo: await enabled(page, "برگشت") };
   rec("build.undo-disabled-after-build", !done.undo && !done.build && S.undo === 0, `build=${done.build} undo=${done.undo}`);
   await shot(page, "08-after-build");
 
@@ -409,7 +409,7 @@ async function main() {
   const d = await desk.page.evaluate(() => ({
     aside: Boolean(document.querySelector('aside[aria-label="ویرایش فروشگاه"]')),
     command: Boolean(document.querySelector("#shop-command")),
-    group: Boolean(document.querySelector('[role="group"][aria-label="بیلد و برگشت"]')),
+    group: Boolean(document.querySelector('[role="group"][aria-label="انتشار و برگشت"]')),
   }));
   await shot(desk.page, "09-desktop");
   rec("desktop.editor-kept", d.aside && d.command && !d.group, JSON.stringify(d));

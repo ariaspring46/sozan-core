@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { formatWhen, money, parseNonNegativeInt, toLatinDigits } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
+import { Wallet } from "lucide-react";
 
 type LedgerRow = { id: string; at: number; kind: string; amount: number; note?: string; orderId?: string };
 type WithdrawRow = {
@@ -219,7 +220,7 @@ export default function WalletPage() {
             <Card>
               <h2 className="font-bold">گردش کیف</h2>
               {(wallet.ledger || []).length === 0 ? (
-                <EmptyState title="هنوز گردشی نیست" detail="فروش درگاهی اینجا می‌آید." />
+                <EmptyState icon={Wallet} title="هنوز گردشی نیست" detail="فروش درگاهی اینجا می‌آید." />
               ) : (
                 <ul className="mt-3 space-y-2">
                   {wallet.ledger.map((row) => (

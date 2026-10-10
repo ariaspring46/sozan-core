@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { formatWhen, money, parseNonNegativeInt } from "@/lib/digits";
 import { EmptyState } from "@/components/empty-state";
+import { Receipt } from "lucide-react";
 import { FlowOrder, OrderFlowCard } from "@/components/order-flow-card";
 import { PushToggle } from "@/components/push-toggle";
 
@@ -152,7 +153,7 @@ export default function SalesPage() {
 
         <section aria-label="خلاصهٔ فروش" className="grid grid-cols-3 gap-2">
           {stats.map((item) => (
-            <div key={item.label} className="min-w-0 rounded-2xl bg-canvas p-3 shadow-card">
+            <div key={item.label} className="min-w-0 rounded-2xl border border-line/80 bg-surface p-3 shadow-card">
               <p className="text-xs text-muted">{item.label}</p>
               <p className="mt-1 whitespace-nowrap text-[clamp(0.8125rem,3.7vw,1rem)] font-bold text-ink">{loading ? "…" : money(item.value)}</p>
               <p className="text-xs text-muted">تومان</p>
@@ -270,10 +271,9 @@ export default function SalesPage() {
           </ul>
         ) : shown.length === 0 ? (
           <EmptyState
+            icon={Receipt}
             title="هنوز فروشی نیامده"
-            detail={
-                "فروش‌هایی که از درگاه سایت یا لینک پرداخت دایرکت می‌آیند خودکار اینجا می‌نشینند. فروش بیرونی را با «ثبت فروش دستی» وارد کن."
-            }
+            detail="فروش‌های درگاه سایت و لینک پرداخت خودکار اینجا می‌آیند. فروش بیرون از سایت را با «ثبت فروش دستی» وارد کن."
           />
         ) : (
           <ul className="space-y-2">

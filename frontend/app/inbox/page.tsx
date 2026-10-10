@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { ChannelAlert } from "@/components/channel-alert";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
+import { MessageCircle } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatWhen } from "@/lib/digits";
 import { cn } from "@/lib/utils";
@@ -299,6 +300,7 @@ export default function InboxPage() {
           </div>
         ) : threads.length === 0 ? (
           <EmptyState
+            icon={MessageCircle}
             title={q || filter || platform ? "گفتگویی با این فیلتر نیست" : "هنوز پیامی نیامده"}
             detail={q || filter || platform ? "فیلتر را بردار یا عبارت دیگری بجو." : "حساب کانال را وصل کن تا پیام مشتری اینجا بیاید."}
             action={

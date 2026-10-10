@@ -1080,7 +1080,7 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
         label = action.get("label") or "صفحه"
         text = f"صفحهٔ {label} در سایت باز است." if ok else "صفحه ساخته نشد."
     elif kind == "revert":
-        text = "به حالت قبل برگشت." if ok else "چیزی برای برگشت نیست؛ بعد از هر بیلد تغییرهای قبلی قفل می‌شوند."
+        text = "به حالت قبل برگشت." if ok else "چیزی برای برگشت نیست؛ بعد از هر انتشار تغییرهای قبلی قفل می‌شوند."
     elif kind == "reject_foreign":
         text = "این پیام ویرایش فروشگاه نیست."
     elif kind == "reply_only":
@@ -1092,7 +1092,7 @@ def _reply_for_verify(action: dict, verified: dict, *, frame_only: bool = False)
     else:
         text = "تغییر روی همین صفحه اعمال شد." if ok else "این تغییر روی این صفحه پیدا نشد. المان را در پیش‌نمایش لمس کن یا دقیق‌تر بگو."
     if ok and frame_only and kind in _EDIT_KINDS and "کادر" not in text:
-        text = f"{text} تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «بیلد» را بزن."
+        text = f"{text} تغییر در کادر است؛ هر وقت آماده بودی دکمهٔ «انتشار» را بزن."
     return unify_edit_fail(text)
 
 
@@ -1439,7 +1439,7 @@ async def _run_actions_in_turn(
         lines.append(reply_line)
         if verified.get("ok"):
             if kind in {"ask_clarify", "greet", "answer", "reply_only"}:
-                continue  # a question is not an edit: no pending change, no undo step, no «بیلد» hint
+                continue  # a question is not an edit: no pending change, no undo step, no «انتشار» hint
             any_ok = True
             if kind in mutating:
                 if kind in {"create_page", "add_nav_link"} or kind not in RUNTIME_VERIFY_KINDS or not live:

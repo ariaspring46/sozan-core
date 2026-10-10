@@ -410,7 +410,7 @@ function ShopLivePreview({
             >
               {failed ? "ساخت دوباره" : (
                 <>
-                  <span>بیلد</span>
+                  <span>انتشار</span>
                 </>
               )}
               {pendingBuild > 0 ? ` (${pendingBuild.toLocaleString("fa-IR")})` : ""}

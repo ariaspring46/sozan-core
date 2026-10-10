@@ -155,7 +155,7 @@ export function BrandIdentitySection() {
           </label>
         </div>
         <div className="w-full min-w-0 space-y-3 sm:w-auto sm:min-w-[14rem] sm:flex-1">
-          <h2 className="text-lg font-bold">هویت سوزان</h2>
+          <h2 className="text-lg font-bold">هویت برند</h2>
           <Field label="نام">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
@@ -166,7 +166,7 @@ export function BrandIdentitySection() {
           className="min-h-64"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="اینجا هرچه می‌خواهی دربارهٔ سوزان بنویس…"
+          placeholder="دربارهٔ برندت بنویس: چه می‌سازی، برای چه کسی و با چه حسی…"
         />
       </Field>
       <div className="flex flex-wrap items-center gap-3">

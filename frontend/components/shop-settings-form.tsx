@@ -160,7 +160,7 @@ export function ShopSettingsForm() {
   return (
       <div className="space-y-4">
           {form ? (
-            <Card className="space-y-3">
+            <Card id="payment" className="scroll-mt-16 space-y-3">
               <h2 className="font-bold">فروشگاه و پرداخت</h2>
               <Field label="نام فروشگاه">
                 <Input value={form.storeName} onChange={(event) => setForm({ ...form, storeName: event.target.value })} />
@@ -274,7 +274,7 @@ export function ShopSettingsForm() {
             <p className="text-sm text-muted">در حال خواندن تنظیمات…</p>
           )}
           {form ? (
-            <Card className="space-y-3">
+            <Card id="sms" className="scroll-mt-16 space-y-3">
               <h2 className="font-bold">درگاه پیامک</h2>
               {form.smsFromHub ? (
                 <p className="text-sm text-signal">ورود پنل با پیامک سوزان فرستاده می‌شود.</p>
