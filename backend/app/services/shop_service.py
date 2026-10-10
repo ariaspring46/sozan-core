@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -852,6 +853,21 @@ def _pipeline_view(*, step: str, status: str, phases: list[dict]) -> list[dict]:
     return out
 
 
+def _with_zone(stamp: str) -> str:
+    """The factory writes its own clock without a zone («2026-10-06T14:01:51», the hub runs on UTC). A browser reads
+    such a string as its own local time, so a seller in Tehran saw a build that had just started as 210 minutes old."""
+    text = str(stamp or "").strip()
+    if not text:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    if parsed.tzinfo is None:
+        parsed = parsed.astimezone()  # the hub's own zone, the one the factory wrote in
+    return parsed.isoformat()
+
+
 def _live_build(base: dict, *, phases_raw: object = None, started_at: str = "", elapsed: object = None) -> dict:
     phases = _normalize_phases(phases_raw)
     status = str(base.get("status") or "idle")
@@ -863,7 +879,7 @@ def _live_build(base: dict, *, phases_raw: object = None, started_at: str = "", 
     payload = dict(base)
     payload["phases"] = phases
     payload["pipeline"] = _pipeline_view(step=step, status=status, phases=phases)
-    payload["startedAt"] = started_at
+    payload["startedAt"] = _with_zone(started_at)
     try:
         payload["elapsedSec"] = int(float(elapsed)) if elapsed not in (None, "") else None
     except (TypeError, ValueError):
