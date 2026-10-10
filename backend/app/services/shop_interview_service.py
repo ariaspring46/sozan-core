@@ -128,13 +128,30 @@ def proposal_open(state: dict, rows: list[dict]) -> bool:
     if state.get("mode") != "propose":
         return False
     at = float(state.get("at") or 0)
-    if at and time.time() - at > PROPOSAL_TTL:
-        return False
+    last = str(rows[-1].get("text") or "") if rows and rows[-1].get("role") == "user" else ""
+    if at and time.time() - at > PROPOSAL_TTL and "بساز" not in last:
+        return False  # a bare «آره» hours later is an ordinary line; «آره، بساز» under the proposal still means build
     said = _squash(state.get("said"))
     if not said:
         return True
     earlier = [row for row in rows[:-1] if row.get("role") == "assistant" and str(row.get("id") or "") != "shop-build-live"]
     return bool(earlier) and said in _squash(earlier[-1].get("text"))
+
+
+def awaits_answer(rows: list[dict]) -> bool:
+    """The seller's latest message (last row) answers this interview's own question (the row before it).
+    2026-10-10: a new seller tapped «کرم و قهوه‌ای»; without a build word the model sent it to the shop editor,
+    which said the shop does not exist yet and to type «بساز»."""
+    if len(rows) < 2 or rows[-1].get("role") != "user":
+        return False
+    asked, spoken = rows[-2], str(rows[-1].get("text") or "")
+    if asked.get("role") != "assistant" or asked.get("kind") != "ask" or _state().get("mode") not in ("ask", "propose"):
+        return False
+    options = {_squash(item) for item in asked.get("options") or []}
+    if _squash(spoken) not in options and (len(spoken.split()) > 6 or re.search(r"[?؟]", spoken)):
+        return False
+    said = [row for row in read_json("shop-messages.json", []) if isinstance(row, dict) and row.get("role") == "assistant"]
+    return bool(said) and _squash(said[-1].get("text")) == _squash(asked.get("text"))
 
 
 def _transcript(rows: list[dict]) -> str:

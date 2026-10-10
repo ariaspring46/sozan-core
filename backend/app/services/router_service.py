@@ -1021,7 +1021,10 @@ def _force_shop_build(spoken: str) -> bool:
     if any(mark in text for mark in _NOT_A_BUILD) or router_text.is_content_request(text) or router_voice.is_hostile(text):
         return False
     if _BUILD_SIGNAL.search(text) is None and not router_voice.names_a_page(text):
-        return False
+        from app.services.shop_interview_service import awaits_answer
+
+        if not awaits_answer(_messages()):
+            return False
     from app.services.shop_service import current_shop as _shop
 
     shop = _shop()
