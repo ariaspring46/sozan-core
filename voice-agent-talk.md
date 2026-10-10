@@ -1082,3 +1082,9 @@ PROMPT:
 (b) Local fallback policy when cloud active: which slot to unban/re-enable — ornith-phone (Vulkan1 serial) or qwen3.5-9b (Vulkan0, VRAM pressure). This is X5 + owner. Also note the RUNNING process is z/15 not z/14 — confirm the intended live branch.
 
 NO code changes made. NO real call. NO campaign. GIFT_CODE_SPOKEN empty confirmed.
+
+## Z — بازاریاب تلفنی: معرفی هوش مصنوعی، لحن انسانی، ابزارها (2026-10-10 19:32 Tehran)
+- انجام شد: شروع تماس «من سوزانم، یه هوش مصنوعی» را قلاب می‌کند؛ جمله‌های ثابت کوتاه و اول‌شخص؛ ابزارهای [قیمت]، [آدرس]، [زنگ‌نزن]؛ فهم «زنگ نزنید»، «نه ممنون»، عجله و قیمت با عبارت‌های طبیعی؛ دستور مدل بی ادعای سابقه. چهار دور بازبینی خصمانه (۹۲ ایراد واقعی رفع شد). جزئیات در CHANGELOG
+- آزمون: `python3 -m unittest test_voice` ۶۸ سبز؛ شبیه‌ساز آفلاین ۵۲ پرسونا (با و بی فهرست قیمت) بی پسرفت؛ `build.py --check` سبز. تماس واقعی و کمپین: صفر
+- شاخه: `claude/project-thread-4mdcfz` (۴ commit روی 17c783c)، push نشده
+- نیاز: شارژ OpenRouter (صدای ابری ۴۰۲ می‌دهد) تا sim_run زنده اجرا شود؛ پراکسی پورت 10871 خاموش است؛ تصمیم مالک برای push و PR
