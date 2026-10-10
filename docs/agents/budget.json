@@ -49,7 +49,7 @@
    "id": "X5",
    "loose_contracts": 31,
    "manifest": 12877,
-   "rare": 20620,
+   "rare": 20631,
    "tests": 56439
   },
   {
@@ -78,9 +78,9 @@
    "core_pct": 51,
    "id": "C",
    "loose_contracts": 22,
-   "manifest": 11674,
+   "manifest": 11717,
    "rare": 11609,
-   "tests": 23436
+   "tests": 29663
   },
   {
    "active": 90620,
@@ -93,7 +93,7 @@
    "tests": 0
   },
   {
-   "active": 225127,
+   "active": 226149,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",

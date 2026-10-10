@@ -69,7 +69,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | core | 23.2k | the files most tasks touch; read the relevant one first |
 | active | 68.7k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
-| tests | 23.4k | read only the test of the module you change |
+| tests | 29.7k | read only the test of the module you change |
 
 **Core:**
 
@@ -81,6 +81,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 **Active (you may edit):**
 
 - `backend/app/api/`: `pay.py` (4.2k), `storefront.py` (2.9k)
+- `backend/app/scenarios/`: `__init__.py` (0.0k)
 - `backend/app/services/`: `pay_service.py` (9.9k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (2.9k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.7k)
@@ -94,7 +95,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `tools/monitor/`: `install.sh` (0.4k), `sozan_monitor.py` (7.1k), `status-nginx.conf` (0.3k)
 - `tools/storefront/`: `scan_storefront.py` (3.4k), `shop-closed.html` (0.3k)
 
-**Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/order_flow_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/pay_stock_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
+**Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/scenarios/order_lifecycle_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/order_flow_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/pay_stock_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
 
 **Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (33.2k)
 
@@ -385,6 +386,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 # backend: your modules only (fast loop). Python 3.11; deps: pip install -r backend/requirements.txt
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
   python3 -m unittest app.api.pay_status_rate_test \
+    app.scenarios.order_lifecycle_test \
     app.services.arvan_dns_service_test \
     app.services.catalog_sync_service_test \
     app.services.order_flow_service_test \
