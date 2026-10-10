@@ -822,3 +822,31 @@ class CatalogBeforeStorefrontTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BuildClockTests(unittest.TestCase):
+    def test_a_factory_time_without_a_zone_gets_the_hubs_zone(self) -> None:
+        # 2026-10-10: a seller in Tehran saw «زمان ساخت ۲۱۱:۴۶» one minute into a build
+        import os
+        from datetime import datetime, timezone
+
+        from app.services.shop_service import _with_zone
+
+        old = os.environ.get("TZ")
+        os.environ["TZ"] = "UTC"
+        try:
+            import time as _t
+
+            _t.tzset()
+            out = _with_zone("2026-10-06T14:01:51")
+        finally:
+            if old is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = old
+            _t.tzset()
+        self.assertEqual(datetime.fromisoformat(out), datetime(2026, 10, 6, 14, 1, 51, tzinfo=timezone.utc))
+        self.assertTrue(out.endswith("+00:00"))
+        self.assertEqual(_with_zone("2026-10-06T14:01:51+03:30"), "2026-10-06T14:01:51+03:30")
+        self.assertEqual(_with_zone(""), "")
+        self.assertEqual(_with_zone("not a time"), "not a time")
