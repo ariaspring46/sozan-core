@@ -88,6 +88,9 @@ WAIT_BRIGHT = ("حتماً!", "سؤال خوبیه!", "حق دارید!")
 FALLBACK_LINE = "سؤال دیگه‌ای هست که بگم؟"
 HOW_ADDRESS_LINE = f"سوزان پیش‌نویس جواب دایرکت‌هاتون رو می‌نویسه و شما تأیید می‌کنید. آدرسش {SPOKEN_ADDRESS}؛ واردش بشید، دکمهٔ ورود رو بزنید."
 _HOW_WORKS = ("چجوری کار", "چطوری کار", "چه جوری کار", "چطور کار")
+_WHO_ASKED = ("کدوم شرکت", "چه شرکتی", "چی شرکتی", "شرکتتون چیه", "شرکتت چیه", "اسم شرکت", "برای کی کار", "کی ساخت")
+_DIDNT_HEAR = re.compile(r"چی میگی|چی می ?گی|چی گفتی|چی گفتید|نفهمیدم|متوجه نشدم|نشنیدم")
+CLARIFY_LINE = "ببخشید، واضح نگفتم. جواب دایرکت‌ها رو من می‌نویسم، شما فقط تأیید می‌کنید؛ الان دایرکت‌ها رو کی جواب می‌ده؟"
 MISHEARD_LINE = "ببخشید، متوجه نشدم؛ یه بار دیگه می‌فرمایید؟"
 SALES_PROBE_LINE = "الو؟ صدامو دارید؟"
 PITCH_MARKS = ("حسش", "رنگش", "بنویس بساز", "می‌نویسی بساز")
@@ -301,8 +304,7 @@ def _noted(blob: str) -> bool:
 
 
 _CANT_TALK = ("نمیتونم صحبت", "نمیتونم حرف بزن", "تو جلسه", "توی جلسه", "جلسه ام", "درگیرم", "پشت فرمونم", "دارم رانندگی")
-# Busy words inside a pain answer («کل روز درگیرم با دایرکتا», «وقت ندارم دایرکتا رو جواب بدم») are the pain, not busy.
-# «مشتری دارم»، «پیام بدید» and «نمی‌تونم جواب بدم» stay busy.
+# Busy words inside a pain answer are the pain; «مشتری دارم» and «پیام بدید» stay busy.
 _PAIN = re.compile(r"دایرکت|پیاما|پیامها|پیام ها|پیامای|پیامهای|استوری|کپشن|پست|جواب میده|جواب میدن|جواب نمیده")
 _CALL_BACK = re.compile(
     r"(?:بعدازظهر|بعد از ظهر|عصر|فردا|شب|یه ساعت دیگه|یه وقت دیگه|یه روز دیگه|هفته بعد)\s+(?:\S+\s+)?"
@@ -326,8 +328,7 @@ _REFUSE_TAIL = frozenset(
 _STILL_IN = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید|بفرما|چطور|چطوری|چجوری)(?![{_FA}])")
 _BUT = re.compile(rf"(?<![{_FA}])(?:ولی|اما|فقط)(?![{_FA}])")
 _WANTS = re.compile(r"دایرکت|پیام|محتوا|پست|استوری|سایت|سفارش|فروشگاه|قیمت|چنده|چقدر|آدرس|لینک|بفرست|رایگان|چی کار|چیکار|چیه|بعدا|توضیح")
-# These count only as the whole clause («نه، نمی‌خواد ممنون»): «اجازه نمی‌خواد»، «مشتری کاتالوگ نمی‌خواد»،
-# «مگه ما مشتری بیشتر نمی‌خوایم» and «دیگه منشی لازم نداریم» are a yes or the seller's own pain.
+# Whole-clause refusals only: «نه، نمی‌خواد ممنون»; «اجازه نمی‌خواد» is not.
 _BARE_REFUSE = re.compile(
     rf"(?<![{_FA}])(?:نمیخواد|نمیخوا(?:یم|هم|هیم)(?:ش|شون)?|(?:لازم|نیاز|نیازی|علاقه ای|علاقه) نداریم)(?![{_FA}])"
 )
@@ -691,7 +692,6 @@ def sales_open() -> str:
         "شخصیت: زن، گرم، باهوش، خوش‌برخورد و باحوصله؛ خودمونی با خطاب «شما». مثل یه آدم واقعی حرف بزن، با تأییدهای کوتاه («آهان»، «چه خوب»، «حق دارید»)، نه مثل متن نوشته.\n"
         "صداقت: تو هوش مصنوعی هستی و اول تماس این را گفتی. هوش مصنوعی بودنت جذابیته، نه عیب: همین صدایی که می‌شنوند، جواب دایرکت‌هایشان را هم می‌نویسد. "
         "اگر پرسیدند ربات یا آدمی: «هوش مصنوعی‌ام، آدم نیستم!» و برگرد سر بحث؛ با «بله» یا «آره» شروع نکن. نگو با مشتری‌هایشان تلفنی حرف می‌زنی.\n"
-        "اگر پرسیدند کی ساختت یا از کدوم شرکتی: «" + COMPANY_LINE + "» و بعد برگرد سر بحث.\n"
         "هدف تماس: طرف دلش بخواد خودش سوزان رو رایگان امتحان کنه (sozan-core.ir، دکمهٔ ورود). فروش زوری نه؛ کمک.\n"
         "روش یه فروشندهٔ خبره:\n"
         "۱. کمتر از طرف حرف بزن: هر نوبت حداکثر دو جملهٔ کوتاه که دومی سؤال باشد.\n"
@@ -732,7 +732,6 @@ def sales_open() -> str:
         "مشتری: گرونه. → حق دارید، ساخت فروشگاه که کلاً رایگانه! با چی مقایسه می‌کنید؟\n"
         "مشتری: بلد نیستم. → لازم نیست بلد باشید؛ فقط اسم پیجتون رو می‌زنید، بقیه‌ش با منه.\n"
         "مشتری: واقعاً رباتی؟ → هوش مصنوعی‌ام، آدم نیستم! جالبش همینه، دایرکت‌هاتون رو هم همین‌طوری جواب می‌نویسم.\n"
-        "مشتری: از کدوم شرکتی؟ → " + COMPANY_LINE + " الان دایرکت‌ها رو کی جواب می‌ده؟\n"
         "مشتری: باشه، از کجا شروع کنم؟ → عالیه! همین امروز رایگان شروع کنید. [آدرس]\n"
         "مشتری: چنده؟ → [قیمت]\n"
         "مشتری: بعداً. → حتماً، مزاحمتون نمی‌شم! [آدرس] [هدیه]"
@@ -1211,8 +1210,7 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             return TurnPlan(kind="close", line=DECLINE_LINE if signals.refuse else CLOSE_LINE, hangup=True, signals=signals)
         aside = bool(re.search(r"(?:الو|بله|بفرمایید|بفرمائید|سلام)[\s.!،؟?]*$", heard or ""))
         if signals.refuse and not signals.source and not aside:
-            # «سلام، لازم نیست»: no pitch after a no; one line says who called and where to look, then goodbye.
-            # «یه لحظه... نه نمی‌خوام. الو؟» was said to someone in the shop before turning to the phone.
+            # «سلام، لازم نیست»: no pitch after a no; say who called and where to look, then goodbye.
             return TurnPlan(kind="close", line=BUSY_OPEN_LINE, hangup=True, signals=signals)
         busy_first = (signals.time or signals.later) and not carrier and not signals.quick
         # A second real sentence after a hold is a person.
@@ -1262,12 +1260,18 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         # «رباتی؟ نمی‌خوام»: the AI answer still comes, then thanks.
         return TurnPlan(kind="close", line=f"{ROBOT_SHORT} {DECLINE_LINE}", hangup=True, signals=signals)
     if state.awaiting_permission and signals.no:
-        # A bare «نه» to «بگم چطوری؟» is a no, not a dropped line.
         state.awaiting_permission = False
         return TurnPlan(kind="close", line=DECLINE_LINE, hangup=True, signals=signals)
-    words = set(_plain_words(heard).split())
+    plain = _plain_words(heard)
+    if plain in {"خدا", "خدافظ"}:  # STT cut «خداحافظ».
+        return TurnPlan(kind="close", line=CLOSE_LINE, hangup=True, signals=signals)
+    words = set(plain.split())
     if len((heard or "").strip()) < 4 and not (words and words <= _SHORT_REPLY):
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
+    if any(part in (heard or "") for part in _WHO_ASKED):
+        return TurnPlan(kind="feature", line=f"{COMPANY_LINE} الان دایرکت‌ها رو کی جواب می‌ده؟", signals=signals)
+    if _DIDNT_HEAR.search(plain) and len(plain.split()) <= 3:
+        return TurnPlan(kind="feature", line=CLARIFY_LINE, signals=signals)
     if signals.robot and not signals.price and any(part in (heard or "") for part in _ADDRESS_HINTS):
         # «رباتی؟ آدرس سایتتون چیه؟»: both answers, without asking for the question again.
         state.robot_answers += 1
@@ -1281,7 +1285,7 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             if not state.awaiting_permission:
                 state.stage = "confirm"
             return TurnPlan(kind="feature", line=robot, signals=signals)
-        # Both fixed answers are spent: the model answers in fresh words (its prompt keeps it honest).
+        # Both fixed answers are spent: the model answers in fresh words.
         state.awaiting_permission = False
         return TurnPlan(kind="model", cue=state.cue(heard), signals=signals)
     if (
@@ -1327,10 +1331,8 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
     if fixed:
         state.stage = "confirm"
         if any(fixed in said for said in state.said):
-            # Asked again: the model answers in fresh words instead of the same sentence.
             return TurnPlan(kind="model", cue=state.cue(heard), signals=signals)
         return TurnPlan(kind="address", line=fixed, signals=signals)
-    # «تو گوشی یادداشت می‌کنم» answering our question is their work.
     asked = bool(state.said) and not mentions_address(state.said[-1]) and state.said[-1].rstrip().endswith(("؟", "?"))
     if signals.agree and not signals.refuse and not (signals.noted and asked) and (state.linked or state.cta_count > 0):
         state.agreed = True
@@ -1609,6 +1611,7 @@ def _price_sentence_ok(sent: str) -> bool:
 
 def guard_reply(reply: str, heard: str) -> str:
     reply = re.sub(r"[^.!؟?]*به هیچ شرکت خاصی تعلق ندارم[^.!؟?]*[.!؟?]?", COMPANY_LINE, reply or "")
+    reply = re.sub(r"آی\Wآره", "آی‌آر", reply)
     text = formalize_you(strip_invented_names(reply, heard or ""))
     kept: list[str] = []
     allowed_code = gift_spoken_code()

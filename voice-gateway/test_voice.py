@@ -1981,7 +1981,30 @@ class LiveSimTest(unittest.TestCase):
         reply = sales.guard_reply("من هوش مصنوعی هستم و به هیچ شرکت خاصی تعلق ندارم.", "شما از کدوم شرکتید؟")
         self.assertNotIn("تعلق ندارم", reply)
         self.assertEqual(reply, sales.COMPANY_LINE)
-        self.assertIn("گهر شبکه کارمانیا", sales.sales_open())
+        # The company question is answered by the route, not by the model: «از کدوم شرکتی؟» names her and asks who answers the DMs.
+        plan = plan_turn(self.opened(), "از کدوم شرکتی؟")
+        self.assertEqual(plan.kind, "feature")
+        self.assertTrue(plan.line.startswith(sales.COMPANY_LINE))
+        self.assertIn("کی جواب می‌ده", plan.line)
+
+    def test_goodbye_clarify_and_spoken_domain_routes(self) -> None:
+        import sales
+
+        # STT cuts «خداحافظ» to «خدا»: that is the goodbye, not «صداتون قطع شد».
+        for heard in ("خدا", "خدافظ"):
+            plan = plan_turn(self.opened(), heard)
+            self.assertEqual(plan.kind, "close", heard)
+            self.assertTrue(plan.hangup, heard)
+            self.assertEqual(plan.line, sales.CLOSE_LINE, heard)
+        # «چی میگی» is «say again», not a sales question: it asks the caller to repeat, without guessing.
+        plan = plan_turn(self.opened(), "ببخشید چی میگی")
+        self.assertEqual(plan.line, sales.CLARIFY_LINE)
+        self.assertNotIn("قطع", plan.line)
+        # A long sentence that merely contains «نفهمیدم» still goes to the model.
+        self.assertNotEqual(plan_turn(self.opened(), "من تا حالا این کار رو نفهمیدم ولی دوست دارم یاد بگیرم").line, sales.CLARIFY_LINE)
+        # The model's «آی‌آره» or «آی آره» becomes the spoken «آی‌آر» before the caller hears it.
+        self.assertEqual(sales.guard_reply("آدرسش سوزان کُر دات آی‌آره، دکمهٔ ورود.", "چطوری شروع کنم"), "آدرسش سوزان کُر دات آی‌آر، دکمهٔ ورود.")
+        self.assertIn("آی‌آر", sales.guard_reply("آدرس دات آی آره است.", "آدرس"))
 
     def test_how_it_works_before_the_address_and_the_spoken_domain(self) -> None:
         import sales
