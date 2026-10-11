@@ -1768,6 +1768,33 @@ class LiveSimTest(unittest.TestCase):
             self.assertFalse(read_signals(heard).agree, heard)
         for heard in ("روزی پنجاه تا، شبا خودم بهشون سر میزنم", "باشه ولی علاقه ای ندارم"):
             self.assertNotEqual(plan_turn(state_after(sales.QUICK_OPEN_LINE), heard).line, sales.CLOSE_LINE, heard)
+        # Noting the address in other words closes too, right after the address line.
+        for heard in (
+            "آدرستون رو یادداشت کردم",
+            "آدرستونو نوشتم",
+            "لینکتون رو سیو کردم",
+            "آدرسو گرفتم ممنون",
+            "مرسی گرفتم آدرسو",
+            "آدرس‌تون رو یادداشت کردم",
+            "سایت‌تون رو چک می‌کنم",
+            "حتما یه سر بهش میزنم",
+            "یه نگاهی بهش میندازم",
+            "حتماً سر می‌زنم بهتون",
+            "مرسی خانم یادداشت کردم",
+        ):
+            self.assertEqual(plan_turn(state_after(ADDRESS_LINE), heard).line, sales.CLOSE_LINE, heard)
+        # But not as the answer to our own question about their work: «سفارش‌ها رو کجا ثبت می‌کنید؟»
+        for last, heard in (
+            (sales.ORDER_LINE, "تو گوشی یادداشت می‌کنم"),
+            (sales.ORDER_LINE, "تو گوشي يادداشت مي‌كنم"),
+            (sales.ORDER_LINE, "بله تو گوشی یادداشت می‌کنیم"),
+            (sales.ORDER_LINE, "تو گوشی نوشتم"),
+            (sales.PAIN_LINE, "تو گوشی چک میکنم"),
+            (sales.PAIN_LINE, "آره سر میزنم"),
+        ):
+            state = state_after(sales.QUICK_OPEN_LINE)
+            note_spoken(state, last)
+            self.assertNotEqual(plan_turn(state, heard).line, sales.CLOSE_LINE, heard)
         # p39: the model added [آدرس] to the busy turn right after the line that gave the address.
         def address_for(heard: str, last: str = sales.QUICK_OPEN_LINE) -> list[str]:
             return sales.tool_followups({"address"}, state_after(last), heard, "حتماً!")[0]
@@ -1776,6 +1803,12 @@ class LiveSimTest(unittest.TestCase):
         for heard in ("سوزان چی؟ دوباره بگو", "ببخشید نفهمیدم اسمش چی بود؟", "سرم شلوغه، اسمش چی بود؟", "خب چطوری ثبت نام کنم؟"):
             self.assertEqual(address_for(heard), [ADDRESS_LINE], heard)
         self.assertEqual(address_for("سرم شلوغه سریع بگو", sales.PAIN_LINE), [ADDRESS_LINE])
+        for heard in ("اسمشو سریع بگو", "سرم شلوغه، تکرار کن", "سرم شلوغه، یه دور دیگه بگو", "سرم شلوغه، دات چی؟", "سرم شلوغه، چطوری ثبت نام کنم؟"):
+            self.assertEqual(address_for(heard), [ADDRESS_LINE], heard)
+        # «بعداً دوباره زنگ بزنید» asks for a call, not the address; a reply that is only [آدرس] still says it.
+        self.assertEqual(address_for("سرم شلوغه، بعداً دوباره زنگ بزنید"), [])
+        busy = sales.tool_followups({"address"}, state_after(sales.QUICK_OPEN_LINE), "سرم شلوغه سریع بگو چی می خوای", "")
+        self.assertEqual(busy[0], [ADDRESS_LINE])
         # p44: «هزینه‌ش چقدر؟ گرون نباشه» after the price got the same sentence again.
         state = SalesState()
         first = plan_turn(state, "اول بگو چقدر می گیری")

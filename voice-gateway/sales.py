@@ -157,7 +157,12 @@ _OBJECTION_DO = {
     "has_site": "سایت دارد: سوزان کنار سایتش، نه جایش.",
     "source": "پرسید شماره از کجا: رک جواب بده و بگو اگر نخواهد دیگر زنگ نمی‌زنیم.",
 }
-_ASK_AGAIN = ("نفهمیدم", "دوباره", "یه بار دیگه", "یک بار دیگه", "اسمش چی", "سوزان چی", "کجا", "چی بود", "چی گفت")
+_ASK_AGAIN = (
+    "نفهمیدم", "دوباره", "یه بار دیگه", "یک بار دیگه", "اسمش", "سوزان چی", "کجا", "چی بود", "چی گفت", "تکرار",
+    "دور دیگه", "دات", "ثبت نام", "بنویسم", "یادم رفت", "آروم",
+)
+# «بعداً دوباره زنگ بزنید» asks for a call, not for the address again.
+_CALL_AGAIN = re.compile(r"(?:دوباره|بار دیگه)\s*(?:زنگ|تماس)")
 _ADDRESS_HINTS = (
     "اسم سایت",
     "آدرس",
@@ -263,19 +268,23 @@ _NO_TIME = re.compile(rf"وقت ندار(?:م|یم)?(?![{_FA}])(?!\s*(?:به|ب�
 # STT hears «باشه، بعداً میام» as «واسه ... بعدم میام» too.
 _NOTED = re.compile(
     rf"(?<![{_FA}])(?:یاد\s*داشت(?:ش)?\s*(?:کرد(?:م|یم)(?:ش)?|میکن(?:م|یم))|نوشت(?:م|یم)(?:ش)?"
-    rf"|(?:سیو|ذخیره|ذخیر)(?:\s*ا?ش)?\s*کرد(?:م|یم)(?:ش)?|سر(?:ی)?\s*میزن(?:م|یم)"
-    rf"|(?:یه\s+)?نگاه(?:ی)?\s*(?:میکن(?:م|یم)|میند(?:ا)?ز(?:م|یم)|میاندازم)|چک\s*میکن(?:م|یم)"
+    rf"|(?:سیو|ذخیره|ذخیر)(?:\s*ا?ش)?\s*کرد(?:م|یم)(?:ش)?|سر(?:ی)?\s*(?:(?:بهش|بهتون)\s+)?میزن(?:م|یم)|گرفتم(?:ش)?"
+    rf"|(?:یه\s+)?نگاه(?:ی)?\s*(?:(?:بهش|بهتون)\s+)?(?:میکن(?:م|یم)|میند(?:ا)?ز(?:م|یم)|میاندازم)|چک\s*میکن(?:م|یم)"
     rf"|(?:بعدا|بعداً|بعدن|بعدم|حتما|حتماً|فردا|امشب)\s+(?:میا|میآ)(?:م|یم))(?![{_FA}])"
 )
 # Only when that is the whole turn: «خودم شبا به دایرکتا سر می‌زنم» and «کپشنشو خودم نوشتمش» are their pain,
-# «یادداشت کردم، فقط این رایگانه؟» still asks, «بعداً میام ولی علاقه‌ای ندارم» is a no.
+# «یادداشت کردم، فقط این رایگانه؟» still asks, «بعداً میام ولی علاقه‌ای ندارم» is a no. And never as the answer to
+# our own question about their work («الان سفارش‌ها رو کجا ثبت می‌کنید؟» → «تو گوشی یادداشت می‌کنم»): see plan_turn.
 _NOTED_TAIL = frozenset(
     (
         "باشه", "واسه", "چشم", "اوکی", "حله", "آره", "بله", "خب", "پس", "حتما", "حتماً", "الان", "بعدا", "بعداً",
         "بعدن", "بعدم", "فردا", "امشب", "یه", "بهش", "اونجا", "توش", "تو", "رو", "را", "هم", "اینو", "اونو",
         "آدرس", "آدرسو", "آدرسش", "آدرسشو", "اسمش", "اسمشو", "اسم", "سایت", "سایتو", "سایتش", "سایتشو", "سایتتون",
         "سایتتونو", "لینک", "لینکو", "لینکش", "شماره", "ممنون", "ممنونم", "مرسی", "متشکرم", "متشکر", "سپاس",
-        "عالیه", "خیلی", "خوبه", "دستتون", "درد", "نکنه", "گوشی", "گوشیم",
+        "عالیه", "خیلی", "خوبه", "دستتون", "درد", "نکنه", "گوشی", "گوشیم", "آدرستون", "آدرستونو", "لینکتون",
+        "لینکتونو", "لینکشو", "بهتون", "خانم", "خانوم",
+        # «آدرس‌تون»، «سایت‌شو»: the half-space became a space.
+        "ش", "شو", "تون", "تونو",
     )
 )
 
@@ -822,6 +831,8 @@ class Signals:
     quick: bool = False
     dnc: bool = False
     no: bool = False
+    # A yes only because they noted the address («یادداشت کردم»), not «باشه» or «میرم».
+    noted: bool = False
 
 
 @dataclass(frozen=True)
@@ -867,7 +878,8 @@ def read_signals(heard: str) -> Signals:
     trust = any(part in blob for part in ("اعتماد", "کلاه", "مطمئن", "درست میگی"))
     agree = any(part in blob for part in ("باشه", "چشم", "اوکی", "باز کردم", "زدم ورود", "آره میام"))
     agree = agree or bool(re.search(rf"(?<![{_FA}])میرم", blob))
-    agree = agree or _noted(blob)
+    noted = not agree and _noted(blob)
+    agree = agree or noted
     robot = any(
         part in blob
         for part in ("ربات", "ماشینی", "واقعی هستی", "آدمی", "آدم هستی", "ضبط شده", "آدم نیستی", "یا آدم", "انسان هستی")
@@ -912,6 +924,7 @@ def read_signals(heard: str) -> Signals:
         quick=quick,
         dnc=dnc,
         no=blob in _BARE_NO,
+        noted=noted,
     )
 
 
@@ -1298,7 +1311,9 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             # Asked again: the model answers in fresh words instead of the same sentence.
             return TurnPlan(kind="model", cue=state.cue(heard), signals=signals)
         return TurnPlan(kind="address", line=fixed, signals=signals)
-    if signals.agree and not signals.refuse and (state.linked or state.cta_count > 0):
+    # «تو گوشی یادداشت می‌کنم» answering «سفارش‌ها رو کجا ثبت می‌کنید؟» is their work, not our address.
+    asked = bool(state.said) and not mentions_address(state.said[-1]) and state.said[-1].rstrip().endswith(("؟", "?"))
+    if signals.agree and not signals.refuse and not (signals.noted and asked) and (state.linked or state.cta_count > 0):
         state.agreed = True
         state.stage = "close"
         return TurnPlan(kind="close", line=CLOSE_LINE, hangup=True, signals=signals)
@@ -1401,9 +1416,11 @@ def tool_followups(tags: set[str], state: SalesState, heard: str, spoken: str) -
     # The model adds [آدرس] to a busy caller's «سرم شلوغه، سریع بگو» right after the line that already gave it;
     # «سوزان چی؟ دوباره بگو» or «اسمش چی بود؟» still gets it.
     signals = read_signals(heard)
-    again = is_repeat(heard) or any(part in (heard or "") for part in _ASK_AGAIN)
+    again = (is_repeat(heard) or any(part in (heard or "") for part in _ASK_AGAIN)) and not _CALL_AGAIN.search(heard or "")
+    # A reply that is only [آدرس] still says it: an empty turn would fall back to «سؤال دیگه‌ای هست؟».
     just_linked = (
-        bool(state.said)
+        bool((spoken or "").strip())
+        and bool(state.said)
         and mentions_address(state.said[-1])
         and (signals.time or signals.later or signals.quick)
         and not (wants_address(heard) or again)
