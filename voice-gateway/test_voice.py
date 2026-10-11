@@ -1736,6 +1736,8 @@ class LiveSimTest(unittest.TestCase):
             note_spoken(state, plan.line or "متوجه‌ام، حق دارید!")
         plan = plan_turn(state, "واسه یادداشت کردم بعدم میام")
         self.assertEqual((plan.line, plan.hangup), (sales.CLOSE_LINE, True))
+        # The next run heard «واسه یادداشت کردن بعدا میام».
+        self.assertEqual(plan_turn(state_after(sales.QUICK_OPEN_LINE), "واسه یادداشت کردن بعدا میام").line, sales.CLOSE_LINE)
         for heard in (
             "یادداشت کردم",
             "آدرسو نوشتم",
@@ -1857,6 +1859,25 @@ class LiveSimTest(unittest.TestCase):
         self.assertEqual(plan.kind, "address")
         self.assertIn("یک میلیون و چهارصد و چهارده هزار", plan.line)
         self.assertTrue(plan.line.startswith(sales.FIRST_DISCLOSE))
+
+    def test_sim_renders_the_card_opening_like_a_dial(self) -> None:
+        import main as main_module
+        import sales
+
+        # p01's opening waited 8 s of Piper in the sim: DIAL renders it while ringing, SIM did not.
+        rendered: list[list[str]] = []
+        warmed: list[str] = []
+
+        class Brain:
+            def warm_sales(self, _brief: str, greet: str) -> None:
+                warmed.append(greet)
+
+        gw = main_module.Gateway.__new__(main_module.Gateway)
+        gw.brain, gw._prerender = Brain(), rendered.append
+        self.assertEqual(gw._arm_sim("SIM yasaman_kids اسباب‌بازی"), "armed")
+        card = ShopCard(instagram="yasaman_kids", product="اسباب‌بازی")
+        self.assertEqual(rendered, [[sales.hello_for(card), sales.value_for(card)]])
+        self.assertEqual(warmed, [sales.hello_for(card)])
 
 
 def state_after(line: str) -> SalesState:

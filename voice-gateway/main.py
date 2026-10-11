@@ -761,9 +761,12 @@ class Gateway:
         self._pending_sales = ShopCard(instagram=instagram, product=product) if instagram else None
         self._outbound_pitch = True
         self._sim_until = time.monotonic() + SIM_ARM_S
+        # Like DIAL: the card's own opening renders now, so the sim does not wait 8 s of Piper on «سلام».
+        greet = hello_for(self._pending_sales)
+        self._prerender([greet, value_for(self._pending_sales)])
         brief = sales_brief(self._pending_sales) if self._pending_sales else sales_open()
         try:
-            self.brain.warm_sales(brief, HELLO_LINE)
+            self.brain.warm_sales(brief, greet)
         except Exception:
             log.warning("sales warm on sim failed", exc_info=True)
         log.info("sim armed seconds=%s instagram=%s", SIM_ARM_S, instagram or "-")
