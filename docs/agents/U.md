@@ -72,7 +72,7 @@ Done when: every P0/P1 is fixed or has an acknowledged request in its owner's re
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.6k tokens. Your core files total 16.6k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.6k tokens. Your core files total 16.7k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -84,7 +84,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 16.6k | the files most tasks touch; read the relevant one first |
+| core | 16.7k | the files most tasks touch; read the relevant one first |
 | active | 91.4k | yours to edit; read only what the task needs |
 | rare | 34.5k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |

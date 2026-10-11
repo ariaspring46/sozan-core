@@ -522,6 +522,27 @@ def set_domain(domain: str) -> dict:
     return snapshot()
 
 
+def check_domain() -> dict:
+    """«بررسی دوباره» on the domain page: DNS can take hours, so the CNAME saved earlier is looked up again.
+    ArvanCloud's CNAME setup (edge SSL) is retried only when it had failed; a Sozan host is never sent there."""
+    from app.services import arvan_dns_service
+
+    shop = _shop()
+    host = _map_host(str(shop.get("domain") or ""))
+    slug = str(shop.get("slug") or "").strip()
+    public = str(shop.get("publicHost") or "").strip().lower().rstrip(".")
+    if not host or not slug or host == public or arvan_dns_service.is_zone_host(host):
+        return snapshot()
+    check = arvan_dns_service.check_cname(host, slug)
+    shop["cnameOk"] = bool(check.get("ok"))
+    shop["cnameCheck"] = {**check, "at": int(time.time())}
+    setup = shop.get("cnameSetup") if isinstance(shop.get("cnameSetup"), dict) else {}
+    if not setup.get("ok"):
+        shop["cnameSetup"] = arvan_dns_service.start_cname_setup(host, slug)
+    _save_shop(shop)
+    return snapshot()
+
+
 FACTORY_ENV_ALLOW = (
     "PATH", "HOME", "USER", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TERM",
     "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",

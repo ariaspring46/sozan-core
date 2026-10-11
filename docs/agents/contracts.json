@@ -146,6 +146,7 @@
   "signature": "GET /shop  ()",
   "since": "2026-10-02",
   "users": [
+   "C",
    "U"
   ]
  },
@@ -184,6 +185,15 @@
   "users": [
    "C",
    "Y"
+  ]
+ },
+ "HTTP PATCH /shop/domain": {
+  "owner": "X4",
+  "shape": "backend/app/api/shop.py: DomainIn {domain: str = Field(default='', max_length=200)}; response untyped",
+  "signature": "PATCH /shop/domain  (body: DomainIn)",
+  "since": "2026-10-11",
+  "users": [
+   "C"
   ]
  },
  "HTTP PATCH /studio/caption": {
@@ -291,6 +301,15 @@
   "shape": "backend/app/api/settings.py: SellerTicketIn {subject: str = Field(min_length=2, max_length=120); text: str = Field(min_length=2, max_length=2000); category: Literal['billing', 'technical', 'other'] | None = None}; response untyped",
   "signature": "POST /settings/support/seller-ticket  (body: SellerTicketIn)",
   "since": "2026-10-09",
+  "users": [
+   "C"
+  ]
+ },
+ "HTTP POST /shop/domain/check": {
+  "owner": "X4",
+  "shape": "backend/app/api/shop.py: response untyped",
+  "signature": "POST /shop/domain/check  ()",
+  "since": "2026-10-11",
   "users": [
    "C"
   ]

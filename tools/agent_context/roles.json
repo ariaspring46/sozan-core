@@ -639,6 +639,7 @@
         "frontend/components/product-editor.tsx",
         "frontend/components/shop-settings-form.tsx",
         "frontend/components/domain-menu.tsx",
+        "frontend/app/more/domain/**",
         "frontend/lib/site-host.ts",
         "tools/storefront/**",
         "tools/monitor/**",
