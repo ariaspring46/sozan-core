@@ -31,41 +31,40 @@ FIXED_SALES_LINES = frozenset(
 )
 
 BYE_LINE = "خداحافظ، روزتون خوش!"
-# Everything below is spoken: colloquial Tehran register (رو، می‌ده، می‌سازه), never written Persian.
-# Opening = greeting + one personal hook from the page bio + AI disclosure + permission question.
-# Being an AI is the hook, not an apology: the voice they hear is the product that drafts their DM replies.
-# «می‌نویسم» = drafts they approve (پرو); fully automatic replies are only پرو مکس. «رایگان» is only ever tied to the store.
+# Spoken Tehran register, never written Persian.
+# Opening: greeting, page hook, AI disclosure (the hook, not an apology), permission question.
+# «می‌نویسم» means drafts they approve (پرو); «رایگان» is only for the store.
 GREET_OPEN = "سلام، وقتتون بخیر!"
 HOOK_GENERIC = "پیج اینستاگرامتون رو دیدم."
-# One sentence: synthesize() speaks at most three, and greeting + hook already use two.
+# One sentence: synthesize() speaks at most three.
 DISCLOSE_LINE = "من سوزانم، یه هوش مصنوعی؛ جواب دایرکت‌هاتون رو هم با لحن خودتون می‌نویسم، بگم چطوری؟"
 SPOKEN_ADDRESS = "سوزان، خط تیره، کُر، دات آی‌آر"
 HELLO_LINE = f"{GREET_OPEN} {HOOK_GENERIC} {DISCLOSE_LINE}"
 HELLO_SMS_LINE = f"{GREET_OPEN} احتمالاً پیامک سوزان به دستتون رسیده. {DISCLOSE_LINE}"
-# After a yes: one tailored value sentence and one open discovery question (never a menu).
-# The opening asked «بگم چطوری؟» about DM replies, so every value line answers that first.
+# After a yes: one value sentence, one open question, never a menu.
 DM_HOW = "جواب دایرکت‌ها رو من می‌نویسم، شما فقط تأیید می‌کنید"
 VALUE_GENERIC = f"{DM_HOW}؛ یعنی کمتر پای گوشی می‌مونید! الان چطوری بهشون می‌رسید؟"
 PAIN_LINE = VALUE_GENERIC
 BUSY_LINE = f"چشم، مزاحمتون نمی‌شم! هر وقت فرصت شد، سر بزنید به {SPOKEN_ADDRESS}؛ خدا قوت!"
 DECLINE_LINE = "چشم، اصلاً اشکالی نداره! ببخشید مزاحم شدم؛ روزتون خوش!"
-# Never start with «بله»: to «آدمی؟» that would sound like "yes, human" for a moment.
+# Never start with «بله»: it would sound like yes, human.
 ROBOT_LINE = "دستیار هوش مصنوعی‌ام، آدم نیستم؛ جالبش همینه! بگم برای پیجتون چی کار می‌کنم؟"
-# Asked again, or after the call moved on: same honest answer, new words, no second permission question.
+# Asked again: same honest answer, new words.
 ROBOT_AGAIN_LINE = "من همون سوزانم، دستیار هوش مصنوعی، نه آدم! بفرمایید، چی براتون سؤاله؟"
-# "I'm busy, say it quickly": they still want to hear it, so a 3-word hook, the AI, one benefit and the address.
+# Busy but listening: hook, AI, one benefit, address.
 QUICK_OPEN_LINE = f"سلام، چشم! پیجتون رو دیدم؛ من سوزانم، یه هوش مصنوعی که از همین پیج رایگان فروشگاه می‌سازم. آدرسش: {SPOKEN_ADDRESS}."
 QUICK_PITCH_LINE = f"چشم، خلاصه: از همین پیج رایگان فروشگاه می‌سازم، جواب دایرکت‌ها رو هم می‌نویسم. آدرسش: {SPOKEN_ADDRESS}."
-# First words are already "no time": the AI is still named, the address is said once, and the call ends.
+# "No time" first: AI named, address once, call ends.
 BUSY_OPEN_LINE = f"چشم، مزاحمتون نمی‌شم! من سوزانم، یه هوش مصنوعی؛ هر وقت فرصت شد سر بزنید: {SPOKEN_ADDRESS}."
 DNC_LINE = "چشم، ببخشید که مزاحم شدم! دیگه تماس نمی‌گیرم؛ روزتون خوش!"
-# The model already apologised before its [زنگ‌نزن] tag: no second apology.
+# The model already apologised: no second apology.
 DNC_SHORT_LINE = "چشم، دیگه تماس نمی‌گیرم؛ روزتون خوش!"
-# Promises to stop calling, so a «نمی‌خوام» right after it is a do-not-call request.
+# After this promise, «نمی‌خوام» is a do-not-call request.
 SOURCE_LINE = "از بین پیج‌های فروشگاهی اینستاگرام پیداتون کردم؛ اگه نخواید، دیگه تماس نمی‌گیرم."
-# Their first words were a question, so the answer itself must still say who is calling.
+# A question first: the answer still names who is calling.
 FIRST_DISCLOSE = "سلام، من سوزانم، یه هوش مصنوعی."
 ROBOT_SHORT = "هوش مصنوعی‌ام، آدم نیستم!"
+COMPANY_LINE = "من سوزانم، ساخته‌شدهٔ شرکت گهر شبکه کارمانیا."
 PRICE_UNKNOWN_LINE = f"راستش الان قیمت‌ها دستم نیست، نمی‌خوام اشتباه بگم! ولی شروعش رایگانه؛ سر بزنید به {SPOKEN_ADDRESS}."
 # A yes that names DMs: the opening already offered DM replies, so this answers its «چطوری؟».
 DM_YES_LINE = f"{DM_HOW}! الان کی جوابشون رو می‌ده، خودتون؟"
@@ -587,7 +586,7 @@ def price_spoken_line(heard: str) -> str | None:
     return line if fits(line) else f"پرو {words} تومانه."
 
 
-# A second price ask: the same numbers in other words. «رایگان» stays with the store; 21 words leave room for ROBOT_SHORT.
+# A second price ask, in other words; ≤21 words.
 PRICE_AGAIN_UNKNOWN_LINE = f"قیمت دقیق رو تو خود سایت می‌بینید: {SPOKEN_ADDRESS}؛ ساخت فروشگاه هم رایگانه."
 
 
@@ -690,6 +689,7 @@ def sales_open() -> str:
         "شخصیت: زن، گرم، باهوش، خوش‌برخورد و باحوصله؛ خودمونی با خطاب «شما». مثل یه آدم واقعی حرف بزن، با تأییدهای کوتاه («آهان»، «چه خوب»، «حق دارید»)، نه مثل متن نوشته.\n"
         "صداقت: تو هوش مصنوعی هستی و اول تماس این را گفتی. هوش مصنوعی بودنت جذابیته، نه عیب: همین صدایی که می‌شنوند، جواب دایرکت‌هایشان را هم می‌نویسد. "
         "اگر پرسیدند ربات یا آدمی: «هوش مصنوعی‌ام، آدم نیستم!» و برگرد سر بحث؛ با «بله» یا «آره» شروع نکن. نگو با مشتری‌هایشان تلفنی حرف می‌زنی.\n"
+        "اگر پرسیدند کی ساختت یا از کدوم شرکتی: «" + COMPANY_LINE + "» و بعد برگرد سر بحث.\n"
         "هدف تماس: طرف دلش بخواد خودش سوزان رو رایگان امتحان کنه (sozan-core.ir، دکمهٔ ورود). فروش زوری نه؛ کمک.\n"
         "روش یه فروشندهٔ خبره:\n"
         "۱. کمتر از طرف حرف بزن: هر نوبت حداکثر دو جملهٔ کوتاه که دومی سؤال باشد.\n"
@@ -730,6 +730,7 @@ def sales_open() -> str:
         "مشتری: گرونه. → حق دارید، ساخت فروشگاه که کلاً رایگانه! با چی مقایسه می‌کنید؟\n"
         "مشتری: بلد نیستم. → لازم نیست بلد باشید؛ فقط اسم پیجتون رو می‌زنید، بقیه‌ش با منه.\n"
         "مشتری: واقعاً رباتی؟ → هوش مصنوعی‌ام، آدم نیستم! جالبش همینه، دایرکت‌هاتون رو هم همین‌طوری جواب می‌نویسم.\n"
+        "مشتری: از کدوم شرکتی؟ → " + COMPANY_LINE + " الان دایرکت‌ها رو کی جواب می‌ده؟\n"
         "مشتری: باشه، از کجا شروع کنم؟ → عالیه! همین امروز رایگان شروع کنید. [آدرس]\n"
         "مشتری: چنده؟ → [قیمت]\n"
         "مشتری: بعداً. → حتماً، مزاحمتون نمی‌شم! [آدرس] [هدیه]"
@@ -1604,7 +1605,7 @@ def _price_sentence_ok(sent: str) -> bool:
 
 
 def guard_reply(reply: str, heard: str) -> str:
-    reply = (reply or "").replace("به هیچ شرکت خاصی تعلق ندارم", "از طرف سوزانم")
+    reply = re.sub(r"[^.!؟?]*به هیچ شرکت خاصی تعلق ندارم[^.!؟?]*[.!؟?]?", COMPANY_LINE, reply or "")
     text = formalize_you(strip_invented_names(reply, heard or ""))
     kept: list[str] = []
     allowed_code = gift_spoken_code()

@@ -1980,7 +1980,8 @@ class LiveSimTest(unittest.TestCase):
         # The model's «به هیچ شرکت خاصی تعلق ندارم» is wrong: Sozan is the one calling, so the guard names her.
         reply = sales.guard_reply("من هوش مصنوعی هستم و به هیچ شرکت خاصی تعلق ندارم.", "شما از کدوم شرکتید؟")
         self.assertNotIn("تعلق ندارم", reply)
-        self.assertIn("از طرف سوزانم", reply)
+        self.assertEqual(reply, sales.COMPANY_LINE)
+        self.assertIn("گهر شبکه کارمانیا", sales.sales_open())
 
     def test_sim_renders_the_card_opening_like_a_dial(self) -> None:
         import main as main_module
