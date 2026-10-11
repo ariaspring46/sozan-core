@@ -250,11 +250,9 @@ _NOT_NOW = re.compile(
 _LATER_SAY = re.compile(
     rf"(?<![{_FA}])(?:بعد|بعدا|بعداً|فردا|بعدازظهر|بعد از ظهر|عصر|شب|یه ساعت دیگه|یه وقت دیگه|یه روز دیگه)\s+(?:بگید|بگین|بگو)$"
 )
-# Busy but still listening: an imperative "say it quickly" wants the short version, not a hang-up.
-# Only «بگو/بگید/بگین»: «خلاصه بگم» is the caller's own filler, «سریع بگیرن» is about their customers.
+# Busy but listening: «سریع بگید» wants the short version. «خلاصه بگم» is the caller's filler.
 _QUICK = re.compile(rf"(?:سریع|خلاصه|خلاصهش رو|خلاصشو|کوتاه|زود|مختصر|فقط)\s*(?:بگو|بگید|بگین)(?![{_FA}])")
 # Do-not-call in its common wordings; «مزاحم نشدید» (polite "no bother") and «از لیستتون زنگ زدید؟» are not.
-# The verb is asked of us (کنید، کنی، بردارید...), not «پیامای منو پاک کنه؟» or «از لیست پاکش می‌کنم».
 _REMOVE = (
     rf"(?:(?:پاک|حذف|خارج|بیرون)(?:ش|م|مون)?\s*(?:کنید|کنین|کنی|کن|بکنید|بکنین|بکنی|بکن)"
     rf"|(?:بردار|دربیار|در بیار)(?:ید|ین|ی)?|خط\s*(?:بزنید|بزنین|بزنی|بزن|بکشید))(?![{_FA}])"
@@ -567,6 +565,7 @@ def price_spoken_line(heard: str) -> str | None:
         return len(text.split()) <= 18
 
     blob = heard or ""
+    tail = f"آدرسش {SPOKEN_ADDRESS}."
     if re.search("مکس|ماکس|میکس", blob):
         promax = plans.get("promax") or {}
         words = toman_words(pay(promax))
@@ -574,15 +573,15 @@ def price_spoken_line(heard: str) -> str | None:
             return None
         # «با تخفیف» only inside a real discount window.
         sale = "با تخفیف سایت " if int(promax.get("listPrice") or 0) > int(promax.get("price") or 0) > 0 else ""
-        line = f"پرو مکس {sale}{words} تومانه. ساخت وبسایت رایگانه."
-        if not fits(line):
-            line = f"پرو مکس {words} تومانه."
-        return line
+        # Pro Max: up to 25 words (owner's call).
+        for line in (f"پرو مکس {sale}{words} تومانه. فروشگاهتون رایگانه؛ {tail}", f"پرو مکس {sale}{words} تومانه. ساخت وبسایت رایگانه."):
+            if len(line.split()) <= 25:
+                return line
+        return f"پرو مکس {words} تومانه."
     words = toman_words(pay(plans.get("pro") or {}))
     if not words:
         return None
     # Next step after the price; shorter when the amount is long.
-    tail = f"آدرسش {SPOKEN_ADDRESS}."
     for line in (f"پرو {words} تومانه. فروشگاهتون رایگانه؛ {tail}", f"پرو {words} تومانه. {tail}"):
         if fits(line):
             return line
@@ -655,7 +654,7 @@ def gift_spoken_code() -> str:
 
 def gift_line() -> str:
     code = gift_spoken_code()
-    if not code:
+    if not code or not payment_ready():
         return ""
     amount = _code_amount("pro")
     if amount:
@@ -699,7 +698,7 @@ def sales_open() -> str:
         "۳. قبل از فایده بپرس: «الان دایرکت‌ها رو کی جواب می‌ده؟» بعد «کجاش بیشتر وقتتون رو می‌گیره؟» منوی چندگزینه‌ای نده.\n"
         "۴. حسش را بگو («انگار حسابی وقتتون رو می‌گیره») و جمع‌بندی کن تا بگوید «دقیقاً». حرفش نامفهوم بود، حدس نزن؛ مؤدبانه دوباره بپرس.\n"
         "۵. فقط یک فایده، همان که به دردش می‌خورد، به شکل نتیجه برای خودش (کمتر پای گوشی، مشتری منتظر نمی‌مونه)؛ فهرست امکانات نخوان.\n"
-        "۶. اعتراض: حق بده، یک سؤال کوتاه، بعد جواب کوتاه. «گرونه» ← «با چی مقایسه می‌کنید؟» بعد «شروعش رایگانه». "
+        "۶. اعتراض: حق بده، یک سؤال کوتاه، بعد جواب کوتاه. "
         "«ادمین دارم» ← «ادمینتون بیشتر وقتش پای چی می‌ره؟» «لحن ما رو نمی‌فهمه» ← «جواب‌ها رو اول خودتون تأیید می‌کنید.» بحث نکن، فوریت ساختگی نساز.\n"
         "۷. اجازه را فقط یک بار بگیر. سؤال تکراری را با جملهٔ تازه جواب بده، جملهٔ قبلی‌ات را تکرار نکن.\n"
         "۸. وقتی علاقه نشان داد (پرسید چطوری، کجا، از کجا شروع کنم)، یک قدم کوچک: «همین امروز رایگان شروع کنید» و [آدرس].\n"
@@ -728,7 +727,6 @@ def sales_open() -> str:
         "نمونهٔ لحن (از بر تکرار نکن):\n"
         "مشتری: آره، دایرکتام زیاده. → آهان، پس وقت زیادی پاش می‌ره! الان کی جوابشون رو می‌ده، خودتون؟\n"
         "مشتری: خودم، شبا تا دیروقت. → حق دارید خسته بشید! جواب‌ها رو من آماده می‌کنم، شما فقط تأیید می‌کنید.\n"
-        "مشتری: گرونه. → حق دارید، ساخت فروشگاه که کلاً رایگانه! با چی مقایسه می‌کنید؟\n"
         "مشتری: بلد نیستم. → لازم نیست بلد باشید؛ فقط اسم پیجتون رو می‌زنید، بقیه‌ش با منه.\n"
         "مشتری: واقعاً رباتی؟ → هوش مصنوعی‌ام، آدم نیستم! جالبش همینه، دایرکت‌هاتون رو هم همین‌طوری جواب می‌نویسم.\n"
         "مشتری: باشه، از کجا شروع کنم؟ → عالیه! همین امروز رایگان شروع کنید. [آدرس]\n"
@@ -865,8 +863,7 @@ def person_started(heard: str) -> bool:
 
 
 def read_signals(heard: str) -> Signals:
-    # Speech-to-text writes «می‌شه», «میشه» and «می شه» alike: join the half-space or space after «می/نمی» so one
-    # one spelling for all three; other half-spaces become spaces («زنگ‌نزنید» → «زنگ نزنید»).
+    # STT writes «می‌شه», «میشه», «می شه» alike: join them; other half-spaces become spaces.
     joined = re.sub(rf"(?<![{_FA}])(ن?می)[\u200c ]+(?=[{_FA}])", r"\1", (heard or "").replace("ي", "ی").replace("ك", "ک"))
     blob = _plain_words(joined)
     question = bool(re.search(r"[؟?]", heard or ""))
@@ -897,8 +894,7 @@ def read_signals(heard: str) -> Signals:
         part in blob
         for part in ("ربات", "ماشینی", "واقعی هستی", "آدمی", "آدم هستی", "ضبط شده", "آدم نیستی", "یا آدم", "انسان هستی")
     )
-    # The opening itself says «هوش مصنوعی»: echoing it with a yes («آره بگید، هوش مصنوعی جالبه») is not the question,
-    # but «بله؟ هوش مصنوعی؟» and «یعنی هوش مصنوعی هستی؟ بگو ببینم» are.
+    # Echoing «هوش مصنوعی» with a yes is not the question; «بله؟ هوش مصنوعی؟» is.
     asks = question or bool(re.search(rf"هستی|هستید|هستین|(?<![{_FA}])آدم|انسان|واقعا", blob))
     yes = any(part in blob for part in ("آره", "بله", "بگید", "بگو", "باشه", "بفرمایید", "جالبه"))
     if "هوش مصنوعی" in blob and (asks or not yes):
@@ -1272,7 +1268,7 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
     if _DIDNT_HEAR.search(plain) and len(plain.split()) <= 3:
         return TurnPlan(kind="feature", line=CLARIFY_LINE, signals=signals)
     if signals.robot and not signals.price and any(part in (heard or "") for part in _ADDRESS_HINTS):
-        # «رباتی؟ آدرس سایتتون چیه؟»: both answers, without asking for the question again.
+        # Both answers in one turn.
         state.robot_answers += 1
         state.awaiting_permission = False
         state.stage = "cta"
@@ -1318,11 +1314,19 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             return TurnPlan(kind="feature", line=line, signals=signals)
         state.awaiting_permission = False
     if signals.price:
+        if "گرون" in plain and not any(cue in plain for cue in ("چقدر", "چنده", "قیمت", "پرو", "هزینه")):
+            # Bare complaint: laugh; the code only while payment is open.
+            code = gift_spoken_code() if payment_ready() else ""
+            if code:
+                line = f"هه، حق دارید! کد تخفیف سی درصدی هم بهتون می‌دم: {code}."
+            else:
+                line = "هه، حق دارید! شروعش رایگانه؛ با چی مقایسه می‌کنید؟"
+            return TurnPlan(kind="feature", line=line, signals=signals)
         priced = price_spoken_line(heard) or PRICE_UNKNOWN_LINE
         state.stage = "cta"
         priced = price_for_turn(state, priced)
         if signals.robot:
-            # «رباتی؟ چنده؟»: the AI answer is never skipped for the price.
+            # The AI answer is never skipped for the price.
             state.robot_answers += 1
             priced = f"{ROBOT_SHORT} {priced}"
         return TurnPlan(kind="address", line=priced, signals=signals)

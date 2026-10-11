@@ -527,9 +527,14 @@ class SalesTest(unittest.TestCase):
         self.assertTrue(gift_allowed(state, read_signals("گرونه")))
         state.gifted = True
         self.assertFalse(gift_allowed(state, read_signals("گرونه")))
+        # The code is spoken only while payment is open.
+        import sales
+
+        sales.set_payment_fetcher(lambda: True)
         self.assertIn("سوزان سی", gift_line())
         self.assertIn("براتون", gift_line())
         self.assertIn("تخفیف سایت", gift_line())
+        sales.set_payment_fetcher(lambda: False)
         self.assertNotIn("برات ", gift_line())
         os.environ.pop("GIFT_CODE_SPOKEN", None)
         self.assertEqual(gift_line(), "")
@@ -759,11 +764,15 @@ class SalesTest(unittest.TestCase):
         self.assertNotIn("targets", spec)
 
     def test_gift_uses_code_price_from_the_catalog(self) -> None:
+        import sales
+
         priced = json.loads(json.dumps(PLAN_FIXTURE))
         priced["plans"][0]["codePrice"] = 989_800
         set_plans_fetcher(lambda: priced)
         os.environ["GIFT_CODE_SPOKEN"] = "سوزان سی"
+        sales.set_payment_fetcher(lambda: True)
         line = gift_line()
+        sales.set_payment_fetcher(lambda: False)
         self.assertIn("نهصد و هشتاد و نه هزار و هشتصد", line)
         self.assertIn("تخفیف سایت", line)
 
@@ -779,7 +788,9 @@ class SalesTest(unittest.TestCase):
         self.assertLessEqual(len((asked.line or "").split()), 18)
         promax = plan_turn(SalesState(greeted=True, stage="discover"), "پرو مکس چقدر است")
         self.assertIn("یک میلیون و نهصد و سی و یک هزار", promax.line or "")
-        self.assertLessEqual(len((promax.line or "").split()), 18)
+        # Pro Max may run past 18 words now, but it still names the address.
+        self.assertLessEqual(len((promax.line or "").split()), 25)
+        self.assertIn("آدرسش", promax.line or "")
         # STT garbles the name: «میکس» and «ماکس» are Pro Max, not the Pro price.
         for heard in ("پرو میکس چنده", "پرو ماکس چقدره"):
             garbled = plan_turn(SalesState(greeted=True, stage="discover"), heard)
@@ -2056,6 +2067,37 @@ class LiveSimTest(unittest.TestCase):
         self.assertEqual(plan_turn(state, "باشه، سر می‌زنم").line, sales.ADDRESS_LINE)
         # The tone sample that was removed from the sales prompt is gone.
         self.assertNotIn("سایت دارم. →", sales.sales_open())
+
+    def test_complaint_laughs_and_the_code_waits_for_open_payment(self) -> None:
+        import sales
+
+        old = os.environ.get("GIFT_CODE_SPOKEN")
+        try:
+            os.environ["GIFT_CODE_SPOKEN"] = "سوزان سی"
+            reset_plan_cache()
+            set_plans_fetcher(lambda: PLAN_FIXTURE)
+            # Payment closed: no code is promised; the complaint gets the free start and one question.
+            sales.set_payment_fetcher(lambda: False)
+            closed = plan_turn(SalesState(greeted=True, stage="discover"), "گرونه")
+            self.assertEqual(closed.kind, "feature")
+            self.assertIn("حق دارید", closed.line or "")
+            self.assertIn("با چی مقایسه می‌کنید", closed.line or "")
+            self.assertNotIn("سوزان سی", closed.line or "")
+            self.assertEqual(sales.gift_line(), "")
+            # Payment open and the owner set the code: the complaint gets the thirty percent code.
+            sales.set_payment_fetcher(lambda: True)
+            opened = plan_turn(SalesState(greeted=True, stage="discover"), "گرونه")
+            self.assertIn("سی درصدی", opened.line or "")
+            self.assertIn("سوزان سی", opened.line or "")
+            self.assertIn("سوزان سی", sales.gift_line())
+        finally:
+            if old is None:
+                os.environ.pop("GIFT_CODE_SPOKEN", None)
+            else:
+                os.environ["GIFT_CODE_SPOKEN"] = old
+            reset_plan_cache()
+            set_plans_fetcher(lambda: PLAN_FIXTURE)
+            sales.set_payment_fetcher(lambda: False)
 
     def test_how_it_works_before_the_address_and_the_spoken_domain(self) -> None:
         import sales
