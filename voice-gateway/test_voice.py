@@ -1569,6 +1569,107 @@ class SecondReviewTest(unittest.TestCase):
             main_module.remember_dnc = original
 
 
+class CloudConnectionTest(unittest.TestCase):
+    """Kept-alive cloud connections: one handshake for several calls, a stale socket retried once, errors still HTTPError."""
+
+    def serve(self):
+        import http.server
+        import threading
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def setup(self) -> None:
+                super().setup()
+                self.server.seen.add(self.client_address)
+
+            def do_POST(self) -> None:
+                self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                if self.path.endswith("/stream"):
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/event-stream")
+                    self.send_header("Transfer-Encoding", "chunked")
+                    self.end_headers()
+                    for piece in (b'data: {"a": 1}\n', b"data: [DONE]\n"):
+                        self.wfile.write(b"%x\r\n%s\r\n" % (len(piece), piece))
+                    self.wfile.write(b"0\r\n\r\n")
+                    return
+                code = 402 if self.path.endswith("/402") else 200
+                body = b"no credit" if code == 402 else b"ok" * 300
+                self.send_response(code)
+                self.send_header("Content-Type", "audio/mpeg" if code == 200 else "text/plain")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args) -> None:
+                return
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        server.seen = set()
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        return server, f"http://127.0.0.1:{server.server_address[1]}"
+
+    def post(self, url: str) -> bytes:
+        import urllib.request
+        import brain as brain_module
+
+        req = urllib.request.Request(url, data=b"{}", headers={"Content-Type": "application/json"}, method="POST")
+        with brain_module.pooled_open(req, 5) as res:
+            return res.read()
+
+    def test_one_connection_serves_several_calls(self) -> None:
+        server, url = self.serve()
+        self.assertEqual(len(self.post(url + "/a")), 600)
+        self.assertEqual(len(self.post(url + "/b")), 600)
+        self.assertEqual(len(server.seen), 1)
+
+    def test_a_stream_stopped_at_done_still_frees_the_socket(self) -> None:
+        import urllib.request
+        import brain as brain_module
+
+        server, url = self.serve()
+        req = urllib.request.Request(url + "/stream", data=b"{}", headers={"Content-Type": "application/json"}, method="POST")
+        seen = b""
+        with brain_module.pooled_open(req, 5) as res:
+            while b"[DONE]" not in seen:
+                chunk = res.read(256)
+                if not chunk:
+                    break
+                seen += chunk
+        self.assertIn(b"[DONE]", seen)
+        self.assertEqual(len(self.post(url + "/a")), 600)
+        self.assertEqual(len(server.seen), 1)
+
+    def test_a_stale_kept_alive_socket_is_retried_once(self) -> None:
+        import cloud_http
+
+        server, url = self.serve()
+        self.post(url + "/a")
+        key = next(k for k in cloud_http._POOL if k[1].endswith(str(server.server_address[1])))
+        cloud_http._POOL[key][0][0].sock.close()
+        self.assertEqual(len(self.post(url + "/b")), 600)
+        self.assertEqual(len(server.seen), 2)
+
+    def test_refused_status_is_still_an_http_error(self) -> None:
+        import urllib.error
+
+        _server, url = self.serve()
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            self.post(url + "/402")
+        self.assertEqual(caught.exception.code, 402)
+
+    def test_talk_starts_at_pickup_not_at_the_trunk_answer(self) -> None:
+        from main import call_times
+
+        # The trunk's 200 OK came 30 s after dialing, while the phone still rang; the person answered at 34 s and talked 60 s.
+        self.assertEqual(call_times(100.0, 134.0, 194.0), (34.0, 60.0))
+        self.assertEqual(call_times(100.0, 0.0, 145.0), (45.0, 0.0))
+        self.assertEqual(call_times(100.0, 90.0, 80.0), (0.0, 0.0))
+
+
 class LiveSimTest(unittest.TestCase):
     """Live persona run on the home machine (real speech-to-text and model): each case failed before its fix."""
 
@@ -1664,14 +1765,14 @@ class LiveSimTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {"TTS_MODEL": "m", "LLM_API_KEY": "k"}):
             voice = Brain.__new__(Brain)
             voice._cloud_off_until = 0.0
-            with mock.patch.object(brain_module._DIRECT, "open", refuse(402)):
+            with mock.patch.object(brain_module, "pooled_open", refuse(402)):
                 self.assertEqual(voice.cloud_pcm("سلام", 1.0), b"")
                 self.assertEqual(voice.cloud_pcm("سلام", 1.0), b"")
             # One refused request, then Piper speaks without waiting on the cloud again.
             self.assertEqual(calls, [402])
             calls.clear()
             voice._cloud_off_until = 0.0
-            with mock.patch.object(brain_module._DIRECT, "open", refuse(503)):
+            with mock.patch.object(brain_module, "pooled_open", refuse(503)):
                 voice.cloud_pcm("سلام", 1.0)
                 voice.cloud_pcm("سلام", 1.0)
             # A passing server error is tried again.

@@ -78,6 +78,7 @@ def build() -> dict:
         for row in rows
         if row.get("kind") == "model" and float(row.get("first_audio") or 0) > 0
     ]
+    picked = [group for group in groups if any(row.get("picked") for row in group)]
     interested = 0
     for group in groups:
         kinds = {str(row.get("kind") or "") for row in group}
@@ -91,7 +92,7 @@ def build() -> dict:
         "errors_today": sum(line.count("sales stream failed") + line.count("sip dial failed") + line.count("dial refused") for line in today.splitlines()),
         "answer_gap_median_s": _median(gaps),
         "outcomes_today": {
-            "answered": len(groups),
+            "answered": len(picked),
             "interested": interested,
             "dnc": today.count("sales outcome dnc"),
             "error": today.count("sales stream failed") + today.count("sip dial failed"),

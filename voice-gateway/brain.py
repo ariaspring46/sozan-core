@@ -19,6 +19,7 @@ import wave
 from json import dumps, loads
 from pathlib import Path
 
+from cloud_http import pooled_open
 from audio_codec import (
     highpass_pcm16,
     limit_pcm16,
@@ -195,7 +196,7 @@ def sales_request_body(
 def open_llm(url: str, req: urllib.request.Request, timeout: float):
     if llm_is_local(url):
         return urllib.request.urlopen(req, timeout=timeout)
-    return _DIRECT.open(req, timeout=timeout)
+    return pooled_open(req, timeout)
 
 
 def _has_tool_tag(raw: str) -> bool:
@@ -1300,7 +1301,7 @@ class Brain:
         )
         started = time.monotonic()
         try:
-            res = _DIRECT.open(req, timeout=first_s + 8)
+            res = pooled_open(req, first_s + 8)
         except Exception as exc:
             # HTTPError carries the status (402 = no OpenRouter credit, 400 = bad model id); log it, never the body.
             log.warning("tts cloud failed %s %s", type(exc).__name__, getattr(exc, "code", ""))

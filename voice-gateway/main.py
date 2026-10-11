@@ -27,6 +27,7 @@ from audio_codec import (
     rtp_packet,
     rtp_parse,
 )
+from cloud_http import warm_connection
 from brain import (
     Brain,
     echo_should_block,
@@ -145,6 +146,13 @@ SIM_DIR = Path("/dev/shm/sozan-sim")
 def hold_early_carrier(outbound: bool, heard_person: bool, age_s: float) -> bool:
     """Keep an outbound call up while the trunk plays its announcement."""
     return bool(outbound) and not heard_person and age_s < 20
+
+
+def call_times(started: float, picked: float, now: float) -> tuple[float, float]:
+    """Ringing and talking seconds. The trunk's 200 OK can come while the phone still rings, so talk starts at pickup."""
+    if not picked:
+        return max(0.0, now - started), 0.0
+    return max(0.0, picked - started), max(0.0, now - picked)
 
 
 def parse_sim_command(raw: str) -> tuple[str, str]:
@@ -552,6 +560,7 @@ class Gateway:
         self._heard_person = False
         self._outbound_call = False
         self._call_started = 0.0
+        self._picked_at = 0.0
         self._idle_since = 0.0
         self._think_i = 0
         self._nudge_i = 0
@@ -841,6 +850,7 @@ class Gateway:
         self._heard_person = False
         self._outbound_call = bool(outbound)
         self._call_started = time.monotonic()
+        self._picked_at = 0.0
         self._idle_since = 0.0
         self._think_i = 0
         self._nudge_i = 0
@@ -856,6 +866,8 @@ class Gateway:
         session.on_snapshot = lambda sess=session: self._kick_partial(sess)
         if self._sales_state:
             log.info("sales call instagram=%s", card.instagram if card else "-")
+        warm = [self.brain.llm_url, "https://openrouter.ai/api/v1/audio/speech"] if tts_model() else [self.brain.llm_url]
+        threading.Thread(target=lambda: [warm_connection(url) for url in warm], name="warm", daemon=True).start()
         threading.Thread(
             target=self._converse,
             args=(session, generation),
@@ -864,6 +876,11 @@ class Gateway:
         ).start()
 
     def _end_call(self, _call: Call | None) -> None:
+        if self._call_started:
+            ring_s, talk_s = call_times(self._call_started, self._picked_at, time.monotonic())
+            log.info("call ended ring=%.1fs talk=%.1fs picked=%s", ring_s, talk_s, bool(self._picked_at))
+        self._call_started = 0.0
+        self._picked_at = 0.0
         with self._session_lock:
             self._call_generation += 1
             session = self.session
@@ -983,6 +1000,9 @@ class Gateway:
             self._nudge_count = 0
             self._idle_since = 0.0
             self._heard_person = True
+            if not self._picked_at:
+                self._picked_at = time.monotonic()
+                log.info("call picked up ring=%.1fs", self._picked_at - self._call_started)
             if self._turn(session, generation, heard, text):
                 break
         if generation == self._call_generation and self.ua.call:
@@ -1175,6 +1195,7 @@ class Gateway:
                 return
             if now - self._idle_since < ANSWER_SILENCE_S:
                 return
+            log.info("call not picked up ring=%.1fs", now - self._call_started)
             self._speak(session, generation, BYE_LINE, "bye")
             session.wait_done(6)
             self.ua.hangup()
@@ -1558,6 +1579,7 @@ class Gateway:
             "gift": bool(gift),
             "hangup": bool(hangup),
             "sim": self._sim_call,
+            "picked": bool(self._picked_at),
             "cost": round(float(cost or 0), 6),
             "model": model_name,
         }
