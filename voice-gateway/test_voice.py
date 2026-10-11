@@ -1096,7 +1096,9 @@ class SimFindingsTest(unittest.TestCase):
         state = self.opened()
         lines, end, dnc = sales.tool_followups({"price", "address"}, state, "خب", "حق دارید!")
         self.assertIn("یک میلیون و چهارصد و چهارده هزار", lines[0])
-        self.assertEqual(lines[1], ADDRESS_LINE)
+        # The price line already carries the address, so the [آدرس] tag adds no second address line.
+        self.assertTrue(sales.mentions_address(lines[0]))
+        self.assertEqual(len(lines), 1)
         self.assertFalse(end or dnc)
         said, _end, _dnc = sales.tool_followups({"address"}, state, "خب", ADDRESS_LINE)
         self.assertEqual(said, [])
@@ -2037,6 +2039,23 @@ class LiveSimTest(unittest.TestCase):
         self.assertNotIn("رایگان شروع", sales.ADDRESS_LINE)
         # After the login the seller hears the one concrete step: the page name.
         self.assertIn("بعدش اسم پیجتون", sales.ADDRESS_LINE)
+
+    def test_price_carries_the_next_step_and_a_short_yes_gets_the_address(self) -> None:
+        import sales
+
+        # A price answer ends with the free store and the address, so the caller knows where to go.
+        plan = plan_turn(self.opened(), "قیمت پرو چقدره")
+        self.assertEqual(plan.kind, "address")
+        self.assertTrue(sales.mentions_address(plan.line or ""))
+        self.assertIn("رایگان", plan.line or "")
+        self.assertLessEqual(len((plan.line or "").split()), 18)
+        # After a yes to the permission question, a short «باشه، سر می‌زنم» gets the address, not a model turn.
+        state = self.opened()
+        yes = plan_turn(state, "آره بگو")
+        note_spoken(state, yes.line or "")
+        self.assertEqual(plan_turn(state, "باشه، سر می‌زنم").line, sales.ADDRESS_LINE)
+        # The tone sample that was removed from the sales prompt is gone.
+        self.assertNotIn("سایت دارم. →", sales.sales_open())
 
     def test_how_it_works_before_the_address_and_the_spoken_domain(self) -> None:
         import sales

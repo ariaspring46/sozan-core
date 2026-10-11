@@ -578,17 +578,15 @@ def price_spoken_line(heard: str) -> str | None:
         if not fits(line):
             line = f"پرو مکس {words} تومانه."
         return line
-    amount = pay(plans.get("pro") or {})
-    words = toman_words(amount)
+    words = toman_words(pay(plans.get("pro") or {}))
     if not words:
         return None
-    line = f"پرو {words} تومانه. ساخت وبسایت رایگانه."
-    promax = pay(plans.get("promax") or {})
-    if promax:
-        both = f"پرو {words} تومانه. پرو مکس {toman_words(promax)} تومانه."
-        if fits(both):
-            line = both
-    return line if fits(line) else f"پرو {words} تومانه."
+    # Next step after the price; shorter when the amount is long.
+    tail = f"آدرسش {SPOKEN_ADDRESS}."
+    for line in (f"پرو {words} تومانه. فروشگاهتون رایگانه؛ {tail}", f"پرو {words} تومانه. {tail}"):
+        if fits(line):
+            return line
+    return f"پرو {words} تومانه."
 
 
 # A second price ask, in other words; ≤21 words.
@@ -730,7 +728,6 @@ def sales_open() -> str:
         "نمونهٔ لحن (از بر تکرار نکن):\n"
         "مشتری: آره، دایرکتام زیاده. → آهان، پس وقت زیادی پاش می‌ره! الان کی جوابشون رو می‌ده، خودتون؟\n"
         "مشتری: خودم، شبا تا دیروقت. → حق دارید خسته بشید! جواب‌ها رو من آماده می‌کنم، شما فقط تأیید می‌کنید.\n"
-        "مشتری: سایت دارم. → چه خوب، سوزان کنار سایتتون دایرکت و محتوا رو جلو می‌بره! الان پست‌ها رو کی می‌سازه؟\n"
         "مشتری: گرونه. → حق دارید، ساخت فروشگاه که کلاً رایگانه! با چی مقایسه می‌کنید؟\n"
         "مشتری: بلد نیستم. → لازم نیست بلد باشید؛ فقط اسم پیجتون رو می‌زنید، بقیه‌ش با منه.\n"
         "مشتری: واقعاً رباتی؟ → هوش مصنوعی‌ام، آدم نیستم! جالبش همینه، دایرکت‌هاتون رو هم همین‌طوری جواب می‌نویسم.\n"
@@ -1340,6 +1337,10 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         state.agreed = True
         state.stage = "close"
         return TurnPlan(kind="close", line=CLOSE_LINE, hangup=True, signals=signals)
+    if signals.agree and not signals.refuse and not signals.later and len(plain.split()) <= 4 and not state.linked and state.cta_count == 0 and not (signals.noted and asked):
+        # Agreement before the domain: the address, not the model.
+        state.stage = "cta"
+        return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
     if wants_address(heard):
         if signals.trust or signals.cant or signals.has_site or signals.robot:
             state.stage = "confirm"
