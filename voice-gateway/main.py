@@ -133,6 +133,7 @@ CURIOUS_LINES = (
 CHECK_LINE = CURIOUS_LINES[0]
 HOWDY_LINE = "خوبم. تو بگو."
 BYE_LINE = "خداحافظ."
+UNCLEAR_LINE = "ببخشید، نشنیدم؛ دوباره بفرمایید."
 WAIT_LINE = THINKING_LINES[0]
 THINK_WAIT_S = 1.8
 NUDGE_AFTER_S = 5.0
@@ -554,6 +555,7 @@ class Gateway:
         self._last_line = GREETING
         self._last_alt = ""
         self._fragment = ""
+        self._unclear_asked = False
         self._spoke_at = 0.0
         self._audio_at = 0.0
         self._checked_in = False
@@ -844,6 +846,7 @@ class Gateway:
         self._last_line = greet
         self._last_alt = ""
         self._fragment = ""
+        self._unclear_asked = False
         self._spoke_at = time.monotonic()
         self._audio_at = self._spoke_at
         self._checked_in = False
@@ -979,6 +982,15 @@ class Gateway:
                 self.ua.hangup()
                 self._end_call(None)
                 break
+            if unclear_speech(heard, is_social(heard)):
+                # Speech-like audio that STT turned into nothing: the echo check
+                # already ran on the raw audio, so this is a caller we did not catch.
+                # Ask once; a silent streak must not turn into barge-in lockout.
+                if not self._unclear_asked:
+                    self._unclear_asked = True
+                    log.info("unclear speech barged=%s", barged)
+                    self._speak(session, generation, UNCLEAR_LINE, "unclear")
+                continue
             if barged and looks_like_echo(heard, self._last_line):
                 log.info("dropped echo text=%s", heard[:80])
                 session.note_echo()
@@ -996,6 +1008,7 @@ class Gateway:
                 heard = f"{self._fragment} {heard}".strip()
                 self._fragment = ""
             log.info("stt seconds=%.2f text=%s", stt_s, heard)
+            self._unclear_asked = False
             self._checked_in = False
             self._nudge_count = 0
             self._idle_since = 0.0
@@ -1664,6 +1677,11 @@ class Gateway:
             session.play(pcm, end=False)
         self._last_line = line
         self._spoke_at = time.monotonic()
+
+
+def unclear_speech(heard: str, social: bool) -> bool:
+    """Empty STT text that is not a social word: unclear caller speech, not echo."""
+    return not heard.strip() and not social
 
 
 def late_echo(late: str, spoken_parts: list[str]) -> bool:

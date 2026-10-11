@@ -1486,6 +1486,15 @@ class SecondReviewTest(unittest.TestCase):
         self.assertFalse(main_module.late_echo("درسته، ولی دیگه به من زنگ نزنید", ["درسته!"]))
         self.assertTrue(main_module.late_echo("جواب دایرکت‌ها رو من با لحن خودتون می‌نویسم", ["جواب دایرکت‌ها رو من با لحن خودتون می‌نویسم!"]))
 
+    def test_empty_stt_is_unclear_not_echo(self) -> None:
+        import main as main_module
+
+        self.assertTrue(main_module.unclear_speech("", False))
+        self.assertTrue(main_module.unclear_speech("   ", False))
+        self.assertFalse(main_module.unclear_speech("", True))
+        self.assertFalse(main_module.unclear_speech("الو", False))
+        self.assertIn("نشنیدم", main_module.UNCLEAR_LINE)
+
     def test_counts_and_cut_off_replies(self) -> None:
         for reply in ("ماهی هزار تا سفارش، یعنی حسابی سرتون شلوغه!", "به هزار تا شهر ارسال دارید؟"):
             self.assertEqual(guard_reply(reply, "خب"), reply)
