@@ -42,7 +42,7 @@ SPOKEN_ADDRESS = "سوزان، خط تیره، کُر، دات آی‌آر"
 HELLO_LINE = f"{GREET_OPEN} {HOOK_GENERIC} {DISCLOSE_LINE}"
 HELLO_SMS_LINE = f"{GREET_OPEN} احتمالاً پیامک سوزان به دستتون رسیده. {DISCLOSE_LINE}"
 # After a yes: one value sentence, one open question, never a menu.
-DM_HOW = "جواب دایرکت‌ها رو من می‌نویسم، شما فقط تأیید می‌کنید"
+DM_HOW = "تو پرو جواب دایرکت‌ها رو من می‌نویسم، شما فقط تأیید می‌کنید"
 VALUE_GENERIC = f"{DM_HOW}؛ یعنی کمتر پای گوشی می‌مونید! الان چطوری بهشون می‌رسید؟"
 PAIN_LINE = VALUE_GENERIC
 BUSY_LINE = f"چشم، مزاحمتون نمی‌شم! هر وقت فرصت شد، سر بزنید به {SPOKEN_ADDRESS}؛ خدا قوت!"
@@ -68,7 +68,7 @@ COMPANY_LINE = "من سوزانم، ساخته‌شدهٔ شرکت گهر شبک
 PRICE_UNKNOWN_LINE = f"راستش الان قیمت‌ها دستم نیست، نمی‌خوام اشتباه بگم! ولی شروعش رایگانه؛ سر بزنید به {SPOKEN_ADDRESS}."
 # A yes that names DMs: the opening already offered DM replies, so this answers its «چطوری؟».
 DM_YES_LINE = f"{DM_HOW}! الان کی جوابشون رو می‌ده، خودتون؟"
-DM_LINE = "جواب دایرکت‌های اینستا و تلگرام رو من با لحن خودتون می‌نویسم؛ روزی حدوداً چندتا دایرکت دارید؟"
+DM_LINE = "تو پرو، جواب دایرکت‌های اینستا و تلگرام رو من با لحن خودتون می‌نویسم؛ روزی حدوداً چندتا دایرکت دارید؟"
 CONTENT_LINE = "پست و استوری و کپشن تبلیغ رو هم من براتون می‌سازم؛ الان محتوا رو خودتون درست می‌کنید؟"
 ORDER_LINE = "سفارش‌ها و فروش و موجودی انبار رو هم براتون نگه می‌دارم؛ الان سفارش‌ها رو کجا ثبت می‌کنید؟"
 SITE_LINE = "از روی همین پیج یه فروشگاه اینترنتی هم می‌سازم و شروعش رایگانه؛ الان سایت جدا دارید؟"
@@ -81,7 +81,7 @@ EXPLAIN = (
 CLOSE_LINE = "پس یادتون نره: sozan-core.ir، دکمهٔ ورود، رایگان می‌سازید. روزتون خوش!"
 ADDRESS_LINE = (
     "آدرسش سوزان، خط تیره، کُر، دات آی‌آر! "
-    "واردش بشید، دکمهٔ ورود رو بزنید، رایگان شروع می‌کنید."
+    "واردش بشید، دکمهٔ ورود رو بزنید، بعدش اسم پیجتون رو بزنید؛ ساخت فروشگاهتون رایگانه."
 )
 WAIT_LINE = "حتماً!"
 WAIT_BRIGHT = ("حتماً!", "سؤال خوبیه!", "حق دارید!")
@@ -150,7 +150,7 @@ _STAGE_DO = {
     "confirm": "آدرس را تکرار نکن مگر بپرسد. نگرانی‌اش را جواب بده.",
     "close": "تشکر گرم و خداحافظی.",
 }
-# What a seasoned seller does with the objection the caller raised last (one short line, added to the model's turn note).
+# The seasoned seller's move for the last objection, added to the turn note.
 _OBJECTION_DO = {
     "time": "عجله دارد: فقط یک جملهٔ کوتاه، قابلیت تازه نگو.",
     "later": "الان وقت ندارد: فشار نیاور، خداحافظی گرم و [پایان].",
@@ -567,12 +567,14 @@ def price_spoken_line(heard: str) -> str | None:
         return len(text.split()) <= 18
 
     blob = heard or ""
-    if "مکس" in blob:
-        amount = pay(plans.get("promax") or {})
-        words = toman_words(amount)
+    if re.search("مکس|ماکس|میکس", blob):
+        promax = plans.get("promax") or {}
+        words = toman_words(pay(promax))
         if not words:
             return None
-        line = f"پرو مکس با تخفیف سایت {words} تومانه. ساخت وبسایت رایگانه."
+        # «با تخفیف» only inside a real discount window.
+        sale = "با تخفیف سایت " if int(promax.get("listPrice") or 0) > int(promax.get("price") or 0) > 0 else ""
+        line = f"پرو مکس {sale}{words} تومانه. ساخت وبسایت رایگانه."
         if not fits(line):
             line = f"پرو مکس {words} تومانه."
         return line
@@ -867,7 +869,7 @@ def person_started(heard: str) -> bool:
 
 def read_signals(heard: str) -> Signals:
     # Speech-to-text writes «می‌شه», «میشه» and «می شه» alike: join the half-space or space after «می/نمی» so one
-    # spelling matches all three; any other half-space becomes a space as before («زنگ‌نزنید» → «زنگ نزنید»).
+    # one spelling for all three; other half-spaces become spaces («زنگ‌نزنید» → «زنگ نزنید»).
     joined = re.sub(rf"(?<![{_FA}])(ن?می)[\u200c ]+(?=[{_FA}])", r"\1", (heard or "").replace("ي", "ی").replace("ك", "ک"))
     blob = _plain_words(joined)
     question = bool(re.search(r"[؟?]", heard or ""))
@@ -961,7 +963,7 @@ def _refuses(text: str) -> bool:
         return True
     tokens = set(plain.split())
     if tokens & {"نه", "نخیر"} and tokens & _THANKS and tokens <= _BARE_TAIL - {"فعلا", "فعلاً"}:
-        # «نه، خیلی ممنونم» on its own; «نه، ممنونم، خیلی هم خوبه» is a yes after it, «فعلاً نه، ممنون» a not-now.
+        # «نه، خیلی ممنونم» alone is a no; «نه، ممنونم، خیلی هم خوبه» is a yes.
         return True
     for clause in re.findall(r"[^،,.!؛;؟?]+[؟?]?", text or ""):
         if clause.rstrip().endswith(("؟", "?")):
@@ -1152,7 +1154,7 @@ def objection_line(signals: Signals, heard: str) -> str | None:
     if "واتس" in blob:
         return "تو تماس لینک نمی‌فرستم، ولی آدرسش راحته: سوزان کُر دات آی‌آر، دکمهٔ ورود."
     if signals.trust:
-        return "حق دارید، منم بودم همینو می‌پرسیدم. برای همین شروعش رایگانه که اول خودتون امتحانش کنید."
+        return "حق دارید. جواب‌ها روی پرو پیش‌نویسه و خودتون تأیید می‌کنید؛ فروشگاهتون رو رایگان بسازید."
     if signals.cant:
         return "اصلاً لازم نیست بلد باشید؛ فقط اسم پیجتون رو می‌زنید، بقیه‌ش با سوزانه."
     if signals.has_site:
@@ -1248,7 +1250,7 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         opening = state.opening or (HELLO_SMS_LINE if state.sms_sent else HELLO_LINE)
         return TurnPlan(kind="hello", line=opening, signals=signals)
     if signals.wrong:
-        # "Don't call me" is promised back in words; a wrong number just gets a goodbye. Both go to the DNC file.
+        # Both go to the DNC file; a wrong number just gets a goodbye.
         return TurnPlan(kind="close", line=DNC_LINE if signals.dnc else BYE_LINE, hangup=True, signals=signals, dnc=True)
     if signals.refuse and state.said and state.said[-1].endswith(SOURCE_LINE):
         # We just said "if you don't want it, we won't call again": hold to it.
@@ -1388,7 +1390,7 @@ def note_spoken(state: SalesState, spoken: str) -> None:
         state.stage = "pitch"
 
 
-# Tools the model calls by writing a tag; the gateway speaks the exact line, so prices and the address are never improvised.
+# Tags the model writes; the gateway speaks the exact line.
 _TAGS = {
     "هدیه": "gift",
     "هديه": "gift",
@@ -1646,7 +1648,7 @@ def stream_tail(buf: str) -> str:
     tail = (buf or "").strip()
     if tail and sentence_done(tail):
         return tail
-    # «ممنون از وقتتون [پایان]»: the tag ends the sentence, so it is spoken; «عرض کنم که [پایان]» is cut off, so it is not.
+    # «ممنون از وقتتون [پایان]»: the tag is spoken as the last sentence.
     text, tags = extract_tags(tail)
     if tags and tail.endswith("]") and text.strip() and "[" not in text and not _DANGLING.search(text.strip()):
         return tail

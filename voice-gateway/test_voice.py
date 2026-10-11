@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import array
+import copy
 import json
 import tempfile
 import os
@@ -611,6 +612,9 @@ class SalesTest(unittest.TestCase):
         # An objection is acknowledged and reframed; the address is not pushed on every objection.
         self.assertIn("رایگان", trust.line or "")
         self.assertNotIn("sozan-core.ir", trust.line or "")
+        # The trust answer never claims a human experience, and the free claim covers the store only.
+        self.assertNotIn("منم بودم", trust.line or "")
+        self.assertIn("فروشگاهتون رو رایگان", trust.line or "")
         cant = plan_turn(worried, "من اصلاً بلد نیستم سایت بسازم سخت نیست")
         self.assertEqual(cant.kind, "address")
         self.assertIn("لازم نیست", cant.line or "")
@@ -776,6 +780,23 @@ class SalesTest(unittest.TestCase):
         promax = plan_turn(SalesState(greeted=True, stage="discover"), "پرو مکس چقدر است")
         self.assertIn("یک میلیون و نهصد و سی و یک هزار", promax.line or "")
         self.assertLessEqual(len((promax.line or "").split()), 18)
+        # STT garbles the name: «میکس» and «ماکس» are Pro Max, not the Pro price.
+        for heard in ("پرو میکس چنده", "پرو ماکس چقدره"):
+            garbled = plan_turn(SalesState(greeted=True, stage="discover"), heard)
+            self.assertTrue((garbled.line or "").startswith("پرو مکس"), heard)
+            self.assertIn("یک میلیون و نهصد و سی و یک هزار", garbled.line or "", heard)
+        # «با تخفیف» is said only inside a real discount: with listed == sale price the line claims none.
+        flat = copy.deepcopy(PLAN_FIXTURE)
+        for plan in flat["plans"]:
+            if plan["id"] == "promax":
+                plan["listPrice"] = plan["price"]
+        reset_plan_cache()
+        set_plans_fetcher(lambda: flat)
+        no_sale = plan_turn(SalesState(greeted=True, stage="discover"), "پرو مکس چقدر است")
+        self.assertNotIn("با تخفیف", no_sale.line or "")
+        self.assertIn("یک میلیون و نهصد و سی و یک هزار", no_sale.line or "")
+        reset_plan_cache()
+        set_plans_fetcher(lambda: PLAN_FIXTURE)
 
         def down():
             raise OSError("down")
@@ -2005,6 +2026,17 @@ class LiveSimTest(unittest.TestCase):
         # The model's «آی‌آره» or «آی آره» becomes the spoken «آی‌آر» before the caller hears it.
         self.assertEqual(sales.guard_reply("آدرسش سوزان کُر دات آی‌آره، دکمهٔ ورود.", "چطوری شروع کنم"), "آدرسش سوزان کُر دات آی‌آر، دکمهٔ ورود.")
         self.assertIn("آی‌آر", sales.guard_reply("آدرس دات آی آره است.", "آدرس"))
+
+    def test_free_claims_name_the_store_and_pro_names_the_drafts(self) -> None:
+        import sales
+
+        # «رایگان» is the store; the drafts are Pro. The fixed lines must not sell free drafts.
+        self.assertIn("تو پرو", sales.DM_LINE)
+        self.assertIn("تو پرو", sales.DM_YES_LINE)
+        self.assertIn("ساخت فروشگاهتون رایگانه", sales.ADDRESS_LINE)
+        self.assertNotIn("رایگان شروع", sales.ADDRESS_LINE)
+        # After the login the seller hears the one concrete step: the page name.
+        self.assertIn("بعدش اسم پیجتون", sales.ADDRESS_LINE)
 
     def test_how_it_works_before_the_address_and_the_spoken_domain(self) -> None:
         import sales
