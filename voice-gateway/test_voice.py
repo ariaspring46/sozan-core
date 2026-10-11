@@ -1860,6 +1860,27 @@ class LiveSimTest(unittest.TestCase):
         self.assertIn("یک میلیون و چهارصد و چهارده هزار", plan.line)
         self.assertTrue(plan.line.startswith(sales.FIRST_DISCLOSE))
 
+    def test_short_replies_are_answers_not_a_cut_off_line(self) -> None:
+        import sales
+
+        # Live calls: «آره», «بله», «ها» are under four letters, so the gateway said «صداتون یه لحظه قطع شد» and two calls ended there.
+        for heard in ("آره", "بله", "ها", "خب", "جان", "اوه", "الو"):
+            plan = plan_turn(self.opened(), heard)
+            self.assertNotEqual(plan.kind, "fallback", heard)
+            self.assertNotEqual(plan.line, sales.MISHEARD_LINE, heard)
+        # A one-letter scrap is still a cut-off line.
+        self.assertEqual(plan_turn(self.opened(), "ه").kind, "fallback")
+        # The fallback does not ask «سؤال دیگه‌ای هست؟» twice in one call; the second time it probes the line instead.
+        state = state_after(sales.ADDRESS_LINE)
+        state.linked = True
+        self.assertEqual(sales.fallback_line(state, "خب چطوری ثبت نام کنم"), sales.FALLBACK_LINE)
+        note_spoken(state, sales.FALLBACK_LINE)
+        self.assertEqual(sales.fallback_line(state, "خب چطوری ثبت نام کنم"), sales.SALES_PROBE_LINE)
+        # The model's «به هیچ شرکت خاصی تعلق ندارم» is wrong: Sozan is the one calling, so the guard names her.
+        reply = sales.guard_reply("من هوش مصنوعی هستم و به هیچ شرکت خاصی تعلق ندارم.", "شما از کدوم شرکتید؟")
+        self.assertNotIn("تعلق ندارم", reply)
+        self.assertIn("از طرف سوزانم", reply)
+
     def test_sim_renders_the_card_opening_like_a_dial(self) -> None:
         import main as main_module
         import sales

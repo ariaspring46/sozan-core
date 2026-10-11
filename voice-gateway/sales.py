@@ -335,6 +335,8 @@ _THANKS = frozenset(("ممنون", "ممنونم", "مرسی", "متشکرم", "
 _BARE_TAIL = (_REFUSE_TAIL - {"اینو", "اونو", "این", "اون", "رو", "کن"}) | {"ما"}
 _NOT_SAID = re.compile(rf"(?<![{_FA}])(?:نه اینکه|نه این که|نگفتم|کی گفته|کی گفت|نمیگم|نمی گم)\s*$")
 _BARE_NO = frozenset(("نه", "نه نه", "نخیر", "نه خیر", "نه بابا", "نوچ"))
+# Short replies are answers, not a cut-off line.
+_SHORT_REPLY = frozenset(("آره", "اره", "بله", "ها", "هوم", "اوه", "آها", "خب", "جان", "الو"))
 _START_WORDS = (
     "سلام",
     "سوزان",
@@ -678,7 +680,7 @@ def fallback_line(state: SalesState, heard: str) -> str:
         return MISHEARD_LINE
     if not state.linked:
         return ADDRESS_LINE
-    return FALLBACK_LINE
+    return SALES_PROBE_LINE if FALLBACK_LINE in state.said else FALLBACK_LINE
 
 
 def sales_open() -> str:
@@ -1260,7 +1262,8 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
         # A bare «نه» to «بگم چطوری؟» is a no, not a dropped line.
         state.awaiting_permission = False
         return TurnPlan(kind="close", line=DECLINE_LINE, hangup=True, signals=signals)
-    if len((heard or "").strip()) < 4:
+    words = set(_plain_words(heard).split())
+    if len((heard or "").strip()) < 4 and not (words and words <= _SHORT_REPLY):
         return TurnPlan(kind="fallback", line=MISHEARD_LINE, signals=signals)
     if signals.robot and not signals.price and any(part in (heard or "") for part in _ADDRESS_HINTS):
         # «رباتی؟ آدرس سایتتون چیه؟»: both answers, without asking for the question again.
@@ -1601,7 +1604,8 @@ def _price_sentence_ok(sent: str) -> bool:
 
 
 def guard_reply(reply: str, heard: str) -> str:
-    text = formalize_you(strip_invented_names(reply or "", heard or ""))
+    reply = (reply or "").replace("به هیچ شرکت خاصی تعلق ندارم", "از طرف سوزانم")
+    text = formalize_you(strip_invented_names(reply, heard or ""))
     kept: list[str] = []
     allowed_code = gift_spoken_code()
     for sent in split_sentences(text) or ([text] if text else []):
