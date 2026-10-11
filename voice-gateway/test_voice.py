@@ -1725,5 +1725,93 @@ class LiveSimTest(unittest.TestCase):
         settle(gw)
         self.assertEqual(set(gw._voice), set(lines))
 
+    def test_live_turns_of_the_busy_and_price_first_callers(self) -> None:
+        import sales
+
+        # p39: «باشه، یادداشت کردم، بعداً میام» reached the gateway as «واسه یادداشت کردم بعدم میام»; the model
+        # answered «چه خوب!» before the goodbye. Noting the address is a yes, so the closing line comes at once.
+        state = SalesState()
+        for heard in ("سرم شلوغه سری بگو", "سرم شلوغه سریع بگو چی می خوای"):
+            plan = plan_turn(state, heard)
+            note_spoken(state, plan.line or "متوجه‌ام، حق دارید!")
+        plan = plan_turn(state, "واسه یادداشت کردم بعدم میام")
+        self.assertEqual((plan.line, plan.hangup), (sales.CLOSE_LINE, True))
+        for heard in (
+            "یادداشت کردم",
+            "آدرسو نوشتم",
+            "حتما یه سر میزنم",
+            "بعداً میام",
+            "باشه سیوش کردم",
+            "یاد داشت کردم ممنون",
+            "حتما یه نگاه میندازم",
+            "بعداً می‌آم",
+            "آدرسو تو گوشیم ذخیره کردم",
+        ):
+            self.assertTrue(read_signals(heard).agree, heard)
+        # Their own work, a question in the same breath, or a no is not a yes.
+        for heard in (
+            "من سفارشا رو یادداشت میکنم",
+            "یادداشت نکردم",
+            "نمیام",
+            "بعدش میام",
+            "کپشنا رو خودم نوشتم",
+            "کپشنشو خودم نوشتمش",
+            "خودم شبا به دایرکتا سر میزنم",
+            "روزی پنجاه تا، شبا خودم بهشون سر میزنم",
+            "سفارشا رو تو دفترم یادداشت کردم ولی گم میشه",
+            "همه مشتریامو تو گوشی سیو کردم",
+            "فردا میام مغازه",
+            "یادداشت کردم، فقط این رایگانه دیگه؟",
+            "من کی گفتم یادداشت کردم",
+            "بعدا میام ولی فعلا علاقه ای ندارم",
+        ):
+            self.assertFalse(read_signals(heard).agree, heard)
+        for heard in ("روزی پنجاه تا، شبا خودم بهشون سر میزنم", "باشه ولی علاقه ای ندارم"):
+            self.assertNotEqual(plan_turn(state_after(sales.QUICK_OPEN_LINE), heard).line, sales.CLOSE_LINE, heard)
+        # p39: the model added [آدرس] to the busy turn right after the line that gave the address.
+        def address_for(heard: str, last: str = sales.QUICK_OPEN_LINE) -> list[str]:
+            return sales.tool_followups({"address"}, state_after(last), heard, "حتماً!")[0]
+
+        self.assertEqual(address_for("سرم شلوغه سریع بگو چی می خوای"), [])
+        for heard in ("سوزان چی؟ دوباره بگو", "ببخشید نفهمیدم اسمش چی بود؟", "سرم شلوغه، اسمش چی بود؟", "خب چطوری ثبت نام کنم؟"):
+            self.assertEqual(address_for(heard), [ADDRESS_LINE], heard)
+        self.assertEqual(address_for("سرم شلوغه سریع بگو", sales.PAIN_LINE), [ADDRESS_LINE])
+        # p44: «هزینه‌ش چقدر؟ گرون نباشه» after the price got the same sentence again.
+        state = SalesState()
+        first = plan_turn(state, "اول بگو چقدر می گیری")
+        note_spoken(state, first.line or "")
+        priced = first.line.replace(f"{sales.FIRST_DISCLOSE} ", "")
+        again = plan_turn(state, "هزینه شین چقدر گروون نباشه")
+        self.assertNotIn(again.line, first.line)
+        self.assertIn("یک میلیون و چهارصد و چهارده هزار", again.line)
+        # «رایگان» is the store, never the paid plan.
+        self.assertIn("ساخت فروشگاه رایگانه", again.line)
+        self.assertNotIn("شروعش رایگانه", again.line)
+        self.assertIn(again.line, sales.cached_sales_lines())
+        note_spoken(state, again.line or "")
+        # A third ask, fixed or through the model's [قیمت], gets the first wording back, never nothing.
+        self.assertEqual(plan_turn(state, "باز هم بگو قیمتش چنده").line, priced)
+        self.assertEqual(sales.tool_followups({"price"}, state, "خب", "حق دارید!")[0], [priced])
+        lines, _end, _dnc = sales.tool_followups({"price"}, state_after(first.line or ""), "چنده؟", "حق دارید!")
+        self.assertEqual(lines, [again.line])
+        for heard in ("قیمت", "پرو مکس"):
+            line = sales.price_again_line(sales.price_spoken_line(heard) or "")
+            self.assertLessEqual(len(line.split()), 21, line)
+            self.assertLessEqual(len(f"{sales.ROBOT_SHORT} {line}".split()), 25, line)
+        # With no price list, the second ask still names the site.
+        set_plans_fetcher(lambda: None)
+        state = state_after(sales.PRICE_UNKNOWN_LINE)
+        self.assertEqual(plan_turn(state, "قیمتش چنده؟").line, sales.PRICE_AGAIN_UNKNOWN_LINE)
+        self.assertTrue(sales.mentions_address(speakable(sales.PRICE_AGAIN_UNKNOWN_LINE, 3)))
+        for line in (sales.PRICE_AGAIN_UNKNOWN_LINE, f"{sales.ROBOT_SHORT} {sales.PRICE_AGAIN_UNKNOWN_LINE}"):
+            self.assertIn(line, sales.cached_sales_lines())
+
+
+def state_after(line: str) -> SalesState:
+    state = SalesState(greeted=True, intro_said=True, pain_asked=True, stage="pitch")
+    note_spoken(state, line)
+    return state
+
+
 if __name__ == "__main__":
     unittest.main()

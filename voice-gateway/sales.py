@@ -12,7 +12,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from brain import is_carrier_text, is_hello, wants_bye
+from brain import is_carrier_text, is_hello, is_repeat, wants_bye
 from sip import normalize_dial
 
 log = logging.getLogger("sozan.sales")
@@ -157,6 +157,7 @@ _OBJECTION_DO = {
     "has_site": "سایت دارد: سوزان کنار سایتش، نه جایش.",
     "source": "پرسید شماره از کجا: رک جواب بده و بگو اگر نخواهد دیگر زنگ نمی‌زنیم.",
 }
+_ASK_AGAIN = ("نفهمیدم", "دوباره", "یه بار دیگه", "یک بار دیگه", "اسمش چی", "سوزان چی", "کجا", "چی بود", "چی گفت")
 _ADDRESS_HINTS = (
     "اسم سایت",
     "آدرس",
@@ -258,6 +259,33 @@ _PUNCT = re.compile(r"[\u060C\u061B\u061F\u066A-\u066D\u06D4]")
 _INVITE = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید|بفرمائید|بفرما)(?![{_FA}])")
 # «وقت ندارم» alone is busy; «وقت ندارم به دایرکتا برسم» is the very pain Sozan answers.
 _NO_TIME = re.compile(rf"وقت ندار(?:م|یم)?(?![{_FA}])(?!\s*(?:به|برای|واسه|که|جواب|پاسخ)(?![{_FA}]))")
+# «یادداشت کردم»، «یه سر می‌زنم»، «بعداً میام»: they took the address and will look, so the closing line, not more pitch.
+# STT hears «باشه، بعداً میام» as «واسه ... بعدم میام» too.
+_NOTED = re.compile(
+    rf"(?<![{_FA}])(?:یاد\s*داشت(?:ش)?\s*(?:کرد(?:م|یم)(?:ش)?|میکن(?:م|یم))|نوشت(?:م|یم)(?:ش)?"
+    rf"|(?:سیو|ذخیره|ذخیر)(?:\s*ا?ش)?\s*کرد(?:م|یم)(?:ش)?|سر(?:ی)?\s*میزن(?:م|یم)"
+    rf"|(?:یه\s+)?نگاه(?:ی)?\s*(?:میکن(?:م|یم)|میند(?:ا)?ز(?:م|یم)|میاندازم)|چک\s*میکن(?:م|یم)"
+    rf"|(?:بعدا|بعداً|بعدن|بعدم|حتما|حتماً|فردا|امشب)\s+(?:میا|میآ)(?:م|یم))(?![{_FA}])"
+)
+# Only when that is the whole turn: «خودم شبا به دایرکتا سر می‌زنم» and «کپشنشو خودم نوشتمش» are their pain,
+# «یادداشت کردم، فقط این رایگانه؟» still asks, «بعداً میام ولی علاقه‌ای ندارم» is a no.
+_NOTED_TAIL = frozenset(
+    (
+        "باشه", "واسه", "چشم", "اوکی", "حله", "آره", "بله", "خب", "پس", "حتما", "حتماً", "الان", "بعدا", "بعداً",
+        "بعدن", "بعدم", "فردا", "امشب", "یه", "بهش", "اونجا", "توش", "تو", "رو", "را", "هم", "اینو", "اونو",
+        "آدرس", "آدرسو", "آدرسش", "آدرسشو", "اسمش", "اسمشو", "اسم", "سایت", "سایتو", "سایتش", "سایتشو", "سایتتون",
+        "سایتتونو", "لینک", "لینکو", "لینکش", "شماره", "ممنون", "ممنونم", "مرسی", "متشکرم", "متشکر", "سپاس",
+        "عالیه", "خیلی", "خوبه", "دستتون", "درد", "نکنه", "گوشی", "گوشیم",
+    )
+)
+
+
+def _noted(blob: str) -> bool:
+    if not _NOTED.search(blob):
+        return False
+    return all(word in _NOTED_TAIL for word in _NOTED.sub(" ", blob).split())
+
+
 _CANT_TALK = ("نمیتونم صحبت", "نمیتونم حرف بزن", "تو جلسه", "توی جلسه", "جلسه ام", "درگیرم", "پشت فرمونم", "دارم رانندگی")
 # Busy words inside a pain answer («کل روز درگیرم با دایرکتا», «وقت ندارم دایرکتا رو جواب بدم») are the pain, not busy.
 # «مشتری دارم»، «پیام بدید» and «نمی‌تونم جواب بدم» stay busy.
@@ -538,6 +566,35 @@ def price_spoken_line(heard: str) -> str | None:
     return line if fits(line) else f"پرو {words} تومانه."
 
 
+# Asked the price again («هزینه‌ش چقدر؟ گرون نباشه»): the same numbers in other words, not the same sentence.
+# «رایگان» stays tied to the store, never to پرو; at most 21 words so «هوش مصنوعی‌ام، آدم نیستم!» still fits 25.
+PRICE_AGAIN_UNKNOWN_LINE = f"قیمت دقیق رو تو خود سایت می‌بینید: {SPOKEN_ADDRESS}؛ ساخت فروشگاه هم رایگانه."
+
+
+def price_again_line(priced: str) -> str:
+    if priced == PRICE_UNKNOWN_LINE:
+        return PRICE_AGAIN_UNKNOWN_LINE
+    numbers = " ".join(part for part in re.split(r"(?<=\.)\s+", priced) if "تومان" in part).rstrip(".")
+    if not numbers:
+        return priced
+    choices = (
+        f"همون‌طور که گفتم، {numbers}؛ ولی ساخت فروشگاه رایگانه، اول همونو امتحان کنید.",
+        f"همون‌طور که گفتم، {numbers}؛ ولی ساخت فروشگاه رایگانه.",
+        f"همون‌طور که گفتم، {numbers}.",
+    )
+    return next((line for line in choices if len(line.split()) <= 21), choices[-1])
+
+
+def price_for_turn(state: SalesState, priced: str) -> str:
+    """The price line for this turn: the first ask gets it, the next in other words, then the two take turns."""
+    if not any(priced in said for said in state.said):
+        return priced
+    again = price_again_line(priced)
+    if state.said and again in state.said[-1]:
+        return priced
+    return again
+
+
 def price_clause() -> str:
     catalog = plan_catalog()
     if not catalog:
@@ -810,6 +867,7 @@ def read_signals(heard: str) -> Signals:
     trust = any(part in blob for part in ("اعتماد", "کلاه", "مطمئن", "درست میگی"))
     agree = any(part in blob for part in ("باشه", "چشم", "اوکی", "باز کردم", "زدم ورود", "آره میام"))
     agree = agree or bool(re.search(rf"(?<![{_FA}])میرم", blob))
+    agree = agree or _noted(blob)
     robot = any(
         part in blob
         for part in ("ربات", "ماشینی", "واقعی هستی", "آدمی", "آدم هستی", "ضبط شده", "آدم نیستی", "یا آدم", "انسان هستی")
@@ -946,6 +1004,8 @@ def cached_sales_lines() -> list[str]:
         DNC_LINE,
         DNC_SHORT_LINE,
         PRICE_UNKNOWN_LINE,
+        PRICE_AGAIN_UNKNOWN_LINE,
+        f"{ROBOT_SHORT} {PRICE_AGAIN_UNKNOWN_LINE}",
         f"{FIRST_DISCLOSE} {PRICE_UNKNOWN_LINE}",
         f"{ROBOT_SHORT} {PRICE_UNKNOWN_LINE}",
         f"{ROBOT_SHORT} {DECLINE_LINE}",
@@ -955,7 +1015,8 @@ def cached_sales_lines() -> list[str]:
     for heard in ("قیمت", "پرو مکس"):
         priced = price_spoken_line(heard)
         if priced:
-            lines.extend((priced, f"{FIRST_DISCLOSE} {priced}", f"{ROBOT_SHORT} {priced}"))
+            again = price_again_line(priced)
+            lines.extend((priced, f"{FIRST_DISCLOSE} {priced}", f"{ROBOT_SHORT} {priced}", again, f"{ROBOT_SHORT} {again}"))
     for signals, heard in (
         (Signals(trust=True), "اعتماد ندارم"),
         (Signals(cant=True), "بلد نیستم"),
@@ -1224,6 +1285,7 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
     if signals.price:
         priced = price_spoken_line(heard) or PRICE_UNKNOWN_LINE
         state.stage = "cta"
+        priced = price_for_turn(state, priced)
         if signals.robot:
             # «رباتی؟ چنده؟»: the AI answer is never skipped for the price.
             state.robot_answers += 1
@@ -1236,7 +1298,7 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             # Asked again: the model answers in fresh words instead of the same sentence.
             return TurnPlan(kind="model", cue=state.cue(heard), signals=signals)
         return TurnPlan(kind="address", line=fixed, signals=signals)
-    if signals.agree and (state.linked or state.cta_count > 0):
+    if signals.agree and not signals.refuse and (state.linked or state.cta_count > 0):
         state.agreed = True
         state.stage = "close"
         return TurnPlan(kind="close", line=CLOSE_LINE, hangup=True, signals=signals)
@@ -1334,8 +1396,24 @@ def tool_followups(tags: set[str], state: SalesState, heard: str, spoken: str) -
     lines: list[str] = []
     _digits, phrases = _money_forms(plan_catalog()) if "price" in tags else (set(), [])
     if "price" in tags and not any(phrase in (spoken or "") for phrase in phrases):
-        lines.append(price_spoken_line(heard if read_signals(heard).price else "قیمت") or PRICE_UNKNOWN_LINE)
-    if "address" in tags and not mentions_address(spoken) and not any(mentions_address(line) for line in lines):
+        priced = price_spoken_line(heard if read_signals(heard).price else "قیمت") or PRICE_UNKNOWN_LINE
+        lines.append(price_for_turn(state, priced))
+    # The model adds [آدرس] to a busy caller's «سرم شلوغه، سریع بگو» right after the line that already gave it;
+    # «سوزان چی؟ دوباره بگو» or «اسمش چی بود؟» still gets it.
+    signals = read_signals(heard)
+    again = is_repeat(heard) or any(part in (heard or "") for part in _ASK_AGAIN)
+    just_linked = (
+        bool(state.said)
+        and mentions_address(state.said[-1])
+        and (signals.time or signals.later or signals.quick)
+        and not (wants_address(heard) or again)
+    )
+    if (
+        "address" in tags
+        and not just_linked
+        and not mentions_address(spoken)
+        and not any(mentions_address(line) for line in lines)
+    ):
         lines.append(ADDRESS_LINE)
     return lines, False, False
 
