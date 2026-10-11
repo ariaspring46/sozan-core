@@ -56,6 +56,7 @@ const PAGE_TITLES: readonly [string, string][] = [
   ["/more/channels", "کانال‌ها"],
   ["/more/wallet", "کیف پول"],
   ["/more/settings", "پرداخت، ارسال و پیامک"],
+  ["/more/domain", "دامنهٔ اختصاصی"],
   ["/more/support", "پشتیبانی"],
   ["/more/docs", "اسناد آموزشی"],
   ["/more", "بیشتر"],

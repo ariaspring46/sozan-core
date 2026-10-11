@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.7k tokens. Your core files total 23.2k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.8k tokens. Your core files total 23.2k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -67,7 +67,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 23.2k | the files most tasks touch; read the relevant one first |
-| active | 68.7k | yours to edit; read only what the task needs |
+| active | 72.9k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
 | tests | 29.7k | read only the test of the module you change |
 
@@ -83,10 +83,11 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `backend/app/api/`: `pay.py` (4.2k), `storefront.py` (2.9k)
 - `backend/app/scenarios/`: `__init__.py` (0.0k)
 - `backend/app/services/`: `pay_service.py` (9.9k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (2.9k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
+- `frontend/app/more/domain/`: `page.tsx` (4.0k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.7k)
 - `frontend/app/p/[id]/`: `page.tsx` (1.9k)
-- `frontend/components/`: `shop-settings-form.tsx` (8.8k), `product-editor.tsx` (5.3k), `inventory-catalog.tsx` (4.4k), `domain-menu.tsx` (4.3k), `order-flow-card.tsx` (2.8k)
+- `frontend/components/`: `shop-settings-form.tsx` (8.8k), `product-editor.tsx` (5.3k), `domain-menu.tsx` (4.4k), `inventory-catalog.tsx` (4.4k), `order-flow-card.tsx` (2.8k)
 - `frontend/lib/`: `site-host.ts` (0.1k)
 
 **Rare (yours; only when the task names it):**
@@ -335,8 +336,12 @@ GET /settings/support/hub  ()  # owner X5, changed 2026-10-02
     backend/app/api/settings.py: returns keys {tickets}
 GET /settings/support/my-tickets  ()  # owner X5, changed 2026-10-02
     backend/app/api/settings.py: returns keys {tickets}
+GET /shop  ()  # owner X4, changed 2026-10-02
+    backend/app/api/shop.py: response untyped
 PATCH /settings  (body: SettingsIn)  # owner X5, changed 2026-10-02
     backend/app/api/settings.py: SettingsIn {mockSms: bool | None = None; adminPhone: str | None = None; otpTtlSeconds: int | None = None; gatewayPublicUrl: str | None = None; storeName: str | None = None; storeTagline: str | None = None; paymentSandbox: bool | None = None; paymentGateway: str | None = None; paymentMerchantId: str | None = Field(default=None, max_length=80); paymentApiKey: str | None 
+PATCH /shop/domain  (body: DomainIn)  # owner X4, changed 2026-10-11
+    backend/app/api/shop.py: DomainIn {domain: str = Field(default='', max_length=200)}; response untyped
 POST /billing/coupon-preview  (body: CouponPreviewIn)  # owner X5, changed 2026-10-02
     backend/app/api/billing.py: CouponPreviewIn {plan: str = Field(min_length=2, max_length=16); code: str = Field(min_length=1, max_length=40)}; response untyped
 POST /billing/subscribe  (body: SubscribeIn)  # owner X5, changed 2026-10-02
@@ -345,6 +350,8 @@ POST /settings/support/hub/{ticket_id}/reply  (ticket_id: str, body: dict)  # ow
     backend/app/api/settings.py: response untyped
 POST /settings/support/seller-ticket  (body: SellerTicketIn)  # owner X5, changed 2026-10-09
     backend/app/api/settings.py: SellerTicketIn {subject: str = Field(min_length=2, max_length=120); text: str = Field(min_length=2, max_length=2000); category: Literal['billing', 'technical', 'other'] | None = None}; response untyped
+POST /shop/domain/check  ()  # owner X4, changed 2026-10-11
+    backend/app/api/shop.py: response untyped
 ```
 
 **Shared runtime state files** (other roles depend on these keys; changing a key is a contract change):

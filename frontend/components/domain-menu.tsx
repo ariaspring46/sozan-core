@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ExternalLink, Globe, X } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronLeft, ExternalLink, Globe, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBackClose } from "@/lib/back-stack";
@@ -29,7 +30,7 @@ export type ShopState = {
   priceBlocked?: boolean;
 };
 
-function personalDomainValue(shop: ShopState | null) {
+export function personalDomainValue(shop: ShopState | null) {
   const domain = String(shop?.domain || "").trim();
   const pub = String(shop?.publicHost || "").trim();
   if (!domain || domain === pub) return "";
@@ -232,6 +233,10 @@ export function DomainMenu({
           </p>
         ) : null}
         {shop?.cnameCheck?.detail ? <p className="text-sm leading-6 text-warm">{shop.cnameCheck.detail}</p> : null}
+        <Link href="/more/domain" className="tap inline-flex min-h-11 items-center gap-1 text-sm text-warm">
+          راهنمای کامل رکورد DNS و بررسی اتصال
+          <ChevronLeft size={16} aria-hidden />
+        </Link>
         {shop?.cnameSetup?.error ? <p className="text-sm leading-6 text-danger" role="alert">{shop.cnameSetup.error}</p> : null}
         {saveError ? (
           <p className="text-sm leading-6 text-danger" role="alert">

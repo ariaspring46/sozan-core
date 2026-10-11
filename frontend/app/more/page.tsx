@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, ChevronLeft, Clapperboard, CreditCard, LifeBuoy, Package, Palette, Share2, Wallet } from "lucide-react";
+import { BookOpen, ChevronLeft, Clapperboard, CreditCard, Globe, LifeBuoy, Package, Palette, Share2, Wallet } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ const GROUPS = [
     items: [
       { href: "/more/inventory", title: "انبار", hint: "کالا، قیمت و موجودی", icon: Package },
       { href: "/brand", title: "هویت و لوگو", hint: "نام، لوگو و حرکت برند", icon: Palette },
+      { href: "/more/domain", title: "دامنهٔ اختصاصی", hint: "وصل کردن دامنهٔ خودت با CNAME", icon: Globe },
       { href: "/more/channels", title: "کانال‌ها", hint: "اینستاگرام، تلگرام و بقیه", icon: Share2 },
       { href: "/studio", title: "استودیو", hint: "پست‌ها و کمپین‌های ساخته‌شده", icon: Clapperboard },
     ],

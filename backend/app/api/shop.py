@@ -61,6 +61,11 @@ async def shop_domain(body: DomainIn, _user=Depends(require_permission("campaign
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
+@router.post("/domain/check")
+async def shop_domain_check(_user=Depends(require_permission("campaigns:write"))):
+    return await asyncio.to_thread(shop_service.check_domain)
+
+
 @router.post("/build")
 async def shop_build(request: Request, body: BuildIn, _user=Depends(require_permission("campaigns:write"))):
     key = _idempotency_key(request)

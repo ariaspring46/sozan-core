@@ -449,6 +449,49 @@ class LiveShopChatRouteTests(unittest.TestCase):
                 self.assertFalse(saved["cnameOk"])
                 self.assertEqual(saved["cnameSetup"]["host"], "shop.example.com")
 
+    def test_check_domain_looks_the_cname_up_again_and_retries_only_a_failed_setup(self) -> None:
+        base = {
+            **shop_service.DEFAULT_SHOP,
+            "slug": "sozan",
+            "port": 12377,
+            "publicHost": "sozan.sozan-core.ir",
+            "domain": "shop.example.com",
+            "cnameOk": False,
+            "status": "ready",
+        }
+        quiet = (
+            patch("app.services.channel_scan_service.scan_status", return_value={}),
+            patch.object(shop_service, "_factory_status", return_value={}),
+            patch.object(shop_service, "_refresh_job", side_effect=lambda shop: shop),
+        )
+        for setup_before, retried in (({"ok": True, "host": "shop.example.com"}, False), ({"ok": False, "error": "x"}, True)):
+            with tempfile.TemporaryDirectory() as raw:
+                with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                    write_json("shop.json", {**base, "cnameSetup": setup_before})
+                    with (
+                        quiet[0], quiet[1], quiet[2],
+                        patch("app.services.arvan_dns_service.check_cname", return_value={"ok": True, "status": "ok", "detail": "CNAME درست است."}) as check,
+                        patch("app.services.arvan_dns_service.start_cname_setup", return_value={"ok": True, "host": "shop.example.com"}) as setup,
+                    ):
+                        out = shop_service.check_domain()
+                    check.assert_called_once_with("shop.example.com", "sozan")
+                    self.assertEqual(setup.called, retried)
+                    self.assertTrue(out["shop"]["cnameOk"])
+                    self.assertTrue(shop_service._shop()["cnameSetup"]["ok"])
+                    self.assertIn("at", shop_service._shop()["cnameCheck"])
+        # the Sozan address itself is never looked up or sent to ArvanCloud
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                write_json("shop.json", {**base, "domain": "sozan.sozan-core.ir", "cnameOk": True})
+                with (
+                    quiet[0], quiet[1], quiet[2],
+                    patch("app.services.arvan_dns_service.check_cname") as check,
+                    patch("app.services.arvan_dns_service.start_cname_setup") as setup,
+                ):
+                    shop_service.check_domain()
+                check.assert_not_called()
+                setup.assert_not_called()
+
     def test_set_domain_rejects_host_claimed_by_another_shop(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw):
