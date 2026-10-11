@@ -80,13 +80,15 @@ EXPLAIN = (
 )
 CLOSE_LINE = "پس یادتون نره: sozan-core.ir، دکمهٔ ورود، رایگان می‌سازید. روزتون خوش!"
 ADDRESS_LINE = (
-    "آدرسش سوزان، خط تیره، کُر، دات آی‌آره! "
+    "آدرسش سوزان، خط تیره، کُر، دات آی‌آر! "
     "واردش بشید، دکمهٔ ورود رو بزنید، رایگان شروع می‌کنید."
 )
 WAIT_LINE = "حتماً!"
 WAIT_BRIGHT = ("حتماً!", "سؤال خوبیه!", "حق دارید!")
 FALLBACK_LINE = "سؤال دیگه‌ای هست که بگم؟"
-MISHEARD_LINE = "ببخشید، صداتون یه لحظه قطع شد، یه بار دیگه می‌فرمایید؟"
+HOW_ADDRESS_LINE = f"سوزان پیش‌نویس جواب دایرکت‌هاتون رو می‌نویسه و شما تأیید می‌کنید. آدرسش {SPOKEN_ADDRESS}؛ واردش بشید، دکمهٔ ورود رو بزنید."
+_HOW_WORKS = ("چجوری کار", "چطوری کار", "چه جوری کار", "چطور کار")
+MISHEARD_LINE = "ببخشید، متوجه نشدم؛ یه بار دیگه می‌فرمایید؟"
 SALES_PROBE_LINE = "الو؟ صدامو دارید؟"
 PITCH_MARKS = ("حسش", "رنگش", "بنویس بساز", "می‌نویسی بساز")
 _FAKE_NAME = re.compile(r"(?:^|[\s،,])(حسین|حسن|علی|رضا|محمد|مهدی)(?:[\s،,]|$)")
@@ -1339,7 +1341,8 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             state.stage = "confirm"
         else:
             state.stage = "cta"
-            return TurnPlan(kind="address", line=ADDRESS_LINE, signals=signals)
+            how = any(part in heard for part in _HOW_WORKS)
+            return TurnPlan(kind="address", line=HOW_ADDRESS_LINE if how else ADDRESS_LINE, signals=signals)
     if signals.refuse and not state.pain_asked:
         # «نمی‌خوام» before anything was pitched: thanks, not the pitch.
         return TurnPlan(kind="close", line=DECLINE_LINE, hangup=True, signals=signals)

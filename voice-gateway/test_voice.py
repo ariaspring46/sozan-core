@@ -1983,6 +1983,21 @@ class LiveSimTest(unittest.TestCase):
         self.assertEqual(reply, sales.COMPANY_LINE)
         self.assertIn("گهر شبکه کارمانیا", sales.sales_open())
 
+    def test_how_it_works_before_the_address_and_the_spoken_domain(self) -> None:
+        import sales
+
+        # Offline replay: «چجوری کار می‌کنه از کجا شروع کنم» got the address alone, so the caller never heard what it does.
+        plan = plan_turn(self.opened(), "چجوری کار می‌کنه از کجا باید شروع کنم")
+        self.assertEqual(plan.line, sales.HOW_ADDRESS_LINE)
+        self.assertIn("پیش‌نویس", plan.line)
+        self.assertLess(len(plan.line.split()), 25)
+        self.assertEqual(plan_turn(self.opened(), "چطوری شروع کنم").line, sales.ADDRESS_LINE)
+        # The spoken domain ends «آی‌آر»: «آی‌آره» is said like «آره», yes.
+        self.assertNotIn("آی‌آره", sales.ADDRESS_LINE)
+        self.assertIn("آی‌آر", sales.ADDRESS_LINE)
+        self.assertNotIn("قطع", sales.MISHEARD_LINE)
+        self.assertTrue(sales.mentions_address(sales.HOW_ADDRESS_LINE))
+
     def test_sim_renders_the_card_opening_like_a_dial(self) -> None:
         import main as main_module
         import sales
