@@ -52,9 +52,10 @@ from meaning import INTENTS
 from sales import (
     ADDRESS_LINE,
     BUY_LINE,
-    BYE_LINE,
+    BYE_LINE as SALES_BYE_LINE,
     CAMPAIGN_PATH,
     CLOSE_LINE,
+    DECLINE_LINE,
     EXPLAIN,
     FALLBACK_LINE,
     FIXED_SALES_LINES,
@@ -76,10 +77,13 @@ from sales import (
     gift_line,
     guard_reply,
     load_campaign,
+    mentions_address,
     note_spoken,
     plan_turn,
+    read_signals,
     remember_dnc,
     sales_brief,
+    sentence_done,
     sales_ended,
     sales_open,
     hello_for,
@@ -87,6 +91,7 @@ from sales import (
     value_kind_for,
     cached_sales_lines,
     too_alike,
+    tool_followups,
     wait_line,
 )
 from sip import Call, SipUA, env_flag, normalize_dial
@@ -533,6 +538,7 @@ class Gateway:
         self._greet_pcm = b""
         self._clip_dir = Path.home() / "local-ai" / "sozan-voice-clips"
         self._voice: dict[str, bytes] = {}
+        self._prefetching = threading.Event()
         self._helloed = False
         self._step = False
         self._last_kind = ""
@@ -700,6 +706,27 @@ class Gateway:
                     self._outbound_pitch = False
                 conn.send(f"{placed or 'busy'}\n".encode())
 
+    def _prefetch_sales_lines(self) -> None:
+        """Load or render the sales lines behind the call, so the caller's «الو» never waits on them. A line the cloud
+        cannot make is skipped, not the rest: lines already on disk still load, and the voice's own breaker keeps a
+        402 (no credit) to one request."""
+        if self._prefetching.is_set():
+            return
+        self._prefetching.set()
+
+        def run() -> None:
+            try:
+                for line in cached_sales_lines():
+                    if line in self._voice:
+                        continue
+                    pcm = self.brain.prefetch_cloud(line)
+                    if pcm:
+                        self._voice[line] = pcm
+            finally:
+                self._prefetching.clear()
+
+        threading.Thread(target=run, name="sozan-sales-prefetch", daemon=True).start()
+
     def _reload_campaign(self) -> None:
         """enrich_campaign.py rewrites the file between calls; pick up its profiles without a restart."""
         try:
@@ -734,9 +761,12 @@ class Gateway:
         self._pending_sales = ShopCard(instagram=instagram, product=product) if instagram else None
         self._outbound_pitch = True
         self._sim_until = time.monotonic() + SIM_ARM_S
+        # Like DIAL: the card's own opening renders now, so the sim does not wait 8 s of Piper on «سلام».
+        greet = hello_for(self._pending_sales)
+        self._prerender([greet, value_for(self._pending_sales)])
         brief = sales_brief(self._pending_sales) if self._pending_sales else sales_open()
         try:
-            self.brain.warm_sales(brief, HELLO_LINE)
+            self.brain.warm_sales(brief, greet)
         except Exception:
             log.warning("sales warm on sim failed", exc_info=True)
         log.info("sim armed seconds=%s instagram=%s", SIM_ARM_S, instagram or "-")
@@ -884,12 +914,7 @@ class Gateway:
             self._end_call(None)
             return
         if self._sales_state and tts_model():
-            for line in cached_sales_lines():
-                if line in self._voice:
-                    continue
-                pcm = self.brain.prefetch_cloud(line)
-                if pcm:
-                    self._voice[line] = pcm
+            self._prefetch_sales_lines()
         deadline = time.monotonic() + 15 * 60
         while self.ua.running and time.monotonic() < deadline and generation == self._call_generation:
             try:
@@ -1260,33 +1285,15 @@ class Gateway:
         extra = self._pending_heard(session)
         if extra:
             heard = f"{heard} {extra}".strip()
+        # The number is kept here: a caller who hangs up right after «زنگ نزنید» clears self._peer_number.
+        peer = self._peer_number
         plan = plan_turn(state, heard)
         if plan.kind == "hold":
             log.info("sales holding for hello text=%s", heard[:80])
             self._log_sales_turn(heard, "hold", "", 0.0, 0.0, False, False)
             return False
         if plan.kind in {"hello", "close", "address", "fallback", "feature"}:
-            line = plan.line or (HELLO_LINE if plan.kind == "hello" else CLOSE_LINE)
-            if plan.kind == "address":
-                line = plan.line or ADDRESS_LINE
-            if plan.kind == "fallback":
-                line = plan.line or MISHEARD_LINE
-            self.brain.commit_assistant(line)
-            note_spoken(state, line)
-            log.info("sales llm=0.00 kind=%s line=%s", plan.kind, line)
-            self._log_sales_turn(heard, plan.kind, line, 0.0, 0.0, state.gifted, plan.hangup)
-            self._speak(session, generation, line, "bye" if plan.hangup else "meaning")
-            if plan.hangup and plan.signals.wrong:
-                remember_dnc(self._peer_number)
-                log.info("sales outcome dnc")
-            if plan.hangup and state.agreed:
-                log.info("sales outcome interested")
-            if plan.hangup:
-                session.wait_done(8)
-                self.ua.hangup()
-                self._end_call(None)
-                return True
-            return False
+            return self._sales_fixed(session, generation, state, heard, plan, peer)
         started = time.monotonic()
         played_flag = {"on": False}
         self._sales_turn_seq += 1
@@ -1320,6 +1327,7 @@ class Gateway:
         model_name = ""
         played = False
         retry_heard = ""
+        late_heard = ""
         gen = self.brain.sales_stream(plan.cue, cancel)
         try:
             for bit in self._ahead_sales(gen, cancel, generation):
@@ -1329,6 +1337,7 @@ class Gateway:
                 if extra or session._speech:
                     cancel.set()
                     retry_heard = f"{heard} {extra}".strip() if extra else heard
+                    late_heard = extra
                     break
                 sentence, raw_all, tags, spoken_parts, generated, played, first_audio, first_token_s, prompt_n = (
                     self._sales_play_bit(
@@ -1355,8 +1364,13 @@ class Gateway:
             gen.close()
         if retry_heard and not spoken_parts and generation == self._call_generation:
             heard = retry_heard
+            late_heard = ""
             self.brain.pop_last_user()
             plan = plan_turn(state, heard)
+            if plan.kind in {"hello", "close", "address", "fallback", "feature"}:
+                # «...نه، زنگ نزنید» said while the model was thinking gets its own fixed line and DNC.
+                session.play(b"", end=True)
+                return self._sales_fixed(session, generation, state, heard, plan, peer)
             if plan.kind == "model":
                 cancel = threading.Event()
                 self._sales_cancel = cancel
@@ -1391,19 +1405,51 @@ class Gateway:
                 finally:
                     retry_gen.close()
         session.play(b"", end=True)
+        if late_heard and late_echo(late_heard, spoken_parts):
+            log.info("dropped echo text=%s", late_heard[:80])
+            late_heard = ""
         generated_text = " ".join(generated).strip()
         spoken = " ".join(spoken_parts).strip()
         tags |= extract_tags(raw_all or generated_text)[1]
         if not spoken:
             spoken, more_tags = finish_spoken(raw_all or generated_text, state, heard)
             tags |= more_tags
-        offer_gift = plan.allow_gift and not state.gifted and (plan.signals.price or plan.signals.later or "gift" in tags)
-        if not spoken and not offer_gift:
+            if spoken and not sentence_done(spoken):
+                # A cut-off reply («عرض کنم که [پایان]») is never spoken.
+                spoken = ""
+            if spoken and not session._speech:
+                self._speak_more(session, generation, spoken)
+        refused = plan.signals.refuse or state.refused_cta
+        offer_gift = (
+            plan.allow_gift
+            and not state.gifted
+            and not refused
+            and (plan.signals.price or plan.signals.later or "gift" in tags)
+        )
+        tool_lines, tool_end, tool_dnc = tool_followups(tags, state, heard, spoken)
+        for extra in tool_lines:
+            self._speak_more(session, generation, extra)
+            spoken = f"{spoken} {extra}".strip()
+        if tool_dnc:
+            offer_gift = False
+            remember_dnc(peer)
+            log.info("sales outcome dnc")
+        if not spoken and not offer_gift and (tool_end or "end" in tags):
+            # A reply that is only [پایان] still ends the call: thanks for a refusal, else the closing line below.
+            if refused:
+                spoken = DECLINE_LINE
+                self._speak(session, generation, spoken, "bye")
+        elif not spoken and not offer_gift:
             spoken = fallback_line(state, heard)
             tags = set()
             self._speak(session, generation, spoken, "meaning")
-        if (plan.signals.price or plan.signals.later) and "sozan-core" not in spoken and "ورود" not in spoken:
-            extra = "برید sozan-core.ir، دکمهٔ ورود رو بزنید، رایگانه."
+        later_again = plan.signals.later and state.linked and not plan.signals.price
+        if (
+            (plan.signals.price or plan.signals.later)
+            and not (tool_dnc or refused or later_again)
+            and not mentions_address(spoken)
+        ):
+            extra = BUY_LINE
             self._speak_more(session, generation, extra)
             spoken = f"{spoken} {extra}".strip()
         if offer_gift:
@@ -1425,7 +1471,7 @@ class Gateway:
             cost = float(usage.get("cost") or 0)
         if usage.get("prompt"):
             prompt_n = int(usage.get("prompt") or prompt_n)
-        hangup = plan.hangup or "end" in tags or sales_ended(heard, spoken)
+        hangup = plan.hangup or "end" in tags or tool_end or sales_ended(heard, spoken)
         log.info(
             "sales llm=%.2f first_token=%.2f first_audio=%.2f prompt_n=%s cost=%.6f model=%s kind=%s line=%s",
             took,
@@ -1446,8 +1492,44 @@ class Gateway:
         self._last_line = spoken
         self._spoke_at = time.monotonic()
         if hangup:
-            if CLOSE_LINE not in spoken:
-                self._speak(session, generation, CLOSE_LINE, "bye")
+            # A refusal or do-not-call ends with thanks, never one more pitch of the address;
+            # an address already given this turn is not repeated by the closing line.
+            if CLOSE_LINE not in spoken and not tool_dnc and not refused:
+                closing = SALES_BYE_LINE if mentions_address(spoken) else CLOSE_LINE
+                if not (closing == SALES_BYE_LINE and wants_bye(spoken)):
+                    self._speak(session, generation, closing, "bye")
+            if late_heard and read_signals(late_heard).wrong:
+                remember_dnc(peer)
+                log.info("sales outcome dnc")
+            session.wait_done(8)
+            self.ua.hangup()
+            self._end_call(None)
+            return True
+        if late_heard and generation == self._call_generation:
+            # Words said over the first sentence are the caller's next turn, not noise.
+            return self._sales_speak(session, generation, late_heard)
+        return False
+
+    def _sales_fixed(
+        self, session: RtpSession, generation: int, state: SalesState, heard: str, plan, peer: str
+    ) -> bool:
+        line = plan.line or (HELLO_LINE if plan.kind == "hello" else CLOSE_LINE)
+        if plan.kind == "address":
+            line = plan.line or ADDRESS_LINE
+        if plan.kind == "fallback":
+            line = plan.line or MISHEARD_LINE
+        if plan.hangup and (plan.signals.wrong or plan.dnc):
+            # Written before the goodbye plays: hanging up during it must not lose the request.
+            remember_dnc(peer)
+            log.info("sales outcome dnc")
+        self.brain.commit_assistant(line)
+        note_spoken(state, line)
+        log.info("sales llm=0.00 kind=%s line=%s", plan.kind, line)
+        self._log_sales_turn(heard, plan.kind, line, 0.0, 0.0, state.gifted, plan.hangup)
+        self._speak(session, generation, line, "bye" if plan.hangup else "meaning")
+        if plan.hangup and state.agreed:
+            log.info("sales outcome interested")
+        if plan.hangup:
             session.wait_done(8)
             self.ua.hangup()
             self._end_call(None)
@@ -1560,6 +1642,18 @@ class Gateway:
             session.play(pcm, end=False)
         self._last_line = line
         self._spoke_at = time.monotonic()
+
+
+def late_echo(late: str, spoken_parts: list[str]) -> bool:
+    """Words heard over a sentence that are mostly that sentence; a «درسته، ولی زنگ نزنید» over «درسته!» is the caller."""
+    signals = read_signals(late)
+    if signals.wrong or signals.refuse or signals.bye:
+        return False
+    for part in spoken_parts:
+        said = len(part.split())
+        if said >= 3 and looks_like_echo(late, part) and len(late.split()) <= said + 2:
+            return True
+    return False
 
 
 def load_env_file() -> None:

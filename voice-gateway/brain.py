@@ -44,8 +44,10 @@ JUNK = re.compile(
     re.IGNORECASE,
 )
 FA = re.compile(r"[\u0600-\u06FF]")
+# «فعلاً» and «تمام» end a call only as the last word: «فعلاً خودم جواب می‌دم» and «تمام روز» are not goodbyes.
 BYE = re.compile(
-    r"خداحافظ|خدا حافظ|خدافه|فلحافظ|خداحاف|خحافظ|خدانگهدار|خدا نگهدار|باشه خدا(?:حافظ)?|ممنون خدا|مرسی خدا|فعلا|تمام|قطع کن"
+    r"خداحافظ|خدا حافظ|خدافه|فلحافظ|خداحاف|خحافظ|خدانگهدار|خدا نگهدار|باشه خدا(?:حافظ)?|ممنون خدا|مرسی خدا|قطع کن"
+    r"|فعلاً? با اجازه|(?:^|\s)فعلاً?[\s.!،؟?]*$|(?:^|\s)تمام(?: شد)?[\s.!،؟?]*$"
 )
 _HELLO = ("سلام", "درود", "صبح بخیر", "عصر بخیر", "خوبی", "خوبید", "چطوری", "الو", "هلو", "هالو")
 _ACK = {
@@ -74,6 +76,8 @@ def chat_completions_url(url: str) -> str:
 
 
 TTS_STYLE = "خانم، گرم، دوستانه و آرام، فروشندهٔ مؤدب، با مکث طبیعی؛ نه خبرخوان"
+# No credit (402) or a refused key (401/403) does not fix itself mid-call: Piper speaks until this has passed.
+CLOUD_OFF_S = 300.0
 
 
 def cloud_speech_body(model: str, voice: str, text: str) -> dict:
@@ -192,6 +196,12 @@ def open_llm(url: str, req: urllib.request.Request, timeout: float):
     if llm_is_local(url):
         return urllib.request.urlopen(req, timeout=timeout)
     return _DIRECT.open(req, timeout=timeout)
+
+
+def _has_tool_tag(raw: str) -> bool:
+    from sales import extract_tags
+
+    return bool(extract_tags(raw)[1])
 
 
 def speakable(text: str, sentences: int = 1) -> str:
@@ -690,6 +700,7 @@ class Brain:
             os.environ.get("LLM_URL", "http://127.0.0.1:19292/v1")
         )
         self.llm_model = os.environ.get("LLM_MODEL", "ornith-phone")
+        self._cloud_off_until = 0.0
         self.llm_fallback_url = chat_completions_url(
             os.environ.get("LLM_FALLBACK_URL", "http://127.0.0.1:19292/v1")
         )
@@ -1107,11 +1118,11 @@ class Brain:
                 log.info("sales llm fallback")
             try:
                 for bit in self._sales_events(url, model, messages, cancel, started):
-                    if str(bit.get("sentence") or "").strip():
+                    if str(bit.get("sentence") or "").strip() or _has_tool_tag(str(bit.get("raw") or "")):
                         spoke = True
                     yield bit
             except Exception as exc:
-                log.warning("sales stream failed %s", type(exc).__name__)
+                log.warning("sales stream failed %s %s", type(exc).__name__, getattr(exc, "code", ""))
             if spoke or (cancel is not None and cancel.is_set()):
                 return
         elapsed = time.monotonic() - started
@@ -1199,15 +1210,16 @@ class Brain:
                     except Exception:
                         continue
                     take_usage(body)
-                    if sent_count >= 2:
-                        continue
                     delta = ((body.get("choices") or [{}])[0].get("delta") or {})
                     piece = str(delta.get("content") or "")
                     if not piece:
                         continue
                     if not first_token_s and piece.strip():
                         first_token_s = time.monotonic() - started
+                    # Keep reading after two sentences: a tool tag ([پایان]، [آدرس]...) usually comes last.
                     raw += piece
+                    if sent_count >= 2:
+                        continue
                     buf += piece
                     ready, buf = take_ready_sentences(buf)
                     for sentence in ready:
@@ -1218,6 +1230,9 @@ class Brain:
         tail = stream_tail(buf) if sent_count < 2 else ""
         if tail:
             yield pack(tail)
+        if "[" in raw:
+            # Nothing more to say, but the full text carries the tags the gateway acts on.
+            yield pack("")
         self.last_sales_stats = {
             "first_token_s": first_token_s,
             "prompt_n": prompt_n,
@@ -1273,7 +1288,7 @@ class Brain:
     def cloud_pcm(self, text: str, first_s: float) -> bytes:
         model = tts_model()
         key = os.environ.get("LLM_API_KEY", "").strip()
-        if not model or not key or not text:
+        if not model or not key or not text or time.monotonic() < self._cloud_off_until:
             return b""
         voice = os.environ.get("TTS_VOICE", "Kore").strip()
         body = cloud_speech_body(model, voice, mask_private(text))
@@ -1287,7 +1302,10 @@ class Brain:
         try:
             res = _DIRECT.open(req, timeout=first_s + 8)
         except Exception as exc:
-            log.warning("tts cloud failed %s", type(exc).__name__)
+            # HTTPError carries the status (402 = no OpenRouter credit, 400 = bad model id); log it, never the body.
+            log.warning("tts cloud failed %s %s", type(exc).__name__, getattr(exc, "code", ""))
+            if getattr(exc, "code", None) in (401, 402, 403):
+                self._cloud_off_until = time.monotonic() + CLOUD_OFF_S
             return b""
         try:
             ctype = res.headers.get("content-type") or ""
