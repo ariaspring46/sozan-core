@@ -109,6 +109,33 @@ class InboxAgentTests(unittest.TestCase):
         self.assertEqual(len(hits), 1)
         self.assertIn("نقره", str(hits[0].get("title") or ""))
 
+    def test_order_questions_get_the_persian_stage_and_tracking(self) -> None:
+        # 2026-10-11: the canned line said «وضعیت سفارش …: paid», looked only for digit ids (real ids are like
+        # 9S8OZEsxL2s), and «ارسال شد؟» got «وضعیت ارسال را از اینجا اعلام نمی‌کنم» although stage and tracking exist
+        from app.state_store import write_json
+
+        orders = [
+            {"id": "9S8OZEsxL2s", "title": "کیف دوشی", "amount": 890000, "status": "paid", "stage": "shipped", "tracking": "5566", "at": 1},
+            {"id": "Ab12Cd34", "title": "شال", "amount": 300000, "status": "pending", "at": 2},
+        ]
+        with tenant_scope("09120001111"), patch.object(settings, "state_dir", str(self.root)), patch(
+            "app.services.inbox_agent_service.emit_later"
+        ), patch("app.services.inbox_agent_service.complete_tools", side_effect=AssertionError("no model for stored facts")):
+            write_json("pay-orders.json", orders)
+            shipped = asyncio.run(inbox_agent_service.answer("سفارش 9S8OZEsxL2s ارسال شد؟")) or ""
+            pending = asyncio.run(inbox_agent_service.answer("کد رهگیری Ab12Cd34 رو بدید")) or ""
+            unknown = asyncio.run(inbox_agent_service.answer("سفارش ZZ99zz99 کجاست")) or ""
+            no_id = asyncio.run(inbox_agent_service.answer("بسته‌ام ارسال شد؟")) or ""
+            tool = inbox_agent_service.tool_order_status("9S8OZEsxL2s")
+        self.assertIn("کیف دوشی", shipped)
+        self.assertIn("ارسال‌شده، رهگیری ۵۵۶۶", shipped)
+        self.assertNotIn("paid", shipped)
+        self.assertIn("در انتظار پرداخت", pending)
+        self.assertEqual(unknown, "سفارش پیدا نشد.")
+        self.assertIn("شمارهٔ سفارش", no_id)
+        self.assertNotIn("اعلام نمی‌کنم", no_id)
+        self.assertEqual(tool["status"], "ارسال‌شده، رهگیری ۵۵۶۶")
+
     def test_missing_order_is_honest(self) -> None:
         seen: list = []
         payloads = [

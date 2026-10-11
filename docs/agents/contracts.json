@@ -2222,6 +2222,14 @@
    "X1"
   ]
  },
+ "backend/app/services/order_flow_service.py::shopper_line": {
+  "owner": "C",
+  "signature": "def shopper_line(row: dict) -> str",
+  "since": "2026-10-11",
+  "users": [
+   "Y"
+  ]
+ },
  "backend/app/services/order_flow_service.py::stage_line": {
   "owner": "C",
   "signature": "def stage_line(row: dict) -> str",
