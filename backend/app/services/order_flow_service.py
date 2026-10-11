@@ -28,6 +28,13 @@ STAGE_FA = {
     "delivered": "تحویل‌شده",
     "cancelled": "لغوشده",
 }
+PAY_FA = {
+    "paid": "پرداخت‌شده",
+    "pending": "در انتظار پرداخت",
+    "awaiting_receipt": "رسید منتظر بررسی",
+    "receipt_rejected": "رسید ردشده",
+    "failed": "پرداخت ناموفق",
+}
 TELLS_SHOPPER = frozenset({"shipped", "cancelled"})
 ADDRESS_MIN, ADDRESS_MAX = 10, 400
 _FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
@@ -196,6 +203,11 @@ def set_address(order_id: str, address: str) -> dict:
         pay_service.log_event(row, "address", "عوض شد" if changed else "ثبت شد")
         pay_service._save_orders(orders)
         return pay_service.public_order(row)
+
+
+def shopper_line(row: dict) -> str:
+    """What a shopper is told about an order in the DM: the shipping stage (with tracking) once paid, else the payment state."""
+    return stage_line(row) or PAY_FA.get(str(row.get("status") or ""), "ثبت‌شده")
 
 
 def stage_line(row: dict) -> str:

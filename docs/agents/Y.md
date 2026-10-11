@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.1k tokens. Your core files total 31.8k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~10.2k tokens. Your core files total 32.0k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -66,21 +66,21 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 31.8k | the files most tasks touch; read the relevant one first |
-| active | 67.2k | yours to edit; read only what the task needs |
+| core | 32.0k | the files most tasks touch; read the relevant one first |
+| active | 67.4k | yours to edit; read only what the task needs |
 | rare | 19.8k | yours; read only when the task names it |
-| tests | 37.0k | read only the test of the module you change |
+| tests | 37.7k | read only the test of the module you change |
 
 **Core:**
 
-- `backend/app/services/inbox_agent_service.py` (15.8k)
+- `backend/app/services/inbox_agent_service.py` (16.0k)
 - `backend/app/services/inbox_service.py` (10.5k)
 - `backend/app/services/sales_policy_service.py` (5.5k)
 
 **Active (you may edit):**
 
 - `backend/app/api/`: `inbox.py` (1.8k)
-- `backend/app/services/`: `inbox_agent_service.py` (15.8k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (3.5k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (1.2k), `pii_mask.py` (0.5k)
+- `backend/app/services/`: `inbox_agent_service.py` (16.0k), `inbox_service.py` (10.5k), `sales_policy_service.py` (5.5k), `shop_memory_service.py` (3.5k), `voice_service.py` (1.6k), `customer_memory_service.py` (1.5k), `training_log.py` (1.5k), `claims_guard.py` (1.2k), `pii_mask.py` (0.5k)
 - `frontend/app/inbox/`: `page.tsx` (4.5k)
 - `frontend/app/inbox/[id]/`: `page.tsx` (2.3k)
 - `frontend/app/sales/`: `page.tsx` (4.1k)
@@ -107,6 +107,7 @@ def edge_dry() -> bool  # changed 2026-09-27
 ```
 **`backend/app/services/order_flow_service.py`** — owner C
 ```
+def shopper_line(row: dict) -> str  # What a shopper is told about an order in the DM: the shipping stage (with tracking) once paid, else the paymen  # changed 2026-10-11
 def stage_line(row: dict) -> str  # «منتظر ارسال» / «ارسال‌شده، رهگیری ۱۲۳» for chat and lists; payment states for unpaid orders.  # changed 2026-10-09
 ```
 **`backend/app/services/pay_service.py`** — owner C

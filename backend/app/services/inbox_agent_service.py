@@ -297,13 +297,14 @@ def tool_order_status(order_id: str) -> dict:
     if not row:
         return {"ok": False, "error": "سفارش پیدا نشد"}
     pub = public_order(row)
-    from app.services.order_flow_service import stage_line
+    from app.services.order_flow_service import shopper_line, stage_line
 
     return {
         "ok": True,
         "id": pub.get("id") or "",
         "title": pub.get("title") or "",
-        "status": pub.get("status") or "",
+        # Persian for the shopper: the model once echoed the raw code («paid»)
+        "status": shopper_line(row),
         "amount": int(pub.get("amount") or 0),
         "stage": stage_line(row),
         "tracking": pub.get("tracking") or "",
@@ -970,25 +971,38 @@ def _catalog_sentence(sentence: str, products: list[dict]) -> str:
     return " ".join(lines)
 
 
+def _order_ids(sentence: str) -> list[str]:
+    """Order numbers in a DM: Sozan's ids are 6–12 letters and digits (`9S8OZEsxL2s`), older ones plain digits."""
+    text = _digit_fold(sentence)
+    found = [
+        token
+        for token in re.findall(r"(?<![A-Za-z0-9])[A-Za-z0-9]{6,12}(?![A-Za-z0-9])", text)
+        if re.search(r"[0-9A-Z]", token)
+    ]
+    found += [run for run in re.findall(r"\d{3,}", text) if run not in found]
+    return found[:3]
+
+
 async def _known_reply(thread: dict | None, sentence: str) -> str | None:
     """Facts the shop already stores. The model is only for what is not stored."""
     folded = _norm(sentence)
-    if "ارسال شد" in folded:
-        return _finish("وضعیت ارسال را از اینجا اعلام نمی‌کنم.", "order")
     if any(mark in folded for mark in _HANDOFF_MARKS):
         return _finish_handoff(thread, "نیاز به انسان")
     if any(mark in folded for mark in _ADDRESS_MARKS):
         return _finish("نشانی حضوری در سیاست این فروشگاه ثبت نشده.", "address")
-    if "سفارش" in folded:
-        order_ids = re.findall(r"\d{3,}", _digit_fold(sentence))
+    if "سفارش" in folded or "ارسال شد" in folded or "رهگیری" in folded:
+        # since the order flow (stage, tracking) «ارسال شد؟» has a real answer; it used to get a fixed refusal
+        order_ids = _order_ids(sentence)
+        for order_id in order_ids:
+            row = tool_order_status(order_id)
+            if row.get("ok"):
+                title = f" ({row['title']})" if row.get("title") else ""
+                return _finish(f"سفارش {row.get('id') or order_id}{title}: {row.get('status')}.", "order")
         if order_ids:
-            row = tool_order_status(order_ids[0])
-            if not row.get("ok"):
-                return _finish("سفارش پیدا نشد.", "order")
-            return _finish(f"وضعیت سفارش {row.get('id') or order_ids[0]}: {row.get('status') or ''}.", "order")
+            return _finish("سفارش پیدا نشد.", "order")
         if re.search(r"[A-Za-z]{3,}", sentence):
             return None
-        return _finish("شماره سفارش را بگویید. اگر در فروشگاه نباشد می‌گویم سفارش پیدا نشد.", "order")
+        return _finish("شمارهٔ سفارش را بفرستید تا وضعیت و کد رهگیری را بگویم.", "order")
     if any(mark in folded for mark in _CONFIRM_MARKS):
         return _finish(CONFIRM_LINE, "payment")
     products = _mentioned_products(sentence)

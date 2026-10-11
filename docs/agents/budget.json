@@ -53,14 +53,14 @@
    "tests": 56439
   },
   {
-   "active": 67236,
-   "core": 31801,
+   "active": 67430,
+   "core": 31995,
    "core_pct": 71,
    "id": "Y",
    "loose_contracts": 13,
-   "manifest": 10135,
+   "manifest": 10189,
    "rare": 19762,
-   "tests": 37035
+   "tests": 37688
   },
   {
    "active": 79109,
@@ -73,12 +73,12 @@
    "tests": 14831
   },
   {
-   "active": 72863,
+   "active": 73026,
    "core": 23173,
    "core_pct": 51,
    "id": "C",
-   "loose_contracts": 22,
-   "manifest": 11849,
+   "loose_contracts": 23,
+   "manifest": 11862,
    "rare": 11609,
    "tests": 29668
   },

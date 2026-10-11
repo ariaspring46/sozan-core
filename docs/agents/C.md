@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.8k tokens. Your core files total 23.2k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.9k tokens. Your core files total 23.2k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -67,7 +67,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 23.2k | the files most tasks touch; read the relevant one first |
-| active | 72.9k | yours to edit; read only what the task needs |
+| active | 73.0k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
 | tests | 29.7k | read only the test of the module you change |
 
@@ -82,7 +82,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 - `backend/app/api/`: `pay.py` (4.2k), `storefront.py` (2.9k)
 - `backend/app/scenarios/`: `__init__.py` (0.0k)
-- `backend/app/services/`: `pay_service.py` (9.9k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (2.9k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
+- `backend/app/services/`: `pay_service.py` (9.9k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (3.0k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
 - `frontend/app/more/domain/`: `page.tsx` (4.0k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.7k)
@@ -378,7 +378,7 @@ A reviewer (ناظر) reviews line by line and is the only one who merges (squas
 - `backend/app/api/storefront.py`: `router` (changed 2026-09-18) ← X5
 - `backend/app/services/arvan_dns_service.py`: `check_cname` (changed 2026-09-18) ← X4; `cname_target` (changed 2026-09-18) ← X4; `edge_dry` (changed 2026-09-27) ← X4, X5, Y; `ensure_shop_record` (changed 2026-09-18) ← X4; `hostname` (changed 2026-09-18) ← X4; `is_zone_host` (changed 2026-09-18) ← X4; `public_host` (changed 2026-09-18) ← X4; `start_cname_setup` (changed 2026-09-18) ← X4; `zone` (changed 2026-09-18) ← X4
 - `backend/app/services/catalog_sync_service.py`: `sync_live` (changed 2026-09-18) ← X1, X4
-- `backend/app/services/order_flow_service.py`: `STAGES` (changed 2026-10-09) ← X1; `STAGE_FA` (changed 2026-10-09) ← X1; `TELLS_SHOPPER` (changed 2026-10-09) ← X1; `advance_order` (changed 2026-10-09) ← X1; `notify_channel` (changed 2026-10-09) ← X1; `stage_line` (changed 2026-10-09) ← X1, Y; `stage_problem` (changed 2026-10-09) ← X1
+- `backend/app/services/order_flow_service.py`: `STAGES` (changed 2026-10-09) ← X1; `STAGE_FA` (changed 2026-10-09) ← X1; `TELLS_SHOPPER` (changed 2026-10-09) ← X1; `advance_order` (changed 2026-10-09) ← X1; `notify_channel` (changed 2026-10-09) ← X1; `shopper_line` (changed 2026-10-11) ← Y; `stage_line` (changed 2026-10-09) ← X1, Y; `stage_problem` (changed 2026-10-09) ← X1
 - `backend/app/services/pay_service.py`: `_orders` (changed 2026-10-09) ← X1; `_save_orders` (changed 2026-10-09) ← X1; `create_order` (changed 2026-10-09) ← Y; `ensure_pay_secret` (changed 2026-09-18) ← X4; `get_order` (changed 2026-09-18) ← Y; `list_orders` (changed 2026-10-09) ← X1; `log_event` (changed 2026-10-09) ← X1; `public_order` (changed 2026-09-18) ← Y; `review_receipt` (changed 2026-10-09) ← X1
 - `backend/app/services/storefront_service.py`: `_list` (changed 2026-10-09) ← X1; `_row_images` (changed 2026-10-09) ← X1; `add_product` (changed 2026-09-18) ← X4; `clear_scanned_catalog` (changed 2026-09-18) ← X3; `count_scanned_handle` (changed 2026-09-19) ← X3; `is_placeholder_catalog` (changed 2026-10-06) ← X2, X3, X4; `list_products` (changed 2026-09-18) ← X1, X2, X3, X4, Y; `list_sales` (changed 2026-09-18) ← X1, X5; `price_label` (changed 2026-09-18) ← X4; `referenced_image_names` (changed 2026-09-18) ← X2; `remove_product_by_title` (changed 2026-09-18) ← X1, X4; `remove_scanned_handle` (changed 2026-09-18) ← X3; `retitle_scanned_from_captions` (changed 2026-09-18) ← X5; `update_product` (changed 2026-10-06) ← X1, X4; `upsert_scanned_product` (changed 2026-09-18) ← X3
 - `backend/app/services/support_service.py`: `create_ticket` (changed 2026-10-09) ← X5; `list_all_tickets_for_hub_admin` (changed 2026-09-29) ← X5; `list_tickets` (changed 2026-09-29) ← X5; `reply_hub_ticket` (changed 2026-10-01) ← X5
