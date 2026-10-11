@@ -1839,6 +1839,25 @@ class LiveSimTest(unittest.TestCase):
         for line in (sales.PRICE_AGAIN_UNKNOWN_LINE, f"{sales.ROBOT_SHORT} {sales.PRICE_AGAIN_UNKNOWN_LINE}"):
             self.assertIn(line, sales.cached_sales_lines())
 
+    def test_first_words_lost_by_speech_to_text(self) -> None:
+        import sales
+
+        # p01: «سلام وقتتون بخیر» was heard as «زنا وقتتون بخیر», and the caller's next sentence was held too: silence.
+        self.assertEqual(plan_turn(SalesState(), "زنا وقتتون بخیر").kind, "hello")
+        self.assertEqual(plan_turn(SalesState(), "من لباس می فروشم شما چیکار می کنی").kind, "hello")
+        state = SalesState()
+        self.assertEqual(plan_turn(state, "زنا").kind, "hold")
+        self.assertEqual(plan_turn(state, "آقا شما با کی کار دارین").kind, "hello")
+        # A recorded carrier message stays on hold however often it plays.
+        state = SalesState()
+        for _ in range(2):
+            self.assertEqual(plan_turn(state, "دستگاه مشترک مورد نظر خاموش می‌باشد").kind, "hold")
+        # p44: «اول بگو چقدر می‌گیری» heard as «اول بگو چقدر میگی» is still the price question.
+        plan = plan_turn(SalesState(), "اول بگو چقدر میگی")
+        self.assertEqual(plan.kind, "address")
+        self.assertIn("یک میلیون و چهارصد و چهارده هزار", plan.line)
+        self.assertTrue(plan.line.startswith(sales.FIRST_DISCLOSE))
+
 
 def state_after(line: str) -> SalesState:
     state = SalesState(greeted=True, intro_said=True, pain_asked=True, stage="pitch")

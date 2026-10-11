@@ -161,7 +161,7 @@ _ASK_AGAIN = (
     "نفهمیدم", "دوباره", "یه بار دیگه", "یک بار دیگه", "اسمش", "سوزان چی", "کجا", "چی بود", "چی گفت", "تکرار",
     "دور دیگه", "دات", "ثبت نام", "بنویسم", "یادم رفت", "آروم",
 )
-# «بعداً دوباره زنگ بزنید» asks for a call, not for the address again.
+# «دوباره زنگ بزنید» is a call-back, not a re-ask.
 _CALL_AGAIN = re.compile(r"(?:دوباره|بار دیگه)\s*(?:زنگ|تماس)")
 _ADDRESS_HINTS = (
     "اسم سایت",
@@ -223,6 +223,13 @@ _HOW_MUCH = (
     "ماهی چند",
     "چقده",
     "چنده",
+    # STT may drop «گیر».
+    "چقدر میگی",
+    "چقدر میگید",
+    "چقدر میگین",
+    "چند میگی",
+    "چند میگید",
+    "چند میگین",
 )
 # «چقدر می‌شه» is a price only at the end: «چقدر می‌شه بهتون اعتماد کرد» is not.
 _HOW_MUCH_END = re.compile(r"(?:چقدر|چقد|چند)\s*(?:میشه|درمیاد|در میاد)$")
@@ -264,17 +271,14 @@ _PUNCT = re.compile(r"[\u060C\u061B\u061F\u066A-\u066D\u06D4]")
 _INVITE = re.compile(rf"(?<![{_FA}])(?:بگید|بگین|بگو|بفرمایید|بفرمائید|بفرما)(?![{_FA}])")
 # «وقت ندارم» alone is busy; «وقت ندارم به دایرکتا برسم» is the very pain Sozan answers.
 _NO_TIME = re.compile(rf"وقت ندار(?:م|یم)?(?![{_FA}])(?!\s*(?:به|برای|واسه|که|جواب|پاسخ)(?![{_FA}]))")
-# «یادداشت کردم»، «یه سر می‌زنم»، «بعداً میام»: they took the address and will look, so the closing line, not more pitch.
-# STT hears «باشه، بعداً میام» as «واسه ... بعدم میام» too.
+# They noted the address and will look: the closing line, not more pitch. STT writes «بعداً میام» as «بعدم میام» too.
 _NOTED = re.compile(
     rf"(?<![{_FA}])(?:یاد\s*داشت(?:ش)?\s*(?:کرد(?:م|یم)(?:ش)?|میکن(?:م|یم))|نوشت(?:م|یم)(?:ش)?"
     rf"|(?:سیو|ذخیره|ذخیر)(?:\s*ا?ش)?\s*کرد(?:م|یم)(?:ش)?|سر(?:ی)?\s*(?:(?:بهش|بهتون)\s+)?میزن(?:م|یم)|گرفتم(?:ش)?"
     rf"|(?:یه\s+)?نگاه(?:ی)?\s*(?:(?:بهش|بهتون)\s+)?(?:میکن(?:م|یم)|میند(?:ا)?ز(?:م|یم)|میاندازم)|چک\s*میکن(?:م|یم)"
     rf"|(?:بعدا|بعداً|بعدن|بعدم|حتما|حتماً|فردا|امشب)\s+(?:میا|میآ)(?:م|یم))(?![{_FA}])"
 )
-# Only when that is the whole turn: «خودم شبا به دایرکتا سر می‌زنم» and «کپشنشو خودم نوشتمش» are their pain,
-# «یادداشت کردم، فقط این رایگانه؟» still asks, «بعداً میام ولی علاقه‌ای ندارم» is a no. And never as the answer to
-# our own question about their work («الان سفارش‌ها رو کجا ثبت می‌کنید؟» → «تو گوشی یادداشت می‌کنم»): see plan_turn.
+# Only as the whole turn: «خودم شبا به دایرکتا سر می‌زنم» is their pain; plan_turn also skips it after our own question.
 _NOTED_TAIL = frozenset(
     (
         "باشه", "واسه", "چشم", "اوکی", "حله", "آره", "بله", "خب", "پس", "حتما", "حتماً", "الان", "بعدا", "بعداً",
@@ -283,7 +287,7 @@ _NOTED_TAIL = frozenset(
         "سایتتونو", "لینک", "لینکو", "لینکش", "شماره", "ممنون", "ممنونم", "مرسی", "متشکرم", "متشکر", "سپاس",
         "عالیه", "خیلی", "خوبه", "دستتون", "درد", "نکنه", "گوشی", "گوشیم", "آدرستون", "آدرستونو", "لینکتون",
         "لینکتونو", "لینکشو", "بهتون", "خانم", "خانوم",
-        # «آدرس‌تون»، «سایت‌شو»: the half-space became a space.
+        # Half-space suffixes («آدرس‌تون»).
         "ش", "شو", "تون", "تونو",
     )
 )
@@ -362,6 +366,12 @@ _START_WORDS = (
     "اینستا",
     "زنگ نزن",
     "اشتباه",
+    # STT may lose «سلام» («زنا وقتتون بخیر»).
+    "بخیر",
+    "فروشم",
+    "چیکار",
+    "چی کار",
+    "چه کار",
 )
 
 
@@ -575,8 +585,7 @@ def price_spoken_line(heard: str) -> str | None:
     return line if fits(line) else f"پرو {words} تومانه."
 
 
-# Asked the price again («هزینه‌ش چقدر؟ گرون نباشه»): the same numbers in other words, not the same sentence.
-# «رایگان» stays tied to the store, never to پرو; at most 21 words so «هوش مصنوعی‌ام، آدم نیستم!» still fits 25.
+# A second price ask: the same numbers in other words. «رایگان» stays with the store; 21 words leave room for ROBOT_SHORT.
 PRICE_AGAIN_UNKNOWN_LINE = f"قیمت دقیق رو تو خود سایت می‌بینید: {SPOKEN_ADDRESS}؛ ساخت فروشگاه هم رایگانه."
 
 
@@ -780,6 +789,7 @@ class SalesState:
     pitched: set[str] = field(default_factory=set)
     robot_answers: int = 0
     turn_objection: str = ""
+    held: int = 0
 
     def stage_fa(self) -> str:
         return _STAGE_FA.get(self.stage, self.stage)
@@ -831,7 +841,7 @@ class Signals:
     quick: bool = False
     dnc: bool = False
     no: bool = False
-    # A yes only because they noted the address («یادداشت کردم»), not «باشه» or «میرم».
+    # A yes only from _NOTED.
     noted: bool = False
 
 
@@ -1200,7 +1210,10 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             # «یه لحظه... نه نمی‌خوام. الو؟» was said to someone in the shop before turning to the phone.
             return TurnPlan(kind="close", line=BUSY_OPEN_LINE, hangup=True, signals=signals)
         busy_first = (signals.time or signals.later) and not carrier and not signals.quick
-        if not (signals.hello or signals.howdy or signals.quick or busy_first or person_started(heard)):
+        # A second real sentence after a hold is a person.
+        talking = state.held > 0 and not carrier and len(_plain_words(heard).split()) >= 3
+        if not (signals.hello or signals.howdy or signals.quick or busy_first or talking or person_started(heard)):
+            state.held += 1
             return TurnPlan(kind="hold", signals=signals)
         state.greeted = True
         state.stage = "discover"
@@ -1311,7 +1324,7 @@ def plan_turn(state: SalesState, heard: str) -> TurnPlan:
             # Asked again: the model answers in fresh words instead of the same sentence.
             return TurnPlan(kind="model", cue=state.cue(heard), signals=signals)
         return TurnPlan(kind="address", line=fixed, signals=signals)
-    # «تو گوشی یادداشت می‌کنم» answering «سفارش‌ها رو کجا ثبت می‌کنید؟» is their work, not our address.
+    # «تو گوشی یادداشت می‌کنم» answering our question is their work.
     asked = bool(state.said) and not mentions_address(state.said[-1]) and state.said[-1].rstrip().endswith(("؟", "?"))
     if signals.agree and not signals.refuse and not (signals.noted and asked) and (state.linked or state.cta_count > 0):
         state.agreed = True
@@ -1413,11 +1426,10 @@ def tool_followups(tags: set[str], state: SalesState, heard: str, spoken: str) -
     if "price" in tags and not any(phrase in (spoken or "") for phrase in phrases):
         priced = price_spoken_line(heard if read_signals(heard).price else "قیمت") or PRICE_UNKNOWN_LINE
         lines.append(price_for_turn(state, priced))
-    # The model adds [آدرس] to a busy caller's «سرم شلوغه، سریع بگو» right after the line that already gave it;
-    # «سوزان چی؟ دوباره بگو» or «اسمش چی بود؟» still gets it.
+    # No second address on a busy turn right after the line that gave it, unless they ask again.
     signals = read_signals(heard)
     again = (is_repeat(heard) or any(part in (heard or "") for part in _ASK_AGAIN)) and not _CALL_AGAIN.search(heard or "")
-    # A reply that is only [آدرس] still says it: an empty turn would fall back to «سؤال دیگه‌ای هست؟».
+    # A bare [آدرس] reply still says it.
     just_linked = (
         bool((spoken or "").strip())
         and bool(state.said)
