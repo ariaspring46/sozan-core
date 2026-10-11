@@ -577,7 +577,7 @@ class SipUA:
                 call.rtp_pt = rtp[3]
             self.call = call
             self._dial = None
-            log.info("sip dial answered rtp=%s", call.rtp_dest)
+            log.info("sip trunk connected rtp=%s (far end may still ring)", call.rtp_dest)
             if self.on_call:
                 self.on_call(call)
             return
