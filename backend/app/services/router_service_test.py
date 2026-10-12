@@ -2027,5 +2027,104 @@ class ChannelReplayTests(unittest.TestCase):
         self.assertTrue(all(row["refers_back"] for row in decided))
 
 
+class ToolErrorRecoveryTests(unittest.TestCase):
+    """A failed read tool gets one retry, and the decider sees the failure kind. A write is never retried."""
+
+    def _decider(self, actions: list[str], seen: list[dict], loop_enough: bool = True):
+        queue = list(actions)
+
+        async def decider(state):
+            seen.append(dict(state))
+            action = queue.pop(0) if queue else actions[-1]
+            return {
+                "action": action,
+                "accepted": True,
+                "probability": 0.91,
+                "margin": 0.5,
+                "effort": "quick",
+                "refers_back": False,
+                "frustrated": False,
+                "loopEnough": loop_enough,
+                "ranked": [],
+                "observed": {},
+            }
+
+        return decider
+
+    def _run_tools(self, failing: set[str], calls: list[str]):
+        async def run(name, args, **_kwargs):
+            calls.append(name)
+            if name in failing:
+                raise TimeoutError("slow backend")
+            return ("سفارش‌های امروز: دو سفارش ثبت شده است.", {})
+
+        return run
+
+    async def _complete(self, _messages, tools):
+        return {"text": "", "tool_calls": [{"name": tools[0]["function"]["name"], "arguments": {}}]}
+
+    def _turn(self, tenant: str, text: str, decider, failing: set[str], calls: list[str]) -> dict:
+        with tenant_scope(tenant), patch.object(router_service, "_run_tool", side_effect=self._run_tools(failing, calls)):
+            return asyncio.run(router_service.turn(text, complete=self._complete, decider=decider, thread_id=""))
+
+    def test_failed_read_tool_is_retried_with_the_failure_seen_by_the_decider(self) -> None:
+        seen: list[dict] = []
+        calls: list[str] = []
+        out = self._turn(
+            "09129900011",
+            "کالاهای من چی هستن؟",
+            self._decider(["find_product", "orders"], seen),
+            {"products"},
+            calls,
+        )
+        self.assertEqual(calls, ["products", "orders"])
+        self.assertEqual(seen[1].get("toolError"), {"tool": "products", "kind": "timeout"})
+        text = str(out["messages"][-1].get("text") or "")
+        self.assertIn("سفارش", text)
+        self.assertNotIn("انجام نشد", text)
+
+    def test_failed_read_tool_inside_the_loop_is_retried_next_round(self) -> None:
+        seen: list[dict] = []
+        calls: list[str] = []
+        out = self._turn(
+            "09129900012",
+            "کالاهایم را برام لیست کن",
+            self._decider(["find_product", "orders"], seen, loop_enough=False),
+            {"products"},
+            calls,
+        )
+        self.assertEqual(calls, ["products", "orders"])
+        self.assertEqual(seen[1].get("toolError"), {"tool": "products", "kind": "timeout"})
+        self.assertNotIn("انجام نشد", str(out["messages"][-1].get("text") or ""))
+
+    def test_same_tool_again_gives_up_with_the_error_line(self) -> None:
+        seen: list[dict] = []
+        calls: list[str] = []
+        out = self._turn(
+            "09129900013",
+            "کالاهای من چی هستن؟",
+            self._decider(["find_product", "find_product"], seen),
+            {"products"},
+            calls,
+        )
+        self.assertEqual(calls, ["products"])
+        self.assertEqual(len(seen), 2)
+        self.assertIn("انجام نشد", str(out["messages"][-1].get("text") or ""))
+
+    def test_failed_read_is_never_retried_as_a_write(self) -> None:
+        seen: list[dict] = []
+        calls: list[str] = []
+        out = self._turn(
+            "09129900014",
+            "کالاهای من چی هستن؟",
+            self._decider(["find_product", "set_discount"], seen),
+            {"products"},
+            calls,
+        )
+        self.assertEqual(calls, ["products"])
+        self.assertFalse(any(row.get("kind") == "confirm" for row in out["messages"]))
+        self.assertIn("انجام نشد", str(out["messages"][-1].get("text") or ""))
+
+
 if __name__ == "__main__":
     unittest.main()
