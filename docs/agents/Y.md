@@ -95,7 +95,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Tests:** `backend/app/api/inbox_dry_test.py`, `backend/app/services/claims_guard_test.py`, `backend/app/services/customer_memory_service_test.py`, `backend/app/services/inbox_agent_service_test.py`, `backend/app/services/inbox_service_test.py`, `backend/app/services/pii_mask_test.py`, `backend/app/services/sales_policy_service_test.py`, `backend/app/services/shop_memory_service_test.py`, `backend/app/services/training_log_test.py`, `backend/app/services/voice_service_test.py`, `tools/train_nightly_test.py`
 
-**Yours but never read** (generated or huge; change only through its script): `.y-tmp/login.sh` (0.5k), `.y-tmp/login2.sh` (0.5k), `sales-agent-talk.md` (31.2k)
+**Yours but never read** (generated or huge; change only through its script): `.y-tmp/login.sh` (0.5k), `.y-tmp/login2.sh` (0.5k), `sales-agent-talk.md` (31.7k)
 
 Every other file in the repo belongs to another role (see `docs/agents/README.md`).
 

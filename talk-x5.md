@@ -25,3 +25,14 @@
 - وابستگی‌های من (consumed): روترها (brand/campaigns/studio/channels/chat_media/onboard/public_media/router_chat/inbox/shop/storefront/pay از X2,X3,X1,X4,Y,C)؛ از X3: `channel_poll.poll_all`، `melipayamak_otp`، `sms_service`؛ از Y: `inbox_service.(expire_stale_sending/rearm)`، `sales_policy`، `mask_pii`، `voice_service.get_voice`، `training_log.log_label`؛ از X2: `probe_ollama_cloud_once`، `studio_compose.expire_stale`؛ از C: `support_service`، `storefront.(list_sales/retitle)`، `arvan_dns.edge_dry`؛ UI از `U`.
 - پایداری: `settings`/`state_store`/`require_permission`/`llm.py` را هر تغییر باید هماهنگ شود (هزاران agent وابسته)؛ signature باید در این قرارداد ثبت شود.
 - در انتظار: درخواست Z (openrouter از هاب) باز است — صفر تماس، campaign_run اجرا نشده.
+
+## مالک → X5 : تقسیم کار رسمی (2026-10-12)
+حوزهٔ تو: پلتفرم، تنظیمات، مدل‌ها و استقرار (config.py، llm.py، llm_routing_service.py، ai_budget_service.py، proxy_health.py، deploy/، tools/sozan_health.py، .env در سرور). چهار کار:
+1. مالک تنظیمات دیسایدر در .env هستی. از امروز DECIDER_TENANTS فهرست ۳۲ حساب است (نسخهٔ پشتیبان: .env.bak-decider-*). هر تغییر را در CHANGELOG ثبت کن و قبل از هر تغییر پشتیبان بگیر.
+2. وضعیت مسیرهای مدل را پایش کن: تونل ۹۲۹۲ و پراکسی ۱۰۸۸۸ روی PC مالک. قطعی‌ها را به‌محض دیدن گزارش کن؛ امروز هر دو یک‌بار قطع شدند.
+3. موجودی و هزینهٔ روزانهٔ OpenRouter را ثبت کن (ai-spend.json). امروز اعتبار کم بود؛ اگر زیر آستانه رفت، فوراً به مالک بگو.
+4. استقرار را با قفل deploy-api.sh و بررسی DEPLOYED_COMMIT انجام بده.
+گزارش در همین فایل.
+
+## مالک → X5: پروتکل ارتباط و نقش SM (2026-10-12)
+از این به بعد پروتکل ارتباط و بورد در scrum-board.md است؛ نقش SM (مدیر اسکرام) آن را نگه می‌دارد. قالب پیام، برچسب‌های [ask] [ack] [doing] [done] [blocked]، مهلت ۲۴ ساعت، و قاعدهٔ تغییر قرارداد مشترک (docs/agents/contracts.json) همه آنجا است. کار را با بستن با [done] یا [blocked] تمام کن.

@@ -1082,3 +1082,9 @@ PROMPT:
 (b) Local fallback policy when cloud active: which slot to unban/re-enable — ornith-phone (Vulkan1 serial) or qwen3.5-9b (Vulkan0, VRAM pressure). This is X5 + owner. Also note the RUNNING process is z/15 not z/14 — confirm the intended live branch.
 
 NO code changes made. NO real call. NO campaign. GIFT_CODE_SPOKEN empty confirmed.
+
+## مالک → Z : تقسیم کار رسمی (2026-10-12)
+حوزهٔ تو: دستیار تلفنی (voice-gateway). امروز کار فوری نداری. وظیفه: وضعیت خط SIP و مدل صوتی را هر روز گزارش کن و هر قطعی را بلافاصله به مالک بگو. هیچ تغییر تولید بدون اجازهٔ مالک. گزارش در همین فایل.
+
+## مالک → Z: پروتکل ارتباط و نقش SM (2026-10-12)
+از این به بعد پروتکل ارتباط و بورد در scrum-board.md است؛ نقش SM (مدیر اسکرام) آن را نگه می‌دارد. قالب پیام، برچسب‌های [ask] [ack] [doing] [done] [blocked]، مهلت ۲۴ ساعت، و قاعدهٔ تغییر قرارداد مشترک (docs/agents/contracts.json) همه آنجا است. کار را با بستن با [done] یا [blocked] تمام کن.
