@@ -2126,5 +2126,43 @@ class ToolErrorRecoveryTests(unittest.TestCase):
         self.assertIn("انجام نشد", str(out["messages"][-1].get("text") or ""))
 
 
+class DeciderFallbackTests(unittest.TestCase):
+    """A decider that does not answer hands the turn to the chat model with every tool; the apology is only for a chat failure too."""
+
+    async def _down(self, _state):
+        return None
+
+    def _turn(self, tenant: str, complete, calls: list[str]) -> dict:
+        async def run(name, args, **_kwargs):
+            calls.append(name)
+            return ("سفارش‌های امروز: دو سفارش ثبت شده است.", {})
+
+        with tenant_scope(tenant), patch.object(router_service, "_run_tool", side_effect=run):
+            return asyncio.run(router_service.turn("کالاهایم را برام لیست کن", complete=complete, decider=self._down, thread_id=""))
+
+    def test_decider_down_lets_the_chat_model_pick_from_every_tool(self) -> None:
+        seen: list[int] = []
+        calls: list[str] = []
+
+        async def complete(_messages, tools):
+            names = [item["function"]["name"] for item in tools]
+            seen.append(len(names))
+            return {"text": "", "tool_calls": [{"name": "orders", "arguments": {}}]} if "orders" in names else {"text": "", "tool_calls": []}
+
+        out = self._turn("09129900021", complete, calls)
+        self.assertTrue(seen and seen[0] > 10)
+        self.assertEqual(calls, ["orders"])
+        text = str(out["messages"][-1].get("text") or "")
+        self.assertIn("سفارش", text)
+        self.assertNotIn("مدل پاسخ نداد", text)
+
+    def test_apology_only_when_the_chat_model_fails_too(self) -> None:
+        async def complete(_messages, _tools):
+            raise RuntimeError("cloud down")
+
+        out = self._turn("09129900022", complete, [])
+        self.assertIn("مدل پاسخ نداد", str(out["messages"][-1].get("text") or ""))
+
+
 if __name__ == "__main__":
     unittest.main()

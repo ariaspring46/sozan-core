@@ -205,6 +205,40 @@ def _add_tokens(total: dict, usage: object) -> None:
     total["completionTokens"] = int(total.get("completionTokens") or 0) + int(usage.get("completionTokens") or 0)
 
 
+async def _chat_fallback(history: list, completer) -> dict | None:
+    """The decider did not answer: the chat model takes the turn with every tool, as on accounts without the decider."""
+    from app.services.turn_clock import expired, remaining
+
+    if expired() or remaining() <= 0:
+        rs._append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
+        rs._emit("router-llm-fail", {"error": "budget"}, status="error")
+        return None
+    rs._trace(path="model", fallback="decider")
+    try:
+        model = await rs.asyncio.wait_for(completer(history, rs.TOOLS), timeout=max(0.05, remaining()))
+    except Exception as exc:
+        if getattr(exc, "budget_capped", False):
+            rs._append("assistant", rs.BUDGET_CAPPED)
+            rs._emit("router-budget-capped", {"reason": str(exc)[:40]}, status="error")
+            return None
+        rs._append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
+        rs._emit("router-llm-fail", {"error": "unreachable"}, status="error")
+        return None
+    if not isinstance(model, dict):
+        model = {}
+    return {
+        "text": str(model.get("text") or ""),
+        "tool_calls": list(model.get("tool_calls") or []),
+        "usage": dict(model.get("usage") or {}),
+        "provider": str(model.get("provider") or ""),
+        "model": str(model.get("model") or ""),
+        "latencyMs": int(model.get("latencyMs") or 0),
+        "frustrated": False,
+        "direct": "",
+        "finish_reason": str(model.get("finish_reason") or ""),
+    }
+
+
 async def _steer_decider(
     spoken: str,
     media: dict | None,
@@ -245,12 +279,12 @@ async def _steer_decider(
         except Exception:
             decision = None
         if not isinstance(decision, dict):
+            rs._trace(path="decider", loopEnough=True, tools=[], deciderRounds=rounds, fallback="chat")
             if state.get("lastTool"):
                 rs._append("assistant", str((state.get("lastTool") or {}).get("text") or ""))
-            rs._append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
-            rs._emit("router-llm-fail", {"error": "decider"}, status="error")
-            rs._trace(path="decider", loopEnough=True, tools=[], deciderRounds=rounds)
-            return None
+                return None
+            rs._emit("router-llm-fail", {"error": "decider"}, status="fallback")
+            return await _chat_fallback(history, completer)
         loop_enough = bool(decision.get("loopEnough", True))
         if decision.get("accepted"):
             plan = decider_service.plan_for(
