@@ -8,6 +8,19 @@ through `rs` at call time, so tests that patch router_service still reach this c
 
 from __future__ import annotations
 
+import httpx
+
+
+
+def tool_error_kind(exc: BaseException) -> str:
+    """The kind of a failed tool call; the decider gets this word, not the raw message."""
+    if isinstance(exc, TimeoutError):
+        return "timeout"
+    if isinstance(exc, httpx.TransportError):
+        return "network"
+    if isinstance(exc, ValueError):
+        return "input"
+    return "internal"
 
 
 class _Router:
@@ -192,12 +205,22 @@ def _add_tokens(total: dict, usage: object) -> None:
     total["completionTokens"] = int(total.get("completionTokens") or 0) + int(usage.get("completionTokens") or 0)
 
 
-async def _steer_decider(spoken: str, media: dict | None, card_open: bool, decider, history: list, completer) -> dict | None:
+async def _steer_decider(
+    spoken: str,
+    media: dict | None,
+    card_open: bool,
+    decider,
+    history: list,
+    completer,
+    tool_error: dict | None = None,
+) -> dict | None:
     """Two rounds at most. The chat model sees only the decider's tool. None means the turn already answered."""
     from app.services import decider_service
     from app.services.turn_clock import expired, remaining
 
     state = _decider_state(spoken, media, card_open)
+    if tool_error:
+        state["toolError"] = dict(tool_error)
     if _wants_growth(spoken):
         from app.services.skill_catalog import remember_seller_metric
 
@@ -420,8 +443,11 @@ async def _steer_decider(spoken: str, media: dict | None, card_open: bool, decid
                 media=media if isinstance(media, dict) else None,
             )
         except Exception as exc:
-            await rs._say(spoken, rs._tool_error(name, exc), "tool_failed")
-            return None
+            kind = tool_error_kind(exc)
+            state["toolError"] = {"tool": name, "kind": kind}
+            rs._trace(toolError={"tool": name, "kind": kind})
+            messages.append({"role": "assistant", "content": f"ابزار {name} شکست خورد ({kind}). ابزار دیگری را انتخاب کن یا از فروشنده بپرس."})
+            continue
         if name == "status":
             carried = rs._missing_image_titles()
         state["lastTool"] = {"name": name, "text": str(reply or "")[:800]}
@@ -429,6 +455,44 @@ async def _steer_decider(spoken: str, media: dict | None, card_open: bool, decid
     if state.get("goal"):
         rs._append("assistant", f"هدف هنوز باز است: {state['goal']}")
     return None
+
+
+async def _retry_read(name: str, exc: Exception, run_kwargs: dict, pending_open: bool, decider, history: list, completer, use_decider: bool):
+    """One retry after a failed read tool: returns (name, reply, extra) of the retry, or None once the seller was answered."""
+    spoken = str(run_kwargs.get("source_text") or "")
+    media = run_kwargs.get("media")
+    if not use_decider or name not in rs.READ_TOOLS or name == "ask_user":
+        await rs._say(spoken, rs._tool_error(name, exc), "tool_failed")
+        return None
+    kind = tool_error_kind(exc)
+    note = {"role": "assistant", "content": f"ابزار {name} شکست خورد ({kind})."}
+    result = await _steer_decider(
+        spoken,
+        media if isinstance(media, dict) else None,
+        pending_open,
+        decider,
+        [*history, note],
+        completer,
+        tool_error={"tool": name, "kind": kind},
+    )
+    if not isinstance(result, dict):
+        return None  # already answered
+    if result.get("direct"):
+        await rs._say(spoken, str(result.get("direct") or ""), "direct")
+        return None
+    calls = result.get("tool_calls") or []
+    first = calls[0] if calls and isinstance(calls[0], dict) else {}
+    new_name = str(first.get("name") or "")
+    if not new_name or new_name == name or new_name not in rs.READ_TOOLS or new_name == "ask_user":
+        await rs._say(spoken, rs._tool_error(name, exc), "tool_failed")
+        return None
+    new_args = first.get("arguments") if isinstance(first.get("arguments"), dict) else {}
+    try:
+        reply, extra = await rs._run_tool(new_name, new_args, **run_kwargs)
+    except Exception as second:
+        await rs._say(spoken, rs._tool_error(new_name, second), "tool_failed")
+        return None
+    return new_name, reply, extra
 
 
 def _shadow_after(out: dict, media: dict | None, *, decider) -> None:

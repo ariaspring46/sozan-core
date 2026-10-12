@@ -2214,20 +2214,13 @@ async def _execute(
         _append("assistant", question, **extra)
         _emit("router-tool", {"tool": "ask_user", "level": "read"})
         return snapshot()
+    opts = dict(campaigns=campaigns, campaigns_factory=campaigns_factory, source_text=spoken, media=media if isinstance(media, dict) else None, view_path=view_path, view_target=view_target)
     try:
-        reply, extra = await _run_tool(
-            name,
-            args,
-            campaigns=campaigns,
-            campaigns_factory=campaigns_factory,
-            source_text=spoken,
-            media=media if isinstance(media, dict) else None,
-            view_path=view_path,
-            view_target=view_target,
-        )
+        reply, extra = await _run_tool(name, args, **opts)
     except Exception as exc:
-        await _say(spoken, _tool_error(name, exc), "tool_failed")
-        return snapshot()
+        ran = await _retry_read(name, exc, opts, pending_open, decider, history, completer, use_decider)
+        if not ran: return snapshot()
+        name, reply, extra = ran
     guarded = _guard_reply(spoken, reply)
     if name in _VOICED_TOOLS:
         guarded = await _voice(spoken, guarded, situation="tool_result")
@@ -2285,6 +2278,7 @@ from app.services.router_loop import (  # noqa: E402  (the decider loop lives in
     _skill_plan,
     _add_tokens,
     _steer_decider,
+    _retry_read,
     _shadow_after,
 )
 from app.services.router_status import (  # noqa: E402  (the status tool lives in router_status)
