@@ -954,8 +954,3 @@ html:has(.sozan-landing) {
   }
 }
 
-/* نوار پایین گوشی وقتی کیبورد باز است جا نمی‌گیرد؛ فیلد نوشتن بالای کیبورد بماند. */
-.sozan-keyboard .sozan-tabbar {
-  display: none;
-}
-

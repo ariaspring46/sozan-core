@@ -83,9 +83,9 @@
    "tests": 29668
   },
   {
-   "active": 91398,
-   "core": 16660,
-   "core_pct": 37,
+   "active": 90841,
+   "core": 16103,
+   "core_pct": 36,
    "id": "U",
    "loose_contracts": 0,
    "manifest": 9575,
@@ -93,7 +93,7 @@
    "tests": 0
   },
   {
-   "active": 227349,
+   "active": 227473,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",
