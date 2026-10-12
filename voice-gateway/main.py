@@ -134,6 +134,7 @@ CHECK_LINE = CURIOUS_LINES[0]
 HOWDY_LINE = "خوبم. تو بگو."
 BYE_LINE = "خداحافظ."
 UNCLEAR_LINE = "ببخشید، نشنیدم؛ دوباره بفرمایید."
+BUSY_PHRASES = ("مکالمه است", "خط مشغول است")
 WAIT_LINE = THINKING_LINES[0]
 THINK_WAIT_S = 1.8
 NUDGE_AFTER_S = 5.0
@@ -964,6 +965,12 @@ class Gateway:
                 heard = text
             else:
                 heard = self.brain.clean_heard(text)
+            if is_busy_text(text) or is_busy_text(heard):
+                # An operator's busy message: nobody is there to talk to.
+                log.info("busy line hangup text=%s", (heard or text)[:80])
+                self.ua.hangup()
+                self._end_call(None)
+                break
             if is_carrier_text(text) or is_carrier_text(heard):
                 # An outbound trunk often answers at once and plays a network
                 # announcement before the person picks up. Dropping on that
@@ -985,8 +992,11 @@ class Gateway:
             if unclear_speech(heard, is_social(heard)):
                 # Speech-like audio that STT turned into nothing: the echo check
                 # already ran on the raw audio, so this is a caller we did not catch.
-                # Ask once; a silent streak must not turn into barge-in lockout.
-                if not self._unclear_asked:
+                # Ask once, and only after pickup: before it, the same audio is
+                # ringback or a carrier tone, not a caller to apologise to.
+                if not self._picked_at:
+                    log.info("unclear before pickup dropped")
+                elif not self._unclear_asked:
                     self._unclear_asked = True
                     log.info("unclear speech barged=%s", barged)
                     self._speak(session, generation, UNCLEAR_LINE, "unclear")
@@ -1682,6 +1692,11 @@ class Gateway:
 def unclear_speech(heard: str, social: bool) -> bool:
     """Empty STT text that is not a social word: unclear caller speech, not echo."""
     return not heard.strip() and not social
+
+
+def is_busy_text(text: str) -> bool:
+    """An operator's busy message, which means no one is there to talk to."""
+    return any(phrase in (text or "") for phrase in BUSY_PHRASES)
 
 
 def late_echo(late: str, spoken_parts: list[str]) -> bool:

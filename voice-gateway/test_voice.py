@@ -1495,6 +1495,14 @@ class SecondReviewTest(unittest.TestCase):
         self.assertFalse(main_module.unclear_speech("الو", False))
         self.assertIn("نشنیدم", main_module.UNCLEAR_LINE)
 
+    def test_operator_busy_message_is_not_a_caller(self) -> None:
+        import main as main_module
+
+        self.assertTrue(main_module.is_busy_text("لطفا، مکالمه است"))
+        self.assertTrue(main_module.is_busy_text("خط مشغول است"))
+        self.assertFalse(main_module.is_busy_text("الو"))
+        self.assertFalse(main_module.is_busy_text(""))
+
     def test_counts_and_cut_off_replies(self) -> None:
         for reply in ("ماهی هزار تا سفارش، یعنی حسابی سرتون شلوغه!", "به هزار تا شهر ارسال دارید؟"):
             self.assertEqual(guard_reply(reply, "خب"), reply)
