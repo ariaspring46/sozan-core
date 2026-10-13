@@ -368,6 +368,11 @@ def _yes(answer: dict) -> bool:
             return True
         if text in {"false", "no", "0"}:
             return False
+    if "noul" in answer:  # the live API sends {"type": "noul", "noul": p}, p = probability of yes
+        try:
+            return float(answer.get("noul") or 0) >= 0.5
+        except (TypeError, ValueError):
+            pass
     probs = answer.get("probabilities") if isinstance(answer.get("probabilities"), dict) else {}
     folded = {str(key).strip().lower(): value for key, value in probs.items()}
     for key in ("true", "yes"):
@@ -617,6 +622,14 @@ async def _post(state: dict, timeout: float) -> dict:
     raise RuntimeError("decider unreachable")
 
 
+def _flag(answers: dict, key: str) -> bool:
+    """A yes/no flag. Missing, empty, or null means yes (the default); anything the API sent is read as an answer."""
+    raw = answers.get(key)
+    if raw is None or raw == {} or raw == []:
+        return True
+    return _yes(raw)
+
+
 def read_decision(payload: dict) -> dict:
     answers = payload.get("answers") if isinstance(payload.get("answers"), dict) else {}
     action_answer = answers.get("action") if isinstance(answers.get("action"), dict) else {}
@@ -632,10 +645,10 @@ def read_decision(payload: dict) -> dict:
         "effort": effort,
         "refers_back": _yes(answers.get("refers_back")),
         "frustrated": _yes(answers.get("frustrated")),
-        "loopEnough": True if not answers.get("loop_enough") else _yes(answers.get("loop_enough")),
+        "loopEnough": _flag(answers, "loop_enough"),
         "skill": _skill_answer(answers.get("skill")),
         "mode": _mode_answer(answers.get("mode")),
-        "goalReached": True if not answers.get("goal_reached") else _yes(answers.get("goal_reached")),
+        "goalReached": _flag(answers, "goal_reached"),
         "usage": payload.get("usage") if isinstance(payload.get("usage"), dict) else {},
     }
 

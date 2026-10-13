@@ -57,6 +57,20 @@ class DeciderParseTests(unittest.TestCase):
         )
         self.assertFalse(weak)
 
+    def test_noul_answers_are_read_as_probability_of_yes(self) -> None:
+        self.assertTrue(decider_service._yes({"type": "noul", "noul": 0.9}))
+        self.assertFalse(decider_service._yes({"type": "noul", "noul": 0.1}))
+        payload = {"answers": {"loop_enough": {"type": "noul", "noul": 0.9}, "goal_reached": {"type": "noul", "noul": 0.1}}}
+        decision = decider_service.read_decision(payload)
+        self.assertTrue(decision["loopEnough"])
+        self.assertFalse(decision["goalReached"])
+
+    def test_a_bare_false_flag_is_false_and_a_missing_one_is_yes(self) -> None:
+        payload = {"answers": {"loop_enough": False}}
+        decision = decider_service.read_decision(payload)
+        self.assertFalse(decision["loopEnough"])
+        self.assertTrue(decider_service.read_decision({"answers": {}})["loopEnough"])
+
     def test_clarify_gives_way_to_the_best_tool(self) -> None:
         choice, _prob, _margin, ok = decider_service.accept_action(
             {"choice": "clarify", "probabilities": {"clarify": 0.6, "scan_page": 0.3}}
