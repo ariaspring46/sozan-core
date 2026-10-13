@@ -286,18 +286,17 @@ async def _steer_decider(
             rs._emit("router-llm-fail", {"error": "decider"}, status="fallback")
             return await _chat_fallback(history, completer)
         loop_enough = bool(decision.get("loopEnough", True))
-        if decision.get("accepted"):
-            plan = decider_service.plan_for(
-                str(decision.get("action") or ""),
-                spoken,
-                frustrated=bool(decision.get("frustrated")),
-                effort=str(decision.get("effort") or "normal"),
-            )
-        else:
-            plan = decider_service.chips_for(list(decision.get("ranked") or []))
-            plan["frustrated"] = bool(decision.get("frustrated"))
-            plan["effort"] = str(decision.get("effort") or "quick")
-        skill = decider_service.chosen_skill(decision) if decision.get("accepted") else "none"
+        if not decision.get("accepted"):
+            # No clear action: the chat model takes the turn with every tool; a question is its own choice, not a menu
+            rs._trace(path="decider", loopEnough=True, tools=[], deciderRounds=rounds, fallback="chat-low-confidence")
+            return await _chat_fallback(messages, completer)
+        plan = decider_service.plan_for(
+            str(decision.get("action") or ""),
+            spoken,
+            frustrated=bool(decision.get("frustrated")),
+            effort=str(decision.get("effort") or "normal"),
+        )
+        skill = decider_service.chosen_skill(decision)
         if skill != "none" and isinstance(plan.get("arguments"), dict):
             plan["arguments"]["skill"] = skill
         subset = _subset_for(str(plan.get("tool") or ""))

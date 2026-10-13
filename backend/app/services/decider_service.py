@@ -416,8 +416,18 @@ def _ranked(probabilities: dict) -> list[tuple[str, float]]:
     return rows
 
 
+# A tool action is taken from this probability, without a margin test. Below it the chat model takes the turn with every tool.
+TOOL_MIN_PROB = 0.3
+# «clarify» hands the turn to the best tool action when that action has at least this much.
+CLARIFY_SECOND_MIN = 0.25
+
+
 def accept_action(answer: dict) -> tuple[str, float, float, bool]:
-    """Return action, probability, margin, and whether it clears both thresholds."""
+    """Return the action to use, its probability, its margin, and whether the decider's answer is taken.
+
+    Asking the seller is the last resort: a clear tool wins at low probability, «clarify» gives way to the best tool, and
+    only a direct answer (identity, refusal) keeps the old two-threshold test. Anything else goes to the chat model.
+    """
     if not isinstance(answer, dict):
         return "", 0.0, 0.0, False
     choice = str(answer.get("choice") or "")
@@ -435,6 +445,15 @@ def accept_action(answer: dict) -> tuple[str, float, float, bool]:
             second = score
             break
     margin = top - second
+    if choice == "clarify":
+        for key, score in ranked:
+            if key != "clarify" and tool_names(key):
+                if score >= CLARIFY_SECOND_MIN:
+                    return key, score, score - top, True
+                break
+        return choice, top, margin, False
+    if tool_names(choice):
+        return choice, top, margin, top >= TOOL_MIN_PROB
     ok = top >= float(settings.decider_min_prob) and margin >= float(settings.decider_min_margin)
     return choice, top, margin, ok
 

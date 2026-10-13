@@ -47,10 +47,26 @@ class DeciderParseTests(unittest.TestCase):
         self.assertEqual(choice, "hero_image")
         self.assertGreaterEqual(prob, 0.6)
         self.assertGreaterEqual(margin, 0.2)
-        _choice, _prob, _margin, low = decider_service.accept_action(
+        # a tool at 0.55 is taken even with a small margin; a tool below 0.3 is not
+        _choice, _prob, _margin, taken = decider_service.accept_action(
             {"choice": "hero_image", "probabilities": {"hero_image": 0.55, "edit_page": 0.4}}
         )
-        self.assertFalse(low)
+        self.assertTrue(taken)
+        _choice, _prob, _margin, weak = decider_service.accept_action(
+            {"choice": "hero_image", "probabilities": {"hero_image": 0.25, "edit_page": 0.2}}
+        )
+        self.assertFalse(weak)
+
+    def test_clarify_gives_way_to_the_best_tool(self) -> None:
+        choice, _prob, _margin, ok = decider_service.accept_action(
+            {"choice": "clarify", "probabilities": {"clarify": 0.6, "scan_page": 0.3}}
+        )
+        self.assertTrue(ok)
+        self.assertEqual(choice, "scan_page")
+        choice, _prob, _margin, ok = decider_service.accept_action(
+            {"choice": "clarify", "probabilities": {"clarify": 0.6, "scan_page": 0.1}}
+        )
+        self.assertFalse(ok)
 
     def test_jewelry_vertical_from_a_broken_word(self) -> None:
         self.assertEqual(stated_vertical("کسخل ج.اهر فروشیه"), "jewelry")
@@ -217,18 +233,21 @@ class DeciderTurnTests(unittest.TestCase):
                     with tenant_scope("09129900001"):
                         self.assertEqual(read_json("shop.json", {}).get("vertical"), "jewelry")
 
-    def test_low_margin_opens_chips(self) -> None:
+    def test_low_confidence_goes_to_the_chat_model_not_a_menu(self) -> None:
         decision = _decision(
             "hero_image",
             accepted=False,
-            ranked=[("hero_image", 0.42), ("edit_page", 0.4)],
+            ranked=[("hero_image", 0.12), ("edit_page", 0.1)],
         )
+        seen: list[int] = []
+
+        async def complete(_messages, tools):
+            seen.append(len(tools))
+            return {"text": "", "tool_calls": []}
+
         with patch("app.services.shop_edit_service.build_dir_for", return_value=__import__("pathlib").Path("/tmp")):
-            out = self._turn("یه چیزی برای بالا", AsyncMock(return_value=decision))
-        last = out["messages"][-1]
-        self.assertEqual(last.get("kind"), "ask")
-        self.assertIn("تصویر هدر", last.get("options") or [])
-        self.assertIn("ویرایش صفحه", last.get("options") or [])
+            self._turn("یه چیزی برای بالا", AsyncMock(return_value=decision), complete=complete)
+        self.assertTrue(seen and seen[0] > 10)
 
     def test_api_down_hands_the_turn_to_the_model_with_every_tool(self) -> None:
         seen = []
