@@ -230,7 +230,7 @@ class DeciderTurnTests(unittest.TestCase):
         self.assertIn("تصویر هدر", last.get("options") or [])
         self.assertIn("ویرایش صفحه", last.get("options") or [])
 
-    def test_api_down_does_not_hand_every_tool_to_the_model(self) -> None:
+    def test_api_down_hands_the_turn_to_the_model_with_every_tool(self) -> None:
         seen = []
 
         async def complete(_messages, tools):
@@ -247,8 +247,8 @@ class DeciderTurnTests(unittest.TestCase):
             "app.services.plan_service.snapshot", return_value={"plan": "free"}
         ), patch("app.services.wallet_service.get", return_value={"available": 0}):
             out = self._turn("الان کجای کاریم", down, complete=complete)
-        self.assertEqual(seen, [])
-        self.assertIn("مدل پاسخ نداد", out["messages"][-1]["text"])
+        self.assertTrue(seen and len(seen[0]) > 10)
+        self.assertNotIn("مدل پاسخ نداد", out["messages"][-1]["text"])
 
     def test_missing_photo_sentence_reads_then_opens_a_card(self) -> None:
         given: list[list[str]] = []

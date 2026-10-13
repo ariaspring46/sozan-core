@@ -645,8 +645,8 @@ async def choose_with_retry(state: dict) -> dict | None:
     """The live call, then one slower try when it failed and the turn still has time.
 
     Review 2026-10-09: 9 of about 26 live calls failed in three days (4 at the 3 s limit), and each one told the
-    seller «مدل پاسخ نداد». The fallback to the full tool list stays off on purpose; this only gives the same
-    decider a second chance.
+    seller «مدل پاسخ نداد». This only gives the same decider a second chance; when it fails too, the chat model
+    takes the turn with every tool (router_loop._chat_fallback).
     """
     from app.services.turn_clock import remaining
 
