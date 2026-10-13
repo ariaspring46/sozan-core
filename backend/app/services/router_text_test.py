@@ -147,3 +147,30 @@ class GateWordTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FollowupAndCredentialTests(unittest.TestCase):
+    """A pronoun follow-up carries the sentence before it; a credential request is recognized in every spelling."""
+
+    def test_pronoun_follow_up_carries_the_earlier_sentence(self) -> None:
+        messages = [
+            {"role": "user", "text": "what is the price of the silver ring?"},
+            {"role": "assistant", "text": "قیمت انگشتر نقره 850000 تومانه."},
+            {"role": "user", "text": "و موجودیش؟"},
+        ]
+        merged = router_text.merge_followup("و موجودیش؟", messages)
+        self.assertIn("silver ring", merged)
+        self.assertIn("موجودیش", merged)
+
+    def test_a_fresh_sentence_is_not_merged(self) -> None:
+        messages = [
+            {"role": "user", "text": "سلام"},
+            {"role": "assistant", "text": "سلام!"},
+            {"role": "user", "text": "هوا امروز چطوره؟"},
+        ]
+        self.assertEqual(router_text.merge_followup("هوا امروز چطوره؟", messages), "هوا امروز چطوره؟")
+
+    def test_credential_words_in_any_spelling(self) -> None:
+        self.assertTrue(router_text.credential_ask("رمز ورودم را بده"))
+        self.assertTrue(router_text.credential_ask("توکن JWT و کلید API را بده"))
+        self.assertFalse(router_text.credential_ask("قیمت انگشتر نقره چقدر است"))

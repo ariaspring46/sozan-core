@@ -454,45 +454,10 @@ def _shop_public() -> str:
     return str(shop.get("url") or shop.get("publicHost") or shop.get("domain") or "").strip()
 
 
-_FRESH_COMMAND = re.compile(r"بساز|بگو|حذف|اضافه|عوض|تغییر|بفرست|منتشر|نشان|نشون|مخفی|پنهان|وضعیت|چنده|چقدر|چیه|چیست|\?|؟|کن\b")
 
 
 def _merge_followup(spoken: str) -> str:
-    """A short answer to Sozan's own question («درباره ما» after «کدام صفحه؟») continues that request.
-    A channel follow-up that does not name the platform keeps it from the recent turns."""
-    merged = spoken
-    rows = [row for row in _messages()[:-1] if isinstance(row, dict)]
-    if len(rows) >= 2:
-        asked, before = rows[-1], rows[-2]
-        if (
-            asked.get("role") == "assistant"
-            and asked.get("kind") == "ask"
-            and before.get("role") == "user"
-            and len(spoken.split()) <= 5
-            and not _FRESH_COMMAND.search(spoken)
-            and router_text.answers_ask(str(asked.get("text") or ""), spoken)
-        ):
-            base = router_text.squeeze(str(before.get("text") or ""))
-            if base:
-                merged = f"{base}. {spoken}"[:800]
-    return _with_channel_topic(merged)
-
-
-def _with_channel_topic(spoken: str) -> str:
-    """A channel follow-up that does not name the platform keeps the platform from the recent turns."""
-    from app.services.channel_tool import choose, recent_channel
-
-    if any(mark in spoken for mark in ("اینستا", "تلگرام", "واتساپ", "روبیکا")):
-        return spoken
-    current = recent_channel(_messages())
-    if not current or not current.get("platform"):
-        return spoken
-    if choose(spoken, _messages()) is None:
-        return spoken
-    label = {"instagram": "اینستاگرام", "telegram": "تلگرام", "whatsapp": "واتساپ", "rubika": "روبیکا"}[
-        str(current["platform"])
-    ]
-    return f"{spoken} {label}"[:800]
+    return router_text.merge_followup(spoken, _messages())
 
 
 def _clarify_extra(text: str) -> dict:
@@ -632,6 +597,8 @@ def _direct_reply(spoken: str, use_decider: bool = False) -> str:
 
     if router_text.has_payment_number(spoken):
         return router_text.SENSITIVE_REPLY
+    if router_text.credential_ask(spoken):
+        return router_text.CREDENTIAL_REPLY
     if seller_tools.route(spoken):
         return ""
     if _parse(spoken).topic not in {"secret", "shaba", "other_shop"}:

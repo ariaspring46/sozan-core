@@ -302,3 +302,60 @@ def is_confirmish(text: str) -> bool:
     topic) is answered normally; a write tool is still held back while the card is open."""
     words = [word for word in re.split(r"[\s\u200c.,،؛:!؟?]+", (text or "").lower()) if word]
     return 0 < len(words) <= 4 and all(word in _CONFIRMISH for word in words)
+
+
+CREDENTIAL_MARKS = ("توکن", "کلید api", "api key", "jwt", "کد یکبارمصرف", "کد ورود", "رمز عبور", "رمز ورود", "otp")
+CREDENTIAL_REPLY = "توکن، کلید، کد ورود و رمز را از چت نمی‌گویم. اگر کمکی دربارهٔ فروشگاه، کالا یا صندوق لازم داری، بگو."
+PRONOUN_FOLLOW = re.compile(r"موجودی\s*ش|قیمتش|قیمتشو|قیمتشون")
+
+
+def credential_ask(text: str) -> bool:
+    """A request for a token, key, login code, or password: the chat never gives one, so the answer is a plain refusal."""
+    low = (text or "").lower()
+    return any(mark in low for mark in CREDENTIAL_MARKS)
+
+
+FRESH_COMMAND = re.compile(r"بساز|بگو|حذف|اضافه|عوض|تغییر|بفرست|منتشر|نشان|نشون|مخفی|پنهان|وضعیت|چنده|چقدر|چیه|چیست|\?|؟|کن\b")
+
+
+def merge_followup(spoken: str, messages: list) -> str:
+    """A short answer to Sozan's own question («درباره ما» after «کدام صفحه؟») continues that request.
+    A channel follow-up that does not name the platform keeps it from the recent turns."""
+    merged = spoken
+    rows = [row for row in messages[:-1] if isinstance(row, dict)]
+    if len(rows) >= 2 and rows[-1].get("role") == "assistant" and rows[-2].get("role") == "user":
+        base = squeeze(str(rows[-2].get("text") or ""))
+        if base and len(spoken.split()) <= 4 and PRONOUN_FOLLOW.search(spoken):
+            answered = squeeze(str(rows[-1].get("text") or ""))[:120]  # the answer names the product in the seller's words
+            merged = f"{base}. {answered}. {spoken}"[:800]
+    if len(rows) >= 2:
+        asked, before = rows[-1], rows[-2]
+        if (
+            asked.get("role") == "assistant"
+            and asked.get("kind") == "ask"
+            and before.get("role") == "user"
+            and len(spoken.split()) <= 5
+            and not FRESH_COMMAND.search(spoken)
+            and answers_ask(str(asked.get("text") or ""), spoken)
+        ):
+            base = squeeze(str(before.get("text") or ""))
+            if base:
+                merged = f"{base}. {spoken}"[:800]
+    return with_channel_topic(merged, messages)
+
+
+def with_channel_topic(spoken: str, messages: list) -> str:
+    """A channel follow-up that does not name the platform keeps the platform from the recent turns."""
+    from app.services.channel_tool import choose, recent_channel
+
+    if any(mark in spoken for mark in ("اینستا", "تلگرام", "واتساپ", "روبیکا")):
+        return spoken
+    current = recent_channel(messages)
+    if not current or not current.get("platform"):
+        return spoken
+    if choose(spoken, messages) is None:
+        return spoken
+    label = {"instagram": "اینستاگرام", "telegram": "تلگرام", "whatsapp": "واتساپ", "rubika": "روبیکا"}[
+        str(current["platform"])
+    ]
+    return f"{spoken} {label}"[:800]

@@ -280,6 +280,12 @@ class PriceMoveTests(unittest.TestCase):
     def test_colloquial_dearer_routes_too(self) -> None:
         self.assertEqual(seller_tools.route("گرون‌ترش کن، بشه 900 هزار تومن"), "edit_product")
 
+    def test_a_new_price_stated_without_a_verb_is_a_price_change(self) -> None:
+        self.assertEqual(seller_tools.route("و قیمت انگشتر فیروزه را ۷۰۰ هزار تومن"), "edit_product")
+
+    def test_a_price_question_with_a_number_stays_a_read(self) -> None:
+        self.assertNotEqual(seller_tools.route("قیمت انگشتر فیروزه ۷۰۰ هزار تومن؟"), "edit_product")
+
     def test_a_question_about_cheaper_stays_a_read(self) -> None:
         self.assertNotEqual(seller_tools.route("این انگشتر ارزون‌تر میشه؟"), "edit_product")
 

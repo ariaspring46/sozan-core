@@ -29,6 +29,7 @@ _ORDER_FA = {
 _CHANGE = re.compile(r"(?:ب?کن|کنید|بشه|بشود|شود|بذار|بزار|بگذار|بزن|عوض|تغییر|برسون|بردار|حذف)(?![\u0600-\u06FF])")
 _ALL = re.compile(r"(?<![\u0600-\u06FF])(?:همه|همهٔ|همه‌ی|همه ی|کل|تمام)(?![\u0600-\u06FF])")
 _PRICE_MOVE = re.compile(r"ارزون|گران|گرون")  # «انگشتر را ارزون‌تر کن، بشه ۸۴۰ هزار تومن»: a price change without the word «قیمت»
+_PRICE_SAID = re.compile(r"\d.*(?:هزار|تومن|تومان)|(?:هزار|تومن|تومان).*\d")  # «و قیمت X را ۷۰۰ هزار تومن» states the new price
 _OUT_OF_STOCK = re.compile(r"تموم\s*شد|تمام\s*شد|ناموجود|موجود\s*نیست")
 _STOCK_ADD = re.compile(r"اضافه|بیشتر|دیگه\s*(?:اومد|رسید|آوردم)|رسید|اومد")
 _NO_DISCOUNT = re.compile(r"تخفیف.{0,40}(?:بردار|حذف|برداشته|صفر\s*کن)|بدون\s*تخفیف|تخفیف\s*نخوره")
@@ -561,7 +562,8 @@ def route(spoken: str) -> str:
         if stocky and (not adding or ("موجود" in text and find_products("", text))):
             if _CHANGE.search(text) or _OUT_OF_STOCK.search(text) or _STOCK_ADD.search(text):
                 return "edit_product"
-        if ("قیمت" in text or _PRICE_MOVE.search(text)) and not adding and _CHANGE.search(text) and _edit_values({}, text)[0] is not None:
+        price_said = ("قیمت" in text or _PRICE_MOVE.search(text)) and bool(_PRICE_SAID.search(text)) and "؟" not in text
+        if ("قیمت" in text or _PRICE_MOVE.search(text)) and not adding and (_CHANGE.search(text) or price_said) and _edit_values({}, text)[0] is not None:
             return "edit_product"
     return _read_route(text)
 

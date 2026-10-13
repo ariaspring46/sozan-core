@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import httpx
 
+from app.services import router_text
+
 
 
 def tool_error_kind(exc: BaseException) -> str:
@@ -267,14 +269,9 @@ async def _chat_fallback(history: list, completer) -> dict | None:
     }
 
 
-CREDENTIAL_MARKS = ("توکن", "کلید api", "api key", "jwt", "کد یکبارمصرف", "کد ورود", "رمز عبور", "رمز ورود", "otp")
-CREDENTIAL_REPLY = "توکن، کلید، کد ورود و رمز را از چت نمی‌گویم. اگر کمکی دربارهٔ فروشگاه، کالا یا صندوق لازم داری، بگو."
-
-
-def _credential_ask(text: str) -> bool:
-    """A request for a token, key, login code, or password: the chat never gives one, so the answer is a plain refusal."""
-    low = (text or "").lower()
-    return any(mark in low for mark in CREDENTIAL_MARKS)
+CREDENTIAL_MARKS = router_text.CREDENTIAL_MARKS
+CREDENTIAL_REPLY = router_text.CREDENTIAL_REPLY
+_credential_ask = router_text.credential_ask
 
 
 async def _steer_decider(
