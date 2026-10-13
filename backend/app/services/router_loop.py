@@ -267,6 +267,16 @@ async def _chat_fallback(history: list, completer) -> dict | None:
     }
 
 
+CREDENTIAL_MARKS = ("توکن", "کلید api", "api key", "jwt", "کد یکبارمصرف", "کد ورود", "رمز عبور", "رمز ورود", "otp")
+CREDENTIAL_REPLY = "توکن، کلید، کد ورود و رمز را از چت نمی‌گویم. اگر کمکی دربارهٔ فروشگاه، کالا یا صندوق لازم داری، بگو."
+
+
+def _credential_ask(text: str) -> bool:
+    """A request for a token, key, login code, or password: the chat never gives one, so the answer is a plain refusal."""
+    low = (text or "").lower()
+    return any(mark in low for mark in CREDENTIAL_MARKS)
+
+
 async def _steer_decider(
     spoken: str,
     media: dict | None,
@@ -280,6 +290,9 @@ async def _steer_decider(
     from app.services import decider_service
     from app.services.turn_clock import expired, remaining
 
+    if _credential_ask(spoken):
+        rs._trace(path="gate", refusal="credential")
+        return decider_service.as_result({"tool": "", "arguments": {}, "direct": CREDENTIAL_REPLY, "frustrated": False, "effort": "quick"})
     state = _decider_state(spoken, media, card_open)
     if tool_error:
         state["toolError"] = dict(tool_error)
