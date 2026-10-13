@@ -158,22 +158,50 @@ def _load_goal() -> dict:
     return row if isinstance(row, dict) else {}
 
 
-def _save_goal(goal: str, skill: str, suggestions: str, *, reached: bool) -> None:
+def _save_goal(goal: str, skill: str, suggestions: str, *, reached: bool, queue: list[str] | None = None) -> None:
     rs.write_json(
         _goal_name(),
-        {"goal": goal, "skill": skill, "suggestions": suggestions[:800], "reached": reached},
+        {"goal": goal, "goals": list(queue or []), "skill": skill, "suggestions": suggestions[:800], "reached": reached},
     )
 
 
-def _goal_line(text: str) -> str:
+def _advance_goal(state: dict, skill: str) -> bool:
+    """The current goal is done. True when the next queued goal became current (the loop goes on); False when none is left."""
+    queue = list(state.get("goalQueue") or [])
+    plan_skill = str(state.get("planSkill") or skill)
+    rs._trace(goal=state.get("goal"), goalReached=True)
+    if not queue:
+        if str(state.get("planSkill") or "") != "ecommerce-growth-mba":
+            _save_goal(str(state.get("goal") or ""), plan_skill, str(state.get("suggestions") or ""), reached=True)
+        return False
+    state["goal"] = queue.pop(0)
+    state["goalQueue"] = queue
+    state["phase"] = "act"
+    if str(state.get("planSkill") or "") != "ecommerce-growth-mba":
+        _save_goal(str(state["goal"]), plan_skill, str(state.get("suggestions") or ""), reached=False, queue=queue)
+    return True
+
+
+def _goal_lines(text: str) -> list[str]:
+    """Every «هدف: …» line of a plan, in order. A plan without such a line gives its first line as the one goal."""
+    goals: list[str] = []
     for line in (text or "").splitlines():
         stripped = line.strip().lstrip("-").strip()
         if stripped.startswith("هدف"):
             parts = stripped.split(":", 1)
             if len(parts) == 2 and parts[1].strip():
-                return _short_goal(parts[1].strip())
+                goal = _short_goal(parts[1].strip())
+                if goal and goal not in goals:
+                    goals.append(goal)
+    if goals:
+        return goals
     first = [line.strip() for line in (text or "").splitlines() if line.strip()]
-    return _short_goal(first[0]) if first else ""
+    return [_short_goal(first[0])] if first else []
+
+
+def _goal_line(text: str) -> str:
+    lines = _goal_lines(text)
+    return lines[0] if lines else ""
 
 
 def _short_goal(text: str) -> str:
@@ -262,6 +290,7 @@ async def _steer_decider(
     saved = _load_goal()
     if saved.get("goal") and not saved.get("reached") and not rs._wants_advice(spoken) and not _wants_growth(spoken):
         state["goal"] = str(saved.get("goal") or "")
+        state["goalQueue"] = [str(item) for item in (saved.get("goals") or []) if str(item).strip()]
         state["suggestions"] = str(saved.get("suggestions") or "done")
         state["planSkill"] = str(saved.get("skill") or "")
         state["phase"] = "act"
@@ -341,9 +370,11 @@ async def _steer_decider(
             if not text:
                 rs._append("assistant", "مدل پاسخ نداد. پیام را دوباره بفرست.")
                 return None
-            goal = _goal_line(text)
+            goals = _goal_lines(text)
+            goal = goals[0] if goals else ""
             rs._append("assistant", "پلن اصلاح:\n" + text)
             state["goal"] = goal
+            state["goalQueue"] = goals[1:]
             state["phase"] = "revise"
             if str(state.get("planSkill") or "") == "ecommerce-growth-mba":
                 from app.services.skill_catalog import append_business_plan
@@ -354,18 +385,13 @@ async def _steer_decider(
                     goal=goal,
                 )
             else:
-                _save_goal(goal, str(state.get("planSkill") or ""), str(state.get("suggestions") or ""), reached=False)
+                _save_goal(goal, str(state.get("planSkill") or ""), str(state.get("suggestions") or ""), reached=False, queue=goals[1:])
             messages.append({"role": "assistant", "content": text[:800]})
             continue
         if state.get("goal") and bool(decision.get("goalReached", True)):
-            if str(state.get("planSkill") or "") != "ecommerce-growth-mba":
-                _save_goal(
-                    str(state.get("goal") or ""),
-                    str(state.get("planSkill") or skill),
-                    str(state.get("suggestions") or ""),
-                    reached=True,
-                )
-            rs._trace(goal=state.get("goal"), goalReached=True)
+            if _advance_goal(state, skill):
+                messages.append({"role": "assistant", "content": f"هدف بعدی: {state['goal']}"})
+                continue
             return None
         observed = decision.get("observed") if isinstance(decision.get("observed"), dict) else {}
         if plan.get("direct") or not subset:
@@ -437,24 +463,14 @@ async def _steer_decider(
         }
         if name == "shop_chat" and state.get("goal") and not args.get("rebuild"):
             if state.get("phase") == "act" and rs._wants_advice(spoken) and not _wants_apply(spoken):
-                _save_goal(
-                    str(state.get("goal") or ""),
-                    str(state.get("planSkill") or skill),
-                    str(state.get("suggestions") or ""),
-                    reached=True,
-                )
-                rs._trace(goal=state.get("goal"), goalReached=True)
+                if _advance_goal(state, skill):
+                    continue
                 return None
             reply = await _skill_plan(spoken, skill or str(state.get("planSkill") or ""), "act", goal=str(state.get("goal") or ""))
             same = reply[:60] and reply[:60] == str(state.get("suggestions") or "")[:60]
             if same and rs._wants_advice(spoken):
-                _save_goal(
-                    str(state.get("goal") or ""),
-                    str(state.get("planSkill") or skill),
-                    str(state.get("suggestions") or ""),
-                    reached=True,
-                )
-                rs._trace(goal=state.get("goal"), goalReached=True)
+                if _advance_goal(state, skill):
+                    continue
                 return None
             if reply and not same:
                 rs._append("assistant", reply)
@@ -486,7 +502,8 @@ async def _steer_decider(
         state["lastTool"] = {"name": name, "text": str(reply or "")[:800]}
         messages.append({"role": "assistant", "content": str(reply or "")[:800]})
     if state.get("goal"):
-        rs._append("assistant", f"هدف هنوز باز است: {state['goal']}")
+        pending = [state["goal"], *(state.get("goalQueue") or [])]
+        rs._append("assistant", "هدف هنوز باز است: " + "؛ ".join(pending))
     return None
 
 
