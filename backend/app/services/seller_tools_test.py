@@ -269,6 +269,21 @@ class ProductEditTests(_Tenant):
         self.assertNotIn("p1", [row["id"] for row in read_json("products.json", [])])
 
 
+class PriceMoveTests(unittest.TestCase):
+    """«ارزون‌تر کن، بشه ۸۴۰ هزار تومن» is a price change even without the word «قیمت»."""
+
+    def test_cheaper_with_a_price_routes_to_edit_product(self) -> None:
+        text = "انگشتر نقره رو ارزون‌تر کن، بشه 840 هزار تومن"
+        self.assertEqual(seller_tools.route(text), "edit_product")
+        self.assertEqual(seller_tools._edit_values({}, text)[0], 840000)
+
+    def test_colloquial_dearer_routes_too(self) -> None:
+        self.assertEqual(seller_tools.route("گرون‌ترش کن، بشه 900 هزار تومن"), "edit_product")
+
+    def test_a_question_about_cheaper_stays_a_read(self) -> None:
+        self.assertNotEqual(seller_tools.route("این انگشتر ارزون‌تر میشه؟"), "edit_product")
+
+
 class DiscountTests(_Tenant):
     def test_one_product_card_shows_the_new_price(self) -> None:
         card = self._card("روی انگشتر فیروزه ۲۰ درصد تخفیف بذار")
