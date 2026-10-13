@@ -421,8 +421,10 @@ def _ranked(probabilities: dict) -> list[tuple[str, float]]:
     return rows
 
 
-# A tool action is taken from this probability, without a margin test. Below it the chat model takes the turn with every tool.
+# A tool action is taken when it has this probability and leads the next action by this margin. Otherwise the chat model
+# takes the turn with every tool. (Probability alone at 0.3 made 13 wrong direct picks on 71 labeled turns, against 10 with the margin.)
 TOOL_MIN_PROB = 0.3
+TOOL_MIN_MARGIN = 0.2
 # «clarify» hands the turn to the best tool action when that action has at least this much.
 CLARIFY_SECOND_MIN = 0.25
 
@@ -458,7 +460,7 @@ def accept_action(answer: dict) -> tuple[str, float, float, bool]:
                 break
         return choice, top, margin, False
     if tool_names(choice):
-        return choice, top, margin, top >= TOOL_MIN_PROB
+        return choice, top, margin, top >= TOOL_MIN_PROB and margin >= TOOL_MIN_MARGIN
     ok = top >= float(settings.decider_min_prob) and margin >= float(settings.decider_min_margin)
     return choice, top, margin, ok
 

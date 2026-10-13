@@ -47,11 +47,15 @@ class DeciderParseTests(unittest.TestCase):
         self.assertEqual(choice, "hero_image")
         self.assertGreaterEqual(prob, 0.6)
         self.assertGreaterEqual(margin, 0.2)
-        # a tool at 0.55 is taken even with a small margin; a tool below 0.3 is not
+        # a tool at 0.55 with a 0.2 lead is taken; a tool with a small lead is not, nor a tool below 0.3
         _choice, _prob, _margin, taken = decider_service.accept_action(
-            {"choice": "hero_image", "probabilities": {"hero_image": 0.55, "edit_page": 0.4}}
+            {"choice": "hero_image", "probabilities": {"hero_image": 0.55, "edit_page": 0.35}}
         )
         self.assertTrue(taken)
+        _choice, _prob, _margin, small_lead = decider_service.accept_action(
+            {"choice": "hero_image", "probabilities": {"hero_image": 0.55, "edit_page": 0.4}}
+        )
+        self.assertFalse(small_lead)
         _choice, _prob, _margin, weak = decider_service.accept_action(
             {"choice": "hero_image", "probabilities": {"hero_image": 0.25, "edit_page": 0.2}}
         )
