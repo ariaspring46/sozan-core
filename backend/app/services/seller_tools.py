@@ -28,6 +28,7 @@ _ORDER_FA = {
 }
 _CHANGE = re.compile(r"(?:ب?کن|کنید|بشه|بشود|شود|بذار|بزار|بگذار|بزن|عوض|تغییر|برسون|بردار|حذف)(?![\u0600-\u06FF])")
 _ALL = re.compile(r"(?<![\u0600-\u06FF])(?:همه|همهٔ|همه‌ی|همه ی|کل|تمام)(?![\u0600-\u06FF])")
+_PRICE_MOVE = re.compile(r"ارزون|گران|گرون")  # «انگشتر را ارزون‌تر کن، بشه ۸۴۰ هزار تومن»: a price change without the word «قیمت»
 _OUT_OF_STOCK = re.compile(r"تموم\s*شد|تمام\s*شد|ناموجود|موجود\s*نیست")
 _STOCK_ADD = re.compile(r"اضافه|بیشتر|دیگه\s*(?:اومد|رسید|آوردم)|رسید|اومد")
 _NO_DISCOUNT = re.compile(r"تخفیف.{0,40}(?:بردار|حذف|برداشته|صفر\s*کن)|بدون\s*تخفیف|تخفیف\s*نخوره")
@@ -290,8 +291,8 @@ def _edit_values(args: dict, spoken: str) -> tuple[int | None, int | None, int |
 
     text = spoken or ""
     price = _int(args.get("price"))
-    if price is None and "قیمت" in text:
-        price = _price_toman(_after(text, "قیمت")) or None
+    if price is None and ("قیمت" in text or _PRICE_MOVE.search(text)):
+        price = _price_toman(_after(text, "قیمت") if "قیمت" in text else text) or None
     stock = _int(args.get("stock"))
     add = _int(args.get("addStock"))
     if stock is None and add is None and "موجود" in text and not _OUT_OF_STOCK.search(text):
@@ -560,7 +561,7 @@ def route(spoken: str) -> str:
         if stocky and (not adding or ("موجود" in text and find_products("", text))):
             if _CHANGE.search(text) or _OUT_OF_STOCK.search(text) or _STOCK_ADD.search(text):
                 return "edit_product"
-        if "قیمت" in text and not adding and _CHANGE.search(text) and _edit_values({}, text)[0] is not None:
+        if ("قیمت" in text or _PRICE_MOVE.search(text)) and not adding and _CHANGE.search(text) and _edit_values({}, text)[0] is not None:
             return "edit_product"
     return _read_route(text)
 
