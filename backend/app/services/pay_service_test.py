@@ -384,3 +384,56 @@ class TenantIndexRuntimeTests(unittest.TestCase):
         self.assertEqual(tix.order_owner(data, "o1"), "09120000001")
         self.assertEqual(tix.sendbox_owner(data, "acc1"), "09120000001")
         self.assertIsNone(tix.slug_owner(data, "shop-b"))
+
+
+class CancelThenOkTests(unittest.TestCase):
+    """A cancel keeps the hint: a later OK for the same authority is verified with the gateway, not dropped."""
+
+    def _order(self) -> dict:
+        return {
+            "id": "ord50",
+            "title": "کیف",
+            "amount": 1000,
+            "productId": "",
+            "qty": 1,
+            "customer": "علی",
+            "channel": "دایرکت",
+            "gateway": "zarinpal",
+            "owner": "hub",
+            "merchant": HUB,
+            "commissionBps": 0,
+            "status": "pending",
+            "authority": "AUTH50",
+        }
+
+    def test_cancelled_authority_is_verified_when_an_ok_arrives_later(self) -> None:
+        verify = AsyncMock(return_value={"ok": True, "refId": "R50", "code": 100})
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+            write_json("pay-orders.json", [self._order()])
+            write_json("pay-pending.json", {"AUTH50": {"phone": PHONE, "orderId": "ord50", "gateway": "zarinpal"}}, shared=True)
+            with patch.object(payment_service, "zarinpal_verify", new=verify), patch.object(
+                pay_service, "_resync_storefront_after_paid", lambda: None
+            ):
+                asyncio.run(pay_service.finish_order(authority="AUTH50", ok=False))
+                cancelled = pay_service.get_order("ord50")
+                still_pending = read_json("pay-pending.json", {}, shared=True)
+                asyncio.run(pay_service.finish_order(authority="AUTH50", ok=True))
+                paid = pay_service.get_order("ord50")
+        self.assertEqual(cancelled["status"], "failed")
+        self.assertIn("AUTH50", still_pending)
+        self.assertEqual(paid["status"], "paid")
+        verify.assert_awaited_once()
+
+    def test_cancelled_hints_are_pruned_after_a_week(self) -> None:
+        import time
+
+        now = int(time.time())
+        pending = {
+            "OLD": {"phone": PHONE, "orderId": "a", "cancelledAt": now - 8 * 24 * 3600},
+            "RECENT": {"phone": PHONE, "orderId": "b", "cancelledAt": now - 3600},
+            "LIVE": {"phone": PHONE, "orderId": "c"},
+        }
+        kept = pay_service._prune_cancelled(pending)
+        self.assertNotIn("OLD", kept)
+        self.assertIn("RECENT", kept)
+        self.assertIn("LIVE", kept)

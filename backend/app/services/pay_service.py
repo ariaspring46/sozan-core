@@ -69,11 +69,34 @@ def _save_pending(rows: dict) -> None:
     write_json("pay-pending.json", rows, shared=True)
 
 
+CANCELLED_HINT_SECONDS = 7 * 24 * 3600
+
+
+def _prune_cancelled(pending: dict) -> dict:
+    """A cancelled checkout keeps its hint for a week (the gateway may still complete it), then it goes."""
+    now = int(time())
+    return {
+        key: hint
+        for key, hint in pending.items()
+        if not (isinstance(hint, dict) and hint.get("cancelledAt") and now - int(hint.get("cancelledAt") or 0) > CANCELLED_HINT_SECONDS)
+    }
+
+
 def _put_pending(authority: str, hint: dict) -> None:
     with shared_lock():
-        pending = _pending()
+        pending = _prune_cancelled(_pending())
         pending[authority] = hint
         _save_pending(pending)
+
+
+def _mark_cancelled(key: str) -> None:
+    """Keep the hint after a cancel: a later OK for the same authority is still verified with the gateway."""
+    with shared_lock():
+        pending = _pending()
+        hint = pending.get(key)
+        if isinstance(hint, dict):
+            pending[key] = {**hint, "cancelledAt": int(time())}
+        _save_pending(_prune_cancelled(pending))
 
 
 def _drop_pending(key: str) -> None:
@@ -414,7 +437,7 @@ async def finish_order(*, authority: str, ok: bool, gateway: str = "zarinpal") -
             row["status"] = "failed"
             log_event(row, "failed")
             _save_orders(orders)
-            _drop_pending(key)
+            _mark_cancelled(key)
             return panel_pay_url(order_id, "cancel")
         try:
             if str(row.get("gateway") or gateway) == "idpay":
