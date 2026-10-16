@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.9k tokens. Your core files total 23.2k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.9k tokens. Your core files total 23.4k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -66,15 +66,15 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 23.2k | the files most tasks touch; read the relevant one first |
-| active | 73.0k | yours to edit; read only what the task needs |
+| core | 23.4k | the files most tasks touch; read the relevant one first |
+| active | 73.3k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
-| tests | 29.7k | read only the test of the module you change |
+| tests | 30.4k | read only the test of the module you change |
 
 **Core:**
 
 - `backend/app/services/storefront_service.py` (6.1k)
-- `backend/app/services/pay_service.py` (9.9k)
+- `backend/app/services/pay_service.py` (10.2k)
 - `backend/app/api/storefront.py` (2.9k)
 - `backend/app/api/pay.py` (4.2k)
 
@@ -82,7 +82,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 - `backend/app/api/`: `pay.py` (4.2k), `storefront.py` (2.9k)
 - `backend/app/scenarios/`: `__init__.py` (0.0k)
-- `backend/app/services/`: `pay_service.py` (9.9k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (3.0k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
+- `backend/app/services/`: `pay_service.py` (10.2k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (3.0k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
 - `frontend/app/more/domain/`: `page.tsx` (4.0k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.7k)
