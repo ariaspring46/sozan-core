@@ -437,3 +437,44 @@ class CancelThenOkTests(unittest.TestCase):
         self.assertNotIn("OLD", kept)
         self.assertIn("RECENT", kept)
         self.assertIn("LIVE", kept)
+class _SlowUpload:
+    """A receipt upload whose body arrives late; another order is saved while it is still reading."""
+
+    filename = "receipt.jpg"
+    content_type = "image/jpeg"
+
+    def __init__(self, while_reading) -> None:
+        self.while_reading = while_reading
+
+    async def read(self) -> bytes:
+        self.while_reading()
+        return b"jpg-bytes"
+
+
+class AttachReceiptRaceTests(unittest.TestCase):
+    """An order created while a receipt uploads must survive the receipt being saved."""
+
+    def test_order_created_during_a_slow_upload_is_kept(self) -> None:
+        first = {
+            "id": "ord1", "title": "کیف", "amount": 1000, "productId": "", "qty": 1, "customer": "علی",
+            "channel": "دایرکت", "gateway": "zarinpal", "owner": "hub", "merchant": HUB, "commissionBps": 0,
+            "status": "pending", "authority": "A1",
+        }
+        second = {**first, "id": "ord2", "authority": "A2"}
+
+        def another_order_is_saved() -> None:
+            write_json("pay-orders.json", [first, second])
+
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+            write_json("pay-orders.json", [first])
+            with patch.object(pay_service, "verify_pay_secret", return_value=PHONE), patch.object(
+                pay_service, "_tell_receipt", lambda row: None
+            ), patch("app.services.support_service.create_ticket", lambda **kwargs: None), patch(
+                "app.services.chat_media_service.save", return_value={"name": "r.jpg"}
+            ):
+                asyncio.run(
+                    pay_service.attach_receipt(slug="x", secret="s", order_no="ord1", upload=_SlowUpload(another_order_is_saved))
+                )
+                stored = {row["id"]: row["status"] for row in pay_service._orders()}
+        self.assertIn("ord2", stored)
+        self.assertEqual(stored["ord1"], "awaiting_receipt")
