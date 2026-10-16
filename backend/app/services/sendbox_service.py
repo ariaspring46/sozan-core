@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import logging
 import re
+import time
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
@@ -212,10 +213,36 @@ async def start_instagram(*, phone: str) -> dict:
     }
 
 
+LIST_PENDING_FILE = "sendbox-list-pending.json"
+LIST_PENDING_SECONDS = 600
+
+
+def _note_list_requested(account_id: str) -> None:
+    """The hub asked Sendbox for this account's posts; the listing that comes back is accepted once."""
+    now = int(time.time())
+    pending = read_json(LIST_PENDING_FILE, {}, shared=True)
+    rows = {}
+    if isinstance(pending, dict):
+        rows = {key: int(value or 0) for key, value in pending.items() if now - int(value or 0) < LIST_PENDING_SECONDS}
+    rows[account_id] = now
+    write_json(LIST_PENDING_FILE, rows, shared=True)
+
+
+def _take_list_requested(account_id: str) -> bool:
+    """True only for an account the hub asked about recently; the first listing uses the request up."""
+    pending = read_json(LIST_PENDING_FILE, {}, shared=True)
+    if not isinstance(pending, dict) or account_id not in pending:
+        return False
+    stamp = int(pending.get(account_id) or 0)
+    write_json(LIST_PENDING_FILE, {key: value for key, value in pending.items() if key != account_id}, shared=True)
+    return time.time() - stamp < LIST_PENDING_SECONDS
+
+
 async def request_list_posts(*, account_id: str, limit: int = 24) -> None:
     ident = str(account_id or "").strip()
     if not ident:
         return
+    _note_list_requested(ident)
     async with _client(timeout=20) as client:
         await client.post(
             f"{base_url()}/service/actions/list_posts",
@@ -584,6 +611,9 @@ def store_bound_posts(payload: dict) -> dict | None:
     if not _is_post_event(event):
         return None
     account_id = str(body.get("account_id") or "").strip()
+    if not account_id or not _take_list_requested(account_id):
+        # an unsigned caller may only fill in a listing the hub asked for, once
+        return {"ok": True, "posts": 0, "ignored": "unrequested"}
     phone = tenant_for_sendbox_account(account_id) if account_id else ""
     data = body.get("data") if isinstance(body.get("data"), dict) else {}
     posts = _posts_from_webhook(body)

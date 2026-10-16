@@ -550,3 +550,54 @@ class WebhookTokenRotationTests(unittest.TestCase):
             settings, "sendbox_webhook_legacy_until", "2999-01-01"
         ):
             self.assertTrue(sendbox_service.valid_webhook_token(old))  # not rotated yet: old behaviour
+
+
+class UnsignedPostListingTests(unittest.TestCase):
+    """An unsigned post listing is stored only when the hub asked Sendbox for that account, and only once."""
+
+    PAYLOAD = {
+        "event_type": "list_posts",
+        "account_id": "acc-9",
+        "data": {"posts": [{"id": "p1", "caption": "کیف", "media_url": "https://cdn.example/a.jpg"}]},
+    }
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc) -> bool:
+            return False
+
+        async def post(self, *args, **kwargs):
+            return None
+
+    def _setup(self, raw: str) -> None:
+        channels = Path(raw) / "tenants" / "09135409482" / "channels.json"
+        channels.parent.mkdir(parents=True)
+        channels.write_text(
+            '[{"id":"ig9","platform":"instagram","handle":"shop","credentials":{"sendboxAccountId":"acc-9"}}]',
+            encoding="utf-8",
+        )
+
+    def test_listing_nobody_asked_for_is_not_stored(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw):
+            self._setup(raw)
+            result = sendbox_service.store_bound_posts(self.PAYLOAD)
+            with tenant_scope("09135409482"):
+                posts = sendbox_service.take_list_posts("acc-9")
+        self.assertEqual(result, {"ok": True, "posts": 0, "ignored": "unrequested"})
+        self.assertEqual(posts, [])
+
+    def test_requested_listing_is_stored_and_the_request_is_used_once(self) -> None:
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), patch.object(
+            sendbox_service, "_client", return_value=self._FakeClient()
+        ):
+            self._setup(raw)
+            asyncio.run(sendbox_service.request_list_posts(account_id="acc-9"))
+            first = sendbox_service.store_bound_posts(self.PAYLOAD)
+            second = sendbox_service.store_bound_posts(self.PAYLOAD)
+            with tenant_scope("09135409482"):
+                posts = sendbox_service.take_list_posts("acc-9")
+        self.assertEqual(first.get("posts"), 1)
+        self.assertEqual(second.get("ignored"), "unrequested")
+        self.assertEqual(len(posts), 1)

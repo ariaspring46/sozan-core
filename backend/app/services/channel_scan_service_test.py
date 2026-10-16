@@ -495,5 +495,65 @@ class ChannelScanTests(unittest.TestCase):
         self.assertFalse(status["needsReview"])
 
 
+
+class _FakeResponse:
+    def __init__(self, status_code: int, headers: dict | None = None, content: bytes = b"") -> None:
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.content = content
+
+
+class _FakeClient:
+    """Records every URL asked for; answers with a redirect to the metadata address."""
+
+    def __init__(self, calls: list[str]) -> None:
+        self.calls = calls
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc) -> bool:
+        return False
+
+    async def get(self, url: str):
+        self.calls.append(url)
+        return _FakeResponse(302, {"location": "http://169.254.169.254/latest/meta-data/"})
+
+
+class ScanImageTargetTests(unittest.TestCase):
+    """A scanned image URL is fetched only when it points at the public internet; redirects are checked hop by hop."""
+
+    def test_private_and_metadata_addresses_are_not_public(self) -> None:
+        for url in (
+            "http://169.254.169.254/latest/meta-data/",
+            "http://127.0.0.1/a.jpg",
+            "http://10.0.0.5/a.jpg",
+            "http://192.168.1.10/a.jpg",
+            "http://localhost/a.jpg",
+            "http://[::1]/a.jpg",
+            "file:///etc/passwd",
+        ):
+            with self.subTest(url=url):
+                self.assertFalse(asyncio.run(channel_scan_service._public_url(url)))
+
+    def test_public_address_is_allowed(self) -> None:
+        self.assertTrue(asyncio.run(channel_scan_service._public_url("https://8.8.8.8/a.jpg")))
+
+    def test_redirect_into_metadata_address_is_not_followed(self) -> None:
+        calls: list[str] = []
+        with patch.object(channel_scan_service, "async_client", lambda **kwargs: _FakeClient(calls)):
+            result = asyncio.run(channel_scan_service._fetch_public("https://8.8.8.8/a.jpg", 5))
+        self.assertEqual(result, (0, b""))
+        self.assertEqual(calls, ["https://8.8.8.8/a.jpg"])
+
+    def test_private_image_url_is_never_requested(self) -> None:
+        calls: list[str] = []
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope(
+            "09135409482"
+        ), patch.object(channel_scan_service, "async_client", lambda **kwargs: _FakeClient(calls)):
+            name = asyncio.run(channel_scan_service._download("http://169.254.169.254/a.jpg"))
+        self.assertEqual(name, "")
+        self.assertEqual(calls, [])
+
 if __name__ == "__main__":
     unittest.main()

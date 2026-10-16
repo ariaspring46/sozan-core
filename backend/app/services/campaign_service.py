@@ -263,11 +263,13 @@ class CampaignService:
                     )
                 )
 
-    def resolve_file(self, rel_path: str) -> Path:
-        base = settings.campaigns_path
+    def resolve_campaign_file(self, slug: str, rel_path: str) -> Path:
+        """A file inside this campaign's own folder. `..` or another campaign's folder is refused."""
+        base = settings.campaigns_path.resolve()
+        owned = (base / slug).resolve()
         path = (base / rel_path).resolve()
-        if base not in path.parents and path != base:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "مسیر نامعتبر است")
+        if path == owned or not path.is_relative_to(owned):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "مسیر مال این کمپین نیست")
         if not path.is_file():
             raise HTTPException(status.HTTP_404_NOT_FOUND, "فایل نیست")
         return path
