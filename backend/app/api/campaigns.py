@@ -103,9 +103,7 @@ async def campaign_file(
     service: CampaignService = Depends(_svc),
 ):
     campaign = await service.get(campaign_id)
-    if not rel_path.startswith(campaign.slug):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "مسیر مال این کمپین نیست")
-    path = service.resolve_file(rel_path)
+    path = service.resolve_campaign_file(campaign.slug, rel_path)
     media = "image/png" if path.suffix.lower() == ".png" else None
     if path.suffix.lower() == ".mp4":
         media = "video/mp4"

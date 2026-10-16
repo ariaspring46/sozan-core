@@ -36,3 +36,24 @@ class CampaignImportTests(unittest.TestCase):
 
                     asyncio.run(service.import_disk_slug("taken-slug"))
         self.assertEqual(ctx.exception.status_code, 403)
+
+
+class CampaignFileTraversalTests(unittest.TestCase):
+    """A campaign file is served only from that campaign's own folder: `..` into another folder is refused."""
+
+    def test_only_files_inside_the_own_folder_resolve(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as raw:
+            base = Path(raw)
+            (base / "own" / "raw").mkdir(parents=True)
+            (base / "own" / "raw" / "still.png").write_bytes(b"x")
+            (base / "victim").mkdir()
+            (base / "victim" / "brief.json").write_text("{}", encoding="utf-8")
+            with patch.object(settings, "campaigns_dir", str(base)):
+                service = CampaignService(None, None, None)
+                self.assertEqual(service.resolve_campaign_file("own", "own/raw/still.png").name, "still.png")
+                for bad in ("own/../victim/brief.json", "own/../../etc/passwd", "victim/brief.json", "own"):
+                    with self.subTest(path=bad), self.assertRaises(HTTPException) as ctx:
+                        service.resolve_campaign_file("own", bad)
+                    self.assertEqual(ctx.exception.status_code, 400)

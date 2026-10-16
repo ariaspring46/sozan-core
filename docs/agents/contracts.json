@@ -1452,9 +1452,9 @@
  },
  "backend/app/services/campaign_service.py::CampaignService": {
   "owner": "X2",
-  "shape": "def __init__(self, campaigns: CampaignRepository, assets: AssetRepository, copies: CopyRepository) -> None; async def list_campaigns(self) -> list[Campaign]; async def get(self, campaign_id: UUID) -> Campaign; async def create(self, *, slug: str, pillar: str, title: str, subtitle: str, cta: str, instagram_caption: str, telegram_caption: str, whatsapp_caption: str='') -> Campaign; async def update_copy(self, campaign_id: UUID, *, title: str | None, subtitle: str | None, cta: str | None, instagram_caption: str | None, telegram_caption: str | None, whatsapp_caption: str | None=None) -> Campaign; async def save_raw(self, campaign_id: UUID, filename: str, data: bytes) -> Asset; def compose_files_sync(self, slug: str) -> dict[str, str]; async def compose(self, campaign_id: UUID) -> Campaign; async def preview_outputs(self, campaign_id: UUID) -> list[dict]; async def export_zip(self, campaign_id: UUID) -> Path; def resolve_file(self, rel_path: str) -> Path; async def import_disk_slug(self, slug: str) -> Campaign",
+  "shape": "def __init__(self, campaigns: CampaignRepository, assets: AssetRepository, copies: CopyRepository) -> None; async def list_campaigns(self) -> list[Campaign]; async def get(self, campaign_id: UUID) -> Campaign; async def create(self, *, slug: str, pillar: str, title: str, subtitle: str, cta: str, instagram_caption: str, telegram_caption: str, whatsapp_caption: str='') -> Campaign; async def update_copy(self, campaign_id: UUID, *, title: str | None, subtitle: str | None, cta: str | None, instagram_caption: str | None, telegram_caption: str | None, whatsapp_caption: str | None=None) -> Campaign; async def save_raw(self, campaign_id: UUID, filename: str, data: bytes) -> Asset; def compose_files_sync(self, slug: str) -> dict[str, str]; async def compose(self, campaign_id: UUID) -> Campaign; async def preview_outputs(self, campaign_id: UUID) -> list[dict]; async def export_zip(self, campaign_id: UUID) -> Path; def resolve_campaign_file(self, slug: str, rel_path: str) -> Path; async def import_disk_slug(self, slug: str) -> Campaign",
   "signature": "class CampaignService",
-  "since": "2026-09-28",
+  "since": "2026-10-16",
   "users": [
    "X1"
   ]

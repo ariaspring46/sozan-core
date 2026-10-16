@@ -51,6 +51,8 @@ class ChannelsWebhookTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with patch.object(settings, "state_dir", raw):
+                # the hub asked Sendbox for acc-1's posts; acc-other was never asked, so its listing is refused
+                sendbox_service._note_list_requested("acc-1")
                 res = self._anon().post("/channels/boxapi/webhook", json=payload)
                 missing = self._anon().post(
                     "/channels/boxapi/webhook",
