@@ -193,7 +193,7 @@ def trim_to_sentence(text: str, *, minimum: int = 16) -> str:
 
 # ---------------------------------------------------------------- card and sheba typed into the chat
 
-_CARD = re.compile(r"(?<!\d)(?:\d[ \-]?){15}\d(?!\d)")
+_CARD = re.compile(r"(?<!\d)(?:\d[ \-.\u200c]?){15}\d(?!\d)")
 _SHEBA = re.compile(r"\bir\s*(?:\d\s*){24}", re.I)
 SENSITIVE_REPLY = "شمارهٔ کارت یا شبا را در چت ننویس؛ من آن‌ها را نگه نمی‌دارم. شبا را از بیشتر ← کیف پول ثبت کن."
 

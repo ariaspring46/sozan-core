@@ -145,6 +145,17 @@ class GateWordTests(unittest.TestCase):
         self.assertEqual(parse_turn("چند تا محصول دارم؟").topic, "product_count")
 
 
+
+class DottedCardNumberTests(unittest.TestCase):
+    """A card number written with dots is a card number too: it is refused in chat and masked when saved."""
+
+    def test_dotted_card_number_is_detected_and_masked(self) -> None:
+        sentence = "کارت 6037.9911.2233.4455 را بگیر"
+        self.assertTrue(router_text.has_payment_number(sentence))
+        masked = router_text.mask_payment(sentence)
+        self.assertNotIn("6037", masked)
+        self.assertIn("[کارت]", masked)
+
 if __name__ == "__main__":
     unittest.main()
 

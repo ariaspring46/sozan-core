@@ -353,5 +353,27 @@ class ReplyTests(_Tenant):
         self.assertIn("«مریم»", text)
 
 
+
+class ReplyRecipientPinTests(unittest.TestCase):
+    """A reply card names one conversation; confirm sends to that conversation, not to whoever wrote last."""
+
+    def test_confirm_sends_to_the_customer_the_card_named(self) -> None:
+        spoken = "مشتری آخر پرسیده کی ارسال میشه، بهش بگو پس‌فردا"
+        args = {"customer": "آخر", "text": "پس‌فردا"}
+        rows = [
+            {"id": "t-maryam", "sender": "مریم", "lastRole": "inbound", "platformLabel": "اینستاگرام"},
+            {"id": "t-sara", "sender": "سارا", "lastRole": "outbound"},
+        ]
+        with patch("app.services.inbox_service.list_threads", return_value={"threads": rows}):
+            card = seller_tools._reply_card(args, spoken)
+        self.assertIn("مریم", card)
+        self.assertEqual(args.get("_pinnedThread"), "t-maryam")
+        newer = [{"id": "t-ali", "sender": "علی", "lastRole": "inbound"}, *rows]
+        with patch("app.services.inbox_service.list_threads", return_value={"threads": newer}), patch(
+            "app.services.inbox_service.reply", new=AsyncMock(return_value={})
+        ) as reply:
+            asyncio.run(seller_tools._reply_customer(spoken, args))
+        self.assertEqual(reply.await_args.args[0], "t-maryam")
+
 if __name__ == "__main__":
     unittest.main()
