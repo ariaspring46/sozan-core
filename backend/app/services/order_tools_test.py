@@ -154,3 +154,25 @@ class ReceiptTests(_Tenant):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReceiptPinTests(unittest.TestCase):
+    """A receipt card names one order; confirm approves that order, not whichever receipt is newest by then."""
+
+    def _row(self, order_id: str, title: str) -> dict:
+        return {"id": order_id, "status": "awaiting_receipt", "title": title, "customer": "سارا", "amount": 1000, "stage": ""}
+
+    def test_confirm_approves_the_order_the_card_named(self) -> None:
+        spoken = "رسید سفارش آخر را تأیید کن"
+        args: dict = {}
+        rows = [self._row("NEWEST", "انگشتر"), self._row("OLDER", "گردنبند")]
+        with patch.object(order_tools, "_orders", return_value=rows):
+            card = order_tools._receipt_card(args, spoken)
+        self.assertTrue(card)
+        self.assertEqual(args.get("order"), "NEWEST")
+        newer_arrived = [self._row("NEWER", "دستبند"), *rows]
+        with patch.object(order_tools, "_orders", return_value=newer_arrived), patch(
+            "app.services.pay_service.review_receipt", return_value={}
+        ) as review:
+            asyncio.run(order_tools._approve_receipt(spoken, args))
+        self.assertEqual(review.call_args.kwargs.get("order_no"), "NEWEST")

@@ -735,34 +735,37 @@ def shop_config(*, slug: str, secret: str) -> dict:
 
 async def attach_receipt(*, slug: str, secret: str, order_no: str, upload) -> dict:
     tenant = verify_pay_secret(slug, secret)
+    # the upload is read before the order list is loaded: a slow upload must not overwrite orders saved meanwhile
+    data = b""
+    if upload is not None and getattr(upload, "filename", ""):
+        data = await upload.read()
+        if len(data) > 4_000_000:
+            raise ValueError("عکس رسید بزرگ‌تر از حد مجاز است")
     with tenant_scope(tenant):
-        orders = _orders()
-        row = next(
-            (
-                item
-                for item in orders
-                if str(item.get("id")) == str(order_no or "").strip()
-                and str(item.get("status") or "") in ("pending", "awaiting_receipt", "receipt_rejected")
-            ),
-            None,
-        )
-        if row is None:
-            raise ValueError("سفارش پیدا نشد")
         image_name = ""
-        if upload is not None and getattr(upload, "filename", ""):
-            data = await upload.read()
-            if len(data) > 4_000_000:
-                raise ValueError("عکس رسید بزرگ‌تر از حد مجاز است")
-            if data:
-                from app.services import chat_media_service
+        if data:
+            from app.services import chat_media_service
 
-                saved = chat_media_service.save(upload.filename, data, upload.content_type or "")
-                image_name = str(saved.get("name") or "")
-        row["status"] = "awaiting_receipt"
-        row["receipt"] = image_name
-        row["receiptStatus"] = "waiting"
-        log_event(row, "receipt")
-        _save_orders(orders)
+            saved = chat_media_service.save(upload.filename, data, upload.content_type or "")
+            image_name = str(saved.get("name") or "")
+        with tenant_file_lock("pay-orders"):
+            orders = _orders()
+            row = next(
+                (
+                    item
+                    for item in orders
+                    if str(item.get("id")) == str(order_no or "").strip()
+                    and str(item.get("status") or "") in ("pending", "awaiting_receipt", "receipt_rejected")
+                ),
+                None,
+            )
+            if row is None:
+                raise ValueError("سفارش پیدا نشد")
+            row["status"] = "awaiting_receipt"
+            row["receipt"] = image_name
+            row["receiptStatus"] = "waiting"
+            log_event(row, "receipt")
+            _save_orders(orders)
         _tell_receipt(row)
         from app.services import support_service
 

@@ -183,11 +183,21 @@ async def _update_order(spoken: str, args: dict) -> tuple[str, dict]:
 # ---------------------------------------------------------------- approve_receipt
 
 
+def _receipt_rows(args: dict, spoken: str) -> list[dict]:
+    """The card pins the order it named (its id). Confirm must approve that order, not whichever receipt is newest now."""
+    wanted = str(args.get("order") or "").strip()
+    if wanted:
+        everything = _orders()
+        if any(str(row.get("id") or "") == wanted for row in everything):
+            return [row for row in everything if str(row.get("id") or "") == wanted and row.get("status") == "awaiting_receipt"]
+    return find_orders(wanted, spoken or "", want="receipt")
+
+
 def _receipt_plan(args: dict, spoken: str) -> dict:
     text = spoken or ""
     raw = args.get("approve")
     approve = bool(raw) if isinstance(raw, bool) else not _RECEIPT_NO.search(text)
-    rows = find_orders(str(args.get("order") or ""), text, want="receipt")
+    rows = _receipt_rows(args, text)
     if len(rows) != 1:
         return {"problem": _which(rows, "رسیدِ منتظر تأییدی")}
     return {"row": rows[0], "approve": approve}
@@ -197,6 +207,7 @@ def _receipt_card(args: dict, spoken: str) -> str:
     plan = _receipt_plan(args, spoken)
     if plan.get("problem"):
         return ""
+    args["order"] = str(plan["row"].get("id") or "")  # the same dict is stored with the card: confirm approves this order
     if plan["approve"]:
         return f"رسید سفارش {_label(plan['row'])} تأیید شود؟\nفقط اگر پول به حسابت نشسته؛ بعد از تأیید موجودی کم و فروش ثبت می‌شود."
     return f"رسید سفارش {_label(plan['row'])} رد شود؟\nمشتری می‌تواند دوباره رسید بفرستد."
