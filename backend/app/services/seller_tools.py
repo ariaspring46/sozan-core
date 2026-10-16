@@ -499,14 +499,21 @@ def _reply_plan(args: dict, spoken: str) -> dict:
     who, body = _reply_parts(args, spoken)
     if not _threads():
         return {"problem": "صندوق هنوز گفتگویی ندارد."}
-    if not who:
-        return {"problem": "برای کدام مشتری؟ نامش را همان‌طور که در صندوق است بگو."}
-    rows = find_threads(who)
-    if not rows:
-        recent = "، ".join(_quote(str(row.get("sender") or "")) for row in _threads()[:4])
-        return {"problem": f"در صندوق گفتگویی با {_quote(who)} پیدا نکردم. آخرین‌ها: {recent}"}
-    if len(rows) > 1:
-        return {"problem": "کدام؟ " + "، ".join(_quote(str(row.get("sender") or "")) for row in rows[:5])}
+    pinned = str(args.get("_pinnedThread") or "")
+    if pinned:
+        # the card named this conversation: confirm sends there, even if a newer customer has written since
+        rows = [row for row in _threads() if str(row.get("id")) == pinned]
+        if not rows:
+            return {"problem": "گفتگوی این پیام دیگر در صندوق نیست؛ دوباره بگو."}
+    else:
+        if not who:
+            return {"problem": "برای کدام مشتری؟ نامش را همان‌طور که در صندوق است بگو."}
+        rows = find_threads(who)
+        if not rows:
+            recent = "، ".join(_quote(str(row.get("sender") or "")) for row in _threads()[:4])
+            return {"problem": f"در صندوق گفتگویی با {_quote(who)} پیدا نکردم. آخرین‌ها: {recent}"}
+        if len(rows) > 1:
+            return {"problem": "کدام؟ " + "، ".join(_quote(str(row.get("sender") or "")) for row in rows[:5])}
     if not body:
         return {"problem": f"چه چیزی برای {_quote(str(rows[0].get('sender') or who))} بفرستم؟"}
     row = rows[0]
@@ -604,6 +611,7 @@ def _reply_card(args: dict, spoken: str) -> str:
     plan = _reply_plan(args, spoken)
     if plan.get("problem"):
         return ""
+    args["_pinnedThread"] = plan["thread"]  # the same dict is stored with the card: confirm sends to this conversation
     return f"این پیام برای {_quote(plan['sender'])} در {plan['where']} فرستاده شود؟\n«{plan['text']}»"
 
 
