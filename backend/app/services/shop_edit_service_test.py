@@ -534,5 +534,15 @@ class ShopEditFlowTests(unittest.TestCase):
         self.assertIsNone(build_dir_for({"slug": "", "jobId": ""}))
 
 
+class RuntimeRelTests(unittest.TestCase):
+    def test_only_build_public_paths_are_copied(self) -> None:
+        from app.services import shop_edit_service
+
+        self.assertTrue(shop_edit_service._runtime_rel_ok("public/img/a.png"))
+        for rel in ("public/../../etc/passwd", "../public/x.png", "/etc/passwd", "app/page.tsx", ""):
+            with self.subTest(rel=rel):
+                self.assertFalse(shop_edit_service._runtime_rel_ok(rel))
+
+
 if __name__ == "__main__":
     unittest.main()
