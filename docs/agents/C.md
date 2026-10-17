@@ -69,7 +69,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | core | 23.5k | the files most tasks touch; read the relevant one first |
 | active | 73.4k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
-| tests | 31.0k | read only the test of the module you change |
+| tests | 31.7k | read only the test of the module you change |
 
 **Core:**
 
@@ -82,7 +82,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 - `backend/app/api/`: `pay.py` (4.2k), `storefront.py` (2.9k)
 - `backend/app/scenarios/`: `__init__.py` (0.0k)
-- `backend/app/services/`: `pay_service.py` (10.3k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (3.0k), `catalog_sync_service.py` (2.4k), `support_service.py` (1.9k), `shop_otp_service.py` (1.8k)
+- `backend/app/services/`: `pay_service.py` (10.3k), `storefront_service.py` (6.1k), `arvan_dns_service.py` (3.9k), `order_flow_service.py` (3.0k), `catalog_sync_service.py` (2.4k), `shop_otp_service.py` (1.9k), `support_service.py` (1.9k)
 - `frontend/app/more/domain/`: `page.tsx` (4.0k)
 - `frontend/app/more/inventory/`: `page.tsx` (0.2k)
 - `frontend/app/more/support/`: `page.tsx` (4.7k)
@@ -236,6 +236,7 @@ Settings.otp_dev: bool = False  # changed 2026-09-18
 Settings.otp_ttl_seconds: int = 300  # changed 2026-09-18
 Settings.panel_url: str = 'https://app.sozan-core.ir'  # changed 2026-09-18
 Settings.payment_sign_secret: str = ''  # changed 2026-09-18
+Settings.payments_enabled: bool = True  # changed 2026-10-17
 Settings.public_api_url: str = 'https://api.sozan-core.ir'  # changed 2026-09-18
 Settings.shop_otp_daily_cap: int = 200  # changed 2026-09-18
 ```
