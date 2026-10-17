@@ -366,3 +366,20 @@ class WithdrawalHistoryTests(unittest.TestCase):
             out = wallet_service.request_withdraw(amount=100, iban="IR" + "1" * 24, name="x")
         shown = [r["id"] for r in out["wallet"]["withdrawals"]]
         self.assertEqual(shown[0], out["withdraw"]["id"])
+
+
+class ShebaDigitsTests(unittest.TestCase):
+    def test_persian_digits_are_stored_as_latin_digits(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                wallet_service.credit_sale(amount=1000, commission=0, order_id="seed", note="", owner="hub")
+                wallet_service.request_withdraw(amount=500, iban="IR" + "۱۲۳۴۵۶۷۸۹۰" * 2 + "۱۲۳۴")
+                stored = read_json("withdrawals.json", [])
+        self.assertEqual(stored[-1]["iban"], "IR" + "1234567890" * 2 + "1234")
+
+    def test_wrong_length_is_still_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                wallet_service.credit_sale(amount=1000, commission=0, order_id="seed2", note="", owner="hub")
+                with self.assertRaises(ValueError):
+                    wallet_service.request_withdraw(amount=500, iban="IR" + "۱" * 23)

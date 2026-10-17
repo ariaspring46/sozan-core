@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import re
 import shutil
@@ -887,9 +888,11 @@ def patch_page_heading(root: Path, page: str, heading: str) -> bool:
     if path is None or not heading:
         return False
     text = path.read_text(encoding="utf-8")
+    # the heading is JSX text: «{» starts an expression and «<» a tag, so they go in as character references
+    safe = html.escape(heading, quote=False).replace("{", "&#123;").replace("}", "&#125;")
     next_text, count = re.subn(
         r"(<h1[^>]*>)([^<]*)(</h1>)",
-        rf"\g<1>{heading}\g<3>",
+        lambda match: match.group(1) + safe + match.group(3),
         text,
         count=1,
     )
