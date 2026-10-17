@@ -403,5 +403,21 @@ class FixedOtpTests(unittest.TestCase):
         self.assertNotEqual(self.redis.store.get("otp:09111234567"), "100001")
 
 
+class FixedOtpProductionTests(unittest.TestCase):
+    """A fixed code in OTP_FIXED_ACCOUNTS is a development shortcut; production never honours it."""
+
+    def test_fixed_code_is_ignored_in_production(self) -> None:
+        with patch.object(auth_service.settings, "payments_enabled", True), patch.object(
+            auth_service.settings, "otp_fixed_accounts", "09129900001:123456"
+        ):
+            self.assertIsNone(auth_service.fixed_otp_for("09129900001"))
+
+    def test_fixed_code_still_works_in_development(self) -> None:
+        with patch.object(auth_service.settings, "payments_enabled", False), patch.object(
+            auth_service.settings, "otp_fixed_accounts", "09129900001:123456"
+        ):
+            self.assertEqual(auth_service.fixed_otp_for("09129900001"), "123456")
+
+
 if __name__ == "__main__":
     unittest.main()
