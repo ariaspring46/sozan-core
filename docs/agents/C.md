@@ -93,7 +93,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 **Rare (yours; only when the task names it):**
 
 - `docs/storefront/`: `after-c-test-1440.png` (0.0k), `after-c-test-390.png` (0.0k), `before-azmaish-1440.png` (0.0k), `before-azmaish-390.png` (0.0k)
-- `tools/monitor/`: `install.sh` (0.4k), `sozan_monitor.py` (7.1k), `status-nginx.conf` (0.3k)
+- `tools/monitor/`: `install.sh` (0.4k), `sozan_monitor.py` (7.2k), `status-nginx.conf` (0.3k)
 - `tools/storefront/`: `scan_storefront.py` (3.4k), `shop-closed.html` (0.3k)
 
 **Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/scenarios/order_lifecycle_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/order_flow_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/pay_stock_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
