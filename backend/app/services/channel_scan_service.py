@@ -34,6 +34,7 @@ META_REV = re.compile(
 )
 IMG_SRC = re.compile(r'<img[^>]+src=["\']([^"\']+)', re.I)
 TAG = re.compile(r"<[^>]+>")
+SCRIPT_STYLE = re.compile(r"<(script|style|noscript)\b[^>]*>.*?</\1\s*>", re.I | re.S)
 SPACE = re.compile(r"\s+")
 ITEM_WORD = re.compile(r"(کیف(?!یت)|کفش|صندل|کوله|زعفران|ادویه|عسل|چای)")
 FA_DIGIT = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
@@ -390,7 +391,8 @@ def _clean_handle(raw: str) -> str:
 
 
 def _plain(html: str) -> str:
-    text = TAG.sub(" ", unescape(html or ""))
+    # CSS و JS صفحه متن نیستند؛ اول حذف می‌شوند، وگرنه در کپشن‌ها و لحن فروشنده می‌نشینند.
+    text = TAG.sub(" ", unescape(SCRIPT_STYLE.sub(" ", html or "")))
     return SPACE.sub(" ", text).strip()[:6000]
 
 

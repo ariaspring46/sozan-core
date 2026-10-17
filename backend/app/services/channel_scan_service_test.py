@@ -532,5 +532,11 @@ class ScanImageTargetTests(unittest.TestCase):
         self.assertEqual(name, "")
         self.assertEqual(calls, [])
 
+
+class PageTextTests(unittest.TestCase):
+    def test_style_and_script_are_not_page_text(self) -> None:
+        html = "<html><head><style>body{margin:0}</style><script>var a=1;</script></head><body><p>کیف چرمی</p></body></html>"
+        self.assertEqual(channel_scan_service._plain(html), "کیف چرمی")
+
 if __name__ == "__main__":
     unittest.main()
