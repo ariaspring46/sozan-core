@@ -43,14 +43,14 @@
    "tests": 50778
   },
   {
-   "active": 99250,
-   "core": 22800,
+   "active": 99527,
+   "core": 23077,
    "core_pct": 51,
    "id": "X5",
    "loose_contracts": 31,
-   "manifest": 12965,
+   "manifest": 12985,
    "rare": 20707,
-   "tests": 57737
+   "tests": 58096
   },
   {
    "active": 67737,
@@ -68,7 +68,7 @@
    "core_pct": 74,
    "id": "Z",
    "loose_contracts": 0,
-   "manifest": 4947,
+   "manifest": 4940,
    "rare": 29390,
    "tests": 14831
   },
@@ -93,7 +93,7 @@
    "tests": 0
   },
   {
-   "active": 227677,
+   "active": 227695,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",
