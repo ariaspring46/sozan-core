@@ -99,7 +99,7 @@ class ShopPayB1Tests(unittest.TestCase):
                     filename = "receipt.png"
                     content_type = "image/png"
 
-                    async def read(self):
+                    async def read(self, size=-1):
                         return b"x" * 64
 
                 out = asyncio.run(
@@ -446,7 +446,7 @@ class _SlowUpload:
     def __init__(self, while_reading) -> None:
         self.while_reading = while_reading
 
-    async def read(self) -> bytes:
+    async def read(self, size: int = -1) -> bytes:
         self.while_reading()
         return b"jpg-bytes"
 
@@ -478,3 +478,59 @@ class AttachReceiptRaceTests(unittest.TestCase):
                 stored = {row["id"]: row["status"] for row in pay_service._orders()}
         self.assertIn("ord2", stored)
         self.assertEqual(stored["ord1"], "awaiting_receipt")
+
+
+class _OversizeUpload:
+    """A receipt bigger than the cap: the service asks for at most cap+1 bytes, never the whole body."""
+
+    filename = "receipt.jpg"
+    content_type = "image/jpeg"
+
+    def __init__(self) -> None:
+        self.asked: list[int] = []
+
+    async def read(self, size: int = -1) -> bytes:
+        self.asked.append(size)
+        return b"x" * (size if size > 0 else 30_000_000)
+
+
+class ReceiptSizeTests(unittest.TestCase):
+    def test_oversize_receipt_is_refused_after_a_bounded_read(self) -> None:
+        upload = _OversizeUpload()
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope(PHONE):
+            write_json("pay-orders.json", [{"id": "ord1", "status": "pending", "authority": "A1", "merchant": HUB}])
+            with patch.object(pay_service, "verify_pay_secret", return_value=PHONE), patch(
+                "app.services.chat_media_service.save", return_value={"name": "r.jpg"}
+            ) as save:
+                with self.assertRaises(ValueError):
+                    asyncio.run(pay_service.attach_receipt(slug="x", secret="s", order_no="ord1", upload=upload))
+        self.assertEqual(upload.asked, [pay_service.RECEIPT_MAX_BYTES + 1])
+        save.assert_not_called()
+
+
+class OpenOrderWindowTests(unittest.TestCase):
+    """The history window (400 rows) drops finished orders only; an order waiting for a receipt is never dropped."""
+
+    def test_awaiting_receipt_survives_a_full_history(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                rows = [{"id": "waiting", "status": "awaiting_receipt"}]
+                rows += [{"id": f"done-{i}", "status": "paid"} for i in range(450)]
+                pay_service._save_orders(rows)
+                saved = read_json("pay-orders.json", [])
+        ids = [row["id"] for row in saved]
+        self.assertIn("waiting", ids)
+        self.assertLessEqual(len(saved), 400)
+
+    def test_receipt_rejected_and_needs_action_survive(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                rows = [
+                    {"id": "rejected", "status": "receipt_rejected"},
+                    {"id": "stock", "status": "paid", "needsAction": {"reason": "stock"}},
+                ]
+                rows += [{"id": f"done-{i}", "status": "paid"} for i in range(450)]
+                pay_service._save_orders(rows)
+                ids = [row["id"] for row in read_json("pay-orders.json", [])]
+        self.assertIn("rejected", ids)
+        self.assertIn("stock", ids)

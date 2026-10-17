@@ -142,8 +142,9 @@ async def storefront_ticket(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "فروشگاه پیدا نشد")
     image_name = ""
     if file is not None and file.filename and file.size != 0:
-        data = await file.read()
-        if len(data) > 4_000_000:
+        # بیشتر از سقف را نمی‌خواند؛ بدنهٔ بزرگ کامل در حافظه نمی‌آید
+        data = await file.read(pay_service.RECEIPT_MAX_BYTES + 1)
+        if len(data) > pay_service.RECEIPT_MAX_BYTES:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "عکس بزرگ‌تر از حد مجاز است")
         if data:
             from app.services import chat_media_service
