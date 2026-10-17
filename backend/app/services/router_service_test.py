@@ -566,6 +566,18 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("انجام نشد", hidden["messages"][-1]["text"])
         self.assertNotIn("secret-trace", hidden["messages"][-1]["text"])
 
+    def test_unexpected_failure_after_confirm_closes_the_card(self) -> None:
+        # A non-validation error can come after part of the write happened: the same tap must not run it again.
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        first = self._turn("پیش‌نویس", complete)
+        cid = first["pendingConfirm"]["id"]
+        with patch("app.services.inbox_service.save_auto_reply", side_effect=RuntimeError("gateway went away")):
+            out = self._turn("", complete, confirm_id=cid)
+        self.assertFalse(out.get("pendingConfirm"))
+        self.assertIn("انجام نشد", out["messages"][-1]["text"])
+
     def test_open_card_trimmed_out_of_history_is_shown_again(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
@@ -2182,3 +2194,29 @@ class ReelFileTests(unittest.TestCase):
     def test_a_feed_post_still_falls_back_to_the_first_image(self) -> None:
         files = [{"kind": "image", "name": "cover.png"}]
         self.assertEqual(router_service._pick_publish_file(files, "این پست را بفرست")["name"], "cover.png")
+
+
+class RescueBudgetTests(unittest.TestCase):
+    """A slow embedding rescue cannot hold the turn past its budget."""
+
+    def test_rescue_gives_up_when_the_budget_runs_out(self) -> None:
+        import time
+
+        async def slow_rescue(_text, embed=None):
+            await asyncio.sleep(5)
+            return "products"
+
+        started = time.monotonic()
+        with patch.object(router_service.router_embed, "rescue_tool", new=slow_rescue), patch(
+            "app.services.turn_clock.remaining", return_value=0.2
+        ):
+            out = asyncio.run(router_service._rescue_in_budget("یه چیزی", None))
+        self.assertEqual(out, "")
+        self.assertLess(time.monotonic() - started, 2)
+
+    def test_rescue_result_is_kept_within_budget(self) -> None:
+        async def quick_rescue(_text, embed=None):
+            return "products"
+
+        with patch.object(router_service.router_embed, "rescue_tool", new=quick_rescue):
+            self.assertEqual(asyncio.run(router_service._rescue_in_budget("یه چیزی", None)), "products")
