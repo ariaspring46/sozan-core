@@ -92,6 +92,7 @@
         "tools/qa_battery.py",
         "tools/agentic_probes/p_router.py",
         "tools/agentic_probes/p_router_lock.py",
+        "tools/harness_eval/**",
         "talk-x1.md"
       ],
       "rare": [
@@ -100,7 +101,8 @@
         "tools/qa50_battery.json",
         "tools/qa_battery.py",
         "tools/agentic_probes/p_router.py",
-        "tools/agentic_probes/p_router_lock.py"
+        "tools/agentic_probes/p_router_lock.py",
+        "tools/harness_eval/**"
       ],
       "title_en": "Router and panel chat",
       "branch": "x1/<issue>-<slug>",
