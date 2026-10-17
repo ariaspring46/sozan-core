@@ -53,6 +53,20 @@ class TurnParseTests(unittest.TestCase):
         self.assertTrue(blocked(10, 16))
 
 
+class ToldSomeoneTests(unittest.TestCase):
+    """A message told to a customer carries a send word; it is not a request to publish the last post."""
+
+    def test_message_to_a_customer_is_not_a_publish(self) -> None:
+        for text in ("به مریم بگو کد رو بفرست", "بهش بگو پس‌فردا بفرسته"):
+            with self.subTest(text=text):
+                self.assertNotEqual(parse_turn(text).act, "publish")
+
+    def test_publish_commands_still_publish(self) -> None:
+        for text in ("این پست را منتشر کن", "پست رو بفرست", "همین را در اینستاگرام منتشر کن"):
+            with self.subTest(text=text):
+                self.assertEqual(parse_turn(text).act, "publish")
+
+
 class ShabaWordTests(unittest.TestCase):
     """«شبا» (شبای من) is the bank account; «شبانه» (nightly) is not and must not be refused as one."""
 
