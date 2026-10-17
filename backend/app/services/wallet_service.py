@@ -17,7 +17,9 @@ EMPTY = {
     "lifetimeCommission": 0,
 }
 
-SHEBA = re.compile(r"^IR\d{24}$")
+SHEBA = re.compile(r"^IR[0-9]{24}$")
+# رقم فارسی و عربی در شبا به رقم لاتین تبدیل می‌شود؛ بانک و تسویه فقط لاتین را می‌پذیرد.
+_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
 CREDITED_FILE = "wallet-credited.json"
 # یک پرداخت بعد از این مدت دیگر دوباره بررسی نمی‌شود (تلاش تأیید درگاه چند دقیقه‌ای است).
 CREDITED_KEEP_SECONDS = 180 * 24 * 3600
@@ -204,7 +206,7 @@ def request_withdraw(*, amount: int, iban: str, name: str = "") -> dict:
     amount = int(amount)
     if amount <= 0:
         raise ValueError("مبلغ برداشت نامعتبر است")
-    sheba = iban.strip().upper().replace(" ", "")
+    sheba = iban.strip().upper().replace(" ", "").translate(_DIGITS)
     if not SHEBA.match(sheba):
         raise ValueError("شبا باید با IR و ۲۴ رقم باشد")
     with tenant_file_lock("wallet"):

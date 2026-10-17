@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import socket
 import sqlite3
 import ssl
@@ -332,18 +333,18 @@ def telegram_send(text: str) -> bool:
                 with urllib.request.urlopen(req, timeout=15) as res:
                     res.read()
                 return True
-            # hub fallback: telegram is blocked from Iranian IPs; ride CHANNEL_PROXY
+            # hub fallback: telegram is blocked from Iranian IPs; ride CHANNEL_PROXY.
+            # The message goes over stdin, never into the remote command line: a message can contain $(...) and quotes.
             cmd = (
                 "set -a; . ~/sozan-core/.env 2>/dev/null; set +a; "
-                f"curl -s --max-time 20 --proxy \"$CHANNEL_PROXY\" -X POST -H 'Content-Type: application/json' "
-                f"-d {json.dumps(json.dumps({'chat_id': chat, 'text': text}))!r} "
-                f"-w '%{{http_code}}' '{api}'"
+                "curl -s --max-time 20 --proxy \"$CHANNEL_PROXY\" -X POST -H 'Content-Type: application/json' "
+                f"--data-binary @- {shlex.quote(api)} -w '%{{http_code}}'"
             )
             out = subprocess.run(
                 ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "hub", cmd],
-                capture_output=True, text=True, timeout=30,
+                input=data, capture_output=True, timeout=30,
             )
-            if out.stdout.strip().endswith("200"):
+            if out.stdout.decode("utf-8", errors="replace").strip().endswith("200"):
                 return True
         except Exception:  # noqa: BLE001
             continue
