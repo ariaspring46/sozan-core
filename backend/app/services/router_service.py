@@ -1055,9 +1055,8 @@ def _pick_publish_file(attachments: list, spoken: str) -> dict | None:
             if any(name in blob for name in names):
                 return item
         if names[0] == "ig-reel":
-            video = next((item for item in rows if item.get("kind") == "video"), None)
-            if video:
-                return video
+            # ریلز ویدیو است؛ عکس کاور را به‌جای آن نمی‌فرستیم
+            return next((item for item in rows if item.get("kind") == "video"), None)
         if names[0] == "ig-story":
             story = next((item for item in rows if "story" in f"{item.get('name') or ''} {item.get('source') or ''}"), None)
             if story:
