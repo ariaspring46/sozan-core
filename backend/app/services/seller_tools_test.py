@@ -261,6 +261,12 @@ class ProductEditTests(_Tenant):
         card = self._card("قیمتش رو بکن ۷۰۰ هزار تومان")
         self.assertEqual(card["summary"], "«انگشتر فیروزه»: قیمت از ۵۰۰٬۰۰۰ به ۷۰۰٬۰۰۰ تومان شود؟")
 
+    def test_a_discount_pointer_uses_the_product_just_discussed(self) -> None:
+        self.assertIn("انگشتر فیروزه", self._last(self._turn("قیمت انگشتر فیروزه چنده؟")))
+        card = self._card("۱۰ درصد ازش تخفیف بده")
+        self.assertIn("انگشتر فیروزه", card["summary"])
+        self.assertIn("۱۰٪", card["summary"])
+
     def test_a_card_keeps_its_product_when_the_chat_moves_on(self) -> None:
         self.assertIn("انگشتر فیروزه", self._last(self._turn("قیمت انگشتر فیروزه چنده؟")))
         card = self._card("قیمتش رو بکن ۷۰۰ هزار تومان")

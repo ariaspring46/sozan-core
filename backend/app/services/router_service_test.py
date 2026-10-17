@@ -438,6 +438,26 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIsNone(out.get("pendingConfirm"))
         self.assertIn("انجامش نمی‌دهم", out["messages"][-1]["text"])
 
+    def test_a_spoken_decline_closes_the_card_without_running_it(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_voice_tone", "arguments": {"toneId": "formal"}}]}
+
+        first = self._turn("لحن رسمی", complete)
+        self.assertTrue(first["pendingConfirm"]["id"])
+        with patch("app.services.voice_service.apply_tone") as apply:
+            out = self._turn("نه، بیخیال", complete)
+        apply.assert_not_called()
+        self.assertIsNone(out.get("pendingConfirm"))
+        self.assertIn("انجامش نمی‌دهم", out["messages"][-1]["text"])
+
+    def test_a_bare_no_keeps_the_card_and_shows_the_button_guide(self) -> None:
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_voice_tone", "arguments": {"toneId": "formal"}}]}
+
+        first = self._turn("لحن رسمی", complete)
+        out = self._turn("نه", complete)
+        self.assertEqual(out["pendingConfirm"]["id"], first["pendingConfirm"]["id"])
+
     def test_passthrough_exception_stays_persian(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "shop_chat", "arguments": {"text": "دکمه"}}]}
