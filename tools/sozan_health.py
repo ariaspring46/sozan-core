@@ -144,7 +144,11 @@ def components(db_error: str, redis_error: str) -> int:
         red += 1
     try:
         panel = httpx.get(PANEL, timeout=6, trust_env=False)
-        _say("سبز", "panel", str(panel.status_code))
+        # a 404 or 5xx from the panel is not healthy: only 2xx and redirects count as up
+        ok = panel.status_code < 400
+        _say("سبز" if ok else "قرمز", "panel", str(panel.status_code))
+        if not ok:
+            red += 1
     except Exception as exc:
         _say("قرمز", "panel", type(exc).__name__)
         red += 1
