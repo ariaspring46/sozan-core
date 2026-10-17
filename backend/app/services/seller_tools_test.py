@@ -261,6 +261,15 @@ class ProductEditTests(_Tenant):
         card = self._card("قیمتش رو بکن ۷۰۰ هزار تومان")
         self.assertEqual(card["summary"], "«انگشتر فیروزه»: قیمت از ۵۰۰٬۰۰۰ به ۷۰۰٬۰۰۰ تومان شود؟")
 
+    def test_a_card_keeps_its_product_when_the_chat_moves_on(self) -> None:
+        self.assertIn("انگشتر فیروزه", self._last(self._turn("قیمت انگشتر فیروزه چنده؟")))
+        card = self._card("قیمتش رو بکن ۷۰۰ هزار تومان")
+        other = next(row for row in read_json("products.json", []) if row["id"] == "p2")
+        with patch("app.services.router_service._last_product", return_value=other):
+            self._turn("", confirm_id=card["id"])
+        self.assertEqual(self._product("p1")["price"], 700000)
+        self.assertEqual(self._product("p2")["price"], other["price"])
+
     def test_a_card_for_a_product_removed_since_does_not_write(self) -> None:
         card = self._card("قیمت انگشتر فیروزه رو بکن ۶۰۰ هزار تومان")
         write_json("products.json", [row for row in read_json("products.json", []) if row["id"] != "p1"])
