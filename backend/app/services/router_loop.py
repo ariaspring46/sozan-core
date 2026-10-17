@@ -113,6 +113,7 @@ async def _decider_result(spoken: str, media: dict | None, card_open: bool, deci
             spoken,
             frustrated=bool(decision.get("frustrated")),
             effort=str(decision.get("effort") or "normal"),
+            card_open=card_open,
         )
     else:
         plan = decider_service.chips_for(list(decision.get("ranked") or []))
@@ -351,6 +352,7 @@ async def _steer_decider(
             spoken,
             frustrated=bool(decision.get("frustrated")),
             effort=str(decision.get("effort") or "normal"),
+            card_open=card_open,
         )
         skill = decider_service.chosen_skill(decision)
         if skill != "none" and isinstance(plan.get("arguments"), dict):
