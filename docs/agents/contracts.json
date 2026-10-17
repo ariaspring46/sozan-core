@@ -60,9 +60,9 @@
  },
  "HTTP GET /health": {
   "owner": "X5",
-  "shape": "backend/app/main.py: returns keys {edgeDry, ok, paymentReady}",
+  "shape": "backend/app/main.py: response untyped",
   "signature": "GET /health  ()",
-  "since": "2026-10-02",
+  "since": "2026-10-17",
   "users": [
    "Z"
   ]
