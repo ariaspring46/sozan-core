@@ -2,9 +2,26 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from unittest.mock import AsyncMock, patch
 
 from app.services import router_loop
 from app.state_store import tenant_scope
+
+_VOICE_PATCHES: list = []
+
+
+def setUpModule() -> None:
+    # The refusal goes through the assistant's voice. Without this, the cloud model words it and the test passes only when
+    # the model happens to write «نمی‌گویم» (it wrote «نمی‌گم» on the hub, 2026-10-17). The plain fallback is deterministic.
+    for name, empty in (("complete_json", {"error": "llm_unreachable"}), ("complete_text_chat", None)):
+        started = patch(f"app.services.shop_voice_service.{name}", new=AsyncMock(return_value=empty))
+        started.start()
+        _VOICE_PATCHES.append(started)
+
+
+def tearDownModule() -> None:
+    while _VOICE_PATCHES:
+        _VOICE_PATCHES.pop().stop()
 
 
 class GoalQueueTests(unittest.TestCase):
