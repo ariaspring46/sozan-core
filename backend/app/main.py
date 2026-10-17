@@ -5,7 +5,7 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 
 from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
@@ -183,9 +183,38 @@ async def favicon():
     return Response(status_code=204)
 
 
+async def _db_up() -> bool:
+    from sqlalchemy import text
+
+    try:
+        async with engine.connect() as conn:
+            await asyncio.wait_for(conn.execute(text("SELECT 1")), timeout=3)
+        return True
+    except Exception:
+        return False
+
+
+async def _redis_up() -> bool:
+    from app.redis_client import redis_client
+
+    try:
+        return bool(await asyncio.wait_for(redis_client.ping(), timeout=2))
+    except Exception:
+        return False
+
+
 @app.get("/health")
 async def health():
+    # DB و Redis هم بررسی می‌شوند: وقتی یکی از آن‌ها نیست، 503 می‌دهیم تا استقرار و سلامت‌سنج قرمز شوند.
     from app.services.arvan_dns_service import edge_dry
     from app.services.payment_service import hub_payments_open
 
-    return {"ok": True, "paymentReady": bool(hub_payments_open()), "edgeDry": edge_dry()}
+    db, cache = await asyncio.gather(_db_up(), _redis_up())
+    body = {
+        "ok": db and cache,
+        "db": db,
+        "redis": cache,
+        "paymentReady": bool(hub_payments_open()),
+        "edgeDry": edge_dry(),
+    }
+    return JSONResponse(body, status_code=200 if db and cache else 503)
