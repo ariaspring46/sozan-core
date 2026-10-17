@@ -4,8 +4,8 @@ import logging
 from urllib.parse import urlparse
 
 from app.services import chat_media_service
-from app.services.channel_http import async_client
 from app.services.observe_client import emit_later
+from app.services.public_fetch import fetch_public
 
 log = logging.getLogger("sozan.inbound-media")
 KIND_HINTS = {"image", "video", "audio"}
@@ -26,14 +26,13 @@ async def fetch_and_store(url: str, *, headers: dict | None = None, kind_hint: s
     kind = _kind_from_url(raw, (kind_hint or "").strip().lower())
     cap = chat_media_service.KIND_MAX.get(kind, 8_000_000)
     try:
-        async with async_client(timeout=40) as client:
-            response = await client.get(raw, headers=headers or {}, follow_redirects=True)
-        if response.status_code >= 400 or not response.content:
-            raise RuntimeError(f"http-{response.status_code}")
-        data = response.content[: cap + 1]
+        status, response_headers, body = await fetch_public(raw, 40, headers=headers)
+        if status >= 400 or not body:
+            raise RuntimeError(f"http-{status}")
+        data = body[: cap + 1]
         if len(data) > cap:
             raise RuntimeError("too-large")
-        mime = (response.headers.get("content-type") or "").split(";")[0].strip()
+        mime = (response_headers.get("content-type") or "").split(";")[0].strip()
         name = urlparse(raw).path.rsplit("/", 1)[-1] or f"inbound.{kind}"
         return chat_media_service.save(name, data, mime or f"{kind}/*")
     except Exception as exc:
