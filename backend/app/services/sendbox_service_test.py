@@ -125,9 +125,13 @@ class SendboxServiceTests(unittest.TestCase):
         self.assertIn("id=09135409482", result["url"])
 
     def test_finish_redirect_stores_account(self) -> None:
+        # The bind starts a background scan and an activation call. Both write into the state dir or the network
+        # after the test returns, so they race the temp dir's removal («Directory not empty»). Not what this test checks.
         with tempfile.TemporaryDirectory() as raw:
             with patch.object(settings, "state_dir", raw), patch.object(
                 settings, "panel_url", "https://app.sozan-core.ir"
+            ), patch.object(sendbox_service, "_kick_scan", lambda **kwargs: None), patch.object(
+                sendbox_service, "_schedule_activate", lambda account_id: None
             ):
                 nonce = sendbox_service.mark_connect_started("09135409482")
                 url = sendbox_service.finish_redirect(
