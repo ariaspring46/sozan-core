@@ -534,5 +534,24 @@ class ShopEditFlowTests(unittest.TestCase):
         self.assertIsNone(build_dir_for({"slug": "", "jobId": ""}))
 
 
+class PageHeadingEscapeTests(unittest.TestCase):
+    """A heading typed by the seller is text in the page's JSX, not code: braces and tags are escaped."""
+
+    def test_braces_and_tags_in_a_heading_are_escaped(self) -> None:
+        import tempfile
+
+        from app.services import shop_edit_service
+
+        with tempfile.TemporaryDirectory() as raw:
+            page = Path(raw) / "app" / "products" / "page.tsx"
+            page.parent.mkdir(parents=True)
+            page.write_text('export default function P() { return <h1 className="x">قدیمی</h1>; }\n', encoding="utf-8")
+            self.assertTrue(shop_edit_service.patch_page_heading(Path(raw), "/products", "{alert(1)} <b>a</b> & کفش"))
+            text = page.read_text(encoding="utf-8")
+        self.assertNotIn("{alert", text)
+        self.assertNotIn("<b>", text)
+        self.assertIn("&#123;alert(1)&#125; &lt;b&gt;a&lt;/b&gt; &amp; کفش", text)
+
+
 if __name__ == "__main__":
     unittest.main()
