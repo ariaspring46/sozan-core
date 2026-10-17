@@ -46,9 +46,16 @@ def guard(cleaned: str, original: str) -> str:
 _L = "\u0621-\u064A\u0670-\u06D3"
 
 
+# «به مریم بگو کد رو بفرست»: آنچه بفرست می‌خورد پیام به یک نفر است، نه انتشار پست.
+_TELL_SOMEONE = re.compile(r"(?<![{L}])(?:به|بهش|بهشون|بهشان)\s*\S*\s*بگو(?![{L}])".format(L=_L))
+
+
 def wants_publish(text: str, marks: list) -> bool:
     """«بفرست / منتشر کن / انتشار» as a command. «اسماشونو بفرستم؟» (I send?) and «بفرستی» are not: a first or second person
-    verb asks or talks, it does not tell Sozan to publish the last post."""
+    verb asks or talks, it does not tell Sozan to publish the last post. A message told to someone («به مریم بگو … بفرست») is
+    not a post either."""
+    if _TELL_SOMEONE.search(text or ""):
+        return False
     return any(
         re.search(rf"(?<![{_L}]){re.escape(str(mark))}(?:ش|ید|یدش|ین)?(?![{_L}])", text or "") for mark in marks if mark
     )

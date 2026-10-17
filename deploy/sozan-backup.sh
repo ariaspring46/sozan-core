@@ -21,6 +21,13 @@ fi
 cp -a "${ROOT}/deploy/shop-upstreams.map" "${DEST}/shop-upstreams.map" 2>/dev/null || true
 chmod 700 "$DEST"
 chmod 600 "${DEST}/sozan_ads.dump" "${DEST}/data.tar"
+if [ "$tar_status" -eq 1 ]; then
+  # tar 1: a file changed while it was read, so the archive may be inconsistent. The copy is kept, but it is not
+  # marked OK (the health page counts only OK runs) and the unit fails, so the gap is visible.
+  printf '%s\n' "$STAMP" > "${DEST}/PARTIAL"
+  echo "backup ${STAMP} PARTIAL: tar reported files that changed while being read" >&2
+  exit 1
+fi
 printf '%s\n' "$STAMP" > "${DEST}/OK"
 
 # Drop backups older than 7 days.

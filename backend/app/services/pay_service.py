@@ -44,11 +44,17 @@ def _orders() -> list[dict]:
     return rows if isinstance(rows, list) else []
 
 
+# سفارش‌های باز: تا وقتی تمام نشده‌اند هرگز از فهرست بیرون نمی‌روند (رسید در انتظار و رسید ردشده هم باز هستند).
+OPEN_STATUSES = {"pending", "awaiting_receipt", "receipt_rejected"}
+
+
 def _save_orders(rows: list[dict]) -> None:
-    # ردیف‌های pending هرگز حذف نمی‌شوند؛ فقط تاریخچهٔ قدیمی کوتاه می‌شود.
-    keep = [row for row in rows if str(row.get("status") or "") == "pending"]
-    done = [row for row in rows if str(row.get("status") or "") != "pending"]
-    write_json("pay-orders.json", (keep + done)[-400:])
+    # ردیف‌های باز هرگز حذف نمی‌شوند؛ فقط تاریخچهٔ تمام‌شده کوتاه می‌شود.
+    keep = [row for row in rows if str(row.get("status") or "") in OPEN_STATUSES or row.get("needsAction")]
+    done = [row for row in rows if not (str(row.get("status") or "") in OPEN_STATUSES or row.get("needsAction"))]
+    # the open rows take their places first; the finished history fills what is left of the 400
+    room = max(0, 400 - len(keep))
+    write_json("pay-orders.json", keep + (done[-room:] if room else []))
 
 
 def _append_order(row: dict) -> None:
@@ -635,16 +641,25 @@ def verify_pay_secret(slug: str, secret: str) -> str:
     return phone
 
 
+def _sign_key() -> bytes | None:
+    # وب‌هوک پرداخت کلید خودش را دارد. کلید JWT فقط در توسعه جایگزین می‌شود؛ در production بدون کلید وب‌هوک بسته است،
+    # تا یک کلید مشترک میان JWT و وب‌هوک نماند.
+    if env.payment_sign_secret:
+        return env.payment_sign_secret.encode()
+    return None if env.payments_enabled else env.jwt_secret.encode()
+
+
 def sign_body(raw: bytes) -> str:
-    key = (env.payment_sign_secret or env.jwt_secret).encode()
-    return hmac.new(key, raw, hashlib.sha256).hexdigest()
+    key = _sign_key()
+    return hmac.new(key, raw, hashlib.sha256).hexdigest() if key else ""
 
 
 def valid_sign(raw: bytes, header: str) -> bool:
     got = (header or "").strip().lower()
-    if not got:
+    expected = sign_body(raw)
+    if not got or not expected:
         return False
-    return hmac.compare_digest(sign_body(raw), got)
+    return hmac.compare_digest(expected, got)
 
 
 async def shop_checkout(
@@ -733,13 +748,17 @@ def shop_config(*, slug: str, secret: str) -> dict:
         return {"paymentMethods": methods, "slug": slug}
 
 
+RECEIPT_MAX_BYTES = 4_000_000
+
+
 async def attach_receipt(*, slug: str, secret: str, order_no: str, upload) -> dict:
     tenant = verify_pay_secret(slug, secret)
     # the upload is read before the order list is loaded: a slow upload must not overwrite orders saved meanwhile
     data = b""
     if upload is not None and getattr(upload, "filename", ""):
-        data = await upload.read()
-        if len(data) > 4_000_000:
+        # بیشتر از سقف را نمی‌خواند: یک فایل ۳۰ مگی نباید کامل در حافظه بیاید تا رد شود
+        data = await upload.read(RECEIPT_MAX_BYTES + 1)
+        if len(data) > RECEIPT_MAX_BYTES:
             raise ValueError("عکس رسید بزرگ‌تر از حد مجاز است")
     with tenant_scope(tenant):
         image_name = ""

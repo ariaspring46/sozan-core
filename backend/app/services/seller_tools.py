@@ -311,7 +311,9 @@ def _edit_plan(args: dict, spoken: str) -> dict:
     text = spoken or ""
     price, stock, add = _edit_values(args, text)
     name = str(args.get("product") or "").strip()
-    rows = _resolve(name, text)
+    pinned = str(args.get("_pinnedProduct") or "")
+    # کارت باز روی همان کالایی می‌ماند که نشان داده شده؛ «قیمتش» بعدی یا گفتگوی تازه آن را عوض نمی‌کند.
+    rows = [row for row in _products() if str(row.get("id") or "") == pinned] if pinned else _resolve(name, text)
     if len(rows) != 1:
         return {"problem": _which(rows, name or ("" if _POINTER.search(text) else _name_in(text)), text)}
     row = rows[0]
@@ -599,7 +601,10 @@ async def _catalog(spoken: str, args: dict) -> tuple[str, dict]:
 
 def _edit_card(args: dict, spoken: str) -> str:
     plan = _edit_plan(args, spoken)
-    return "" if plan.get("problem") else f"{_quote(plan['title'])}: {_edit_words(plan)} شود؟"
+    if plan.get("problem"):
+        return ""
+    args["_pinnedProduct"] = plan["id"]  # the same dict is stored with the card: confirm edits this product
+    return f"{_quote(plan['title'])}: {_edit_words(plan)} شود؟"
 
 
 def _discount_summary(args: dict, spoken: str) -> str:
