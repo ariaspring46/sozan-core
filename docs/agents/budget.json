@@ -23,14 +23,14 @@
    "tests": 32835
   },
   {
-   "active": 87673,
+   "active": 87854,
    "core": 18443,
    "core_pct": 41,
    "id": "X3",
    "loose_contracts": 22,
-   "manifest": 11238,
+   "manifest": 11272,
    "rare": 1208,
-   "tests": 44638
+   "tests": 45767
   },
   {
    "active": 111425,
@@ -93,7 +93,7 @@
    "tests": 0
   },
   {
-   "active": 227536,
+   "active": 227551,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",

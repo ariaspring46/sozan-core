@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import ipaddress
 import json
 import re
-import socket
 import subprocess
 import tempfile
 import threading
@@ -20,6 +18,7 @@ from app.services import storefront_service, voice_service
 from app.services.channel_http import async_client, proxies_for
 from app.services.llm import complete_json
 from app.services.observe_client import emit_later
+from app.services.public_fetch import fetch_public
 from app.services.settings_service import get_settings
 from app.state_store import current_tenant, read_json, tenant_dir, write_json
 
@@ -494,37 +493,6 @@ async def _fetch(url: str, *, headers: dict[str, str] | None = None) -> tuple[st
     return body.decode("utf-8", errors="ignore"), final
 
 
-async def _public_url(url: str) -> bool:
-    """http(s) to an address on the public internet only: no loopback, private, link-local (cloud metadata) or shared space."""
-    parsed = urlparse(url)
-    host = parsed.hostname or ""
-    if parsed.scheme not in {"http", "https"} or not host:
-        return False
-    try:
-        infos = await asyncio.get_running_loop().getaddrinfo(host, parsed.port or 443, type=socket.SOCK_STREAM)
-        found = {str(info[4][0]).split("%")[0] for info in infos}
-        return bool(found) and all(ipaddress.ip_address(addr).is_global for addr in found)
-    except (OSError, ValueError):
-        return False
-
-
-async def _fetch_public(url: str, timeout: float) -> tuple[int, bytes]:
-    """Every hop is checked before it is requested; redirects are followed by hand, so a 302 cannot reach a private address."""
-    try:
-        for _hop in range(4):
-            if not await _public_url(url):
-                return 0, b""
-            async with async_client(timeout=timeout, follow_redirects=False, headers={"User-Agent": USER_AGENT}) as client:
-                res = await client.get(url)
-            location = res.headers.get("location") if res.status_code in {301, 302, 303, 307, 308} else None
-            if not location:
-                return res.status_code, res.content or b""
-            url = urljoin(url, location)
-    except Exception:
-        return 0, b""
-    return 0, b""
-
-
 async def _download(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
@@ -535,7 +503,7 @@ async def _download(url: str) -> str:
     name = f"{uuid4().hex}{suffix}"
     dest = _scan_dir() / name
     try:
-        status, body = await _fetch_public(url, 20)
+        status, _headers, body = await fetch_public(url, 20, headers={"User-Agent": USER_AGENT})
         if status >= 400 or not body or len(body) > 8_000_000:
             return ""
         dest.write_bytes(body)
