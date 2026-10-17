@@ -911,6 +911,14 @@
    "C"
   ]
  },
+ "backend/app/config.py::settings.payments_enabled": {
+  "owner": "X5",
+  "signature": "Settings.payments_enabled: bool = True",
+  "since": "2026-10-17",
+  "users": [
+   "C"
+  ]
+ },
  "backend/app/config.py::settings.public_api_url": {
   "owner": "X5",
   "signature": "Settings.public_api_url: str = 'https://api.sozan-core.ir'",
