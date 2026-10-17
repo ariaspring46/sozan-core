@@ -357,6 +357,7 @@
         "backend/app/__init__.py",
         "backend/app/config.py",
         "backend/app/main.py",
+        "backend/app/main_health_test.py",
         "backend/app/state_store.py",
         "backend/app/tenant_migrate.py",
         "backend/app/security.py",
