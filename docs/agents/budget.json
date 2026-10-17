@@ -73,14 +73,14 @@
    "tests": 14831
   },
   {
-   "active": 73590,
-   "core": 23661,
+   "active": 73719,
+   "core": 23790,
    "core_pct": 53,
    "id": "C",
    "loose_contracts": 23,
    "manifest": 11882,
    "rare": 11609,
-   "tests": 32181
+   "tests": 32584
   },
   {
    "active": 90841,
