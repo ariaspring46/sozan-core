@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import re
 import shutil
@@ -887,9 +888,11 @@ def patch_page_heading(root: Path, page: str, heading: str) -> bool:
     if path is None or not heading:
         return False
     text = path.read_text(encoding="utf-8")
+    # the heading is JSX text: «{» starts an expression and «<» a tag, so they go in as character references
+    safe = html.escape(heading, quote=False).replace("{", "&#123;").replace("}", "&#125;")
     next_text, count = re.subn(
         r"(<h1[^>]*>)([^<]*)(</h1>)",
-        rf"\g<1>{heading}\g<3>",
+        lambda match: match.group(1) + safe + match.group(3),
         text,
         count=1,
     )
@@ -903,6 +906,12 @@ async def fetch_hero_png(prompt: str) -> bytes:
     return fetch_image_png(prompt, width=1280, height=720)
 
 
+def _runtime_rel_ok(rel: str) -> bool:
+    """Only files under public/ of the build, never a path that climbs out («..») or starts at the root."""
+    parts = Path(str(rel)).parts
+    return bool(parts) and parts[0] == "public" and ".." not in parts and not Path(str(rel)).is_absolute()
+
+
 def publish_shop_runtime(shop: dict, root: Path, rels: list[str]) -> None:
     from app.services.shop_service import PROTECTED_SHOP_SLUGS
 
@@ -911,7 +920,8 @@ def publish_shop_runtime(shop: dict, root: Path, rels: list[str]) -> None:
         return
     if not has_runtime_overlay(root):
         return
-    parents = sorted({str(Path(rel).parent) for rel in rels if rel.startswith("public/") and "/" in rel[7:]})
+    rels = [rel for rel in rels if _runtime_rel_ok(rel)]
+    parents = sorted({str(Path(rel).parent) for rel in rels if "/" in rel[7:]})
     for dest in parents:
         subprocess.run(
             ["docker", "exec", f"sozan-{slug}", "mkdir", "-p", f"/app/{dest}"],
@@ -921,8 +931,6 @@ def publish_shop_runtime(shop: dict, root: Path, rels: list[str]) -> None:
             text=True,
         )
     for rel in rels:
-        if not rel.startswith("public/"):
-            continue
         src = root / rel
         if not src.is_file():
             continue
