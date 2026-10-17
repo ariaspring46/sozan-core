@@ -52,5 +52,34 @@ class VoiceSampleTests(unittest.TestCase):
         self.assertIn("موجود است", saved["samples"][-1])
 
 
+class VoiceCodeTests(unittest.TestCase):
+    CSS = "body{margin:0} .a{display:flex;color:#000} @media (max-width:600px){ .b{font-size:12px} }"
+
+    def test_css_and_script_never_become_tone_samples(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09120000991"):
+                write_json(
+                    "voice.json",
+                    {
+                        "samples": [self.CSS + " کیف چرمی دست‌دوز", "<style>.x{a:b}</style>"],
+                        "sampleReply": "سلام {a:b}",
+                    },
+                )
+                loaded = voice_service.get_voice()
+        self.assertEqual(loaded["samples"], ["کیف چرمی دست‌دوز"])
+        self.assertEqual(loaded["sampleReply"], "سلام")
+
+    def test_learn_stores_only_the_seller_words(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09120000991"), patch(
+                "app.services.voice_service.complete_json",
+                new=AsyncMock(return_value={"summary": "گرم", "tone": "کوتاه", "do": [], "dont": []}),
+            ), patch("app.services.voice_service.emit_later"):
+                saved = asyncio.run(
+                    voice_service.learn(platform="instagram", handle="sozan", samples=self.CSS + " کفش مجلسی ساتن")
+                )
+        self.assertEqual(saved["samples"], ["کفش مجلسی ساتن"])
+
+
 if __name__ == "__main__":
     unittest.main()

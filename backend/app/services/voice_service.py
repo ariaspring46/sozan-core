@@ -25,9 +25,35 @@ DEFAULT_VOICE = {
 }
 
 
+# CSS و JS که از صفحهٔ اینستاگرام به متن نمونه می‌رسند. هیچ‌کدام لحن فروشنده نیست.
+_HTML_CODE_RE = re.compile(r"<(style|script|noscript)\b[^>]*>.*?</\1\s*>", re.I | re.S)
+_CSS_RE = re.compile(
+    r"@(?:media|font-face|import|keyframes|supports|charset)\b[^{};]*(?:\{\s*\}|;)?"
+    r"|[A-Za-z0-9_.#>:,\[\]=\"'*+~()\-\s]{0,120}\{[^{}]*:[^{}]*\}"
+    r"|\{[^{}]*\}",
+    re.I,
+)
+
+
+def strip_code(text: str) -> str:
+    """Removes style and script text (CSS rules, JS blocks). Seller words around them stay."""
+    out = str(text or "")
+    if not any(mark in out for mark in ("{", "<", "@")):
+        return " ".join(out.split())
+    while True:
+        cleaned = _CSS_RE.sub(" ", _HTML_CODE_RE.sub(" ", out))
+        if cleaned == out:
+            return " ".join(out.split())
+        out = cleaned
+
+
 def strip_urls(text: str) -> str:
     """Tone samples keep the seller's words. A shop or payment address is not tone."""
     return " ".join(_URL_RE.sub(" ", str(text or "")).split())
+
+
+def clean_tone_text(text: str) -> str:
+    return strip_code(strip_urls(text))
 
 
 def get_voice() -> dict:
@@ -36,8 +62,8 @@ def get_voice() -> dict:
         stored = {}
     out = dict(DEFAULT_VOICE)
     out.update({key: stored[key] for key in DEFAULT_VOICE if key in stored})
-    out["sampleReply"] = strip_urls(str(out.get("sampleReply") or ""))
-    out["samples"] = [clean for item in (out.get("samples") or []) if (clean := strip_urls(str(item)))]
+    out["sampleReply"] = clean_tone_text(str(out.get("sampleReply") or ""))
+    out["samples"] = [clean for item in (out.get("samples") or []) if (clean := clean_tone_text(str(item)))]
     return out
 
 
@@ -87,7 +113,7 @@ def prompt_block() -> str:
 async def learn(*, platform: str, handle: str, samples: str) -> dict:
     cfg = get_settings()
     previous = get_voice()
-    blob = strip_urls(samples)
+    blob = clean_tone_text(samples)
     parsed = await complete_json(
         """از نوشته‌های فروشنده فقط JSON برگردان.
 {"summary":"یک خط شخصیت","tone":"چند کلمه لحن","do":["..."],"dont":["..."],"sampleReply":"یک پاسخ نمونه به مشتری"}""",
@@ -109,9 +135,9 @@ async def learn(*, platform: str, handle: str, samples: str) -> dict:
     if isinstance(parsed.get("dont"), list):
         voice["dont"] = [str(item).strip() for item in parsed["dont"] if str(item).strip()][:6]
     if parsed.get("sampleReply"):
-        voice["sampleReply"] = strip_urls(str(parsed["sampleReply"]))[:280]
+        voice["sampleReply"] = clean_tone_text(str(parsed["sampleReply"]))[:280]
     if blob:
-        kept = [clean for item in (voice.get("samples") or []) if (clean := strip_urls(str(item)))]
+        kept = [clean for item in (voice.get("samples") or []) if (clean := clean_tone_text(str(item)))]
         kept.append(blob[:1200])
         voice["samples"] = kept[-8:]
     elif not voice.get("summary"):
