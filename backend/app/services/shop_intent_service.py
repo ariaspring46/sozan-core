@@ -123,6 +123,9 @@ def _product_title(text: str) -> str:
     if quoted:
         return quoted
     cleaned = re.sub(r"(?:با\s+|به\s+)?قیمت.*", "", text or "")
+    named = re.search(r"(?<![\u0600-\u06FF])(?:اسم|نام)(?:ش)?\s+(\S.*)", cleaned)
+    if named:  # «یک کالای جدید به اسم گوشواره نقره»: the title is what follows the naming word
+        cleaned = named.group(1)
     kept: list[str] = []
     tokens = cleaned.split()
     index = 0

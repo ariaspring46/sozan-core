@@ -117,6 +117,13 @@ class ShopIntentClassifyTests(unittest.TestCase):
         inner = catalog_add("هر کفش قرمز را با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")
         self.assertIn("هر", inner["title"].split())
 
+    def test_title_follows_the_naming_word(self) -> None:
+        named = catalog_add("یک کالای جدید به اسم گوشواره نقره با قیمت ۳۲۰۰۰۰۰ تومان و موجودی ۴ اضافه کن")
+        called = catalog_add("کالایی با نام دستبند چرم قیمت ۴۵۰۰۰۰ تومان اضافه کن")
+        self.assertEqual(named["title"], "گوشواره نقره")
+        self.assertEqual(named["price"], 3200000)
+        self.assertEqual(called["title"], "دستبند چرم")
+
     def test_title_strips_markup(self) -> None:
         row = catalog_add("کالای <script>alert(1)</script> را با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")
         marked = catalog_add("کفش `نایک`\u202e را با قیمت ۲۵۰۰۰۰۰ تومان اضافه کن")

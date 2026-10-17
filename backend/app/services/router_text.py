@@ -304,6 +304,18 @@ def is_confirmish(text: str) -> bool:
     return 0 < len(words) <= 4 and all(word in _CONFIRMISH for word in words)
 
 
+_DECLINE = re.compile(
+    r"(?:نه|نخیر)?\s*(?:بی\s*خیال|ولش(?:\s*کن)?|انصراف|لغو(?:\s*کن)?|نمی\s*خو(?:ا|اه)م(?:ش)?|لازم\s*نیست)(?:\s*(?:شد|باشه|ممنون|مرسی))?"
+)
+
+
+def is_decline(text: str) -> bool:
+    """«نه، بیخیال» / «ولش کن» / «لازم نیست» as the whole sentence. A bare «نه» is not enough (it gets the button guide),
+    and «نه، قیمت دستبند را ... کن» is a new request, not a decline."""
+    compact = re.sub(r"[\u200c.,،؛:!؟?]+", " ", (text or "").lower()).strip()
+    return bool(compact) and _DECLINE.fullmatch(re.sub(r"\s+", " ", compact)) is not None
+
+
 CREDENTIAL_MARKS = ("توکن", "کلید api", "api key", "jwt", "کد یکبارمصرف", "کد ورود", "رمز عبور", "رمز ورود", "otp")
 CREDENTIAL_REPLY = "توکن، کلید، کد ورود و رمز را از چت نمی‌گویم. اگر کمکی دربارهٔ فروشگاه، کالا یا صندوق لازم داری، بگو."
 PRONOUN_FOLLOW = re.compile(r"موجودی\s*ش|قیمتش|قیمتشو|قیمتشون")

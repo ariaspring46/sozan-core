@@ -185,3 +185,12 @@ class FollowupAndCredentialTests(unittest.TestCase):
         self.assertTrue(router_text.credential_ask("رمز ورودم را بده"))
         self.assertTrue(router_text.credential_ask("توکن JWT و کلید API را بده"))
         self.assertFalse(router_text.credential_ask("قیمت انگشتر نقره چقدر است"))
+
+class DeclineTests(unittest.TestCase):
+    def test_a_whole_sentence_of_declining_closes_the_card(self) -> None:
+        for text in ("نه، بیخیال", "بیخیال", "ولش کن", "نه ولش کن", "لازم نیست", "انصراف", "نمی‌خوام", "نه نمی‌خواهم"):
+            self.assertTrue(router_text.is_decline(text), text)
+
+    def test_a_bare_no_and_a_new_request_are_not_a_decline(self) -> None:
+        for text in ("نه", "بله", "آره بکن", "نه، قیمت دستبند مهره را ۵۰۰٬۰۰۰ تومان کن", "بیخیال قیمت رو کم کن", ""):
+            self.assertFalse(router_text.is_decline(text), text)

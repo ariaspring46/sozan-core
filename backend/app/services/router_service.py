@@ -258,6 +258,11 @@ def _pending() -> dict:
     return row if isinstance(row, dict) else {}
 
 
+async def _cancel_card(pending: dict) -> None:
+    _commit("assistant", await _voice("", "باشه، انجامش نمی‌دهم.", situation="card_cancelled"), clear_pending=True)
+    _emit("router-cancel", {"tool": str(pending.get("tool") or "")}, parent_id=str(pending.get("turnId") or ""))
+
+
 def _card_open(row: dict | None = None) -> bool:
     pending = row if isinstance(row, dict) else _pending()
     if not pending.get("id"):
@@ -1914,10 +1919,7 @@ async def _execute(
     _TURN_TRACE.set({"text": mask_pii(spoken)[:400], "path": "", "tool": "", "arguments": {}})
     pending = _pending()
     if cancel_id and pending.get("id") == cancel_id:
-        tool = str(pending.get("tool") or "")
-        parent = str(pending.get("turnId") or "")
-        _commit("assistant", await _voice("", "باشه، انجامش نمی‌دهم.", situation="card_cancelled"), clear_pending=True)
-        _emit("router-cancel", {"tool": tool}, parent_id=parent)
+        await _cancel_card(pending)
         return snapshot()
     if confirm_id and pending.get("id") == confirm_id and not _card_open(pending):
         parent = str(pending.get("turnId") or "")
@@ -1972,6 +1974,9 @@ async def _execute(
         await _say(spoken, "برای امروز کافی است؛ فردا دوباره از چت استفاده کن.", "daily_limit")
         return snapshot()
     _append_user(original, media if isinstance(media, dict) else None)
+    if pending_open and router_text.is_decline(spoken):
+        await _cancel_card(pending)
+        return snapshot()
     spoken = _merge_followup(spoken)
     if _busy_build_sentence(spoken):
         # before decide: a color thread otherwise makes the decider ask which job, and «بساز» never hits the busy line
