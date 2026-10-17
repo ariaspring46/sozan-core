@@ -134,7 +134,11 @@ export default function ChatPage() {
       }
       return true;
     } catch (err) {
-      if (seen !== epoch.current) return true;
+      if (seen !== epoch.current) {
+        // گفتگو عوض شده و این ارسال شکست خورده: متن به کادر برمی‌گردد تا گم نشود
+        setError(err instanceof Error ? err.message : "خطا");
+        return false;
+      }
       finishIdempotencyKey(chatKey.current, err);
       setError(err instanceof Error ? err.message : "خطا");
       return false;
@@ -147,8 +151,16 @@ export default function ChatPage() {
     }
   }
 
+  /** A send still in flight belongs to the thread we left: its own finally no longer clears the busy state. */
+  function leaveSending() {
+    busyRef.current = false;
+    setBusy(false);
+    setPending("");
+  }
+
   async function openThread(id: string) {
     epoch.current += 1;
+    leaveSending();
     chatKey.current = emptyIdempotencySlot();
     threadRef.current = id;
     setThreadId(id);
@@ -159,6 +171,7 @@ export default function ChatPage() {
 
   async function startThread() {
     epoch.current += 1;
+    leaveSending();
     chatKey.current = emptyIdempotencySlot();
     setNotice("");
     setError("");
