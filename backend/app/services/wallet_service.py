@@ -18,6 +18,9 @@ EMPTY = {
 }
 
 SHEBA = re.compile(r"^IR\d{24}$")
+CREDITED_FILE = "wallet-credited.json"
+# یک پرداخت بعد از این مدت دیگر دوباره بررسی نمی‌شود (تلاش تأیید درگاه چند دقیقه‌ای است).
+CREDITED_KEEP_SECONDS = 180 * 24 * 3600
 
 
 def get() -> dict:
@@ -62,10 +65,29 @@ def _append(kind: str, amount: int, *, order_id: str = "", note: str = "") -> di
     return row
 
 
+def _credited_index() -> dict:
+    stored = read_json(CREDITED_FILE, {})
+    return stored if isinstance(stored, dict) else {}
+
+
+def _mark_credited(order_id: str) -> None:
+    """ایندکس دائمی فروش‌های اعتبارشده. دفتر فقط ۴۰۰ ردیف آخر را نگه می‌دارد؛ این فهرست نباید با آن پاک شود."""
+    now = int(time())
+    index = {
+        key: at
+        for key, at in _credited_index().items()
+        if isinstance(at, int) and at > now - CREDITED_KEEP_SECONDS
+    }
+    index[order_id] = now
+    write_json(CREDITED_FILE, index)
+
+
 def _sale_credited(order_id: str) -> bool:
     token = str(order_id or "").strip()
     if not token:
         return False
+    if token in _credited_index():
+        return True
     rows = read_json("wallet-ledger.json", [])
     if not isinstance(rows, list):
         return False
@@ -85,6 +107,9 @@ def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner
     with tenant_file_lock("wallet"):
         if _sale_credited(order_id):
             return dict(get())
+        if str(order_id or "").strip():
+            # نشانه پیش از موجودی: اگر وسط کار قطع شد، تلاش بعدی دوبار اعتبار نمی‌دهد.
+            _mark_credited(str(order_id).strip())
         wallet = get()
         wallet["lifetimeSales"] = int(wallet["lifetimeSales"]) + amount
         if owner == "hub":
