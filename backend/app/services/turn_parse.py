@@ -88,6 +88,8 @@ _SECRET_WORD = re.compile(
     r"(?<![\u0600-\u06FF])(?:رمز(?:م|\s?عبور|\s?دوم|\s?پویا|\s?یکبار)?|پسورد|password)(?![\u0600-\u06FF])", re.I
 )
 _MENU_WORD = re.compile(r"(?<![\u0600-\u06FF])منو(?:ی)?(?![\u0600-\u06FF])")
+# «شبا» و صورت‌های آن (شبای من، شبام)؛ «شبانه» (شبِ شب، ساعت شبانه) شبا نیست.
+_SHABA_WORD = re.compile(r"(?<![\u0600-\u06FF])شبا(?:ی|م|ت|ش|ه|رو)?(?![\u0600-\u06FF])")
 
 
 def _topic(text: str, write: bool) -> str:
@@ -96,7 +98,7 @@ def _topic(text: str, write: bool) -> str:
         return "status"
     if _SECRET_WORD.search(text) or any(mark in folded for mark in ("otp", "توکن", "کد ورود", "کد یکبار", "api key", "کلید api")):
         return "secret"
-    if "شبا" in text:
+    if _SHABA_WORD.search(text):
         return "shaba"
     if "joahr" in folded or "فروشگاه دیگر" in text or "فروشگاه همسایه" in text:
         return "other_shop"

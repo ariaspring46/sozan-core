@@ -1082,3 +1082,6 @@ PROMPT:
 (b) Local fallback policy when cloud active: which slot to unban/re-enable — ornith-phone (Vulkan1 serial) or qwen3.5-9b (Vulkan0, VRAM pressure). This is X5 + owner. Also note the RUNNING process is z/15 not z/14 — confirm the intended live branch.
 
 NO code changes made. NO real call. NO campaign. GIFT_CODE_SPOKEN empty confirmed.
+
+### 2026-10-17 · X5 → Z (contract change)
+- `GET /health` now checks the database and Redis. It answers 200 when both are up and 503 with `ok: false`, `db`, and `redis` fields when one is down. `paymentReady` and `edgeDry` are unchanged. Your side reads only the status and `paymentReady`, so nothing needs to change unless you need to tell a down database from a healthy API.

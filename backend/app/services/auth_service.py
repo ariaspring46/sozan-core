@@ -88,6 +88,9 @@ def _hash_otp(phone: str, code: str) -> str:
 
 
 def fixed_otp_for(phone: str) -> str | None:
+    # در production کد ثابت نیست: هر شمارهٔ فهرست OTP_FIXED_ACCOUNTS با یک کد ثابت بی‌پیامک وارد می‌شد.
+    if settings.payments_enabled:
+        return None
     return settings.otp_fixed_map.get(phone)
 
 
