@@ -1933,6 +1933,9 @@ async def _execute(
                 confirmed=True,
             )
         except Exception as exc:
+            # ValueError: کنترل ورودی، پیش از اثر؛ کارت می‌ماند. بقیه ممکن است نیمه‌کاره باشد؛ کارت بسته می‌شود.
+            if not isinstance(exc, ValueError):
+                _clear_pending()
             await _say("", _tool_error(name, exc), "tool_failed")
             return snapshot()
         if name in _VOICED_TOOLS:
