@@ -87,6 +87,18 @@ class WalletPayTests(unittest.TestCase):
                 self.assertEqual(kinds.count("sale_sozan"), 1)
                 self.assertEqual(kinds.count("commission"), 1)
 
+    def test_credit_sale_stays_idempotent_after_ledger_window_moves_on(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            with patch.object(settings, "state_dir", raw), tenant_scope("09135409482"):
+                wallet_service.credit_sale(amount=1000, commission=0, order_id="old", note="", owner="hub")
+                # دفتر ۴۰۰ ردیف آخر را نگه می‌دارد: ردیف این سفارش دیگر در آن نیست.
+                write_json(
+                    "wallet-ledger.json",
+                    [{"kind": "sale_sozan", "orderId": f"other-{i}", "amount": 1} for i in range(450)],
+                )
+                wallet_service.credit_sale(amount=1000, commission=0, order_id="old", note="", owner="hub")
+                self.assertEqual(wallet_service.get()["available"], 1000)
+
     def test_withdraw_ledger_matches_available(self) -> None:
         def balance() -> int:
             rows = read_json("wallet-ledger.json", [])
