@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timezone
 from time import time
 
 import asyncio
@@ -187,3 +188,59 @@ class BillingServiceTests(unittest.TestCase):
         self.assertEqual(seen["amount_toman"], 1000)
         pro = next(item for item in shown if item["id"] == "pro")
         self.assertEqual(pro["priceToman"], 1000)
+
+
+class BillingRaceTests(unittest.TestCase):
+    MERCHANT = "11111111-1111-1111-1111-111111111111"
+
+    def test_finish_keeps_purchases_recorded_while_verifying(self) -> None:
+        from app.state_store import read_json, write_json
+
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw):
+            with tenant_scope("09135409482"), patch.object(payment_service.env, "payments_enabled", True), patch.object(
+                payment_service, "merchant_id", return_value=self.MERCHANT
+            ), patch.object(
+                payment_service,
+                "zarinpal_request",
+                new=AsyncMock(return_value={"authority": "AUTH9", "startPayUrl": "https://pay.example/AUTH9"}),
+            ):
+                asyncio.run(billing_service.start_subscription("pro", phone="09135409482"))
+
+                async def verify_while_another_purchase_lands(**_kwargs):
+                    rows = read_json("billing.json", [])
+                    rows.append({"id": "other", "phone": "09135409482", "plan": "promax", "status": "paid"})
+                    write_json("billing.json", rows)
+                    return {"ok": True, "refId": "77", "code": 100}
+
+                with patch.object(payment_service, "zarinpal_verify", new=verify_while_another_purchase_lands):
+                    asyncio.run(billing_service.finish_subscription(authority="AUTH9", ok=True))
+                rows = read_json("billing.json", [])
+        self.assertIn("other", [row.get("id") for row in rows])
+        mine = [row for row in rows if row.get("authority") == "AUTH9"]
+        self.assertEqual([row.get("status") for row in mine], ["paid"])
+
+    def test_coupon_is_held_while_its_payment_is_open(self) -> None:
+        from datetime import datetime, timedelta
+
+        now = datetime.now(timezone.utc)
+        with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope(
+            "09129900007"
+        ), patch.object(settings, "phone_coupon_code", "SOZAN30"), patch.object(
+            settings, "phone_coupon_percent", 30
+        ), patch.object(settings, "phone_coupon_until", ""), patch.object(
+            plan_service, "discount_until", return_value=now + timedelta(days=7)
+        ), patch.object(payment_service.env, "payments_enabled", True), patch.object(
+            payment_service, "merchant_id", return_value=self.MERCHANT
+        ), patch.object(
+            payment_service,
+            "zarinpal_request",
+            new=AsyncMock(return_value={"authority": "C" * 36, "startPayUrl": "https://pay.example/c"}),
+        ):
+            first = asyncio.run(billing_service.start_subscription("pro", phone="09129900007", code="SOZAN30"))
+            self.assertFalse(first["activated"])
+            with self.assertRaises(ValueError):
+                asyncio.run(billing_service.start_subscription("pro", phone="09129900007", code="SOZAN30"))
+            # پرداخت اول کامل نشد: کد آزاد می‌شود
+            asyncio.run(billing_service.finish_subscription(authority="C" * 36, ok=False))
+            again = asyncio.run(billing_service.start_subscription("pro", phone="09129900007", code="SOZAN30"))
+        self.assertFalse(again["activated"])
