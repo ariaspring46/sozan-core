@@ -1884,6 +1884,18 @@ async def turn(
             turn_clock.disarm(clock)
 
 
+async def _rescue_in_budget(spoken: str, embed) -> str:
+    """The embedding rescue spends the turn's time too. Past the budget it gives up and the turn answers now."""
+    from app.services.turn_clock import expired, remaining
+
+    if expired() or remaining() <= 0:
+        return ""
+    try:
+        return await asyncio.wait_for(router_embed.rescue_tool(spoken, embed=embed), timeout=max(0.05, remaining()))
+    except TimeoutError:
+        return ""
+
+
 async def _execute(
     text: str,
     *,
@@ -2075,7 +2087,7 @@ async def _execute(
     if not calls and _force_shop_build(spoken) and not (isinstance(result, dict) and result.get("direct")):
         calls = [{"name": "shop_chat", "arguments": {}}]
     elif not calls:
-        rescued = await router_embed.rescue_tool(spoken, embed=embed)
+        rescued = await _rescue_in_budget(spoken, embed)
         if rescued:
             calls = [{"name": rescued, "arguments": {}}]
         else:

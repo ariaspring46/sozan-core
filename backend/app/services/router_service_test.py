@@ -2166,3 +2166,29 @@ class DeciderFallbackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RescueBudgetTests(unittest.TestCase):
+    """A slow embedding rescue cannot hold the turn past its budget."""
+
+    def test_rescue_gives_up_when_the_budget_runs_out(self) -> None:
+        import time
+
+        async def slow_rescue(_text, embed=None):
+            await asyncio.sleep(5)
+            return "products"
+
+        started = time.monotonic()
+        with patch.object(router_service.router_embed, "rescue_tool", new=slow_rescue), patch(
+            "app.services.turn_clock.remaining", return_value=0.2
+        ):
+            out = asyncio.run(router_service._rescue_in_budget("یه چیزی", None))
+        self.assertEqual(out, "")
+        self.assertLess(time.monotonic() - started, 2)
+
+    def test_rescue_result_is_kept_within_budget(self) -> None:
+        async def quick_rescue(_text, embed=None):
+            return "products"
+
+        with patch.object(router_service.router_embed, "rescue_tool", new=quick_rescue):
+            self.assertEqual(asyncio.run(router_service._rescue_in_budget("یه چیزی", None)), "products")
