@@ -733,13 +733,17 @@ def shop_config(*, slug: str, secret: str) -> dict:
         return {"paymentMethods": methods, "slug": slug}
 
 
+RECEIPT_MAX_BYTES = 4_000_000
+
+
 async def attach_receipt(*, slug: str, secret: str, order_no: str, upload) -> dict:
     tenant = verify_pay_secret(slug, secret)
     # the upload is read before the order list is loaded: a slow upload must not overwrite orders saved meanwhile
     data = b""
     if upload is not None and getattr(upload, "filename", ""):
-        data = await upload.read()
-        if len(data) > 4_000_000:
+        # بیشتر از سقف را نمی‌خواند: یک فایل ۳۰ مگی نباید کامل در حافظه بیاید تا رد شود
+        data = await upload.read(RECEIPT_MAX_BYTES + 1)
+        if len(data) > RECEIPT_MAX_BYTES:
             raise ValueError("عکس رسید بزرگ‌تر از حد مجاز است")
     with tenant_scope(tenant):
         image_name = ""

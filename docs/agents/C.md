@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.9k tokens. Your core files total 23.5k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.9k tokens. Your core files total 23.6k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -66,10 +66,10 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 | set | tokens | how to use |
 |---|---|---|
-| core | 23.5k | the files most tasks touch; read the relevant one first |
-| active | 73.4k | yours to edit; read only what the task needs |
+| core | 23.6k | the files most tasks touch; read the relevant one first |
+| active | 73.6k | yours to edit; read only what the task needs |
 | rare | 11.6k | yours; read only when the task names it |
-| tests | 31.7k | read only the test of the module you change |
+| tests | 32.1k | read only the test of the module you change |
 
 **Core:**
 
