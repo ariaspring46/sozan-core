@@ -86,6 +86,30 @@ class DeciderParseTests(unittest.TestCase):
         )
         self.assertFalse(ok)
 
+    def test_help_answers_in_words_with_the_real_card_facts(self) -> None:
+        # B20: «دکمه تایید کجاست؟»، «خوبی؟» had no action of their own; clarify sent them to the chat model, which ran status
+        self.assertEqual(decider_service.tool_names("help"), [])
+        choice, _prob, _margin, ok = decider_service.accept_action({"choice": "help", "probabilities": {"help": 0.7, "clarify": 0.1}})
+        self.assertEqual((choice, ok), ("help", True))
+        _choice, _prob, _margin, ok = decider_service.accept_action({"choice": "help", "probabilities": {"help": 0.5, "clarify": 0.3}})
+        self.assertFalse(ok)
+        open_card = decider_service.plan_for("help", "دکمه تایید کجاست؟", frustrated=False, effort="quick", card_open=True)
+        self.assertEqual(open_card["tool"], "")
+        self.assertIn("«تأیید»", open_card["direct"])
+        self.assertIn("«انصراف»", open_card["direct"])
+        no_card = decider_service.plan_for("help", "کدوم دکمه تایید", frustrated=False, effort="quick")
+        self.assertEqual(no_card["direct"], decider_service.HELP_NO_CARD)
+        general = decider_service.plan_for("help", "الان متوجه نمیشی من چی میگم؟", frustrated=False, effort="quick")
+        self.assertEqual(general["direct"], decider_service.HELP_GENERAL)
+        self.assertNotIn("«", general["direct"])
+        # «کارت به کارت» is a payment question, not the confirm card
+        self.assertEqual(decider_service.help_text("کارت به کارت چطوریه", True), decider_service.HELP_GENERAL)
+        # every help fact says nothing was done, so the voice may not word it as a success
+        from app.services.shop_voice_service import _FAILED
+
+        for fact in (decider_service.HELP_CARD_OPEN, decider_service.HELP_NO_CARD, decider_service.HELP_GENERAL):
+            self.assertTrue(_FAILED.search(fact), fact)
+
     def test_jewelry_vertical_from_a_broken_word(self) -> None:
         self.assertEqual(stated_vertical("کسخل ج.اهر فروشیه"), "jewelry")
         self.assertEqual(stated_vertical("سایت مربوط به جواهر فروشی است"), "jewelry")
@@ -266,6 +290,17 @@ class DeciderTurnTests(unittest.TestCase):
         with patch("app.services.shop_edit_service.build_dir_for", return_value=__import__("pathlib").Path("/tmp")):
             self._turn("یه چیزی برای بالا", AsyncMock(return_value=decision), complete=complete)
         self.assertTrue(seen and seen[0] > 10)
+
+    def test_help_is_a_spoken_answer_that_runs_nothing(self) -> None:
+        complete = AsyncMock(side_effect=AssertionError("help must not reach the chat model"))
+        for index, (spoken, fact) in enumerate(
+            (("دکمه تایید کجاست؟", decider_service.HELP_NO_CARD), ("الان متوجه نمیشی من چی میگم؟", decider_service.HELP_GENERAL))
+        ):
+            out = self._turn(spoken, AsyncMock(return_value=_decision("help")), complete=complete, thread_id=f"h{index}")
+            self.assertIsNone(out.get("pendingConfirm"), spoken)
+            self.assertEqual(out["messages"][-1]["role"], "assistant")
+            self.assertEqual(out["messages"][-1]["text"], fact)
+        complete.assert_not_called()
 
     def test_api_down_hands_the_turn_to_the_model_with_every_tool(self) -> None:
         seen = []

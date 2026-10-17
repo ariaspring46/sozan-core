@@ -40,6 +40,7 @@ _ACTIONS: dict[str, tuple[str, dict]] = {
     "read_status": ("status", {}),
     "inbox_status": ("inbox_status", {}),
     "identity": ("", {}),
+    "help": ("", {}),
     "clarify": ("ask_user", {}),
     "studio_image": ("studio_chat", {}),
     "studio_caption": ("studio_chat", {}),
@@ -72,6 +73,7 @@ _LABELS = {
     "read_status": "وضعیت ساخت",
     "inbox_status": "صندوق",
     "identity": "این دستیار کیست",
+    "help": "راهنما",
     "clarify": "سؤال کوتاه",
     "studio_image": "ساخت عکس",
     "studio_caption": "کپشن",
@@ -104,6 +106,7 @@ _CRITERIA = {
     "read_status": "Where the shop build, scan, or domain stands, or which products have no photo. Example: الان در چه مرحله ایه؟ When the seller says to check the site and then make the missing photos, this is the first action and loop_enough is false.",
     "inbox_status": "Unread inbox or auto-reply, not the shop build. Example: صندوق را ببین.",
     "identity": "Who this assistant is, who built Sozan, or what Sozan can do. Example: تو کی هستی؟ سوزان چیست؟ ویژگی‌های مهم سوزان چیست؟",
+    "help": "Small talk, or a question about how this chat works: where the confirm button or card is, what the last reply meant, or a complaint that the assistant does not understand. Example: دکمه تایید کجاست؟ or الان یعنی چی؟ or خوبی؟ Answered in words; nothing in the shop is changed or looked up. Who you are is identity.",
     "clarify": "The sentence is too thin to pick a tool. Example: یک چیزی عوض کن.",
     "studio_image": "A post photo or product image for the studio, not the site header. Example: a necklace photo. Also the step that makes photos after products without one were listed.",
     "studio_caption": "A caption for a post. Example: کپشن این عکس را بنویس.",
@@ -504,7 +507,25 @@ def voice_tone(spoken: str) -> str:
     return ""
 
 
-def plan_for(action: str, spoken: str, *, frustrated: bool, effort: str) -> dict:
+# «help»: how this chat works, from the real UI (chat-parts.tsx ConfirmCard, PendingDock). Each fact says nothing was done
+# («نشده»/«نیست»), so the voice may not word it as a success: voicing «تأیید را بزن» once read as a finished edit.
+HELP_CARD_OPEN = "کار هنوز انجام نشده و منتظر تأیید توست: کارتش در همین گفتگوست و دو دکمهٔ «تأیید» و «انصراف» دارد. اگر کارت بالاتر رفته، نوار کوچکی بالای کادر نوشتن همان دو دکمه را دارد."
+HELP_NO_CARD = "الان هیچ کاری منتظر تأیید نیست. کار را با یک جملهٔ کامل بگو، مثلاً قیمت یک کالا را چند کنم، تا کارتش با دکمهٔ تأیید بیاید."
+HELP_GENERAL = "هنوز کاری روی فروشگاه انجام نشده. با یک جملهٔ روشن بگو چه کاری بکنم، مثلاً قیمت یک کالا را عوض کنم، عکس پست بسازم، یا سفارش‌ها را ببینم."
+
+
+def help_text(spoken: str, card_open: bool) -> str:
+    """The facts for a «help» answer; the voice words them and nothing runs. Only the open-card fact has « », since each
+    «» fact must appear word for word in the reply."""
+    from app.services.router_text import asks_for_card
+
+    raw = spoken or ""
+    if asks_for_card(raw) or "تایید" in raw or "تأیید" in raw:
+        return HELP_CARD_OPEN if card_open else HELP_NO_CARD
+    return HELP_GENERAL
+
+
+def plan_for(action: str, spoken: str, *, frustrated: bool, effort: str, card_open: bool = False) -> dict:
     """Tool, arguments, and the direct sentence. correct_category writes the brief field first."""
     tool, base = _ACTIONS.get(action, ("", {}))
     args = dict(base)
@@ -538,6 +559,8 @@ def plan_for(action: str, spoken: str, *, frustrated: bool, effort: str) -> dict
     direct = ""
     if action == "identity":
         direct = IDENTITY_FACT
+    elif action == "help":
+        direct = help_text(spoken, card_open)
     elif action == "refuse":
         direct = "این کار را از چت نمی‌توانم انجام دهم."
     elif action == "clarify":
