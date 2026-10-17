@@ -635,16 +635,25 @@ def verify_pay_secret(slug: str, secret: str) -> str:
     return phone
 
 
+def _sign_key() -> bytes | None:
+    # وب‌هوک پرداخت کلید خودش را دارد. کلید JWT فقط در توسعه جایگزین می‌شود؛ در production بدون کلید وب‌هوک بسته است،
+    # تا یک کلید مشترک میان JWT و وب‌هوک نماند.
+    if env.payment_sign_secret:
+        return env.payment_sign_secret.encode()
+    return None if env.payments_enabled else env.jwt_secret.encode()
+
+
 def sign_body(raw: bytes) -> str:
-    key = (env.payment_sign_secret or env.jwt_secret).encode()
-    return hmac.new(key, raw, hashlib.sha256).hexdigest()
+    key = _sign_key()
+    return hmac.new(key, raw, hashlib.sha256).hexdigest() if key else ""
 
 
 def valid_sign(raw: bytes, header: str) -> bool:
     got = (header or "").strip().lower()
-    if not got:
+    expected = sign_body(raw)
+    if not got or not expected:
         return False
-    return hmac.compare_digest(sign_body(raw), got)
+    return hmac.compare_digest(expected, got)
 
 
 async def shop_checkout(
