@@ -480,6 +480,37 @@ class AttachReceiptRaceTests(unittest.TestCase):
         self.assertEqual(stored["ord1"], "awaiting_receipt")
 
 
+class PaymentSignKeyTests(unittest.TestCase):
+    """The payment webhook never falls back to the JWT key in production."""
+
+    BODY = b'{"slug":"x"}'
+
+    def test_production_without_its_own_secret_refuses_every_webhook(self) -> None:
+        import hmac as _hmac
+        import hashlib
+
+        jwt_sig = _hmac.new(settings.jwt_secret.encode(), self.BODY, hashlib.sha256).hexdigest()
+        with patch.object(pay_service.env, "payments_enabled", True), patch.object(pay_service.env, "payment_sign_secret", ""):
+            self.assertFalse(pay_service.valid_sign(self.BODY, jwt_sig))
+
+    def test_own_secret_is_checked(self) -> None:
+        import hmac as _hmac
+        import hashlib
+
+        sig = _hmac.new(b"webhook-key", self.BODY, hashlib.sha256).hexdigest()
+        with patch.object(pay_service.env, "payments_enabled", True), patch.object(pay_service.env, "payment_sign_secret", "webhook-key"):
+            self.assertTrue(pay_service.valid_sign(self.BODY, sig))
+            self.assertFalse(pay_service.valid_sign(self.BODY, "0" * 64))
+
+    def test_development_keeps_the_jwt_fallback(self) -> None:
+        import hmac as _hmac
+        import hashlib
+
+        jwt_sig = _hmac.new(settings.jwt_secret.encode(), self.BODY, hashlib.sha256).hexdigest()
+        with patch.object(pay_service.env, "payments_enabled", False), patch.object(pay_service.env, "payment_sign_secret", ""):
+            self.assertTrue(pay_service.valid_sign(self.BODY, jwt_sig))
+
+
 class _OversizeUpload:
     """A receipt bigger than the cap: the service asks for at most cap+1 bytes, never the whole body."""
 
