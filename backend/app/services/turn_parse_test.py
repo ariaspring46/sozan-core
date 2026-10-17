@@ -53,5 +53,19 @@ class TurnParseTests(unittest.TestCase):
         self.assertTrue(blocked(10, 16))
 
 
+class ShabaWordTests(unittest.TestCase):
+    """«شبا» (شبای من) is the bank account; «شبانه» (nightly) is not and must not be refused as one."""
+
+    def test_nightly_is_not_a_shaba_request(self) -> None:
+        for text in ("شبانه بیا", "شبانه ارسال کن", "ساعت کاری شبانه کیه"):
+            with self.subTest(text=text):
+                self.assertNotEqual(parse_turn(text).topic, "shaba")
+
+    def test_shaba_forms_are_still_recognized(self) -> None:
+        for text in ("شبا رو بده", "شبای من", "شبام را بفرست"):
+            with self.subTest(text=text):
+                self.assertEqual(parse_turn(text).topic, "shaba")
+
+
 if __name__ == "__main__":
     unittest.main()
