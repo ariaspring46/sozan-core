@@ -92,7 +92,10 @@ async def send(*, slug: str, phone: str, ip: str = "") -> dict:
     with tenant_scope(tenant):
         overlay = get_settings()
         mock = overlay.get("mockSms")
-        if mock is None:
+        if settings.payments_enabled:
+            # در production کد آزمایشی وجود ندارد، هر تنظیمی فروشنده گذاشته باشد (همان قاعدهٔ ورود).
+            mock = False
+        elif mock is None:
             mock = settings.otp_dev is True
         else:
             mock = mock is True
