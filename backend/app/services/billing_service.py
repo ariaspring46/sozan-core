@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from app.config import settings as env
 from app.services import payment_service, plan_service
+from app.services.tenant_lock import tenant_file_lock
 from app.state_store import read_json, shared_lock, write_json
 
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
@@ -14,6 +15,8 @@ _COUPON_ALIASES = {
     "سوزانسی": "sozan30",
     "سوزان30": "sozan30",
 }
+# کد تخفیف وقتی پرداختش در جریان است رزرو می‌ماند؛ اگر پرداخت کامل نشد، بعد از این مدت آزاد می‌شود.
+COUPON_HOLD_SECONDS = 30 * 60
 
 
 def _pending() -> dict:
@@ -53,9 +56,25 @@ def normalize_coupon(value: str) -> str:
     return _COUPON_ALIASES.get(blob, blob)
 
 
+def _update_rows(match, fields: dict) -> None:
+    """Changes the rows that match, on a fresh read: a snapshot taken before an await would overwrite newer rows."""
+    with tenant_file_lock("billing"):
+        history = _history()
+        for item in history:
+            if match(item):
+                item.update(fields)
+        write_json("billing.json", history[-80:])
+
+
 def coupon_already_used() -> bool:
+    now = int(time())
     for item in _history():
-        if item.get("coupon") and item.get("status") == "paid":
+        if not item.get("coupon"):
+            continue
+        if item.get("status") == "paid":
+            return True
+        # پرداختِ درحال‌انجام کد را رزرو می‌کند، تا دو درخواست هم‌زمان هر دو تخفیف نگیرند
+        if item.get("status") == "pending" and int(item.get("at") or 0) > now - COUPON_HOLD_SECONDS:
             return True
     return False
 
@@ -162,22 +181,26 @@ async def start_subscription(plan_id: str, *, phone: str, code: str | None = Non
     except (TypeError, ValueError):
         available = 0
     if override is None and available >= amount:
-        wallet_service.debit("plan", amount, note=f"اشتراک {spec['label']}")
-        plan_service.set_plan(wanted)
-        history = _history()
-        history.append(
-            {
-                "id": str(uuid4()),
-                "phone": phone,
-                "plan": wanted,
-                "amount": amount,
-                "status": "paid",
-                "source": "wallet",
-                "coupon": coupon or "",
-                "at": int(time()),
-            }
-        )
-        write_json("billing.json", history[-80:])
+        with tenant_file_lock("billing"):
+            # کد تخفیف را دوباره، زیر قفل، می‌سنجیم: دو خرید هم‌زمان با یک کد نباید هر دو تخفیف بگیرند.
+            if coupon and coupon_already_used():
+                raise ValueError("این کد تخفیف معتبر نیست")
+            wallet_service.debit("plan", amount, note=f"اشتراک {spec['label']}")
+            plan_service.set_plan(wanted)
+            history = _history()
+            history.append(
+                {
+                    "id": str(uuid4()),
+                    "phone": phone,
+                    "plan": wanted,
+                    "amount": amount,
+                    "status": "paid",
+                    "source": "wallet",
+                    "coupon": coupon or "",
+                    "at": int(time()),
+                }
+            )
+            write_json("billing.json", history[-80:])
         return {
             "activated": True,
             "fromWallet": True,
@@ -187,27 +210,37 @@ async def start_subscription(plan_id: str, *, phone: str, code: str | None = Non
         }
     if not payment_service.hub_payments_open():
         raise ValueError(payment_service.PAYMENT_LATER)
-    paid = await payment_service.zarinpal_request(
-        amount_toman=amount,
-        description=f"اشتراک {spec['label']} سوزان",
-        callback_url=callback_url(),
-        mobile=phone,
-    )
-    authority = str(paid.get("authority") or "").strip()
     row = {
         "id": str(uuid4()),
         "phone": phone,
         "plan": wanted,
         "amount": amount,
-        "authority": authority,
+        "authority": "",
         "status": "pending",
         "coupon": coupon or "",
         "at": int(time()),
     }
+    with tenant_file_lock("billing"):
+        # رزرو کد تخفیف پیش از درخواست به درگاه؛ کد دوم همین‌جا رد می‌شود.
+        if coupon and coupon_already_used():
+            raise ValueError("این کد تخفیف معتبر نیست")
+        history = _history()
+        history.append(row)
+        write_json("billing.json", history[-80:])
+    try:
+        paid = await payment_service.zarinpal_request(
+            amount_toman=amount,
+            description=f"اشتراک {spec['label']} سوزان",
+            callback_url=callback_url(),
+            mobile=phone,
+        )
+    except Exception:
+        _update_rows(lambda item: item.get("id") == row["id"], {"status": "failed"})
+        raise
+    authority = str(paid.get("authority") or "").strip()
+    row["authority"] = authority
+    _update_rows(lambda item: item.get("id") == row["id"], {"authority": authority})
     _put_pending(authority, row)
-    history = _history()
-    history.append(row)
-    write_json("billing.json", history[-80:])
     return {
         "activated": False,
         "plan": wanted,
@@ -235,13 +268,9 @@ async def finish_subscription(*, authority: str, ok: bool) -> str:
     from app.state_store import tenant_scope
 
     with tenant_scope(phone):
-        history = _history()
         if not ok:
             _drop_pending(key)
-            for item in history:
-                if item.get("authority") == key:
-                    item["status"] = "failed"
-            write_json("billing.json", history[-80:])
+            _update_rows(lambda item: item.get("authority") == key, {"status": "failed"})
             return panel_return("cancel")
         try:
             verified = await payment_service.zarinpal_verify(
@@ -250,15 +279,18 @@ async def finish_subscription(*, authority: str, ok: bool) -> str:
             )
         except ValueError:
             return panel_return("fail")
-        _drop_pending(key)
         from time import time as _time
 
-        plan_service.set_plan(
-            str(row.get("plan") or "free"), paid_until=int(_time()) + 30 * 86400
-        )
-        for item in history:
-            if item.get("authority") == key:
-                item["status"] = "paid"
-                item["refId"] = verified.get("refId") or ""
-        write_json("billing.json", history[-80:])
+        # خواندن تاریخچه بعد از verify: خریدهای دیگری که در این مدت ثبت شده‌اند نباید پاک شوند.
+        with tenant_file_lock("billing"):
+            plan_service.set_plan(
+                str(row.get("plan") or "free"), paid_until=int(_time()) + 30 * 86400
+            )
+            history = _history()
+            for item in history:
+                if item.get("authority") == key:
+                    item["status"] = "paid"
+                    item["refId"] = verified.get("refId") or ""
+            write_json("billing.json", history[-80:])
+        _drop_pending(key)
     return panel_return("ok")
