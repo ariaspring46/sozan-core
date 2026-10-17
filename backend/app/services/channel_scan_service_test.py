@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from app.config import settings
-from app.services import channel_scan_service, shop_service
+from app.services import channel_scan_service, public_fetch, shop_service
 from app.state_store import tenant_scope
 
 
@@ -521,36 +521,13 @@ class _FakeClient:
 
 
 class ScanImageTargetTests(unittest.TestCase):
-    """A scanned image URL is fetched only when it points at the public internet; redirects are checked hop by hop."""
-
-    def test_private_and_metadata_addresses_are_not_public(self) -> None:
-        for url in (
-            "http://169.254.169.254/latest/meta-data/",
-            "http://127.0.0.1/a.jpg",
-            "http://10.0.0.5/a.jpg",
-            "http://192.168.1.10/a.jpg",
-            "http://localhost/a.jpg",
-            "http://[::1]/a.jpg",
-            "file:///etc/passwd",
-        ):
-            with self.subTest(url=url):
-                self.assertFalse(asyncio.run(channel_scan_service._public_url(url)))
-
-    def test_public_address_is_allowed(self) -> None:
-        self.assertTrue(asyncio.run(channel_scan_service._public_url("https://8.8.8.8/a.jpg")))
-
-    def test_redirect_into_metadata_address_is_not_followed(self) -> None:
-        calls: list[str] = []
-        with patch.object(channel_scan_service, "async_client", lambda **kwargs: _FakeClient(calls)):
-            result = asyncio.run(channel_scan_service._fetch_public("https://8.8.8.8/a.jpg", 5))
-        self.assertEqual(result, (0, b""))
-        self.assertEqual(calls, ["https://8.8.8.8/a.jpg"])
+    """A scanned image is downloaded through public_fetch only: no private address is ever requested."""
 
     def test_private_image_url_is_never_requested(self) -> None:
         calls: list[str] = []
         with tempfile.TemporaryDirectory() as raw, patch.object(settings, "state_dir", raw), tenant_scope(
             "09135409482"
-        ), patch.object(channel_scan_service, "async_client", lambda **kwargs: _FakeClient(calls)):
+        ), patch.object(public_fetch, "async_client", lambda **kwargs: _FakeClient(calls)):
             name = asyncio.run(channel_scan_service._download("http://169.254.169.254/a.jpg"))
         self.assertEqual(name, "")
         self.assertEqual(calls, [])
