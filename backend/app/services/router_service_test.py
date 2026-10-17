@@ -2180,6 +2180,22 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class ReelFileTests(unittest.TestCase):
+    """«ریلز را بفرست» without a video does not send the cover image as a reel."""
+
+    def test_a_reel_without_video_is_not_a_cover_image(self) -> None:
+        cover = [{"kind": "image", "name": "cover.png", "source": "studio"}]
+        self.assertIsNone(router_service._pick_publish_file(cover, "ریلز را بفرست"))
+
+    def test_a_reel_picks_the_video(self) -> None:
+        files = [{"kind": "image", "name": "cover.png"}, {"kind": "video", "name": "clip.mp4"}]
+        self.assertEqual(router_service._pick_publish_file(files, "ریلز را بفرست")["name"], "clip.mp4")
+
+    def test_a_feed_post_still_falls_back_to_the_first_image(self) -> None:
+        files = [{"kind": "image", "name": "cover.png"}]
+        self.assertEqual(router_service._pick_publish_file(files, "این پست را بفرست")["name"], "cover.png")
+
+
 class RescueBudgetTests(unittest.TestCase):
     """A slow embedding rescue cannot hold the turn past its budget."""
 
