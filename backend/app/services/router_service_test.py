@@ -566,6 +566,18 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("انجام نشد", hidden["messages"][-1]["text"])
         self.assertNotIn("secret-trace", hidden["messages"][-1]["text"])
 
+    def test_unexpected_failure_after_confirm_closes_the_card(self) -> None:
+        # A non-validation error can come after part of the write happened: the same tap must not run it again.
+        async def complete(_messages, _tools):
+            return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}
+
+        first = self._turn("پیش‌نویس", complete)
+        cid = first["pendingConfirm"]["id"]
+        with patch("app.services.inbox_service.save_auto_reply", side_effect=RuntimeError("gateway went away")):
+            out = self._turn("", complete, confirm_id=cid)
+        self.assertFalse(out.get("pendingConfirm"))
+        self.assertIn("انجام نشد", out["messages"][-1]["text"])
+
     def test_open_card_trimmed_out_of_history_is_shown_again(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "set_auto_reply", "arguments": {"mode": "draft"}}]}

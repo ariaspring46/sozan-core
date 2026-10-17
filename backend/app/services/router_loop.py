@@ -8,9 +8,14 @@ through `rs` at call time, so tests that patch router_service still reach this c
 
 from __future__ import annotations
 
+import time
+
 import httpx
 
 from app.services import router_text
+
+# هدف باز (پلن چندمرحله‌ای) بعد از این مدت کهنه است و دیگر به پیام تازه چسبانده نمی‌شود.
+GOAL_TTL_SECONDS = 24 * 3600
 
 
 
@@ -157,13 +162,25 @@ def _goal_name() -> str:
 
 def _load_goal() -> dict:
     row = rs.read_json(_goal_name(), {})
-    return row if isinstance(row, dict) else {}
+    if not isinstance(row, dict):
+        return {}
+    # هدفی که مدت‌ها پیش ثبت شده، از پیام امروز نیست؛ بدون سقف، هر پیام بعدی را به آن می‌بست.
+    if int(row.get("at") or 0) < time.time() - GOAL_TTL_SECONDS:
+        return {}
+    return row
 
 
 def _save_goal(goal: str, skill: str, suggestions: str, *, reached: bool, queue: list[str] | None = None) -> None:
     rs.write_json(
         _goal_name(),
-        {"goal": goal, "goals": list(queue or []), "skill": skill, "suggestions": suggestions[:800], "reached": reached},
+        {
+            "goal": goal,
+            "goals": list(queue or []),
+            "skill": skill,
+            "suggestions": suggestions[:800],
+            "reached": reached,
+            "at": int(time.time()),
+        },
     )
 
 
