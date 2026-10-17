@@ -231,6 +231,7 @@
         "backend/app/services/instagram_oauth_service.py",
         "backend/app/services/whatsapp_service.py",
         "backend/app/services/inbound_media_service.py",
+        "backend/app/services/public_fetch.py",
         "backend/app/services/chat_media_service.py",
         "backend/app/services/public_media_service.py",
         "backend/app/services/upload_limits_test.py",
