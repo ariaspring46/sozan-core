@@ -7,9 +7,10 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.services import turn_subject
+from app.services.fa_text import AFTER, BEFORE
 
 _DATA = Path(__file__).resolve().parent.parent / "data"
-_WORD = r"(?<![\u0600-\u06FF\w]){token}(?![\u0600-\u06FF\w])"
+_WORD = r"(?<!\w){token}(?!\w)"
 
 
 @lru_cache(maxsize=1)
@@ -84,12 +85,10 @@ def _subject(text: str, data: dict) -> str:
 
 
 # «رمز» فقط وقتی کلمهٔ مستقل است؛ در «قرمز» و «رمزگذاری» پنهان نیست.
-_SECRET_WORD = re.compile(
-    r"(?<![\u0600-\u06FF])(?:رمز(?:م|\s?عبور|\s?دوم|\s?پویا|\s?یکبار)?|پسورد|password)(?![\u0600-\u06FF])", re.I
-)
-_MENU_WORD = re.compile(r"(?<![\u0600-\u06FF])منو(?:ی)?(?![\u0600-\u06FF])")
+_SECRET_WORD = re.compile(BEFORE + r"(?:رمز(?:م|\s?عبور|\s?دوم|\s?پویا|\s?یکبار)?|پسورد|password)" + AFTER, re.I)
+_MENU_WORD = re.compile(BEFORE + r"منو(?:ی)?" + AFTER)
 # «شبا» و صورت‌های آن (شبای من، شبام)؛ «شبانه» (شبِ شب، ساعت شبانه) شبا نیست.
-_SHABA_WORD = re.compile(r"(?<![\u0600-\u06FF])شبا(?:ی|م|ت|ش|ه|رو)?(?![\u0600-\u06FF])")
+_SHABA_WORD = re.compile(BEFORE + r"شبا(?:ی|م|ت|ش|ه|رو)?" + AFTER)
 
 
 def _topic(text: str, write: bool) -> str:

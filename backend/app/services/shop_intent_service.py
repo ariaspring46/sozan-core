@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from app.services.fa_text import AFTER, BEFORE
 from app.services.persian_text import sanitize_persian
 from app.services.shop_edit_service import (
     looks_like_foreign_payload,
@@ -131,7 +132,7 @@ def _product_title(text: str) -> str:
     if quoted:
         return quoted
     cleaned = re.sub(r"(?:با\s+|به\s+)?قیمت.*", "", text or "")
-    named = re.search(r"(?<![\u0600-\u06FF])(?:اسم|نام)(?:ش)?\s+(\S.*)", cleaned)
+    named = re.search(BEFORE + r"(?:اسم|نام)(?:ش)?\s+(\S.*)", cleaned)
     if named:  # «یک کالای جدید به اسم گوشواره نقره»: the title is what follows the naming word
         cleaned = named.group(1)
     kept: list[str] = []

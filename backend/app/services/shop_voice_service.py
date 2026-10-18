@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import re
 
+from app.services.fa_text import AFTER
 from app.services.llm import complete_json, complete_text_chat
 from app.services.router_text import fix_halfspace
 
@@ -64,7 +65,7 @@ _FAILED = re.compile(r"نشد|نیست|نمی‌شود|نمی‌توان|ممک�
 # nothing in the system tells the seller later, so the model must not promise it
 _PROMISE = re.compile(r"خبر(?:ت)?\s*می‌?(?:کنم|دم)|بهت\s*(?:می‌?گم|خبر)|اطلاع\s*می‌?دم")
 # a success verb that is not negated («نشد»، «نکردم»)
-_SUCCESS = re.compile(r"(?<![نم])(?:شد|کردم|گذاشتم|ساختم|فرستادم|نوشتم|دادم|زدم|نشست|رسید|اعمال)(?![\u0600-\u06FF])")
+_SUCCESS = re.compile(r"(?<![نم])(?:شد|کردم|گذاشتم|ساختم|فرستادم|نوشتم|دادم|زدم|نشست|رسید|اعمال)" + AFTER)
 
 
 _DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩٬,", "01234567890123456789  ")
