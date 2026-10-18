@@ -160,6 +160,11 @@ class RouterServiceTests(unittest.TestCase):
         for spoken in ("یه صفحه بساز", "صفحه جدید", "یک صفحه ی جدید میخوام برای فروشگ"):
             self.assertIn("کدام صفحه", router_service._direct_reply(spoken, use_decider=True), spoken)
 
+    def test_a_secret_word_before_arabic_punctuation_gets_the_direct_answer(self) -> None:
+        # «پسورد؟» «رمز، لطفا» «شبا؟»: the punctuation glued to the word and the gate never saw it
+        for spoken in ("پسورد؟", "رمز، لطفا", "شبا؟", "منو؟"):
+            self.assertEqual(router_service.decide(spoken, use_decider=True)["kind"], "direct", spoken)
+
     def test_similar_questions_do_not_dump_status(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "status", "arguments": {}}]}

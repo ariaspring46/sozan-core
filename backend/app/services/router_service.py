@@ -1133,7 +1133,7 @@ def _bind_recipient(args: dict, spoken: str) -> str:
         for row in rows
         if (name := str(row.get("sender") or "").strip())
         and len(name) >= 2
-        and re.search(rf"(?<![\w\u0600-\u06FF]){re.escape(name)}(?![\w\u0600-\u06FF])", spoken or "")
+        and re.search(rf"(?<!\w){re.escape(name)}(?!\w)", spoken or "")
     ]
     if len(hits) == 1:
         args["recipientId"] = str(hits[0].get("recipientId") or "")

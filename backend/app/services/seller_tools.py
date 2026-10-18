@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from app.services.fa_text import AFTER, BEFORE
 from app.services.router_text import fa_digits, fa_money, fold, price_problem
 from app.services.router_tools import Tool, register
 
@@ -26,8 +27,8 @@ _ORDER_FA = {
     "receipt_rejected": "رسید ردشده",
     "failed": "ناموفق",
 }
-_CHANGE = re.compile(r"(?:ب?کن|کنید|بشه|بشود|شود|بذار|بزار|بگذار|بزن|عوض|تغییر|برسون|بردار|حذف)(?![\u0600-\u06FF])")
-_ALL = re.compile(r"(?<![\u0600-\u06FF])(?:همه|همهٔ|همه‌ی|همه ی|کل|تمام)(?![\u0600-\u06FF])")
+_CHANGE = re.compile(r"(?:ب?کن|کنید|بشه|بشود|شود|بذار|بزار|بگذار|بزن|عوض|تغییر|برسون|بردار|حذف)" + AFTER)
+_ALL = re.compile(BEFORE + r"(?:همه|همهٔ|همه‌ی|همه ی|کل|تمام)" + AFTER)
 _PRICE_MOVE = re.compile(r"ارزون|گران|گرون")  # «انگشتر را ارزون‌تر کن، بشه ۸۴۰ هزار تومن»: a price change without the word «قیمت»
 _PRICE_SAID = re.compile(r"\d.*(?:هزار|تومن|تومان)|(?:هزار|تومن|تومان).*\d")  # «و قیمت X را ۷۰۰ هزار تومن» states the new price
 _OUT_OF_STOCK = re.compile(r"تموم\s*شد|تمام\s*شد|ناموجود|موجود\s*نیست")
@@ -38,9 +39,7 @@ _PERCENT_WORDS = {
     "بیست و پنج": 25, "سی و پنج": 35, "پانزده": 15, "پونزده": 15, "پنجاه": 50, "بیست": 20, "چهل": 40, "شصت": 60,
     "هفتاد": 70, "پنج": 5, "سی": 30, "ده": 10,
 }
-_PERCENT_WORD = re.compile(
-    r"(?<![\u0600-\u06FF])(" + "|".join(_PERCENT_WORDS) + r")\s*(?:درصد|درصدی|٪)"
-)
+_PERCENT_WORD = re.compile(BEFORE + "(" + "|".join(_PERCENT_WORDS) + r")\s*(?:درصد|درصدی|٪)")
 _STOCK_ASK = re.compile(r"(?:کدوم|کدام|کدوما|چه\s*کالا|چی|لیست|فهرست).{0,30}(?:موجودی|تموم|تمام|ناموجود)")
 _REPLY_IT = re.compile(r"(?:بهش|براش|به\s*او)\s+(?:بگو|بنویس|بفرست|جواب\s*بده)(?:\s*(?:که|:))?\s*(?P<text>.+)$")
 _SALES = re.compile(r"گزارش\s*فروش|(?:امروز|دیروز|هفته|ماه)\S*\s.{0,12}فروش(?!گاه|نده)|فروش(?!گاه|نده).{0,12}(?:امروز|دیروز|هفته|ماه|چقد)|(?:چقدر|چقد|چند).{0,10}(?:فروختم|فروختیم|فروش(?!گاه))|درآمد")
@@ -49,7 +48,7 @@ _REPLY = re.compile(
     r"(?:^|\s)(?:به|برای)\s+(?P<who>\S+(?:\s+\S+)?)\s+(?:بگو|بنویس|بفرست|پیام\s*بده|جواب\s*بده)(?:\s*(?:که|:))?\s*(?P<text>.+)$"
     r"|(?:جواب|پاسخ)\s+(?P<who2>\S+(?:\s+\S+)?)\s+(?:رو|را)\s+بده(?:\s*(?:که|:))?\s*(?P<text2>.+)$"
 )
-_POINTER = re.compile(r"(?<![\u0600-\u06FF])(?:اون|همون|همین|این|ازش|ازشون|براش|روش)(?![\u0600-\u06FF])|(?:قیمت|موجودی|تخفیف)ش")
+_POINTER = re.compile(BEFORE + r"(?:اون|همون|همین|این|ازش|ازشون|براش|روش)" + AFTER + r"|(?:قیمت|موجودی|تخفیف)ش")
 _PAGE = re.compile(r"سایت|صفحه|نشون|نشان|نمایش|مخفی|پنهان|قایم")
 _LATEST = frozenset({"آخر", "آخری", "آخرین", "مشتری آخر", "آخرین مشتری", "آخرین نفر"})
 _NAME_DROP = frozenset(

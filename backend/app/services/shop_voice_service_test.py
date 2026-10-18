@@ -77,6 +77,16 @@ class ReplyChecks(unittest.TestCase):
         self.assertEqual(voice.clean_brief("nope"), {})
 
 
+class ArabicPunctuationTests(unittest.TestCase):
+    def test_a_success_claim_before_punctuation_is_still_a_claim(self) -> None:
+        # when nothing was done (patched=False) «…کردم،» must be refused like «…کردم.»
+        for text in ("رنگ را عوض کردم، ولی", "ثبت شد؟", "همه چیز ساخته شد،", "گذاشتم؟", "اعمال شد؛ بعد"):
+            self.assertTrue(voice._SUCCESS.search(text), text)
+            self.assertFalse(voice.acceptable(f"باشه، {text} همین را ببین.", patched=False), text)
+        for text in ("نکردم، ببخشید", "نشد، ببخشید"):
+            self.assertIsNone(voice._SUCCESS.search(text), text)
+
+
 class SayTests(unittest.TestCase):
     def setUp(self) -> None:
         patcher = patch.object(voice, "_capped", return_value=False)  # the shared test ledger may be full

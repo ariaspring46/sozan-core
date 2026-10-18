@@ -53,6 +53,30 @@ class TurnParseTests(unittest.TestCase):
         self.assertTrue(blocked(10, 16))
 
 
+class ArabicPunctuationTests(unittest.TestCase):
+    """«،» «؟» «؛» are in the Arabic block; they used to glue to the word before them and hide it from the word tests."""
+
+    def test_a_secret_or_account_word_before_punctuation_is_still_that_topic(self) -> None:
+        for text, topic in (
+            ("پسورد؟", "secret"),
+            ("رمز؟", "secret"),
+            ("پسورد،", "secret"),
+            ("رمز، لطفا", "secret"),
+            ("شبا؟", "shaba"),
+            ("شبا،", "shaba"),
+            ("منو؟", "menu"),
+        ):
+            self.assertEqual(parse_turn(text).topic, topic, text)
+
+    def test_words_that_only_contain_them_are_not_those_topics(self) -> None:
+        for text in ("قرمز؟", "رمزگذاری،", "شبانه؟"):
+            self.assertNotIn(parse_turn(text).topic, {"secret", "shaba"}, text)
+
+    def test_a_write_verb_before_punctuation_is_still_a_write(self) -> None:
+        for text in ("اون کالا را موجود کن،", "پاسخ خودکار را پیش‌نویس کن؟", "انگشتر نقره رو گرون‌تر کن، بشه 990 هزار تومن"):
+            self.assertTrue(parse_turn(text).write, text)
+
+
 class ToldSomeoneTests(unittest.TestCase):
     """A message told to a customer carries a send word; it is not a request to publish the last post."""
 

@@ -69,6 +69,7 @@
         "backend/app/services/turn_subject.py",
         "backend/app/services/fallback_tally.py",
         "backend/app/services/persian_text.py",
+        "backend/app/services/fa_text.py",
         "backend/app/api/router_chat.py",
         "backend/app/api/chat_payload.py",
         "backend/app/api/chat_payload_test.py",

@@ -186,6 +186,13 @@ class RouteTests(_Tenant):
         self.assertTrue(_wants_growth("فروشم کمه چیکار کنم"))
 
 
+class ArabicPunctuationRouteTests(_Tenant):
+    def test_a_change_verb_before_punctuation_still_routes(self) -> None:
+        # «اون کالا را موجود کن،» had no tool: «کن،» looked like one word
+        self.assertEqual(seller_tools.route("اون کالا را موجود کن،"), "edit_product")
+        self.assertEqual(seller_tools.route("اون کالا را موجود کن"), "edit_product")
+
+
 class ReadTests(_Tenant):
     def test_orders_count_by_status_and_list_the_newest(self) -> None:
         text = seller_tools.orders_text(now=NOW)

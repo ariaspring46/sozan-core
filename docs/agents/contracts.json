@@ -1818,6 +1818,24 @@
    "X5"
   ]
  },
+ "backend/app/services/fa_text.py::AFTER": {
+  "owner": "X1",
+  "signature": "AFTER = f'(?![{FA_LETTER}])'",
+  "since": "2026-10-18",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
+ "backend/app/services/fa_text.py::BEFORE": {
+  "owner": "X1",
+  "signature": "BEFORE = f'(?<![{FA_LETTER}])'",
+  "since": "2026-10-18",
+  "users": [
+   "X2",
+   "X4"
+  ]
+ },
  "backend/app/services/idempotency_service.py::body_stamp": {
   "owner": "X5",
   "signature": "def body_stamp(raw: bytes) -> str",

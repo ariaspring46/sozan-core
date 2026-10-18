@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from app.services.campaign_service import CampaignService
 from app.services.claims_guard import check as _claim_check
+from app.services.fa_text import AFTER, BEFORE
 from app.services.llm import complete_json
 from app.services.observe_client import emit_later, safe_text
 from app.services.persian_text import guard_output, sanitize_persian
@@ -167,7 +168,7 @@ def _sentence_unclaimed(sentence: str, source: str) -> bool:
     for word in (*_CLAIM_WORDS, *_FLUFF):
         if word in source:
             continue
-        if re.search(rf"(?<![\u0600-\u06FF]){re.escape(word)}(?![\u0600-\u06FF])", sentence):
+        if re.search(BEFORE + re.escape(word) + AFTER, sentence):
             return True
     return False
 
