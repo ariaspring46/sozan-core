@@ -1,6 +1,6 @@
 {
-  "version": "2.1",
-  "status": "draft v2.1: not locked. Only B01 and B02 differ from v2 (cases.v2.json + cases.v2.lock stay as the B2/B3 evidence); needs the owner's review before `run.py lock`.",
+  "version": "3",
+  "status": "draft v3: not locked. Differs from v2.1 only in E04 and R21 (cases.v2_1.json + cases.v2_1.lock stay as the B4/B5 evidence); the scorer is version 3. Needs the owner's review before `run.py lock`, then a new baseline.",
   "fixture": {
     "phone": "09128880001",
     "slug": "harness-eval",
@@ -555,7 +555,7 @@
     {
       "id": "E04",
       "layer": "effects",
-      "note": "افزودن کالا با تأیید: یک ردیف بیشتر و قیمت درست",
+      "note": "افزودن کالا با تأیید: یک ردیف بیشتر و قیمت درست (v3: پاسخ «توی کادر پیش‌نویس است» هم درست است؛ فقط ادعای شکست رد می‌شود و نام کالا باید بیاید)",
       "turns": [
         {
           "say": "یک کالای جدید به اسم گوشواره نقره با قیمت ۳۲۰۰۰۰۰ تومان و موجودی ۴ اضافه کن",
@@ -563,7 +563,10 @@
           "expect": {
             "card": true,
             "tool": "add_product",
-            "claim": "success"
+            "claim_not": "failure",
+            "must_any": [
+              "گوشواره نقره"
+            ]
           }
         }
       ],
@@ -928,7 +931,7 @@
     {
       "id": "R21",
       "layer": "route",
-      "note": "کالای ناموجود: کارت نسازد و بگوید پیدا نشد یا بپرسد",
+      "note": "کالای ناموجود: کارت نسازد، بگوید پیدا نشد یا بپرسد، و قیمت نسازد (v3: «نبود» هم پذیرفته است؛ «تومان» در پاسخ ممنوع)",
       "turns": [
         {
           "say": "قیمت کفش قرمز راهبه چنده؟",
@@ -937,9 +940,15 @@
             "must_any": [
               "پیدا",
               "نیست",
+              "نبود",
+              "نیافتم",
+              "ندیدم",
               "ندارم",
               "کدام",
               "کدوم"
+            ],
+            "must_not": [
+              "تومان"
             ]
           }
         }

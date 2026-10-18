@@ -10,10 +10,13 @@ import json
 import re
 from typing import Any
 
+# Bump when the way a record is judged changes: runs scored differently are not comparable (report.py refuses).
+# 3: `amount` reads spoken numbers («۴ میلیون»، «سه‌تا») and matches whole numbers; `claim_not` added.
+SCORER_VERSION = 3
 LAYERS = ("route", "effects", "verify", "build", "reply", "safety")
 CASE_LAYERS = ("route", "effects", "verify", "build", "reply", "safety", "multi")
 ACTIONS = ("none", "confirm", "cancel")
-EXPECT_KEYS = {"tool", "card", "ask", "args", "amount", "claim", "must_any", "must_not"}
+EXPECT_KEYS = {"tool", "card", "ask", "args", "amount", "claim", "claim_not", "must_any", "must_not"}
 CATEGORIES = (
     "wrong-route",
     "needless-ask",
@@ -55,6 +58,55 @@ def number(value: Any) -> float | None:
         return float(value)
     text = re.sub(r"[,٬،]", "", norm(value))
     return float(text) if re.fullmatch(r"-?\d+(\.\d+)?", text) else None
+
+
+_WORDS = {
+    "صفر": 0, "یک": 1, "یه": 1, "دو": 2, "سه": 3, "چهار": 4, "پنج": 5, "شش": 6, "شیش": 6, "هفت": 7, "هشت": 8, "نه": 9,
+    "ده": 10, "یازده": 11, "دوازده": 12, "سیزده": 13, "چهارده": 14, "پانزده": 15, "پونزده": 15, "شانزده": 16, "هفده": 17,
+    "هجده": 18, "نوزده": 19, "بیست": 20, "سی": 30, "چهل": 40, "پنجاه": 50, "شصت": 60, "هفتاد": 70, "هشتاد": 80, "نود": 90,
+    "صد": 100, "یکصد": 100,
+}
+_SCALES = {"هزار": 1_000, "میلیون": 1_000_000, "میلیارد": 1_000_000_000}
+_NUM_TOKEN = re.compile(r"\d{1,3}(?:,\d{3})+|\d+(?:[./]\d+)?|[؀-ۿ]+")
+
+
+def amounts(text: Any) -> set[float]:
+    """The numbers a reply states, as whole values: «۴٬۰۰۰٬۰۰۰»، «۴ میلیون»، «۴ میلیون و ۵۰۰ هزار»، «سه‌تا»، «بیست و پنج».
+    A number followed by a scale word («هزار»، «میلیون») counts only as the scaled value."""
+    raw = ("" if text is None else str(text)).translate(_DIGITS).replace("٬", ",").replace("٫", ".").replace("،", " ")
+    raw = raw.replace("‌", " ").replace("ي", "ی").replace("ك", "ک")
+    tokens = _NUM_TOKEN.findall(raw)
+
+    def value(token: str) -> float | None:
+        if token[0].isdigit():
+            clean = token.replace(",", "").replace("/", ".")
+            return float(clean)
+        return _WORDS.get(token)
+
+    found: set[float] = set()
+    i = 0
+    while i < len(tokens):
+        base = value(tokens[i])
+        if base is None:
+            i += 1
+            continue
+        i += 1
+        if base % 10 == 0 and 20 <= base < 100 and i + 1 < len(tokens) and tokens[i] == "و":  # «بیست و پنج»
+            unit = _WORDS.get(tokens[i + 1])
+            if unit is not None and unit < 10:
+                base, i = base + unit, i + 2
+        if i < len(tokens) and tokens[i] in _SCALES:
+            total, last = base * _SCALES[tokens[i]], _SCALES[tokens[i]]
+            i += 1
+            while i + 1 < len(tokens) and tokens[i] == "و":  # «۴ میلیون و ۵۰۰ هزار»
+                part = value(tokens[i + 1])
+                if part is None or i + 2 >= len(tokens) or tokens[i + 2] not in _SCALES or _SCALES[tokens[i + 2]] >= last:
+                    break
+                total, last, i = total + part * _SCALES[tokens[i + 2]], _SCALES[tokens[i + 2]], i + 3
+            found.add(float(total))
+        else:
+            found.add(float(base))
+    return found
 
 
 def same_value(actual: Any, wanted: Any) -> bool:
@@ -170,11 +222,12 @@ def score_case(case: dict, rec: dict) -> dict:
             bad = [f"{key}={got_args.get(key)!r} ≠ {value!r}" for key, value in exp["args"].items() if not same_value(got_args.get(key), value)]
             add("route", f"{tag}.args", not bad, "; ".join(bad), "wrong-args")
         if "amount" in exp:
-            digits = re.sub(r"[,٬،]", "", norm(reply))
-            want = str(int(float(exp["amount"])))
-            add("route", f"{tag}.amount", want in digits, f"{want} not in the reply", "wrong-args")
+            want = float(exp["amount"])
+            add("route", f"{tag}.amount", want in amounts(reply), f"{int(want)} not in the reply", "wrong-args")
         if "claim" in exp:
             add("reply", f"{tag}.claim", step.get("claim") == exp["claim"], f"{step.get('claim')} ≠ {exp['claim']}", "reply-claim")
+        if "claim_not" in exp:
+            add("reply", f"{tag}.claim-not", step.get("claim") != exp["claim_not"], f"claim is {step.get('claim')}", "reply-claim")
         if step.get("claim") == "success" and truth is False:
             add("reply", f"{tag}.truthful", False, "success claimed, an assertion failed", "false-claim")
         if "must_any" in exp:

@@ -232,6 +232,16 @@ def comparable(manifest: dict, name: str) -> list[str]:
     return problems
 
 
+def same_basis(manifest: dict, base: dict) -> list[str]:
+    """Two runs are only comparable when they were judged on the same case file by the same scorer version."""
+    problems = []
+    if manifest.get("cases_sha256") != base.get("cases_sha256"):
+        problems.append("the case files differ (a different list needs its own baseline)")
+    if int(manifest.get("scorer") or 2) != int(base.get("scorer") or 2):
+        problems.append(f"the scorer versions differ ({manifest.get('scorer') or 2} vs {base.get('scorer') or 2})")
+    return problems
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("run_id")
@@ -246,7 +256,7 @@ def main() -> int:
     if args.baseline:
         base_dir = common.EVAL_HOME / "runs" / args.baseline
         base_manifest = json.loads((base_dir / "manifest.json").read_text(encoding="utf-8")) if (base_dir / "manifest.json").is_file() else {}
-        problems = comparable(run_manifest, "run") + comparable(base_manifest, "baseline")
+        problems = comparable(run_manifest, "run") + comparable(base_manifest, "baseline") + same_basis(run_manifest, base_manifest)
         if problems:
             verdict = (False, ["not comparable: " + "; ".join(problems)])
         else:
