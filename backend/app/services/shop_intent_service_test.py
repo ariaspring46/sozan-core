@@ -74,6 +74,18 @@ class ShopIntentClassifyTests(unittest.TestCase):
         self.assertEqual([row["type"] for row in missing], ["set_colors", "replace_text"])
         self.assertEqual(missing[1]["find"], "این تیتر روی صفحه نیست")
 
+    def test_home_headline_is_the_shop_name_not_a_product_or_a_new_page(self) -> None:
+        # B01: «کالا» inside the new headline made this a product add that asked for a price
+        for spoken in ("تیتر صفحهٔ اصلی رو بگذار «کالای دست‌ساز»", "تیتر صفحه اول را «کالای دست‌ساز» کن", "عنوان خانه را «کالای دست‌ساز» کن"):
+            actions = classify_actions(spoken)
+            self.assertEqual([row["type"] for row in actions], ["set_brand"], spoken)
+            self.assertEqual(actions[0]["fields"], {"name": "کالای دست\u200cساز"})
+        self.assertIsNone(catalog_add("تیتر صفحهٔ اصلی رو بگذار «کالای دست‌ساز»"))
+        # a selected element keeps its own replacement, and a real product add still adds
+        picked = classify_actions("تیتر صفحهٔ اصلی را «کالای دست‌ساز» کن", view_target="خوش آمدید")
+        self.assertEqual(picked[0]["type"], "replace_text")
+        self.assertEqual(classify_actions("یک کالا اضافه کن با عنوان «انگشتر نقره» با قیمت ۸۰۰ هزار تومان")[0]["type"], "add_product")
+
     def test_spoken_prices(self) -> None:
         self.assertEqual(_price_toman("۴۵۰ هزار"), 450_000)
         self.assertEqual(_price_toman("۴۵۰ هزار تومن"), 450_000)

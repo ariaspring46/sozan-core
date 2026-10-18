@@ -650,11 +650,9 @@ def _direct_reply(spoken: str, use_decider: bool = False) -> str:
     if refusal:
         return refusal
     if "صفحه" in text and not any(mark in text for mark in ("پیشنهاد", "بهبود", "ببین")):
-        from app.services.shop_intent_service import CLARIFY_PAGE, page_kind_from_text
+        from app.services.shop_intent_service import page_reply
 
-        if not page_kind_from_text(text):
-            return CLARIFY_PAGE
-        return ""
+        return page_reply(text)
     if _generic_photo(text):
         if use_decider:
             return ""
