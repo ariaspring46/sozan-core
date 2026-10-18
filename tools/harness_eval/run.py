@@ -106,10 +106,15 @@ def canary() -> dict:
     tenants_dir = common.PROD_DATA / "tenants"
     tenants = sorted(path.name for path in tenants_dir.iterdir() if path.is_dir() and path.name.isdigit()) if tenants_dir.is_dir() else []
     settings = common.PROD_DATA / "settings.json"
+    others = sorted(set(fixture.docker("ps", "-a", "--format", "{{.Names}}").stdout.split()) - {common.CONTAINER})
+    builds_dir = common.SITE_BUILDER / "builds"
+    builds = sorted(path.name for path in builds_dir.iterdir() if path.name != common.FIXTURE_SLUG) if builds_dir.is_dir() else []
     return {
         "map": common.sha256(common.PROD_MAP) if common.PROD_MAP.is_file() else "",
         "settings": common.sha256(settings) if settings.is_file() else "",
         "tenants": hashlib.sha256("|".join(tenants).encode("utf-8")).hexdigest(),
+        "containers": hashlib.sha256("|".join(others).encode("utf-8")).hexdigest(),
+        "builds": hashlib.sha256("|".join(builds).encode("utf-8")).hexdigest(),
     }
 
 
@@ -172,6 +177,37 @@ def _docker(args, *rest, **kwargs):
     return subprocess.CompletedProcess(args, 1, "", "blocked by harness eval")
 
 
+def _built_run(real_run):
+    """subprocess.run while the really built shop is in play: docker exec/cp on the fixture container only."""
+
+    def guarded(args, *rest, **kwargs):
+        cmd = [str(part) for part in args] if isinstance(args, (list, tuple)) else [str(args)]
+        on_fixture = any(part == common.CONTAINER or part.startswith(common.CONTAINER + ":") for part in cmd)
+        if cmd[:2] in (["docker", "exec"], ["docker", "cp"]) and on_fixture:
+            EFFECTS["docker_calls"] += 1
+            return real_run(args, *rest, **kwargs)
+        if any("sozan_factory_fastpath" in part for part in cmd):
+            EFFECTS["build_calls"] += 1
+        else:
+            EFFECTS["docker_calls"] += 1
+        return subprocess.CompletedProcess(args, 1, "", "blocked by harness eval")
+
+    return guarded
+
+
+def _built_spawn(original):
+    """A confirmed edit may start the factory's revise step for the fixture job, once; anything else is blocked."""
+
+    def guarded(job_id, shop):
+        if str(job_id) != fixture.built_manifest()["jobId"]:
+            EFFECTS["build_calls"] += 1
+            return None
+        EFFECTS["build_calls"] += 1
+        return original(job_id, shop)
+
+    return guarded
+
+
 def _recorded_chat(original):
     async def recorded(**kwargs):
         result = await original(**kwargs)
@@ -228,7 +264,7 @@ def _counted(original):
     return counted_sync
 
 
-def stubbed(stack: contextlib.ExitStack) -> None:
+def stubbed(stack: contextlib.ExitStack, built: bool = False) -> None:
     from unittest.mock import patch
 
     from app.services import (
@@ -254,15 +290,23 @@ def stubbed(stack: contextlib.ExitStack) -> None:
         (seller_alerts, "alert", _outbound("alert.alert")),
         (seller_alerts, "alert_soon", _outbound_sync("alert.soon")),
         (studio_publish_service, "publish", _outbound("studio.publish")),
-        (shop_service, "start_build", _build),
-        (shop_service, "_refresh_job", lambda row: row),
-        (shop_service, "_factory_status", lambda *a, **k: {"status": "ready", "url": f"https://{common.FIXTURE_SLUG}.sozan-core.ir"}),
-        (shop_edit_service, "build_dir_for", lambda shop: fixture.SITE),
         (ai_budget_service, "cloud_blocked", lambda *a, **k: None),
-        (subprocess, "run", _docker),
         (llm, "complete_tools", _recorded_chat(llm.complete_tools)),
         (decider_service, "choose_with_retry", _recorded_decider(decider_service.choose_with_retry)),
     ]
+    if built:
+        pairs += [
+            (subprocess, "run", _built_run(subprocess.run)),
+            (shop_edit_service, "spawn_rebuild", _built_spawn(shop_edit_service.spawn_rebuild)),
+        ]
+    else:
+        pairs += [
+            (shop_service, "start_build", _build),
+            (shop_service, "_refresh_job", lambda row: row),
+            (shop_service, "_factory_status", lambda *a, **k: {"status": "ready", "url": f"https://{common.FIXTURE_SLUG}.sozan-core.ir"}),
+            (shop_edit_service, "build_dir_for", lambda shop: fixture.SITE),
+            (subprocess, "run", _docker),
+        ]
     for name in ("complete_json", "complete_json_chat"):
         original = getattr(shop_voice_service, name, None)
         if original is not None:
@@ -363,8 +407,50 @@ async def run_step(turn: dict) -> dict:
     return result
 
 
+def _get(url: str) -> tuple[int, str]:
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=20) as res:
+            return res.status, res.read(400_000).decode("utf-8", "replace")
+    except OSError:
+        return 0, ""
+
+
+async def settle_build(max_s: float) -> tuple[dict, dict]:
+    """After a confirmed edit on the really built shop: wait for the factory's revise step if one started, then read the
+    job state and the live page from the container (its own request, not the app's check)."""
+    from app.services import shop_service
+
+    started = time.monotonic()
+    while True:
+        shop = shop_service._refresh_job(shop_service._shop())
+        if str(shop.get("status") or "") not in shop_service.BUILD_BUSY or time.monotonic() - started > max_s:
+            break
+        await asyncio.sleep(5)
+    job_path = common.FACTORY_JOBS / f"{fixture.built_manifest()['jobId']}.json"
+    try:
+        job = json.loads(job_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        job = {}
+    port = int(shop.get("port") or fixture.built_manifest()["port"])
+    code, html = await asyncio.to_thread(_get, f"http://127.0.0.1:{port}/")
+    _, css = await asyncio.to_thread(_get, f"http://127.0.0.1:{port}/brand-vars.css")
+    _, flags = await asyncio.to_thread(_get, f"http://127.0.0.1:{port}/storefront-flags.json")
+    status = str(shop.get("status") or "")
+    build = {
+        "status": status,
+        "jobStatus": str(job.get("status") or ""),
+        "buildOk": status == "ready" and str(job.get("status") or "") in {"done", "ready"},
+        "urlOk": code == 200,
+        "waitedSec": round(time.monotonic() - started, 1),
+    }
+    return build, {"text": "\n".join((html, css, flags))}
+
+
 async def run_case(case: dict, rep: int, budget: float) -> dict:
-    fixture.restore()
+    built = bool(case.get("needs_build"))
+    fixture.restore(built=built)
     EFFECTS.clear()
     CALLS.clear()
     DECISIONS.clear()
@@ -376,6 +462,9 @@ async def run_case(case: dict, rep: int, budget: float) -> dict:
         steps.append(await run_step(turn))
         if SPEND["usd"] > budget:
             raise BudgetStop(f"spent ${SPEND['usd']:.3f} > ${budget:.2f}")
+    build, live_page = {}, {}
+    if built and case.get("build"):
+        build, live_page = await settle_build(float(case.get("max_s", 900)))
     elapsed = time.monotonic() - started
     golden, live = fixture.golden_hashes(), fixture.live_hashes()
     changed = sorted(key for key in set(golden) | set(live) if golden.get(key) != live.get(key))
@@ -396,8 +485,8 @@ async def run_case(case: dict, rep: int, budget: float) -> dict:
         "canary_ok": canary() == canary_before,
         "elapsed": round(elapsed, 2),
         "spend": round(SPEND["usd"] - spend_before, 5),
-        "build": {},
-        "live": {},
+        "build": build,
+        "live": live_page,
     }
 
 
@@ -436,22 +525,28 @@ async def run_cases(args) -> int:
     write_json(run_dir / "manifest.json", manifest(args.run_id, "cases", args))
     out = (run_dir / "records.jsonl").open("w", encoding="utf-8")
     stopped = ""
-    with contextlib.ExitStack() as stack:
-        stubbed(stack)
-        with tenant_scope(common.FIXTURE_PHONE):
-            try:
-                for case in selected:
-                    if case.get("needs_build"):
-                        out.write(json.dumps({"case": case["id"], "layer": case.get("layer", ""), "skipped": "needs a real build of the fixture (not built yet)"}, ensure_ascii=False) + "\n")
-                        print(f"{case['id']} skipped: needs a real build of the fixture", flush=True)
-                        continue
-                    for rep in range(1, args.repeat + 1):
+    built_ready = (common.GOLDEN_BUILT / "manifest.json").is_file() and (common.GOLDEN_BUILT / "job.json").is_file()
+    ran_built = False
+    with tenant_scope(common.FIXTURE_PHONE):
+        try:
+            for case in selected:
+                if case.get("needs_build") and not built_ready:
+                    out.write(json.dumps({"case": case["id"], "layer": case.get("layer", ""), "skipped": "needs a real build of the fixture (not built yet)"}, ensure_ascii=False) + "\n")
+                    print(f"{case['id']} skipped: needs a real build of the fixture", flush=True)
+                    continue
+                for rep in range(1, args.repeat + 1):
+                    with contextlib.ExitStack() as stack:
+                        stubbed(stack, built=bool(case.get("needs_build")))
                         rec = await run_case(case, rep, args.budget)
-                        out.write(json.dumps(rec, ensure_ascii=False) + "\n")
-                        out.flush()
-                        print_record(rec, "done")
-            except BudgetStop as exc:
-                stopped = str(exc)
+                    ran_built = ran_built or bool(case.get("needs_build"))
+                    out.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                    out.flush()
+                    print_record(rec, "done")
+        except BudgetStop as exc:
+            stopped = str(exc)
+        finally:
+            if ran_built:
+                fixture.restore(built=True)  # leave the container as it was found
     out.close()
     if stopped:
         print(f"STOPPED: {stopped}. Records so far are in {run_dir}.")
