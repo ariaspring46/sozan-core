@@ -91,6 +91,7 @@ def manifest(run_id: str, mode: str, args) -> dict:
         "commit": common.git_head(),
         "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "python": sys.version.split()[0],
+        "scorer": score.SCORER_VERSION,
         "cases_sha256": cases_sha,
         "lock_sha256": lock_sha,
         "dev": bool(getattr(args, "dev", False)),

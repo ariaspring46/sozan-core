@@ -155,6 +155,32 @@ def main() -> int:
     res = score.score_case(CASE, record(steps=[{**copy.deepcopy(GOOD_STEP), "trace": [{"fallback": "decider"}], "decisions": [{"action": "find_product"}]}]))
     expect("low-confidence decider (chat fallback) is not a fault", "decider-down" not in categories(res), str(categories(res)))
 
+    # Scorer v3: spoken amounts are read as whole numbers
+    spoken = {"id": "R02", "layer": "route", "turns": [{"say": "x", "expect": {"amount": 4000000}}]}
+
+    def amount_ok(reply: str, case=spoken) -> bool:
+        return "wrong-args" not in categories(score.score_case(case, {"steps": [{**copy.deepcopy(GOOD_STEP), "reply": reply}]}))
+
+    expect("«۴ میلیون» is 4,000,000", amount_ok("کفش ۴ میلیون تومنه."))
+    expect("«چهار میلیون» is 4,000,000", amount_ok("کفش چهار میلیون تومان است."))
+    expect("«۴٬۰۰۰٬۰۰۰» is 4,000,000", amount_ok("قیمت ۴٬۰۰۰٬۰۰۰ تومان."))
+    expect("«۳ میلیون» is not 4,000,000", not amount_ok("کفش ۳ میلیون تومنه."))
+    expect("«۴۰ میلیون» is not 4,000,000", not amount_ok("کفش ۴۰ میلیون تومنه."))
+    expect("a longer number containing the digits is not the amount", not amount_ok("کد ۴۰۰۰۰۰۰۱ را بزن."))
+    stock = {"id": "R03", "layer": "route", "turns": [{"say": "x", "expect": {"amount": 3}}]}
+    expect("«سه‌تا» is 3", amount_ok("انگشتر سه‌تا موجوده.", stock))
+    expect("«سه تا» is 3", amount_ok("انگشتر سه تا موجوده.", stock))
+    expect("«چهار تا» is not 3", not amount_ok("انگشتر چهار تا موجوده.", stock))
+    expect("«بیست و پنج» is 25", score.amounts("بیست و پنج عدد") == {25.0})
+    expect("«۴ میلیون و ۵۰۰ هزار» is 4,500,000", score.amounts("۴ میلیون و ۵۰۰ هزار") == {4_500_000.0})
+
+    # claim_not: a failure claim is refused, anything else passes
+    nofail = {"id": "E04", "layer": "effects", "turns": [{"say": "x", "expect": {"claim_not": "failure"}}]}
+    res = score.score_case(nofail, {"steps": [{**copy.deepcopy(GOOD_STEP), "claim": "none"}]})
+    expect("claim_not failure: a plain statement passes", "reply-claim" not in categories(res), str(categories(res)))
+    res = score.score_case(nofail, {"steps": [{**copy.deepcopy(GOOD_STEP), "claim": "failure"}]})
+    expect("claim_not failure: a failure claim is caught", "reply-claim" in categories(res), str(categories(res)))
+
     # Build case: job built but the live page lacks the new text
     build_case = {"id": "B1", "layer": "build", "build": True, "live_contains": "کالای دست‌ساز",
                   "turns": [{"say": "تیتر را عوض کن", "action": "confirm", "expect": {"card": True}}]}
