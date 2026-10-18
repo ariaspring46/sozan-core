@@ -153,6 +153,13 @@ class RouterServiceTests(unittest.TestCase):
         self.assertIn("sozan.sozan-core.ir", self._turn("دامنه ی فروشگاه من چیه؟", complete)["messages"][-1]["text"])
         self.assertIn("کدام صفحه", self._turn("یک صفحه ی جدید میخوام برای فروشگ", complete)["messages"][-1]["text"])
 
+    def test_the_home_page_headline_is_not_a_question_about_a_new_page(self) -> None:
+        # B01: any sentence with «صفحه» and no page kind got «کدام صفحه را بسازم»; «صفحهٔ اصلی» is an existing place
+        for spoken in ("تیتر صفحهٔ اصلی رو بگذار «کالای دست‌ساز»", "داخل صفحه چی بنویسم"):
+            self.assertEqual(router_service._direct_reply(spoken, use_decider=True), "", spoken)
+        for spoken in ("یه صفحه بساز", "صفحه جدید", "یک صفحه ی جدید میخوام برای فروشگ"):
+            self.assertIn("کدام صفحه", router_service._direct_reply(spoken, use_decider=True), spoken)
+
     def test_similar_questions_do_not_dump_status(self) -> None:
         async def complete(_messages, _tools):
             return {"text": "", "tool_calls": [{"name": "status", "arguments": {}}]}

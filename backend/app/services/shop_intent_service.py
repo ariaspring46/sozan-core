@@ -70,6 +70,14 @@ PRICE_CHANGE_RE = re.compile(r"قیمت.{0,60}(?:بکن|کن|عوض|بذار|ب�
 PRICE_CHANGE_REPLY = "قیمت را در چت اصلی بگو، مثلاً «قیمت انگشتر فیروزه را بکن ۶۰۰ هزار»، یا از «بیشتر ← انبار» عوض کن؛ همان لحظه روی سایت هم می‌نشیند."
 PAGE_PLACE_RE = re.compile(r"(?:بالا|پایین|وسط|داخل|توی|تو|اول|آخر|همین|این|بخش)\s*(?:ی|ِ)?\s*صفحه|صفحه\s*(?:ی|ٔ|‌ی)?\s*(?:اصلی|اول|خانه)")
 CLARIFY_PAGE = "کدام صفحه را بسازم: درباره ما، تماس، داستان برند، یا پرسش‌های متداول؟"
+# «تیتر صفحهٔ اصلی را «X» کن»: the home page's headline, which in the template is the shop name (components/ui/Hero.tsx)
+HOME_TITLE_RE = re.compile(r"(?:تیتر|عنوان)\s*(?:ی\s*)?(?:صفحه\s*(?:ی|ٔ|‌ی)?\s*(?:اصلی|اول|خانه)|خانه)")
+
+
+def page_reply(text: str) -> str:
+    """The gate's answer for a sentence that says «صفحه»: ask which page only when it names none and no place. Empty means
+    the sentence goes on (a named page kind, or «صفحهٔ اصلی» / «داخل صفحه», an existing place, not a page to build)."""
+    return "" if page_kind_from_text(text) or PAGE_PLACE_RE.search(text) else CLARIFY_PAGE
 
 
 def _price_toman(text: str) -> int:
@@ -154,6 +162,8 @@ def _product_title(text: str) -> str:
 def _is_product_add(text: str) -> bool:
     blob = text or ""
     if CREATE_PAGE_RE.search(blob):
+        return False
+    if HOME_TITLE_RE.search(blob):  # «تیتر صفحهٔ اصلی را بگذار «کالای دست‌ساز»»: «کالا» is in the new text, not the thing to add
         return False
     if ADD_PRODUCT_RE.search(blob):
         return True
@@ -357,6 +367,8 @@ def classify_actions(prompt: str, view_target: str = "", view_path: str = "") ->
                 actions.append({"type": "set_brand", "fields": {key: written}})
     elif target and quoted:
         actions.append({"type": "replace_text", "find": target, "replace": quoted})
+    elif quoted and not target and HOME_TITLE_RE.search(text) and "هدر" not in text:
+        actions.append({"type": "set_brand", "fields": {"name": quoted}})
     elif quoted and ("تیتر" in text or "عنوان" in text) and "هدر" not in text:
         if target or "تیتر" in text:
             actions.append({"type": "replace_text", "find": target or quoted, "replace": quoted})

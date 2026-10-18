@@ -2859,6 +2859,14 @@
    "X1"
   ]
  },
+ "backend/app/services/shop_intent_service.py::page_reply": {
+  "owner": "X4",
+  "signature": "def page_reply(text: str) -> str",
+  "since": "2026-10-18",
+  "users": [
+   "X1"
+  ]
+ },
  "backend/app/services/shop_interview_service.py::awaits_answer": {
   "owner": "X4",
   "signature": "def awaits_answer(rows: list[dict]) -> bool",
