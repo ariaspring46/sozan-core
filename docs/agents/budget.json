@@ -9,7 +9,7 @@
    "id": "X1",
    "loose_contracts": 5,
    "manifest": 12377,
-   "rare": 52163,
+   "rare": 67934,
    "tests": 79027
   },
   {
@@ -93,7 +93,7 @@
    "tests": 0
   },
   {
-   "active": 227715,
+   "active": 227854,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",

@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "status": "draft v2: not locked; v1 stays in cases.v1.json (+ cases.v1.lock) so B0/B1 remain comparable evidence",
+  "version": "2.1",
+  "status": "draft v2.1: not locked. Only B01 and B02 differ from v2 (cases.v2.json + cases.v2.lock stay as the B2/B3 evidence); needs the owner's review before `run.py lock`.",
   "fixture": {
     "phone": "09128880001",
     "slug": "harness-eval",
@@ -789,22 +789,46 @@
       "needs_build": true,
       "build": true,
       "max_s": 900,
-      "note": "تیتر صفحه با تأیید و ساخت: متن تازه در صفحهٔ زنده دیده شود (پس از ساخت واقعی فیکسچر کامل می‌شود)",
+      "note": "v2.1: تیتر صفحهٔ اصلی با تأیید، و بعد «دوباره بساز» با تأیید؛ متن تازه در صفحهٔ زندهٔ کانتینر دیده شود. در این قالب تیتر صفحهٔ اصلی همان نام فروشگاه است و ویرایش فقط در فایل می‌نشیند تا ساخت دوباره.",
       "turns": [
         {
           "say": "تیتر صفحهٔ اصلی رو بگذار «کالای دست‌ساز»",
           "action": "confirm",
           "expect": {
             "card": true,
-            "tool": "edit_shop",
-            "claim": "success"
+            "tool": "edit_shop"
+          }
+        },
+        {
+          "say": "دوباره بساز",
+          "action": "confirm",
+          "expect": {
+            "card": true,
+            "tool": "shop_chat"
           }
         }
       ],
       "effects": {
-        "allowed": [],
-        "must": []
+        "allowed": [
+          "site/lib/brand.ts",
+          "tenant/shop.json",
+          "site/public/brand-vars.css",
+          "site/public/images/hero.png",
+          "site/public/images/hero.svg",
+          "site/seller-instructions.md"
+        ],
+        "must": [
+          "site/lib/brand.ts",
+          "tenant/shop.json"
+        ]
       },
+      "asserts": [
+        {
+          "id": "name-in-brand-file",
+          "file": "site/lib/brand.ts",
+          "contains": "کالای دست‌ساز"
+        }
+      ],
       "live_contains": "کالای دست‌ساز"
     },
     {
@@ -813,7 +837,7 @@
       "needs_build": true,
       "build": true,
       "max_s": 900,
-      "note": "رنگ اصلی سایت با تأیید: ساخت و وارسی (فایل‌ها و نمونهٔ مقدار پس از ساخت واقعی تعیین می‌شود)",
+      "note": "v2.1: رنگ اصلی سایت با تأیید؛ ویرایش مستقیم در کانتینر زنده می‌نشیند (بدون ساخت دوباره). سبز در جدول رنگ کد برابر #15803D است.",
       "turns": [
         {
           "say": "رنگ اصلی سایت رو به سبز تغییر بده",
@@ -826,9 +850,30 @@
         }
       ],
       "effects": {
-        "allowed": [],
-        "must": []
-      }
+        "allowed": [
+          "site/lib/brand.ts",
+          "site/app/brand-vars.css",
+          "site/public/brand-vars.css",
+          "tenant/shop.json"
+        ],
+        "must": [
+          "site/lib/brand.ts",
+          "site/public/brand-vars.css"
+        ]
+      },
+      "asserts": [
+        {
+          "id": "new-color-in-css",
+          "file": "site/public/brand-vars.css",
+          "contains": "#15803D"
+        },
+        {
+          "id": "old-color-gone",
+          "file": "site/public/brand-vars.css",
+          "lacks": "#1E3A5F"
+        }
+      ],
+      "live_contains": "#15803D"
     },
     {
       "id": "R14b",

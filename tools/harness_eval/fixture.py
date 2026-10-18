@@ -8,10 +8,15 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import common
+
+# The harness patches subprocess.run during a case; the fixture's own docker calls go through the original.
+_RUN = subprocess.run
 
 STATE = common.EVAL_HOME / "state"
 GOLDEN = common.EVAL_HOME / "golden"
@@ -23,11 +28,21 @@ def tenant_dir() -> Path:
     return STATE / "tenants" / common.FIXTURE_PHONE
 
 
+BUILT = False  # True while the cases that need the really built shop run
+
+
+def use_built(flag: bool) -> None:
+    global BUILT
+    BUILT = bool(flag)
+
+
 def live_roots() -> dict[str, Path]:
-    return {"tenant": tenant_dir(), "site": SITE}
+    return {"tenant": tenant_dir(), "site": common.BUILD_DIR if BUILT else SITE}
 
 
 def golden_roots() -> dict[str, Path]:
+    if BUILT:
+        return {"tenant": common.GOLDEN_BUILT / "tenant", "site": common.GOLDEN_BUILT / "site"}
     return {"tenant": GOLDEN / "tenant", "site": GOLDEN / "site"}
 
 
@@ -63,26 +78,139 @@ def build_golden() -> None:
     shutil.copytree(SITE, GOLDEN / "site", dirs_exist_ok=True)
 
 
-def restore() -> None:
-    """Puts the tenant and the site folder back to the golden copy. Refuses any path outside the eval home."""
+def restore(built: bool = False) -> None:
+    """Puts the tenant and the site back to the golden copy. Refuses any path outside the eval home (the built site is
+    restored file by file, never removed). `built` also puts the running container back."""
+    use_built(built)
     home = common.EVAL_HOME.resolve()
-    for target in (tenant_dir(), SITE):
-        if home not in target.resolve().parents:
-            raise RuntimeError(f"refusing to reset {target}: outside {home}")
+    if home not in tenant_dir().resolve().parents:
+        raise RuntimeError(f"refusing to reset {tenant_dir()}: outside {home}")
+    roots = golden_roots()
     if tenant_dir().exists():
         shutil.rmtree(tenant_dir())
-    shutil.copytree(GOLDEN / "tenant", tenant_dir())
+    shutil.copytree(roots["tenant"], tenant_dir())
+    if built:
+        restore_built_site()
+        return
+    if home not in SITE.resolve().parents:
+        raise RuntimeError(f"refusing to reset {SITE}: outside {home}")
     if SITE.exists():
         shutil.rmtree(SITE)
-    shutil.copytree(GOLDEN / "site", SITE)
+    shutil.copytree(roots["site"], SITE)
+
+
+# --------------------------------------------------------------------------- the really built shop
+
+
+def docker(*args: str, timeout: int = 120) -> subprocess.CompletedProcess:
+    return _RUN(["docker", *args], capture_output=True, text=True, timeout=timeout)
+
+
+def container_image() -> str:
+    return docker("inspect", "--format", "{{.Image}}", common.CONTAINER).stdout.strip()
+
+
+def built_hashes(root: Path) -> dict[str, str]:
+    return common.tree_hashes(root, "site")
+
+
+def clean_image() -> str:
+    try:
+        return json.loads(common.BUILT_STATE.read_text(encoding="utf-8")).get("image", "")
+    except (OSError, json.JSONDecodeError):
+        return ""
+
+
+def mark_clean() -> None:
+    common.BUILT_STATE.write_text(json.dumps({"image": container_image(), "at": time.strftime("%Y-%m-%dT%H:%M:%S")}), encoding="utf-8")
+
+
+def built_manifest() -> dict:
+    return json.loads((common.GOLDEN_BUILT / "manifest.json").read_text(encoding="utf-8"))
+
+
+def sync_built_files(root: Path, golden: Path) -> tuple[list[str], list[str]]:
+    """Golden files back into the build folder; returns (copied, removed) as `site/...` keys."""
+    live, want = built_hashes(root), built_hashes(golden)
+    changed = [rel for rel in want if live.get(rel) != want[rel]]
+    removed = [rel for rel in live if rel not in want]
+    for key in removed:
+        (root / key.split("/", 1)[1]).unlink(missing_ok=True)
+    for key in changed:
+        src, dest = golden / key.split("/", 1)[1], root / key.split("/", 1)[1]
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+    return changed, removed
+
+
+def push_to_container(root: Path, changed: list[str], removed: list[str]) -> None:
+    for key in changed:
+        rel = key.split("/", 1)[1]
+        docker("exec", common.CONTAINER, "mkdir", "-p", f"/app/{Path(rel).parent}")
+        docker("cp", str(root / rel), f"{common.CONTAINER}:/app/{rel}")
+    for key in removed:
+        docker("exec", common.CONTAINER, "rm", "-f", f"/app/{key.split('/', 1)[1]}")
+
+
+def restore_built_site() -> None:
+    """Sync the build folder to the golden files, then the running container: copy changed files back and, when the
+    container was rebuilt, rebuild it again from the golden files. A rebuild regenerates some files (the hero images,
+    the colour sheet), so the files are synced once more after it. Only exact fixture paths are touched."""
+    root, golden = common.BUILD_DIR, common.GOLDEN_BUILT / "site"
+    if root.name != common.FIXTURE_SLUG or root.parent != common.SITE_BUILDER / "builds":
+        raise RuntimeError(f"refusing to restore {root}")
+    changed, removed = sync_built_files(root, golden)
+    job = common.FACTORY_JOBS / f"{built_manifest()['jobId']}.json"
+    shutil.copy2(common.GOLDEN_BUILT / "job.json", job)
+    if clean_image() and container_image() != clean_image():
+        rebuild_and_wait()
+        changed, removed = sync_built_files(root, golden)
+        shutil.copy2(common.GOLDEN_BUILT / "job.json", job)
+    push_to_container(root, changed, removed)
+    mark_clean()
+
+
+def rebuild_and_wait(timeout_s: int = 900) -> None:
+    """The factory's own revise step (the one a confirmed edit starts), run to the end."""
+    manifest = built_manifest()
+    script = common.SITE_BUILDER / "tools" / "sozan_factory_fastpath.py"
+    job_path = common.FACTORY_JOBS / f"{manifest['jobId']}.json"
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    job["status"] = "running"
+    job_path.write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
+    proc = subprocess.Popen(
+        [sys.executable, str(script), "revise", "--job-id", manifest["jobId"], "--rebuild-only"],
+        cwd=str(common.SITE_BUILDER), env=factory_env(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    started = time.monotonic()
+    while time.monotonic() - started < timeout_s:
+        if proc.poll() is not None:
+            break
+        time.sleep(5)
+    else:
+        proc.kill()
+        raise RuntimeError("the restore rebuild did not finish")
+    state = json.loads(job_path.read_text(encoding="utf-8")).get("status")
+    if state not in {"done", "ready"}:
+        raise RuntimeError(f"the restore rebuild ended as {state!r}")
+
+
+def factory_env() -> dict[str, str]:
+    from app.services import shop_service
+    from app.state_store import tenant_scope
+
+    with tenant_scope(common.FIXTURE_PHONE):
+        return shop_service._factory_env()
 
 
 def golden_hashes() -> dict[str, str]:
-    return {**common.tree_hashes(GOLDEN / "tenant", "tenant"), **common.tree_hashes(GOLDEN / "site", "site")}
+    roots = golden_roots()
+    return {**common.tree_hashes(roots["tenant"], "tenant"), **common.tree_hashes(roots["site"], "site")}
 
 
 def live_hashes() -> dict[str, str]:
-    return {**common.tree_hashes(tenant_dir(), "tenant"), **common.tree_hashes(SITE, "site")}
+    roots = live_roots()
+    return {**common.tree_hashes(roots["tenant"], "tenant"), **common.tree_hashes(roots["site"], "site")}
 
 
 def read_value(rel: str, *, golden: bool):

@@ -19,6 +19,15 @@ OWNER = "09135409482"
 PROTECTED_PHONES = {"09120007777", "09135409482", "09120000000", "09120000991"}
 PROTECTED_SLUGS = {"joahr-froshi", "cahrm-srai-pars", "sozan", "azmaish-panl", "firozeh-sra", "sales-battery"}
 
+SITE_BUILDER = Path("/home/ubuntu/site-builder")
+FACTORY_JOBS = SITE_BUILDER / "queue" / "fastpath" / "jobs"
+BUILD_DIR = SITE_BUILDER / "builds" / FIXTURE_SLUG
+CONTAINER = f"sozan-{FIXTURE_SLUG}"
+GOLDEN_BUILT = Path.home() / "sozan-eval" / "golden-built"
+BUILT_STATE = Path.home() / "sozan-eval" / "built-state.json"
+# Big or generated folders of a built site: never hashed, copied or restored.
+BUILD_SKIP = ("node_modules", ".next", ".git")
+
 PROD_ENV = Path("/home/ubuntu/sozan-core/.env")
 PROD_DATA = Path("/home/ubuntu/sozan-core/backend/data")
 PROD_MAP = Path("/home/ubuntu/sozan-core/deploy/shop-upstreams.map")
@@ -31,7 +40,7 @@ LOCK = HERE / "cases.lock"
 # file). A file effect means something else changed.
 NOISE_NAMES = {"router-turns.jsonl", "router-turns.1.jsonl", "observe-outbox.jsonl", "router-usage.json", "router-threads.json"}
 NOISE_RE = re.compile(r"^router-.*-(messages|busy|pending)\.json$|^router-last-.*\.json$|^shop-messages\.json$|^\.lock-|^\.sozan-undo/|^\.sozan-turn-|\.log$")
-NOISE_DIRS = ("shop-workspace/",)
+NOISE_DIRS = ("shop-workspace/", "node_modules/", ".next/", ".git/")
 
 
 def is_noise(rel: str) -> bool:
