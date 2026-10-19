@@ -10,7 +10,7 @@ Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Eac
 | X2 | Studio, images and brand content | [X2.md](X2.md) (10.4k) | 41.3k | 82.8k | 53.6k | 32.8k | `talk-x2.md` |
 | X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (11.3k) | 18.4k | 87.9k | 1.2k | 45.9k | `talk-x3.md` |
 | X4 | Shop build and live editing | [X4.md](X4.md) (10.5k) | 32.6k | 112.0k | 2.3k | 52.0k | `talk-x4.md` |
-| X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (13.0k) | 23.1k | 99.7k | 20.9k | 58.7k | `talk-x5.md` |
+| X5 | Platform, accounts, billing and deploy | [X5.md](X5.md) (13.0k) | 23.1k | 99.7k | 21.2k | 58.7k | `talk-x5.md` |
 | Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (10.2k) | 32.0k | 67.7k | 19.8k | 38.2k | `sales-agent-talk.md` |
 | Z | Phone voice agent | [Z.md](Z.md) (4.9k) | 33.4k | 79.1k | 29.4k | 14.8k | `voice-agent-talk.md` |
 | C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (11.9k) | 23.9k | 73.9k | 11.6k | 33.0k | `storefront-talk.md` |
