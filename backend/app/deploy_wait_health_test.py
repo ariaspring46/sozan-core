@@ -88,6 +88,15 @@ class WaitHealthTests(unittest.TestCase):
         done, _ = wait(port, 2)
         self.assertEqual(done.returncode, 1)
 
+    def test_quiet_mode_prints_nothing_on_success(self) -> None:
+        # the panel answers with a whole HTML page; the deploy log should not carry it
+        port = free_port()
+        serve_after(port, 0)
+        time.sleep(0.3)
+        done = subprocess.run(["bash", str(SCRIPT), f"http://127.0.0.1:{port}/", "10", "quiet"], capture_output=True, text=True, timeout=30)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout, "")
+
     def test_a_missing_url_is_refused(self) -> None:
         done = subprocess.run(["bash", str(SCRIPT)], capture_output=True, text=True, timeout=10)
         self.assertNotEqual(done.returncode, 0)
@@ -113,6 +122,20 @@ class DeployScriptTests(unittest.TestCase):
         text = (DEPLOY / "deploy-api.sh").read_text(encoding="utf-8")
         self.assertIn('grep -q "app.main:app"', text)
         self.assertIn("not sozan-api; not killed", text)
+
+
+@unittest.skipUnless((DEPLOY / "deploy-panel.sh").is_file(), "deploy-panel.sh is not part of the files shipped to the hub")
+class DeployPanelScriptTests(unittest.TestCase):
+    def test_the_script_parses(self) -> None:
+        done = subprocess.run(["bash", "-n", str(DEPLOY / "deploy-panel.sh")], capture_output=True, text=True)
+        self.assertEqual(done.returncode, 0, done.stderr)
+
+    def test_deploy_panel_waits_for_the_panel_instead_of_asking_once(self) -> None:
+        # the panel needs 5-10 s after a restart (ready in 4.5 s, first page 9.4 s); `sleep 2 && curl` failed a healthy deploy
+        text = (DEPLOY / "deploy-panel.sh").read_text(encoding="utf-8")
+        self.assertNotIn("sleep 2 && curl", text)
+        self.assertIn("deploy/wait-health.sh http://127.0.0.1:3010/ 90 quiet", text)
+        self.assertIn('git archive "$COMMIT" frontend deploy/wait-health.sh', text)
 
 
 if __name__ == "__main__":
