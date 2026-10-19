@@ -423,6 +423,7 @@
         "frontend/lib/use-ai-budget.ts",
         "frontend/lib/seller-guides.ts",
         "deploy/**",
+        "backend/app/deploy_wait_health_test.py",
         "docker-compose.yml",
         ".env.example",
         ".gitignore",
