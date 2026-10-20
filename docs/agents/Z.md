@@ -101,7 +101,7 @@ Nothing.
 **HTTP routes you call** (contract: method, path, parameters, response):
 
 ```
-GET /billing/plans  ()  # owner X5, changed 2026-10-02
+GET /billing/plans  ()  # owner X7, changed 2026-10-02
     backend/app/api/billing.py: response untyped
 GET /health  ()  # owner X5, changed 2026-10-17
     backend/app/main.py: response untyped
@@ -109,7 +109,7 @@ GET /health  ()  # owner X5, changed 2026-10-17
 
 ## 8. Contracts outside imports (HTTP, files, services)
 
-- HTTP to the hub: `GET {SOZAN_API}/billing/plans` (plan prices; owner X5, `backend/app/api/billing.py`) and `GET {SOZAN_API}/health` (field `paymentReady`; owner X5, `backend/app/main.py`). If either fails, say no price.
+- HTTP to the hub: `GET {SOZAN_API}/billing/plans` (plan prices; owner X7, `backend/app/api/billing.py`) and `GET {SOZAN_API}/health` (field `paymentReady`; owner X5, `backend/app/main.py`). If either fails, say no price.
 - llama-swap on the home machine: only the `ornith-phone` slot, plus `/v1/audio/speech` and `/v1/embeddings` (bge-m3, read-only use).
 - DNC file `~/local-ai/config/sozan-dnc.txt`; call log `~/local-ai/sozan-voice-log/calls.jsonl` (mode 600, stays on that machine).
 - Instagram (shared with X3): `voice-gateway/enrich_campaign.py` uses the same `i.instagram.com` endpoints and app user-agent as `backend/app/services/channel_scan_service.py::_instagram_page`. If Instagram changes them, X3 and Z change together.

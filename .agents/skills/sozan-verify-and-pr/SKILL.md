@@ -21,7 +21,7 @@ Use before committing, before a PR, and when writing a report entry.
 - no real customer message, SMS, call, payment, post, or publish in tests — use the test tenant, mocks, the dry gateway (`edge_dry`), or simulators
 
 ## PR rules
-- A reviewer (ناظر) merges; you never merge your own PR (squash into `main`).
+- Role **R** (reviewer, ناظر) reviews and merges (squash into `main`) after green CI; you never merge your own PR. Ask with `## <ROLE> → R: review <PR link>` in `talk-r.md`, listing the gates you ran.
 - `docs/agents/` regenerated and committed in the same PR as any contract or route change.
 - `CHANGELOG.md`: append one bullet under today's dated heading; never edit other bullets.
 

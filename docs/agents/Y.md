@@ -67,8 +67,8 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 32.0k | the files most tasks touch; read the relevant one first |
-| active | 67.7k | yours to edit; read only what the task needs |
-| rare | 19.8k | yours; read only when the task names it |
+| active | 60.0k | yours to edit; read only what the task needs |
+| rare | 3.4k | yours; read only when the task names it |
 | tests | 38.2k | read only the test of the module you change |
 
 **Core:**
@@ -85,13 +85,12 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 - `frontend/app/inbox/[id]/`: `page.tsx` (2.3k)
 - `frontend/app/sales/`: `page.tsx` (4.1k)
 - `frontend/components/`: `sales-policy-form.tsx` (1.4k), `training-choice.tsx` (0.5k)
-- `tools/`: `sales100_battery.py` (7.8k), `train_nightly.py` (3.4k)
+- `tools/`: `train_nightly.py` (3.4k)
 
 **Rare (yours; only when the task names it):**
 
 - `deploy/`: `sozan-battery.service` (0.1k), `sozan-battery.timer` (0.0k), `sozan-chroma.service` (0.2k)
-- `tools/`: `draft_day_stats.py` (1.5k), `observe_weekly.py` (0.2k), `sales100_battery.json` (4.5k), `sales_tenant_reset.py` (1.4k), `synthetic_personas.py` (8.5k)
-- `tools/agentic_probes/`: `p_dm_loop.py` (1.0k), `p_dm_numbers.py` (0.6k), `p_dm_paylink.py` (0.6k), `p_dm_paystock.py` (0.4k), `p_f7_memory.py` (0.7k)
+- `tools/`: `draft_day_stats.py` (1.5k), `observe_weekly.py` (0.2k), `sales_tenant_reset.py` (1.4k)
 
 **Tests:** `backend/app/api/inbox_dry_test.py`, `backend/app/services/claims_guard_test.py`, `backend/app/services/customer_memory_service_test.py`, `backend/app/services/inbox_agent_service_test.py`, `backend/app/services/inbox_service_test.py`, `backend/app/services/pii_mask_test.py`, `backend/app/services/sales_policy_service_test.py`, `backend/app/services/shop_memory_service_test.py`, `backend/app/services/training_log_test.py`, `backend/app/services/voice_service_test.py`, `tools/train_nightly_test.py`
 
@@ -190,15 +189,6 @@ def cosine(left: list[float], right: list[float]) -> float  # changed 2026-09-22
 ```
 def remaining() -> float  # changed 2026-10-09
 ```
-**`frontend/components/chat-thread.tsx`** — owner X1
-```
-export type ChatMsg =  # changed 2026-10-09
-export function ChatThread(  # changed 2026-10-06
-```
-**`frontend/components/push-toggle.tsx`** — owner X1
-```
-export function PushToggle({ compact = false }: { compact?: boolean })  # changed 2026-10-10
-```
 **`backend/app/services/channel_outbound_service.py`** — owner X3
 ```
 async def deliver(*, platform: str, sender_id: str, chat_id: str, text: str) -> None  # changed 2026-09-18
@@ -268,14 +258,6 @@ def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, su
 BEHAVIOR_VERSION = '2026.10.06-harness'  # changed 2026-10-06
 def hub_release_id() -> str  # changed 2026-09-18
 ```
-**`backend/app/services/plan_service.py`** — owner X5
-```
-def current() -> dict  # changed 2026-09-18
-```
-**`backend/app/services/profile_service.py`** — owner X5
-```
-TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\u200cتعارف.', 'sampleRepl...  # changed 2026-09-18
-```
 **`backend/app/services/settings_service.py`** — owner X5
 ```
 def allows_training() -> bool  # True unless this seller turned «کمک به بهتر شدن سوزان» off.  # changed 2026-09-28
@@ -290,6 +272,23 @@ def tenant_file_lock(name: str='shop') -> Iterator[None]  # changed 2026-09-18
 def current_tenant() -> str  # changed 2026-09-18
 def read_json(name: str, default: Any, *, shared: bool=False) -> Any  # changed 2026-09-18
 def write_json(name: str, payload: Any, *, shared: bool=False) -> None  # changed 2026-09-18
+```
+**`frontend/components/chat-thread.tsx`** — owner X6
+```
+export type ChatMsg =  # changed 2026-10-09
+export function ChatThread(  # changed 2026-10-06
+```
+**`frontend/components/push-toggle.tsx`** — owner X6
+```
+export function PushToggle({ compact = false }: { compact?: boolean })  # changed 2026-10-10
+```
+**`backend/app/services/plan_service.py`** — owner X7
+```
+def current() -> dict  # changed 2026-09-18
+```
+**`backend/app/services/profile_service.py`** — owner X7
+```
+TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\u200cتعارف.', 'sampleRepl...  # changed 2026-09-18
 ```
 
 **HTTP routes you call** (contract: method, path, parameters, response):
@@ -326,13 +325,13 @@ PUT /settings/sales-policy  (body: SalesPolicyIn)  # owner X5, changed 2026-10-0
 
 ## 9. Who reviews and merges
 
-A reviewer (ناظر) reviews line by line and is the only one who merges (squash into `main`). You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.
+Role **R** (reviewer, ناظر) reviews line by line and is the only one who merges (squash into `main`), and only after CI is green. When your PR is ready, append `## Y → R: review <PR link>` to `talk-r.md` with the gates you ran. You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.
 
 ## 10. Your contract (others call these; change only after their ack)
 
 - `HTTP routes`: `GET /inbox/unread` (changed 2026-10-02) ← U; `GET /inbox/{thread_id}` (changed 2026-10-02) ← U; `GET /inbox` (changed 2026-10-02) ← U; `PATCH /inbox/{thread_id}` (changed 2026-10-02) ← U
 - `backend/app/api/inbox.py`: `router` (changed 2026-09-18) ← X5
-- `backend/app/services/claims_guard.py`: `check` (changed 2026-09-27) ← X2, X4; `needs_claims_model` (changed 2026-10-06) ← X4
+- `backend/app/services/claims_guard.py`: `check` (changed 2026-09-27) ← X1, X2; `needs_claims_model` (changed 2026-10-06) ← X1
 - `backend/app/services/inbox_service.py`: `expire_stale_sending` (changed 2026-09-18) ← X5; `handle_inbound` (changed 2026-09-18) ← X3; `list_publish_audience` (changed 2026-09-21) ← X1, X2; `list_threads` (changed 2026-09-18) ← X1; `rearm_pending_auto_replies` (changed 2026-09-26) ← X5; `reply` (changed 2026-10-09) ← C, X1; `save_auto_reply` (changed 2026-09-18) ← X1; `unread_count` (changed 2026-09-18) ← X1
 - `backend/app/services/pii_mask.py`: `mask_pii` (changed 2026-09-27) ← X1, X4, X5
 - `backend/app/services/sales_policy_service.py`: `public_policy` (changed 2026-09-27) ← X5; `save_policy` (changed 2026-09-27) ← X5
@@ -375,7 +374,7 @@ python3 tools/agent_context/build.py --check
 
 **Merge gates** (all must hold before you ask for review):
 
-- Any change to inbox_agent_service.py, inbox_service.py, sales_policy_service.py, claims_guard.py or pii_mask.py: sales100 100/100 on two consecutive live runs on the parallel instance (sales-agent-plan.md §3.7). 99/100 means no merge. Ask X5 to run it.
+- Any change to inbox_agent_service.py, inbox_service.py, sales_policy_service.py, claims_guard.py or pii_mask.py: sales100 100/100 on two consecutive live runs on the parallel instance (sales-agent-plan.md §3.7). 99/100 means no merge. Ask X5 to run it (Q owns the battery code).
 - Offline structure check you can run: python3 tools/sales100_battery.py (must print 'sales100 structure 101/101').
 
 ## 12. Git and PR
@@ -446,12 +445,13 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
 
 **F2 — Seller panel chat → tool**
 
-- U: chat frame, api()
-- X1: router turn: tool choice, confirm card, lock
-- X4/X2/X5/Y: the tool runs: edit_shop, studio_chat, settings, auto-reply ← **you**
+- U: panel frame, api()
+- X6: chat page: thread, composer, confirm card
+- X1: router turn: tool choice, confirm card, lock, reply voice
+- X4/X2/X5/Y: the tool runs: build_shop, edit_shop, studio_chat, settings, auto-reply ← **you**
 ```bash
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
-  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.api.chat_payload_test app.services.router_embed_test 2>&1 | tail -3
+  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.api.chat_payload_test app.services.router_embed_test app.services.shop_voice_service_test 2>&1 | tail -3
 ```
 
 **F9 — Shared core: tenant state, LLM, budget, events**

@@ -257,27 +257,9 @@ redis_client = Redis.from_url(settings.redis_url, decode_responses=True)  # chan
 ```
 def require_permission(code: str)  # changed 2026-09-18
 ```
-**`backend/app/services/auth_service.py`** — owner X5
-```
-OTP_SEND_LIMIT = 5  # changed 2026-09-20
-OTP_SEND_WINDOW = 900  # changed 2026-09-20
-OTP_VERIFY_LIMIT = 5  # changed 2026-09-20
-OTP_VERIFY_WINDOW = 300  # changed 2026-09-20
-def otp_test_reveal_allowed(phone: str) -> bool  # کد فقط برای شماره‌های ساختگیِ تست و فقط در پنجرهٔ تست در پاسخ می‌آید.  # changed 2026-10-01
-```
 **`backend/app/services/observe_client.py`** — owner X5
 ```
 def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, surface: str='', component: str='', stage: str='', status: str='', conversation_id: str='', turn_id: str='', operation_id: str='', job_id: str='', scan_id: str='', parent_id: str='', event_id: str='', started_at: float | None=None, duration_ms: int | None=None) -> None  # changed 2026-09-18
-```
-**`backend/app/services/payment_service.py`** — owner X5
-```
-PAYMENT_LATER = 'پرداخت به\u200cزودی فعال می\u200cشود'  # changed 2026-09-27
-def commission_toman(amount: int, bps: int | None=None) -> int  # changed 2026-09-18
-async def idpay_request(*, amount_toman: int, description: str, callback_url: str, order_id: str, api_key: str, sandbox: bool=False, name: str='', phone: str='') -> dict  # changed 2026-09-18
-async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: bool=False, amount_toman: int=0) -> dict  # changed 2026-09-20
-def resolve_sale_gateway(row: dict | None=None) -> dict  # changed 2026-09-18
-async def zarinpal_request(*, amount_toman: int, description: str, callback_url: str, mobile: str='', merchant: str='') -> dict  # changed 2026-09-18
-async def zarinpal_verify(*, amount_toman: int, authority: str, merchant: str='') -> dict  # changed 2026-09-18
 ```
 **`backend/app/services/settings_service.py`** — owner X5
 ```
@@ -291,12 +273,6 @@ def upsert(*, phone: str, slug: str='', order_id: str='', sendbox_id: str='') ->
 **`backend/app/services/tenant_lock.py`** — owner X5
 ```
 def tenant_file_lock(name: str='shop') -> Iterator[None]  # changed 2026-09-18
-```
-**`backend/app/services/wallet_service.py`** — owner X5
-```
-def consume_sms() -> dict  # changed 2026-09-18
-def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner: str) -> dict  # changed 2026-09-18
-def refund_sms(charged: int=0) -> dict  # changed 2026-09-20
 ```
 **`backend/app/state_store.py`** — owner X5
 ```
@@ -316,6 +292,30 @@ export function QuotaUsage({ budget, compact = false }: { budget: AiBudget; comp
 ```
 export function useAiBudget(): AiBudget | null  # changed 2026-09-28
 ```
+**`backend/app/services/auth_service.py`** — owner X7
+```
+OTP_SEND_LIMIT = 5  # changed 2026-09-20
+OTP_SEND_WINDOW = 900  # changed 2026-09-20
+OTP_VERIFY_LIMIT = 5  # changed 2026-09-20
+OTP_VERIFY_WINDOW = 300  # changed 2026-09-20
+def otp_test_reveal_allowed(phone: str) -> bool  # کد فقط برای شماره‌های ساختگیِ تست و فقط در پنجرهٔ تست در پاسخ می‌آید.  # changed 2026-10-01
+```
+**`backend/app/services/payment_service.py`** — owner X7
+```
+PAYMENT_LATER = 'پرداخت به\u200cزودی فعال می\u200cشود'  # changed 2026-09-27
+def commission_toman(amount: int, bps: int | None=None) -> int  # changed 2026-09-18
+async def idpay_request(*, amount_toman: int, description: str, callback_url: str, order_id: str, api_key: str, sandbox: bool=False, name: str='', phone: str='') -> dict  # changed 2026-09-18
+async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: bool=False, amount_toman: int=0) -> dict  # changed 2026-09-20
+def resolve_sale_gateway(row: dict | None=None) -> dict  # changed 2026-09-18
+async def zarinpal_request(*, amount_toman: int, description: str, callback_url: str, mobile: str='', merchant: str='') -> dict  # changed 2026-09-18
+async def zarinpal_verify(*, amount_toman: int, authority: str, merchant: str='') -> dict  # changed 2026-09-18
+```
+**`backend/app/services/wallet_service.py`** — owner X7
+```
+def consume_sms() -> dict  # changed 2026-09-18
+def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner: str) -> dict  # changed 2026-09-18
+def refund_sms(charged: int=0) -> dict  # changed 2026-09-20
+```
 **`backend/app/services/inbox_service.py`** — owner Y
 ```
 async def reply(thread_id: str, text: str, *, deliver: bool=True, draft_id: str='', as_draft: bool=False, auto: bool=False) -> dict  # changed 2026-10-09
@@ -329,7 +329,7 @@ def schedule_delete(collection: str, doc_id: str, *, phone: str | None=None) -> 
 **HTTP routes you call** (contract: method, path, parameters, response):
 
 ```
-GET /auth/me  ()  # owner X5, changed 2026-10-02
+GET /auth/me  ()  # owner X7, changed 2026-10-02
     backend/app/api/auth.py: returns keys {id, isAdmin, onboarded, phone, role}
 GET /settings  ()  # owner X5, changed 2026-10-02
     backend/app/api/settings.py: response untyped
@@ -343,9 +343,9 @@ PATCH /settings  (body: SettingsIn)  # owner X5, changed 2026-10-02
     backend/app/api/settings.py: SettingsIn {mockSms: bool | None = None; adminPhone: str | None = None; otpTtlSeconds: int | None = None; gatewayPublicUrl: str | None = None; storeName: str | None = None; storeTagline: str | None = None; paymentSandbox: bool | None = None; paymentGateway: str | None = None; paymentMerchantId: str | None = Field(default=None, max_length=80); paymentApiKey: str | None 
 PATCH /shop/domain  (body: DomainIn)  # owner X4, changed 2026-10-11
     backend/app/api/shop.py: DomainIn {domain: str = Field(default='', max_length=200)}; response untyped
-POST /billing/coupon-preview  (body: CouponPreviewIn)  # owner X5, changed 2026-10-02
+POST /billing/coupon-preview  (body: CouponPreviewIn)  # owner X7, changed 2026-10-02
     backend/app/api/billing.py: CouponPreviewIn {plan: str = Field(min_length=2, max_length=16); code: str = Field(min_length=1, max_length=40)}; response untyped
-POST /billing/subscribe  (body: SubscribeIn)  # owner X5, changed 2026-10-02
+POST /billing/subscribe  (body: SubscribeIn)  # owner X7, changed 2026-10-02
     backend/app/api/billing.py: SubscribeIn {plan: str = Field(min_length=2, max_length=16); code: str = ''}; response untyped
 POST /settings/support/hub/{ticket_id}/reply  (ticket_id: str, body: dict)  # owner X5, changed 2026-10-02
     backend/app/api/settings.py: response untyped
@@ -359,25 +359,25 @@ POST /shop/domain/check  ()  # owner X4, changed 2026-10-11
 
 - `channel-scan.json`: writers: X3; readers: C, X5 — top-level keys per role: C: {categories}
 - `pay-orders.json`: writers: C; readers: X1, X5
-- `shop.json`: writers: C, X4, X5; readers: X1, X3 — top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, url}; X3: {brand, tagline, vertical}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}
+- `shop.json`: writers: C, X4, X5; readers: X1, X3, X7 — top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, url}; X3: {brand, tagline, vertical}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}; X7: {slug}
 - `support-tickets.json`: writers: C; readers: X5
 
 ## 8. Contracts outside imports (HTTP, files, services)
 
-- Main work outside the repo: `/home/demon/local-ai/smoke-workspace/site-builder/**` (templates, quality gate, `tools/sozan_factory_fastpath.py`). X4 reads the `status` JSON and the job file: their fields are a contract.
+- Main work outside the repo: the factory checkout (hub: `/home/ubuntu/site-builder/**`; `settings.site_builder_dir`) (templates, quality gate, `tools/sozan_factory_fastpath.py`). X4 reads the `status` JSON and the job file: their fields are a contract.
 - The live storefront calls these hub routes, all yours: `/p/catalog-ids`, `/p/shop-config`, `/p/shop/checkout`, `/p/shop/paid`, `/p/otp/*`, `/p/tickets`, `/catalog/*`.
 - `tools/monitor/**` and `tools/storefront/**` live on branch `feat/storefront-c`; after merge they are yours automatically.
 
 ## 9. Who reviews and merges
 
-A reviewer (ناظر) reviews line by line and is the only one who merges (squash into `main`). You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.
+Role **R** (reviewer, ناظر) reviews line by line and is the only one who merges (squash into `main`), and only after CI is green. When your PR is ready, append `## C → R: review <PR link>` to `talk-r.md` with the gates you ran. You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.
 
 ## 10. Your contract (others call these; change only after their ack)
 
 - `HTTP routes`: `GET /catalog` (changed 2026-10-02) ← U; `GET /sales` (changed 2026-10-02) ← Y; `GET /wallet/orders` (changed 2026-10-02) ← Y; `POST /catalog` (changed 2026-10-02) ← U; `POST /sales` (changed 2026-10-02) ← Y
 - `backend/app/api/pay.py`: `router` (changed 2026-09-18) ← X5
 - `backend/app/api/storefront.py`: `router` (changed 2026-09-18) ← X5
-- `backend/app/services/arvan_dns_service.py`: `check_cname` (changed 2026-09-18) ← X4; `cname_target` (changed 2026-09-18) ← X4; `edge_dry` (changed 2026-09-27) ← X4, X5, Y; `ensure_shop_record` (changed 2026-09-18) ← X4; `hostname` (changed 2026-09-18) ← X4; `is_zone_host` (changed 2026-09-18) ← X4; `public_host` (changed 2026-09-18) ← X4; `start_cname_setup` (changed 2026-09-18) ← X4; `zone` (changed 2026-09-18) ← X4
+- `backend/app/services/arvan_dns_service.py`: `check_cname` (changed 2026-09-18) ← X4; `cname_target` (changed 2026-09-18) ← X4; `edge_dry` (changed 2026-09-27) ← X4, X5, X7, Y; `ensure_shop_record` (changed 2026-09-18) ← X4; `hostname` (changed 2026-09-18) ← X4; `is_zone_host` (changed 2026-09-18) ← X4; `public_host` (changed 2026-09-18) ← X4; `start_cname_setup` (changed 2026-09-18) ← X4; `zone` (changed 2026-09-18) ← X4
 - `backend/app/services/catalog_sync_service.py`: `sync_live` (changed 2026-09-18) ← X1, X4
 - `backend/app/services/order_flow_service.py`: `STAGES` (changed 2026-10-09) ← X1; `STAGE_FA` (changed 2026-10-09) ← X1; `TELLS_SHOPPER` (changed 2026-10-09) ← X1; `advance_order` (changed 2026-10-09) ← X1; `notify_channel` (changed 2026-10-09) ← X1; `shopper_line` (changed 2026-10-11) ← Y; `stage_line` (changed 2026-10-09) ← X1, Y; `stage_problem` (changed 2026-10-09) ← X1
 - `backend/app/services/pay_service.py`: `_orders` (changed 2026-10-09) ← X1; `_save_orders` (changed 2026-10-09) ← X1; `create_order` (changed 2026-10-09) ← Y; `ensure_pay_secret` (changed 2026-09-18) ← X4; `get_order` (changed 2026-09-18) ← Y; `list_orders` (changed 2026-10-09) ← X1; `log_event` (changed 2026-10-09) ← X1; `public_order` (changed 2026-09-18) ← Y; `review_receipt` (changed 2026-10-09) ← X1
@@ -555,7 +555,7 @@ cd frontend && npm run build 2>&1 | tail -15
 |---|---|---|---|
 | `channel-scan.json` | X3 | C, X5 | read-only for you; never write it |
 | `pay-orders.json` | C | X1, X5 | you are the only writer; keep the shape stable for the readers |
-| `shop.json` | C, X4, X5 | X1, X3 | write only with `update_json(..., lock=...)` or inside `tenant_file_lock` |
+| `shop.json` | C, X4, X5 | X1, X3, X7 | write only with `update_json(..., lock=...)` or inside `tenant_file_lock` |
 | `support-tickets.json` | C | X5 | you are the only writer; keep the shape stable for the readers |
 
 ## 18. UI rules (owner: U; checked by `tools/ui_check.py`)
