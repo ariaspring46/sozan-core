@@ -1,6 +1,6 @@
 {
  "HTTP GET /auth/me": {
-  "owner": "X5",
+  "owner": "X7",
   "shape": "backend/app/api/auth.py: returns keys {id, isAdmin, onboarded, phone, role}",
   "signature": "GET /auth/me  ()",
   "since": "2026-10-02",
@@ -11,8 +11,17 @@
    "X3"
   ]
  },
+ "HTTP GET /billing/ai-budget": {
+  "owner": "X7",
+  "shape": "backend/app/api/billing.py: response untyped",
+  "signature": "GET /billing/ai-budget  ()",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "HTTP GET /billing/plans": {
-  "owner": "X5",
+  "owner": "X7",
   "shape": "backend/app/api/billing.py: response untyped",
   "signature": "GET /billing/plans  ()",
   "since": "2026-10-02",
@@ -47,6 +56,24 @@
   "users": [
    "U",
    "Y"
+  ]
+ },
+ "HTTP GET /chat": {
+  "owner": "X1",
+  "shape": "backend/app/api/router_chat.py: response untyped",
+  "signature": "GET /chat  (threadId: str)",
+  "since": "2026-10-20",
+  "users": [
+   "X6"
+  ]
+ },
+ "HTTP GET /events/push": {
+  "owner": "X1",
+  "shape": "backend/app/api/events.py: returns keys {devices, publicKey}",
+  "signature": "GET /events/push  ()",
+  "since": "2026-10-20",
+  "users": [
+   "X6"
   ]
  },
  "HTTP GET /events/unseen": {
@@ -110,6 +137,7 @@
   "since": "2026-10-02",
   "users": [
    "C",
+   "X7",
    "Y"
   ]
  },
@@ -156,7 +184,7 @@
   "signature": "GET /studio  ()",
   "since": "2026-10-02",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "HTTP GET /wallet/orders": {
@@ -184,6 +212,7 @@
   "since": "2026-10-02",
   "users": [
    "C",
+   "X7",
    "Y"
   ]
  },
@@ -202,11 +231,11 @@
   "signature": "PATCH /studio/caption  (body: CaptionIn)",
   "since": "2026-10-02",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "HTTP POST /auth/refresh": {
-  "owner": "X5",
+  "owner": "X7",
   "shape": "backend/app/api/auth.py: returns keys {access_token, token_type}",
   "signature": "POST /auth/refresh  ()",
   "since": "2026-10-06",
@@ -215,7 +244,7 @@
   ]
  },
  "HTTP POST /billing/coupon-preview": {
-  "owner": "X5",
+  "owner": "X7",
   "shape": "backend/app/api/billing.py: CouponPreviewIn {plan: str = Field(min_length=2, max_length=16); code: str = Field(min_length=1, max_length=40)}; response untyped",
   "signature": "POST /billing/coupon-preview  (body: CouponPreviewIn)",
   "since": "2026-10-02",
@@ -224,7 +253,7 @@
   ]
  },
  "HTTP POST /billing/subscribe": {
-  "owner": "X5",
+  "owner": "X7",
   "shape": "backend/app/api/billing.py: SubscribeIn {plan: str = Field(min_length=2, max_length=16); code: str = ''}; response untyped",
   "signature": "POST /billing/subscribe  (body: SubscribeIn)",
   "since": "2026-10-02",
@@ -260,6 +289,51 @@
    "Y"
   ]
  },
+ "HTTP POST /chat": {
+  "owner": "X1",
+  "shape": "backend/app/api/router_chat.py: response untyped",
+  "signature": "POST /chat  (request: Request)",
+  "since": "2026-10-20",
+  "users": [
+   "X6"
+  ]
+ },
+ "HTTP POST /chat/threads": {
+  "owner": "X1",
+  "shape": "backend/app/api/router_chat.py: response untyped",
+  "signature": "POST /chat/threads  ()",
+  "since": "2026-10-20",
+  "users": [
+   "X6"
+  ]
+ },
+ "HTTP POST /events/push/subscribe": {
+  "owner": "X1",
+  "shape": "backend/app/api/events.py: PushSubscriptionIn {endpoint: str = Field(min_length=10, max_length=1000); keys: PushKeys}; returns keys {devices}",
+  "signature": "POST /events/push/subscribe  (body: PushSubscriptionIn, request: Request)",
+  "since": "2026-10-20",
+  "users": [
+   "X6"
+  ]
+ },
+ "HTTP POST /events/push/test": {
+  "owner": "X1",
+  "shape": "backend/app/api/events.py: response untyped",
+  "signature": "POST /events/push/test  ()",
+  "since": "2026-10-20",
+  "users": [
+   "X6"
+  ]
+ },
+ "HTTP POST /events/push/unsubscribe": {
+  "owner": "X1",
+  "shape": "backend/app/api/events.py: PushEndpointIn {endpoint: str = Field(min_length=10, max_length=1000)}; returns keys {devices}",
+  "signature": "POST /events/push/unsubscribe  (body: PushEndpointIn)",
+  "since": "2026-10-20",
+  "users": [
+   "X6"
+  ]
+ },
  "HTTP POST /events/seen": {
   "owner": "X1",
   "shape": "backend/app/api/events.py: returns keys {count}",
@@ -284,7 +358,7 @@
   "signature": "POST /settings/feedback  (body: FeedbackIn)",
   "since": "2026-10-02",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "HTTP POST /settings/support/hub/{ticket_id}/reply": {
@@ -320,7 +394,7 @@
   "signature": "POST /studio/publish  (request: Request, body: PublishIn)",
   "since": "2026-10-02",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "HTTP POST /studio/regenerate": {
@@ -329,7 +403,7 @@
   "signature": "POST /studio/regenerate  (request: Request)",
   "since": "2026-10-02",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "HTTP PUT /settings/sales-policy": {
@@ -339,6 +413,14 @@
   "since": "2026-10-02",
   "users": [
    "Y"
+  ]
+ },
+ "STATE billing.json": {
+  "owner": "X7",
+  "signature": "state billing.json  writers: X7; readers: X5",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
   ]
  },
  "STATE campaign-ids.json": {
@@ -385,6 +467,15 @@
    "X5"
   ]
  },
+ "STATE plan.json": {
+  "owner": "X7",
+  "shape": "top-level keys per role: X5: {paidUntil, plan}; X7: {at, expiredFrom, paidUntil, plan}",
+  "signature": "state plan.json  writers: X7; readers: X5",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "STATE scan-status.json": {
   "owner": "X3",
   "shape": "top-level keys per role: X3: {error, errorClass, handles, imported, kept, needsReview, noImage, noPrice, productCount, rejected, startedAt, status}",
@@ -396,20 +487,37 @@
  },
  "STATE shop.json": {
   "owner": "C",
-  "shape": "top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, url}; X3: {brand, tagline, vertical}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}",
-  "signature": "state shop.json  writers: C, X4, X5; readers: X1, X3",
-  "since": "2026-10-06",
+  "shape": "top-level keys per role: C: {paySecret, slug}; X1: {brand, domain, publicHost, url}; X3: {brand, tagline, vertical}; X4: {paySecret, slug, url}; X5: {brand, publicHost, slug, status, tagline}; X7: {slug}",
+  "signature": "state shop.json  writers: C, X4, X5; readers: X1, X3, X7",
+  "since": "2026-10-20",
   "users": [
    "X1",
    "X3",
    "X4",
-   "X5"
+   "X5",
+   "X7"
   ]
  },
  "STATE support-tickets.json": {
   "owner": "C",
   "signature": "state support-tickets.json  writers: C; readers: X5",
   "since": "2026-10-02",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/auth.py::router": {
+  "owner": "X7",
+  "signature": "router = APIRouter(prefix='/auth', tags=['auth'])",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/api/billing.py::router": {
+  "owner": "X7",
+  "signature": "router = APIRouter(prefix='/billing', tags=['billing'])",
+  "since": "2026-10-20",
   "users": [
    "X5"
   ]
@@ -527,12 +635,21 @@
    "X5"
   ]
  },
+ "backend/app/api/wallet.py::router": {
+  "owner": "X7",
+  "signature": "router = APIRouter(prefix='/wallet', tags=['wallet'])",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "backend/app/client_ip.py::client_ip": {
   "owner": "X5",
   "signature": "def client_ip(request: Request) -> str",
   "since": "2026-10-01",
   "users": [
-   "C"
+   "C",
+   "X7"
   ]
  },
  "backend/app/config.py::settings": {
@@ -545,6 +662,7 @@
    "X2",
    "X3",
    "X4",
+   "X7",
    "Y"
   ]
  },
@@ -654,6 +772,14 @@
   "users": [
    "X2",
    "X4"
+  ]
+ },
+ "backend/app/config.py::settings.commission_bps": {
+  "owner": "X5",
+  "signature": "Settings.commission_bps: int = 200",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
   ]
  },
  "backend/app/config.py::settings.cutout_api_key": {
@@ -800,6 +926,7 @@
   "users": [
    "C",
    "X3",
+   "X7",
    "Y"
   ]
  },
@@ -883,7 +1010,48 @@
   "signature": "Settings.otp_dev: bool = False",
   "since": "2026-09-18",
   "users": [
-   "C"
+   "C",
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.otp_fixed_map": {
+  "owner": "X5",
+  "signature": "def Settings.otp_fixed_map(self) -> dict[str, str]",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.otp_global_daily_cap": {
+  "owner": "X5",
+  "signature": "Settings.otp_global_daily_cap: int = 500",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.otp_provider": {
+  "owner": "X5",
+  "signature": "Settings.otp_provider: str = ''",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.otp_test_phone_set": {
+  "owner": "X5",
+  "signature": "def Settings.otp_test_phone_set(self) -> frozenset[str]",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.otp_test_until": {
+  "owner": "X5",
+  "signature": "Settings.otp_test_until: str = ''",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
   ]
  },
  "backend/app/config.py::settings.otp_ttl_seconds": {
@@ -891,7 +1059,8 @@
   "signature": "Settings.otp_ttl_seconds: int = 300",
   "since": "2026-09-18",
   "users": [
-   "C"
+   "C",
+   "X7"
   ]
  },
  "backend/app/config.py::settings.panel_url": {
@@ -900,7 +1069,8 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X3"
+   "X3",
+   "X7"
   ]
  },
  "backend/app/config.py::settings.payment_sign_secret": {
@@ -916,7 +1086,72 @@
   "signature": "Settings.payments_enabled: bool = True",
   "since": "2026-10-17",
   "users": [
-   "C"
+   "C",
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.phone_coupon_code": {
+  "owner": "X5",
+  "signature": "Settings.phone_coupon_code: str = 'SOZAN30'",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.phone_coupon_percent": {
+  "owner": "X5",
+  "signature": "Settings.phone_coupon_percent: int = 30",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.phone_coupon_until": {
+  "owner": "X5",
+  "signature": "Settings.phone_coupon_until: str = ''",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.plan_discount_percents": {
+  "owner": "X5",
+  "signature": "Settings.plan_discount_percents: str = '{\"pro\":0,\"promax\":20,\"ultra\":30}'",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.plan_discount_until": {
+  "owner": "X5",
+  "signature": "Settings.plan_discount_until: str = ''",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.plan_price_pro": {
+  "owner": "X5",
+  "signature": "Settings.plan_price_pro: int = 1414000",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.plan_price_promax": {
+  "owner": "X5",
+  "signature": "Settings.plan_price_promax: int = 2414000",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.plan_price_ultra": {
+  "owner": "X5",
+  "signature": "Settings.plan_price_ultra: int = 3843000",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
   ]
  },
  "backend/app/config.py::settings.public_api_url": {
@@ -926,7 +1161,8 @@
   "users": [
    "C",
    "X3",
-   "X4"
+   "X4",
+   "X7"
   ]
  },
  "backend/app/config.py::settings.sendbox_api_key": {
@@ -982,7 +1218,8 @@
   "signature": "Settings.sms_ir_api_key: str = ''",
   "since": "2026-09-18",
   "users": [
-   "X3"
+   "X3",
+   "X7"
   ]
  },
  "backend/app/config.py::settings.sms_ir_template_id": {
@@ -990,7 +1227,8 @@
   "signature": "Settings.sms_ir_template_id: str = ''",
   "since": "2026-09-18",
   "users": [
-   "X3"
+   "X3",
+   "X7"
   ]
  },
  "backend/app/config.py::settings.sms_ir_token_name": {
@@ -1001,6 +1239,14 @@
    "X3"
   ]
  },
+ "backend/app/config.py::settings.sms_overage_toman": {
+  "owner": "X5",
+  "signature": "Settings.sms_overage_toman: int = 200",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
  "backend/app/config.py::settings.sms_provider": {
   "owner": "X5",
   "signature": "Settings.sms_provider: str = 'smsir'",
@@ -1009,12 +1255,44 @@
    "X3"
   ]
  },
+ "backend/app/config.py::settings.sms_quota_free": {
+  "owner": "X5",
+  "signature": "Settings.sms_quota_free: int = 50",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.sms_quota_pro": {
+  "owner": "X5",
+  "signature": "Settings.sms_quota_pro: int = 500",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.sms_quota_promax": {
+  "owner": "X5",
+  "signature": "Settings.sms_quota_promax: int = 2000",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
  "backend/app/config.py::settings.sozan_npm_proxy": {
   "owner": "X5",
   "signature": "Settings.sozan_npm_proxy: str = ''",
   "since": "2026-09-18",
   "users": [
    "X4"
+  ]
+ },
+ "backend/app/config.py::settings.sozan_sms_provider": {
+  "owner": "X5",
+  "signature": "Settings.sozan_sms_provider: str = 'smsir'",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
   ]
  },
  "backend/app/config.py::settings.state_dir": {
@@ -1030,7 +1308,8 @@
   "signature": "def Settings.state_path(self) -> Path",
   "since": "2026-09-18",
   "users": [
-   "X3"
+   "X3",
+   "X7"
   ]
  },
  "backend/app/config.py::settings.telegram_hub_bot_token": {
@@ -1065,6 +1344,22 @@
    "X3"
   ]
  },
+ "backend/app/config.py::settings.zarinpal_amount_unit": {
+  "owner": "X5",
+  "signature": "Settings.zarinpal_amount_unit: str = 'rial'",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/config.py::settings.zarinpal_merchant_id": {
+  "owner": "X5",
+  "signature": "Settings.zarinpal_merchant_id: str = ''",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
  "backend/app/database.py::SessionLocal": {
   "owner": "X5",
   "signature": "SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)",
@@ -1079,7 +1374,8 @@
   "signature": "async def get_session() -> AsyncSession",
   "since": "2026-09-18",
   "users": [
-   "X2"
+   "X2",
+   "X7"
   ]
  },
  "backend/app/egress.py::client_kwargs": {
@@ -1088,7 +1384,24 @@
   "since": "2026-10-06",
   "users": [
    "C",
-   "X3"
+   "X3",
+   "X7"
+  ]
+ },
+ "backend/app/hub_admin.py::is_hub_admin": {
+  "owner": "X5",
+  "signature": "def is_hub_admin(phone: str) -> bool",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/lab_account.py::LAB_PHONE": {
+  "owner": "X5",
+  "signature": "LAB_PHONE = '09120000991'",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
   ]
  },
  "backend/app/lab_account.py::is_lab_phone": {
@@ -1096,6 +1409,7 @@
   "signature": "def is_lab_phone(phone: str) -> bool",
   "since": "2026-10-09",
   "users": [
+   "X7",
    "Y"
   ]
  },
@@ -1212,7 +1526,8 @@
   "signature": "class User(Base)",
   "since": "2026-09-18",
   "users": [
-   "X3"
+   "X3",
+   "X7"
   ]
  },
  "backend/app/phone.py::normalize_digits": {
@@ -1220,7 +1535,8 @@
   "signature": "def normalize_digits(raw: str) -> str",
   "since": "2026-09-19",
   "users": [
-   "C"
+   "C",
+   "X7"
   ]
  },
  "backend/app/phone.py::normalize_phone": {
@@ -1229,7 +1545,8 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X3"
+   "X3",
+   "X7"
   ]
  },
  "backend/app/redis_client.py::redis_client": {
@@ -1239,7 +1556,8 @@
   "users": [
    "C",
    "X2",
-   "X3"
+   "X3",
+   "X7"
   ]
  },
  "backend/app/repositories/brand_repository.py::BrandRepository": {
@@ -1278,6 +1596,15 @@
    "X1"
   ]
  },
+ "backend/app/repositories/user_repository.py::UserRepository": {
+  "owner": "X5",
+  "shape": "def __init__(self, session: AsyncSession) -> None; async def get_by_id(self, user_id: UUID) -> User | None; async def get_by_phone(self, phone: str) -> User | None; async def list_all(self) -> list[User]; async def set_active(self, phone: str, *, active: bool) -> None; async def create(self, phone: str, role: str='admin') -> User",
+  "signature": "class UserRepository",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
  "backend/app/schemas.py::CampaignCreateIn": {
   "owner": "X5",
   "shape": "slug: str = Field(min_length=2, max_length=80, pattern='^[a-z0-9-]+$'); pillar: str; title: str; subtitle: str = ''; cta: str = ''; instagram_caption: str = ''; telegram_caption: str = ''; whatsapp_caption: str = ''",
@@ -1314,6 +1641,40 @@
    "X2"
   ]
  },
+ "backend/app/schemas.py::OtpSendIn": {
+  "owner": "X5",
+  "shape": "phone: str; captchaToken: str = Field(default='', max_length=80); captchaAnswer: str = Field(default='', max_length=8)",
+  "signature": "class OtpSendIn(BaseModel)",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/schemas.py::OtpVerifyIn": {
+  "owner": "X5",
+  "shape": "phone: str; code: str",
+  "signature": "class OtpVerifyIn(BaseModel)",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/security.py::encode_token": {
+  "owner": "X5",
+  "signature": "def encode_token(user_id: UUID, role: str, ttl_minutes: int | None=None) -> str",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/security.py::get_current_user": {
+  "owner": "X5",
+  "signature": "async def get_current_user(creds: HTTPAuthorizationCredentials | None=Depends(bearer), session: AsyncSession=Depends(get_session)) -> User",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
  "backend/app/security.py::require_permission": {
   "owner": "X5",
   "signature": "def require_permission(code: str)",
@@ -1324,7 +1685,16 @@
    "X2",
    "X3",
    "X4",
+   "X7",
    "Y"
+  ]
+ },
+ "backend/app/security.py::session_minutes": {
+  "owner": "X5",
+  "signature": "def session_minutes() -> int",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
   ]
  },
  "backend/app/services/ai_budget_service.py::record_cost": {
@@ -1333,6 +1703,22 @@
   "since": "2026-09-28",
   "users": [
    "X2"
+  ]
+ },
+ "backend/app/services/ai_budget_service.py::report": {
+  "owner": "X5",
+  "signature": "def report() -> dict[str, Any]",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
+  ]
+ },
+ "backend/app/services/ai_budget_service.py::tenant_status": {
+  "owner": "X5",
+  "signature": "def tenant_status(tenant: str | None=None) -> dict[str, Any]",
+  "since": "2026-10-20",
+  "users": [
+   "X7"
   ]
  },
  "backend/app/services/arvan_dns_service.py::check_cname": {
@@ -1358,6 +1744,7 @@
   "users": [
    "X4",
    "X5",
+   "X7",
    "Y"
   ]
  },
@@ -1410,7 +1797,7 @@
   ]
  },
  "backend/app/services/auth_service.py::OTP_SEND_LIMIT": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "OTP_SEND_LIMIT = 5",
   "since": "2026-09-20",
   "users": [
@@ -1418,7 +1805,7 @@
   ]
  },
  "backend/app/services/auth_service.py::OTP_SEND_WINDOW": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "OTP_SEND_WINDOW = 900",
   "since": "2026-09-20",
   "users": [
@@ -1426,7 +1813,7 @@
   ]
  },
  "backend/app/services/auth_service.py::OTP_VERIFY_LIMIT": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "OTP_VERIFY_LIMIT = 5",
   "since": "2026-09-20",
   "users": [
@@ -1434,7 +1821,7 @@
   ]
  },
  "backend/app/services/auth_service.py::OTP_VERIFY_WINDOW": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "OTP_VERIFY_WINDOW = 300",
   "since": "2026-09-20",
   "users": [
@@ -1442,7 +1829,7 @@
   ]
  },
  "backend/app/services/auth_service.py::otp_test_reveal_allowed": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def otp_test_reveal_allowed(phone: str) -> bool",
   "since": "2026-10-01",
   "users": [
@@ -1497,6 +1884,7 @@
   "signature": "def brief_for_shop() -> str",
   "since": "2026-09-18",
   "users": [
+   "X1",
    "X4"
   ]
  },
@@ -1798,8 +2186,8 @@
   "signature": "async def check(text: str, facts: str, complete: Callable[..., Awaitable[dict]] | None=None) -> list[str]",
   "since": "2026-09-27",
   "users": [
-   "X2",
-   "X4"
+   "X1",
+   "X2"
   ]
  },
  "backend/app/services/claims_guard.py::needs_claims_model": {
@@ -1807,7 +2195,7 @@
   "signature": "def needs_claims_model(text: str, facts: str) -> bool",
   "since": "2026-10-06",
   "users": [
-   "X4"
+   "X1"
   ]
  },
  "backend/app/services/decider_service.py::heavy_model": {
@@ -1997,7 +2385,7 @@
   "signature": "def _budget_capped(surface: str) -> str | None",
   "since": "2026-10-06",
   "users": [
-   "X4"
+   "X1"
   ]
  },
  "backend/app/services/llm.py::_emit_usage": {
@@ -2045,6 +2433,7 @@
   "signature": "async def complete_json(system: str, user: str, *, surface: str='llm', max_tokens: int=700, temperature: float=0.2) -> dict",
   "since": "2026-10-06",
   "users": [
+   "X1",
    "X2",
    "X3",
    "X4",
@@ -2056,8 +2445,8 @@
   "signature": "async def complete_text_chat(*, system: str, turns: list[dict], surface: str='shop', temperature: float=0.7, max_tokens: int=500) -> str | None",
   "since": "2026-10-06",
   "users": [
-   "X3",
-   "X4"
+   "X1",
+   "X3"
   ]
  },
  "backend/app/services/llm.py::complete_tools": {
@@ -2099,7 +2488,7 @@
   "signature": "class OtpSendError(RuntimeError)",
   "since": "2026-09-29",
   "users": [
-   "X5"
+   "X7"
   ]
  },
  "backend/app/services/melipayamak_otp_service.py::send_otp": {
@@ -2107,7 +2496,7 @@
   "signature": "async def send_otp(phone: str, code: str) -> str",
   "since": "2026-09-29",
   "users": [
-   "X5"
+   "X7"
   ]
  },
  "backend/app/services/melipayamak_otp_service.py::send_pattern": {
@@ -2135,14 +2524,6 @@
    "Y"
   ]
  },
- "backend/app/services/number_span.py::voice_amounts": {
-  "owner": "X1",
-  "signature": "def voice_amounts(text: str) -> set[str]",
-  "since": "2026-10-09",
-  "users": [
-   "X4"
-  ]
- },
  "backend/app/services/observe_client.py::emit_later": {
   "owner": "X5",
   "signature": "def emit_later(*, kind: str, title: str, payload: dict[str, Any] | None=None, surface: str='', component: str='', stage: str='', status: str='', conversation_id: str='', turn_id: str='', operation_id: str='', job_id: str='', scan_id: str='', parent_id: str='', event_id: str='', started_at: float | None=None, duration_ms: int | None=None) -> None",
@@ -2153,6 +2534,7 @@
    "X2",
    "X3",
    "X4",
+   "X7",
    "Y"
   ]
  },
@@ -2345,8 +2727,17 @@
    "X1"
   ]
  },
+ "backend/app/services/payment_service.py::GATEWAYS": {
+  "owner": "X7",
+  "shape": "GATEWAYS = ({'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'}, {'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'}, {'id': 'str', 'label': 'str', 'docs': 'str', 'help': 'str'})",
+  "signature": "GATEWAYS = ({'id': 'mock', 'label': 'ثبت دستی / بدون درگاه', 'docs': '', 'help': 'فروش را خودت در بخش فروش ثبت می\\u200cکنی. برای دریافت آنلاین، زرین\\u200cپال...",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "backend/app/services/payment_service.py::PAYMENT_LATER": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "PAYMENT_LATER = 'پرداخت به\\u200cزودی فعال می\\u200cشود'",
   "since": "2026-09-27",
   "users": [
@@ -2354,15 +2745,23 @@
   ]
  },
  "backend/app/services/payment_service.py::commission_toman": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def commission_toman(amount: int, bps: int | None=None) -> int",
   "since": "2026-09-18",
   "users": [
    "C"
   ]
  },
+ "backend/app/services/payment_service.py::hub_payments_open": {
+  "owner": "X7",
+  "signature": "def hub_payments_open() -> bool",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "backend/app/services/payment_service.py::idpay_request": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "async def idpay_request(*, amount_toman: int, description: str, callback_url: str, order_id: str, api_key: str, sandbox: bool=False, name: str='', phone: str='') -> dict",
   "since": "2026-09-18",
   "users": [
@@ -2370,23 +2769,47 @@
   ]
  },
  "backend/app/services/payment_service.py::idpay_verify": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "async def idpay_verify(*, order_id: str, authority: str, api_key: str, sandbox: bool=False, amount_toman: int=0) -> dict",
   "since": "2026-09-20",
   "users": [
    "C"
   ]
  },
+ "backend/app/services/payment_service.py::public_catalog": {
+  "owner": "X7",
+  "signature": "def public_catalog() -> list[dict]",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
+ "backend/app/services/payment_service.py::public_status": {
+  "owner": "X7",
+  "signature": "def public_status(row: dict) -> dict",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "backend/app/services/payment_service.py::resolve_sale_gateway": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def resolve_sale_gateway(row: dict | None=None) -> dict",
   "since": "2026-09-18",
   "users": [
    "C"
   ]
  },
+ "backend/app/services/payment_service.py::validate_patch": {
+  "owner": "X7",
+  "signature": "def validate_patch(patch: dict, current: dict) -> None",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "backend/app/services/payment_service.py::zarinpal_request": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "async def zarinpal_request(*, amount_toman: int, description: str, callback_url: str, mobile: str='', merchant: str='') -> dict",
   "since": "2026-09-18",
   "users": [
@@ -2394,7 +2817,7 @@
   ]
  },
  "backend/app/services/payment_service.py::zarinpal_verify": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "async def zarinpal_verify(*, amount_toman: int, authority: str, merchant: str='') -> dict",
   "since": "2026-09-18",
   "users": [
@@ -2465,8 +2888,17 @@
    "Y"
   ]
  },
+ "backend/app/services/plan_service.py::PLANS": {
+  "owner": "X7",
+  "shape": "PLANS = {'free': {'id': 'str', 'label': 'str', 'sites': 1, 'workspaces': 1, 'channels': 2, 'autoReply': 'str', 'dmSync': False, 'smsQuota': int(env.sms_quota_free or 50), 'features': ['یک فروشگاه اینترنتی', 'انبار کالا و ثبت فروش', 'جواب دستی به پیام مشتری']}, 'pro': {'id': 'str', 'label': 'str', 'sites': 1, 'workspaces': 1, 'channels': 5, 'autoReply': 'str', 'dmSync': True, 'smsQuota': int(env.sms_quota_pro or 500), 'features': ['همهٔ امکانات رایگان', 'یادگیری لحن تو', 'دایرکت اینستاگرام در صندوق', 'پیش\\u200cنویس جواب با لحن تو']}, 'promax': {'id': 'str', 'label': 'str', 'sites': 1, 'workspaces': 1, 'channels': 0, 'autoReply': 'str', 'dmSync': True, 'smsQuota': int(env.sms_quota_promax or 2000), 'features': ['همهٔ امکانات پرو', 'همهٔ کانال\\u200cها', 'جواب خودکار دایرکت با لحن تو']}, 'ultra': {'id': 'str', 'label': 'str', 'sites': 1, 'workspaces': 2, 'channels': 0, 'autoReply': 'str', 'dmSync': True, 'smsQuota': int(env.sms_quota_promax or 2000), 'features': ['همهٔ امکانات پرو مکس', 'تا ۲ فضای کاری کامل']}}",
+  "signature": "PLANS = {'free': {'id': 'free', 'label': 'رایگان', 'sites': 1, 'workspaces': 1, 'channels': 2, 'autoReply': '', 'dmSync': False, 'smsQuota': int(env.sms_quot...",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "backend/app/services/plan_service.py::allow_new_channel": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def allow_new_channel(already: int) -> str | None",
   "since": "2026-09-18",
   "users": [
@@ -2474,7 +2906,7 @@
   ]
  },
  "backend/app/services/plan_service.py::allow_new_site": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def allow_new_site() -> str | None",
   "since": "2026-09-18",
   "users": [
@@ -2482,7 +2914,7 @@
   ]
  },
  "backend/app/services/plan_service.py::current": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def current() -> dict",
   "since": "2026-09-18",
   "users": [
@@ -2491,27 +2923,37 @@
   ]
  },
  "backend/app/services/plan_service.py::current_plan_id": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def current_plan_id() -> str",
   "since": "2026-09-18",
   "users": [
-   "X2"
+   "X2",
+   "X5"
   ]
  },
  "backend/app/services/plan_service.py::record_site": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def record_site(slug: str) -> None",
   "since": "2026-09-18",
   "users": [
    "X4"
   ]
  },
+ "backend/app/services/plan_service.py::set_plan": {
+  "owner": "X7",
+  "signature": "def set_plan(plan_id: str, *, paid_until: int | None=None) -> dict",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "backend/app/services/plan_service.py::snapshot": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def snapshot() -> dict",
   "since": "2026-09-18",
   "users": [
-   "X1"
+   "X1",
+   "X5"
   ]
  },
  "backend/app/services/product_image_service.py::remove_if_unreferenced": {
@@ -2532,7 +2974,7 @@
   ]
  },
  "backend/app/services/profile_service.py::TONES": {
-  "owner": "X5",
+  "owner": "X7",
   "shape": "TONES = {'warm': {'id': 'str', 'label': 'str', 'tone': 'str', 'summary': 'str', 'sampleReply': 'str'}, 'formal': {'id': 'str', 'label': 'str', 'tone': 'str', 'summary': 'str', 'sampleReply': 'str'}, 'street': {'id': 'str', 'label': 'str', 'tone': 'str', 'summary': 'str', 'sampleReply': 'str'}, 'luxury': {'id': 'str', 'label': 'str', 'tone': 'str', 'summary': 'str', 'sampleReply': 'str'}}",
   "signature": "TONES = {'warm': {'id': 'warm', 'label': 'گرم و خودمونی', 'tone': 'گرم، کوتاه، فارسی روزمره', 'summary': 'فروشندهٔ صمیمی؛ واضح و بی\\u200cتعارف.', 'sampleRepl...",
   "since": "2026-09-18",
@@ -2542,15 +2984,23 @@
   ]
  },
  "backend/app/services/profile_service.py::complete": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def complete(phone: str, *, firstName: str, lastName: str, brandName: str, brandWork: str, toneId: str, hasLogo: bool) -> dict",
   "since": "2026-09-18",
   "users": [
    "X3"
   ]
  },
+ "backend/app/services/profile_service.py::for_session": {
+  "owner": "X7",
+  "signature": "def for_session(phone: str) -> dict",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
+  ]
+ },
  "backend/app/services/profile_service.py::get_profile": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def get_profile(phone: str) -> dict",
   "since": "2026-09-18",
   "users": [
@@ -2558,7 +3008,7 @@
   ]
  },
  "backend/app/services/profile_service.py::patch_profile": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def patch_profile(phone: str, patch: dict) -> dict",
   "since": "2026-09-18",
   "users": [
@@ -2596,6 +3046,14 @@
   "since": "2026-09-18",
   "users": [
    "X2"
+  ]
+ },
+ "backend/app/services/renewal_reminder_service.py::loop": {
+  "owner": "X7",
+  "signature": "async def loop() -> None",
+  "since": "2026-10-20",
+  "users": [
+   "X5"
   ]
  },
  "backend/app/services/router_embed.py::cosine": {
@@ -2668,14 +3126,6 @@
   "since": "2026-09-25",
   "users": [
    "X2"
-  ]
- },
- "backend/app/services/router_text.py::fix_halfspace": {
-  "owner": "X1",
-  "signature": "def fix_halfspace(text: str) -> str",
-  "since": "2026-10-06",
-  "users": [
-   "X4"
   ]
  },
  "backend/app/services/sales_policy_service.py::public_policy": {
@@ -2751,6 +3201,7 @@
    "X2",
    "X3",
    "X4",
+   "X7",
    "Y"
   ]
  },
@@ -3080,21 +3531,102 @@
    "X1"
   ]
  },
- "backend/app/services/shop_voice_service.py::about_text": {
-  "owner": "X4",
-  "signature": "def about_text() -> str",
-  "since": "2026-10-06",
+ "backend/app/services/shop_voice_service.py::VOICE": {
+  "owner": "X1",
+  "shape": "VOICE = 'تو «سوزان» هستی، دستیار فروش فروشنده\\u200cهای ایرانی، ساختهٔ تیم سوزان و محصول شرکت گهر شبکه کارمانیا.\\nکارهای مهمت این\\u200cهاست: ساخت فروشگاه با چند جمله، آوردن کالا از پیج و کانال عمومی، استودیو برای عکس و پست و کپشن، صندوق پیام مشتری، سفارش و پرداخت، و کارت تأیید قبل از هر کار مهم. شروع رایگان است.\\nوقتی فروشنده پرسید تو کیستی، سوزان چیست، یا چه کارهایی می\\u200cکنی، همین کارها را بگو. در جواب بقیهٔ سؤال\\u200cها به همان سؤال جواب بده.\\nمثل یک آدم واقعی و دلسوز حرف بزن: خودمانی، با «تو»، فارسی روان و محاوره\\u200cای، نه اداری و نه ربات\\u200cوار.\\nکوتاه بنویس (یک تا چهار جمله). جملهٔ قالبی و تکراری نگو؛ هر بار طور دیگری حرف بزن. فهرست، شماره\\u200cگذاری و ایموجی پشت\\u200cسرهم نه.\\nبه حرف و کلمه\\u200cهای خود فروشنده اشاره کن (اسم کالا، شهر، حسی که گفت). کاری را که انجام نشده انجام\\u200cشده نگو.\\nاصطلاح فنی و نشانی (docker، next، API، پورت، IP) نگو. قولی نده که سیستم انجام نمی\\u200cدهد (مثل «بعداً خبرت می\\u200cکنم»).'",
+  "signature": "VOICE = 'تو «سوزان» هستی، دستیار فروش فروشنده\\u200cهای ایرانی، ساختهٔ تیم سوزان و محصول شرکت گهر شبکه کارمانیا.\\nکارهای مهمت این\\u200cهاست: ساخت فروشگاه با چ...",
+  "since": "2026-10-20",
   "users": [
-   "X1"
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::_URL": {
+  "owner": "X1",
+  "signature": "_URL = re.compile('https?://|www\\\\.|127\\\\.0\\\\.0\\\\.1|localhost', re.I)",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::_brief_lines": {
+  "owner": "X1",
+  "signature": "def _brief_lines(brief: dict) -> str",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::_capped": {
+  "owner": "X1",
+  "signature": "def _capped(surface: str) -> bool",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::_catalog_lines": {
+  "owner": "X1",
+  "signature": "def _catalog_lines() -> str",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::acceptable": {
+  "owner": "X1",
+  "signature": "def acceptable(reply: str, *, must_keep: list[str] | None=None, patched: bool | None=None, facts: str | None=None, seller_text: str='') -> bool",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::brief_facts": {
+  "owner": "X1",
+  "signature": "def brief_facts(brief: dict) -> list[str]",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::clean_brief": {
+  "owner": "X1",
+  "signature": "def clean_brief(raw: object) -> dict",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::clean_reply": {
+  "owner": "X1",
+  "signature": "def clean_reply(text: object) -> str",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::complete_json": {
+  "owner": "X1",
+  "signature": "complete_json",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
+  ]
+ },
+ "backend/app/services/shop_voice_service.py::complete_text_chat": {
+  "owner": "X1",
+  "signature": "complete_text_chat",
+  "since": "2026-10-20",
+  "users": [
+   "X4"
   ]
  },
  "backend/app/services/shop_voice_service.py::say": {
-  "owner": "X4",
+  "owner": "X1",
   "signature": "async def say(situation: str, facts: list[str], *, seller_text: str='', fallback: str, patched: bool | None=None, surface: str='shop', recent: list[dict] | None=None) -> str",
   "since": "2026-10-06",
   "users": [
-   "X1",
-   "X2"
+   "X2",
+   "X4"
   ]
  },
  "backend/app/services/skill_catalog.py::GROWTH_SKILL": {
@@ -3152,7 +3684,8 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X5"
+   "X5",
+   "X7"
   ]
  },
  "backend/app/services/sms_service.py::send_otp": {
@@ -3161,7 +3694,7 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X5"
+   "X7"
   ]
  },
  "backend/app/services/storefront_service.py::_list": {
@@ -3441,6 +3974,7 @@
    "X1",
    "X2",
    "X4",
+   "X7",
    "Y"
   ]
  },
@@ -3470,29 +4004,12 @@
    "X1"
   ]
  },
- "backend/app/services/turn_clock.py::expired": {
-  "owner": "X1",
-  "signature": "def expired() -> bool",
-  "since": "2026-10-09",
-  "users": [
-   "X4"
-  ]
- },
  "backend/app/services/turn_clock.py::remaining": {
   "owner": "X1",
   "signature": "def remaining() -> float",
   "since": "2026-10-09",
   "users": [
-   "X4",
    "Y"
-  ]
- },
- "backend/app/services/turn_clock.py::turn_id": {
-  "owner": "X1",
-  "signature": "def turn_id() -> str",
-  "since": "2026-10-09",
-  "users": [
-   "X4"
   ]
  },
  "backend/app/services/turn_parse.py::parse_turn": {
@@ -3539,7 +4056,7 @@
   ]
  },
  "backend/app/services/wallet_service.py::consume_sms": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def consume_sms() -> dict",
   "since": "2026-09-18",
   "users": [
@@ -3547,7 +4064,7 @@
   ]
  },
  "backend/app/services/wallet_service.py::credit_sale": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def credit_sale(*, amount: int, commission: int, order_id: str, note: str, owner: str) -> dict",
   "since": "2026-09-18",
   "users": [
@@ -3555,15 +4072,16 @@
   ]
  },
  "backend/app/services/wallet_service.py::get": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def get() -> dict",
   "since": "2026-09-18",
   "users": [
-   "X1"
+   "X1",
+   "X5"
   ]
  },
  "backend/app/services/wallet_service.py::refund_sms": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "def refund_sms(charged: int=0) -> dict",
   "since": "2026-09-20",
   "users": [
@@ -3597,6 +4115,7 @@
    "X2",
    "X3",
    "X4",
+   "X7",
    "Y"
   ]
  },
@@ -3608,7 +4127,8 @@
    "C",
    "X1",
    "X3",
-   "X4"
+   "X4",
+   "X7"
   ]
  },
  "backend/app/state_store.py::read_json": {
@@ -3621,6 +4141,7 @@
    "X2",
    "X3",
    "X4",
+   "X7",
    "Y"
   ]
  },
@@ -3632,7 +4153,8 @@
    "C",
    "X1",
    "X2",
-   "X4"
+   "X4",
+   "X7"
   ]
  },
  "backend/app/state_store.py::tenant_dir": {
@@ -3654,7 +4176,8 @@
    "X1",
    "X2",
    "X3",
-   "X4"
+   "X4",
+   "X7"
   ]
  },
  "backend/app/state_store.py::update_json": {
@@ -3675,6 +4198,7 @@
    "X2",
    "X3",
    "X4",
+   "X7",
    "Y"
   ]
  },
@@ -3685,11 +4209,12 @@
   "since": "2026-10-06",
   "users": [
    "C",
-   "X1",
    "X2",
    "X3",
    "X4",
    "X5",
+   "X6",
+   "X7",
    "Y"
   ]
  },
@@ -3734,12 +4259,12 @@
   "signature": "export function ChannelAlert({ inset = true }: { inset?: boolean })",
   "since": "2026-09-27",
   "users": [
-   "X1",
+   "X6",
    "Y"
   ]
  },
  "frontend/components/chat-parts.tsx::ConfirmCard": {
-  "owner": "X1",
+  "owner": "X6",
   "shape": "export function ConfirmCard({ tool, text, open, busy, tapped, onConfirm, onCancel, }: { tool?: string; text: string; open: boolean; busy: boolean; /** فروشنده همین حالا یکی از دکمه‌ها را لمس کرده و جواب هنوز نرسیده. */ tapped?: \"confirm\" | \"cancel\"; onConfirm: () => void; onCancel?: () => void; })",
   "signature": "export function ConfirmCard(",
   "since": "2026-10-06",
@@ -3748,7 +4273,7 @@
   ]
  },
  "frontend/components/chat-parts.tsx::RevealText": {
-  "owner": "X1",
+  "owner": "X6",
   "signature": "export function RevealText({ on, className, children }: { on: boolean; className?: string; children: ReactNode })",
   "since": "2026-10-06",
   "users": [
@@ -3756,7 +4281,7 @@
   ]
  },
  "frontend/components/chat-thread.tsx::ChatMsg": {
-  "owner": "X1",
+  "owner": "X6",
   "shape": "export type ChatMsg = { id: string; role: \"user\" | \"assistant\"; text: string; at: number; trainId?: string; kind?: string; /** ابزاری که کارت تأیید برایش آمده (عنوان و نماد کارت از روی آن). */ tool?: string; confirmId?: string; options?: string[]; campaignId?: string; link?: { href: string; label?: string }; platform?: string; platformLabel?: string; sender?: string; mediaKind?: string; mediaName?: string; attachments?: StudioAttachment[]; captions?: StudioCaptions; published?: Record<string, number>; compose?: { status?: string; error?: string; jobId?: string; stage?: string; startedAt?: number }; delivered?: boolean; status?: string; error?: string; }",
   "signature": "export type ChatMsg =",
   "since": "2026-10-09",
@@ -3765,7 +4290,7 @@
   ]
  },
  "frontend/components/chat-thread.tsx::ChatThread": {
-  "owner": "X1",
+  "owner": "X6",
   "shape": "export function ChatThread({ messages, busy, placeholder, onSend, pendingText, allowMedia = true, publishTargets, onPublish, onRegenerate, onApproveDraft, onDiscardFailed, onSaveCaptions, onEditDraft, showTime = false, sanitize = false, welcome = false, welcomeLines, starters, confirmId = \"\", onConfirm, onCancel, persona = \"\", aspects, loading = false, banner, }: { messages: ChatMsg[]; busy: boolean; placeholder: string; onSend: (payload: ChatSend) => Promise<void> | void; pendingText?: string; allowMedia?: boolean; publishTargets?: PublishTarget[]; onPublish?: (payload: PublishPayload) => Promise<{ skipped?: boolean; message?: string } | void>; onRegenerate?: (payload: { messageId: string; campaignId?: string; part: \"image\" | \"caption\"; file?: File }) => Promise<void>; onApproveDraft?: (payload: { messageId: string; text: string }) => Promise<void>; onDiscardFailed?: (payload: { messageId: string }) => Promise<void>; onSaveCaptions?: (payload: { messageId: string; captions: StudioCaptions }) => void | Promise<void>; onEditDraft?: (payload: { messageId: string; text: string }) => void; sanitize?: boolean; welcome?: boolean; welcomeLines?: string[]; /** کارت‌های شروع در چت خالی؛ لمس، جملهٔ شروع را در کادر می‌گذارد. */ starters?: readonly ChatStarter[]; confirmId?: string; onConfirm?: (confirmId: string) => void; onCancel?: (confirmId: string) => void; persona?: string; showTime?: boolean; /** انتخاب‌گر نسبت خروجی استودیو: پست ۴:۵، مربع، استوری. */ aspects?: readonly Aspect[]; /** تا تاریخچه نرسیده، صفحهٔ خوشامد نشان داده نمی‌شود (سوسوی «سلام، من سوزانم» در بازدید دوباره). */ loading?: boolean; /** خطا یا اعلان؛ بالای کادر نوشتن می‌نشیند تا کنار جایی باشد که کاربر دست دارد. */ banner?: ReactNode; })",
   "signature": "export function ChatThread(",
   "since": "2026-10-06",
@@ -3812,7 +4337,7 @@
   "signature": "export const PUSH_WORKER = \"/sozan-push-sw.js\";",
   "since": "2026-10-10",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "frontend/components/empty-state.tsx::EmptyState": {
@@ -3826,6 +4351,7 @@
    "X3",
    "X4",
    "X5",
+   "X7",
    "Y"
   ]
  },
@@ -3837,7 +4363,7 @@
    "C",
    "X2",
    "X3",
-   "X5",
+   "X7",
    "Y"
   ]
  },
@@ -3846,11 +4372,11 @@
   "signature": "export function GettingStarted({ compact = false }: { compact?: boolean })",
   "since": "2026-10-06",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "frontend/components/link-text.tsx::LinkText": {
-  "owner": "X1",
+  "owner": "X6",
   "signature": "export function LinkText({ text }: { text: string })",
   "since": "2026-10-06",
   "users": [
@@ -3863,7 +4389,7 @@
   "since": "2026-09-18",
   "users": [
    "X3",
-   "X5"
+   "X7"
   ]
  },
  "frontend/components/onboard-gate.tsx::OnboardGate": {
@@ -3892,7 +4418,7 @@
   ]
  },
  "frontend/components/push-toggle.tsx::PushToggle": {
-  "owner": "X1",
+  "owner": "X6",
   "signature": "export function PushToggle({ compact = false }: { compact?: boolean })",
   "since": "2026-10-10",
   "users": [
@@ -3933,11 +4459,11 @@
    "C",
    "X3",
    "X4",
-   "X5"
+   "X7"
   ]
  },
  "frontend/components/sozan-orb.tsx::SozanOrb": {
-  "owner": "X1",
+  "owner": "X6",
   "shape": "export function SozanOrb({ size = 120, busy = false, still = false, level, className, }: { size?: number; busy?: boolean; /** فقط یک بار کشیده شود (آواتار کنار پیام‌ها): بی‌حلقهٔ انیمیشن. */ still?: boolean; level?: MutableRefObject<number>; className?: string; })",
   "signature": "export function SozanOrb(",
   "since": "2026-10-06",
@@ -3951,7 +4477,7 @@
   "signature": "export type PublishPayload =",
   "since": "2026-09-21",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "frontend/components/studio-publish.tsx::PublishTarget": {
@@ -3960,7 +4486,7 @@
   "signature": "export type PublishTarget =",
   "since": "2026-09-18",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "frontend/components/studio-publish.tsx::StudioAttachment": {
@@ -3969,7 +4495,7 @@
   "signature": "export type StudioAttachment = { kind: string; name: string; source?: string };",
   "since": "2026-09-18",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "frontend/components/studio-publish.tsx::StudioCaptions": {
@@ -3978,7 +4504,7 @@
   "signature": "export type StudioCaptions = { instagram?: string; telegram?: string; whatsapp?: string };",
   "since": "2026-09-18",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "frontend/components/studio-publish.tsx::StudioPublishCard": {
@@ -3987,7 +4513,7 @@
   "signature": "export function StudioPublishCard(",
   "since": "2026-09-18",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "frontend/components/theme-toggle.tsx::ThemeToggle": {
@@ -4013,11 +4539,12 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X1",
    "X2",
    "X3",
    "X4",
    "X5",
+   "X6",
+   "X7",
    "Y"
   ]
  },
@@ -4029,7 +4556,7 @@
    "C",
    "X2",
    "X3",
-   "X5",
+   "X7",
    "Y"
   ]
  },
@@ -4042,6 +4569,7 @@
    "X2",
    "X3",
    "X5",
+   "X7",
    "Y"
   ]
  },
@@ -4072,7 +4600,7 @@
   "since": "2026-09-21",
   "users": [
    "X3",
-   "X5"
+   "X7"
   ]
  },
  "frontend/lib/api.ts::Brand": {
@@ -4099,11 +4627,12 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X1",
    "X2",
    "X3",
    "X4",
    "X5",
+   "X6",
+   "X7",
    "Y"
   ]
  },
@@ -4120,7 +4649,7 @@
   "signature": "export function chatMediaUrl(name: string): string",
   "since": "2026-09-18",
   "users": [
-   "X1"
+   "X6"
   ]
  },
  "frontend/lib/api.ts::clearToken": {
@@ -4154,7 +4683,7 @@
   "since": "2026-09-18",
   "users": [
    "X3",
-   "X5"
+   "X7"
   ]
  },
  "frontend/lib/api.ts::getToken": {
@@ -4162,10 +4691,10 @@
   "signature": "export function getToken(): string | null",
   "since": "2026-09-18",
   "users": [
-   "X1",
    "X2",
    "X3",
-   "X5"
+   "X6",
+   "X7"
   ]
  },
  "frontend/lib/api.ts::refreshSession": {
@@ -4182,7 +4711,7 @@
   "since": "2026-09-18",
   "users": [
    "X3",
-   "X5"
+   "X7"
   ]
  },
  "frontend/lib/api.ts::setToken": {
@@ -4190,7 +4719,7 @@
   "signature": "export function setToken(token: string)",
   "since": "2026-09-18",
   "users": [
-   "X5"
+   "X7"
   ]
  },
  "frontend/lib/api.ts::timeoutSignal": {
@@ -4198,8 +4727,8 @@
   "signature": "export function timeoutSignal(ms: number): AbortSignal",
   "since": "2026-10-06",
   "users": [
-   "X1",
-   "X3"
+   "X3",
+   "X6"
   ]
  },
  "frontend/lib/back-stack.ts::useBackClose": {
@@ -4208,8 +4737,8 @@
   "since": "2026-10-06",
   "users": [
    "C",
-   "X1",
-   "X4"
+   "X4",
+   "X6"
   ]
  },
  "frontend/lib/digits.ts::formatWhen": {
@@ -4219,7 +4748,7 @@
   "users": [
    "C",
    "X2",
-   "X5",
+   "X7",
    "Y"
   ]
  },
@@ -4229,7 +4758,7 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X5",
+   "X7",
    "Y"
   ]
  },
@@ -4239,7 +4768,7 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X5",
+   "X7",
    "Y"
   ]
  },
@@ -4257,7 +4786,7 @@
   "since": "2026-09-18",
   "users": [
    "C",
-   "X5"
+   "X7"
   ]
  },
  "frontend/lib/idempotency.ts::emptyIdempotencySlot": {
@@ -4265,8 +4794,8 @@
   "signature": "export function emptyIdempotencySlot(): IdempotencySlot",
   "since": "2026-09-20",
   "users": [
-   "X1",
    "X4",
+   "X6",
    "Y"
   ]
  },
@@ -4275,8 +4804,8 @@
   "signature": "export function finishIdempotencyKey(slot: IdempotencySlot, err?: unknown): void",
   "since": "2026-09-20",
   "users": [
-   "X1",
    "X4",
+   "X6",
    "Y"
   ]
  },
@@ -4285,8 +4814,8 @@
   "signature": "export function takeIdempotencyKey(slot: IdempotencySlot, stamp: string): string",
   "since": "2026-09-20",
   "users": [
-   "X1",
    "X4",
+   "X6",
    "Y"
   ]
  },
@@ -4324,11 +4853,12 @@
   ]
  },
  "frontend/lib/use-plan.ts::usePlan": {
-  "owner": "X5",
+  "owner": "X7",
   "signature": "export function usePlan(): PlanInfo | null",
   "since": "2026-09-27",
   "users": [
-   "U"
+   "U",
+   "X5"
   ]
  },
  "frontend/lib/utils.ts::cn": {
@@ -4336,9 +4866,9 @@
   "signature": "export function cn(...inputs: ClassValue[])",
   "since": "2026-09-18",
   "users": [
-   "X1",
    "X2",
    "X4",
+   "X6",
    "Y"
   ]
  }

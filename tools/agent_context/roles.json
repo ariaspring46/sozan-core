@@ -30,15 +30,13 @@
   "roles": [
     {
       "id": "X1",
-      "title": "روتر و چت پنل",
-      "summary": "مغز چت پنل (انتخاب ابزار، کارت تأیید، قفل نوبت) و صفحهٔ چت.",
+      "title": "مغز روتر چت پنل",
+      "summary": "مغز چت پنل در بک‌اند: انتخاب ابزار، تصمیم‌گیر، کارت تأیید، قفل نوبت، ابزارهای فروشنده و صدای پاسخ.",
       "report": "talk-x1.md",
       "core": [
         "backend/app/services/router_service.py",
         "backend/app/services/turn_parse.py",
-        "backend/app/api/router_chat.py",
-        "frontend/components/chat-thread.tsx",
-        "frontend/app/chat/page.tsx"
+        "backend/app/api/router_chat.py"
       ],
       "owns": [
         "backend/app/services/router_service.py",
@@ -51,18 +49,16 @@
         "backend/app/services/order_tools.py",
         "backend/app/services/seller_events.py",
         "backend/app/services/seller_alerts.py",
-        "frontend/components/push-toggle.tsx",
-        "frontend/public/sozan-push-sw.js",
         "backend/app/api/events.py",
-        "frontend/lib/use-sozan-events.ts",
         "backend/app/services/router_context.py",
         "backend/app/services/turn_clock.py",
         "backend/app/services/number_span.py",
         "backend/app/services/skill_catalog.py",
         "backend/app/skills/**",
-        "frontend/components/typing-hints.tsx",
         "backend/app/services/router_text.py",
         "backend/app/services/router_voice.py",
+        "backend/app/services/shop_voice_service.py",
+        "backend/app/services/shop_voice_service_test.py",
         "backend/app/services/router_text_test.py",
         "backend/app/services/router_chat_behavior_test.py",
         "backend/app/services/turn_parse.py",
@@ -75,6 +71,50 @@
         "backend/app/api/chat_payload_test.py",
         "backend/app/data/**",
         "backend/scripts/refresh_router_intents.py",
+        "talk-x1.md"
+      ],
+      "rare": [
+        "backend/app/data/**",
+        "backend/scripts/refresh_router_intents.py",
+        "backend/app/skills/**"
+      ],
+      "title_en": "Panel chat router brain",
+      "branch": "x1/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Own the panel chat brain on the backend: one model call per turn picks a tool name; code extracts arguments; every write tool goes through a confirm card; the decider and its accept rules; the per-thread turn lock; the seller tools; seller events and alerts (backend); and the reply voice (shop_voice_service: say/acceptable/claim guard). The chat page and its components are X6's; the eval harness and batteries are Q's.",
+      "frontend": false,
+      "gates": [
+        "qa50 router battery 50/50 on two consecutive runs on the hub's parallel instance whenever router_service.py, turn_parse.py, router_embed.py, backend/app/data/router_*.json or the LLM env changes. You cannot run it (it needs the hub); ask X5 in talk-x5.md and wait for the result before asking R for review.",
+        "A change to the decider or routing that Q's harness covers: ask Q (talk-q.md) for a harness run against the current baseline and attach the verdict line to the PR."
+      ],
+      "rules": [
+        "The model only picks a tool NAME. Prices, text and targets come from the user's sentence via code. Never add free-form string arguments that the model fills.",
+        "Every tool in WRITE_TOOLS must create a confirm card; it runs only on a matching, unexpired confirmId.",
+        "router_intent_vectors.json is generated: change router_intents.json and run backend/scripts/refresh_router_intents.py (needs the bge-m3 embed service). Never hand-edit or read the vectors file."
+      ],
+      "external": [
+        "The chat UI (X6) renders whatever `/router/chat` returns: reply text, card, `tool_calls`, events. A new field is fine; renaming or removing one needs X6's ack in talk-x6.md."
+      ]
+    },
+    {
+      "id": "X6",
+      "title": "رابط چت پنل و اعلان فروشنده",
+      "title_en": "Panel chat UI and seller notifications",
+      "summary": "صفحهٔ چت پنل و اجزایش (رشتهٔ پیام، کارت تأیید، نوار کار منتظر، نوشتن، صدا، پیوست)، گرفتن رویدادهای زنده در مرورگر و فعال‌سازی اعلان push.",
+      "report": "talk-x6.md",
+      "core": [
+        "frontend/components/chat-thread.tsx",
+        "frontend/components/chat-parts.tsx",
+        "frontend/app/chat/page.tsx",
+        "frontend/components/chat-composer.tsx"
+      ],
+      "owns": [
+        "frontend/lib/use-sozan-events.ts",
+        "frontend/components/push-toggle.tsx",
+        "frontend/public/sozan-push-sw.js",
+        "frontend/components/typing-hints.tsx",
         "frontend/app/chat/**",
         "frontend/components/chat-thread.tsx",
         "frontend/components/chat-attach.tsx",
@@ -85,40 +125,31 @@
         "frontend/components/chat-header.tsx",
         "frontend/components/chat-voice.tsx",
         "frontend/components/sozan-orb.tsx",
-        "tools/qa50_battery.json",
-        "tools/qa50_battery.py",
-        "tools/chat_scenarios.json",
-        "tools/chat_scenarios.py",
-        "tools/stress_battery.py",
-        "tools/qa_battery.py",
-        "tools/agentic_probes/p_router.py",
-        "tools/agentic_probes/p_router_lock.py",
-        "tools/harness_eval/**",
-        "talk-x1.md"
+        "talk-x6.md"
       ],
       "rare": [
-        "backend/app/data/**",
-        "backend/scripts/refresh_router_intents.py",
-        "tools/qa50_battery.json",
-        "tools/qa_battery.py",
-        "tools/agentic_probes/p_router.py",
-        "tools/agentic_probes/p_router_lock.py",
-        "tools/harness_eval/**"
+        "frontend/public/sozan-push-sw.js",
+        "frontend/components/sozan-orb.tsx"
       ],
-      "title_en": "Router and panel chat",
-      "branch": "x1/<issue>-<slug>",
+      "branch": "x6/<issue>-<slug>",
       "plan": [
         "owner-plan.md"
       ],
-      "mission": "Own the panel chat brain: one model call per turn picks a tool name; code extracts arguments; every write tool goes through a confirm card; the per-thread turn lock; and the chat page that shows it.",
+      "mission": "Own what the seller sees and touches in the panel chat: the chat page, message thread, confirm card and the pending-card dock, composer, voice input, attachments, typing hints, the header and orb; and the seller's live events in the browser (use-sozan-events) and push opt-in (push toggle, service worker). The router brain behind /router/chat and the event and alert backend (seller_events, seller_alerts, /events) are X1's.",
       "frontend": true,
       "gates": [
-        "qa50 router battery 50/50 on two consecutive runs on the hub's parallel instance whenever router_service.py, turn_parse.py, router_embed.py, backend/app/data/router_*.json or the LLM env changes. You cannot run it (it needs the hub); ask X5 in talk-x5.md and wait for the result before asking for merge."
+        "`python3 tools/ui_check.py` prints 0 problems and `npm run build` passes.",
+        "Any visual change to the chat: screenshots at 390px and 1440px, light and dark, attached to the PR; the confirm card and its two buttons («تأیید» / «انصراف») stay reachable with the on-screen keyboard open."
       ],
       "rules": [
-        "The model only picks a tool NAME. Prices, text and targets come from the user's sentence via code. Never add free-form string arguments that the model fills.",
-        "Every tool in WRITE_TOOLS must create a confirm card; it runs only on a matching, unexpired confirmId.",
-        "router_intent_vectors.json is generated: change router_intents.json and run backend/scripts/refresh_router_intents.py (needs the bge-m3 embed service). Never hand-edit or read the vectors file."
+        "The confirm card is the only way a write runs: never add a UI path that calls a write tool without the card's confirmId.",
+        "Show what /router/chat returns; never invent reply text, prices or card content on the client.",
+        "Push notifications carry no customer text, phone number or amount; only a short Persian title and a link into the panel.",
+        "Live updates come only through use-sozan-events (the /events stream); never open a second stream or poll the API in a loop."
+      ],
+      "external": [
+        "`/router/chat` (owner X1) is the brain; its response fields are X1's contract. Ask X1 in talk-x1.md for a new field.",
+        "The /events stream and push payloads come from seller_events/seller_alerts (owner X1); ask X1 for a new event type."
       ]
     },
     {
@@ -168,10 +199,6 @@
         "brand/**",
         "campaigns/**",
         "deploy/sozan-worker.service",
-        "tools/qa_image_battery.json",
-        "tools/qa_image_battery.py",
-        "tools/agentic_probes/p_budget_image.py",
-        "tools/agentic_probes/p_tenant_thread.py",
         "talk-x2.md"
       ],
       "rare": [
@@ -183,10 +210,6 @@
         "backend/app/services/logo_motion_service.py",
         "backend/app/services/test_stills.py",
         "backend/app/services/fixtures/**",
-        "tools/qa_image_battery.json",
-        "tools/qa_image_battery.py",
-        "tools/agentic_probes/p_budget_image.py",
-        "tools/agentic_probes/p_tenant_thread.py",
         "deploy/sozan-worker.service"
       ],
       "title_en": "Studio, images and brand content",
@@ -197,7 +220,7 @@
       "mission": "Own content creation: studio chat (captions, posts, stories), still/scene image generation with the vision guard, cutout, compose to video, campaigns, publishing through the channel layer, brand identity and the promo-engine.",
       "frontend": true,
       "gates": [
-        "qa_image_battery (tools/qa_image_battery.py) green when image_provider_service.py, cloud_cutout_service.py or compose_pipeline.py changes. It spends real cloud money: ask the owner in talk-x2.md to run it; never run it yourself."
+        "qa_image_battery (tools/qa_image_battery.py, owned by Q) green when image_provider_service.py, cloud_cutout_service.py or compose_pipeline.py changes. It spends real cloud money: ask the owner in talk-x2.md to run it; never run it yourself."
       ],
       "rules": [
         "Every cloud image or vision call goes through the AI budget gate (_image_budget_capped / llm._budget_capped). No new cloud call without it.",
@@ -308,20 +331,11 @@
         "backend/app/services/shop_undo_service.py",
         "backend/app/services/shop_undo_service_test.py",
         "backend/app/services/shop_image_service.py",
-        "backend/app/services/shop_voice_service.py",
         "backend/app/services/shop_interview_service.py",
         "backend/app/services/shop_interview_service_test.py",
-        "backend/app/services/shop_voice_service_test.py",
-        "tools/agentic_probes/p_shop_edit.py",
-        "tools/agentic_probes/p_shop_create_page.py",
-        "tools/agentic_probes/p_loop_block.py",
         "talk-x4.md"
       ],
-      "rare": [
-        "tools/agentic_probes/p_shop_edit.py",
-        "tools/agentic_probes/p_shop_create_page.py",
-        "tools/agentic_probes/p_loop_block.py"
-      ],
+      "rare": [],
       "external": [
         "Factory CLI (owner C, outside the repo): `settings.factory_script` with `status --job-id <id>` and `start ... --detach`; the last stdout line is JSON. Job file `<fastpath>/jobs/<id>.json`. Do not change how you parse these without C's ack.",
         "Storefront files the editor patches follow C's template: `lib/brand.ts`, `lib/nav.ts`, `app/brand-vars.css`, `public/brand-vars.css`, `public/storefront-flags.json`, `public/catalog.json`, `public/pages/*.json`, `public/images/hero.png`."
@@ -346,8 +360,8 @@
     },
     {
       "id": "X5",
-      "title": "پلتفرم، حساب، اشتراک و انتشار",
-      "summary": "هستهٔ مشترک (LLM، state و مستأجر، observe، بودجهٔ ابر، config/main)، ورود و OTP، پلن و پرداخت اشتراک و کیف، مدیر هاب و پشتیبانی، استقرار روی هاب و CI. تنها کسی که روی هاب منتشر می‌کند.",
+      "title": "پلتفرم و انتشار",
+      "summary": "هستهٔ مشترک (LLM، state و مستأجر، observe، بودجهٔ ابر، config/main)، مدیر هاب و پشتیبانی، تنظیمات، استقرار روی هاب و CI. تنها کسی که روی هاب منتشر می‌کند.",
       "report": "talk-x5.md",
       "core": [
         "backend/app/services/llm.py",
@@ -376,10 +390,6 @@
         "backend/app/repositories/__init__.py",
         "backend/app/repositories/user_repository.py",
         "backend/app/api/__init__.py",
-        "backend/app/api/auth.py",
-        "backend/app/api/auth_refresh_test.py",
-        "backend/app/api/billing.py",
-        "backend/app/api/wallet.py",
         "backend/app/api/admin.py",
         "backend/app/api/settings.py",
         "backend/app/services/__init__.py",
@@ -400,26 +410,15 @@
         "backend/app/services/loop_watch.py",
         "backend/app/services/client_ip_test.py",
         "backend/app/services/agentic_regressions_test.py",
-        "backend/app/services/auth_service.py",
-        "backend/app/services/plan_service.py",
-        "backend/app/services/billing_service.py",
-        "backend/app/services/payment_service.py",
-        "backend/app/services/wallet_service.py",
-        "backend/app/services/wallet_pay_test.py",
-        "backend/app/services/renewal_reminder_service.py",
         "backend/app/services/admin_service.py",
-        "backend/app/services/profile_service.py",
         "backend/app/services/settings_service.py",
         "backend/requirements.txt",
-        "frontend/app/login/**",
         "frontend/app/admin/**",
         "frontend/components/admin-health.tsx",
         "frontend/app/manage/**",
         "frontend/app/more/page.tsx",
         "frontend/app/more/settings/**",
-        "frontend/app/more/wallet/**",
         "frontend/app/more/docs/**",
-        "frontend/lib/use-plan.ts",
         "frontend/lib/use-ai-budget.ts",
         "frontend/lib/seller-guides.ts",
         "deploy/**",
@@ -432,9 +431,6 @@
         "tools/lab_session.py",
         "tools/smoke_prod.sh",
         "tools/remove_test_tenant.py",
-        "tools/agentic_probes/run_all.sh",
-        "tools/agentic_probes/p_outbox_chain.py",
-        "tools/agentic_probes/p_outbox_chain_loop.py",
         "talk-x5.md"
       ],
       "rare": [
@@ -449,22 +445,19 @@
         "frontend/lib/seller-guides.ts",
         "frontend/app/more/docs/**",
         "tools/lab_session.py",
-        "tools/remove_test_tenant.py",
-        "tools/agentic_probes/run_all.sh",
-        "tools/agentic_probes/p_outbox_chain.py",
-        "tools/agentic_probes/p_outbox_chain_loop.py"
+        "tools/remove_test_tenant.py"
       ],
       "external": [
         "Only deployer: `flock /home/ubuntu/.sozan-deploy.lock` with `deploy/deploy-api.sh` / `deploy/deploy-panel.sh`.",
         "observe service on the home machine (`POST {observe}/sozan/events`) and the LLM proxy; the event envelope (`pipeline_release.envelope`) is a contract for every role.",
-        "Batteries run on the hub's parallel instance (port 8013): `tools/qa50_battery.py` for X1, `tools/sales100_battery.py --live` for Y. You run them on request and append the one-line summary to the requester's report file."
+        "Batteries run on the hub's parallel instance (port 8013): `tools/qa50_battery.py` for X1, `tools/sales100_battery.py --live` for Y (code owned by Q). You run them on request and append the one-line summary to the requester's report file."
       ],
-      "title_en": "Platform, accounts, billing and deploy",
+      "title_en": "Platform and deploy",
       "branch": "x5/<issue>-<slug>",
       "plan": [
         "owner-plan.md"
       ],
-      "mission": "Own the shared core every role depends on (LLM routing and calls, tenant state, locks, observe events, AI budget, config, app startup), login/OTP, plans, subscription payments and wallet, hub admin, settings, CI, and deployment. You are the only role that deploys to the hub.",
+      "mission": "Own the shared core every role depends on (LLM routing and calls, tenant state, locks, observe events, AI budget, config, app startup), hub admin, settings, CI, and deployment. You are the only role that deploys to the hub. Login, plans, subscription payments and the wallet are X7's.",
       "frontend": true,
       "gates": [
         "Before every deploy: full backend suite green (deploy/deploy-api.sh runs it with STATE_DIR and SOZAN_OBSERVE_OUTBOX=0). Deploy only with the owner's explicit go."
@@ -475,6 +468,61 @@
         "Tenant isolation: every read/write goes through state_store with the tenant ContextVar; background threads must copy the context (contextvars.copy_context()).",
         "The AI budget gate stays fail-open on internal errors but must emit budget-check-failed; never remove the company daily cap.",
         "Run the batteries other roles ask for (qa50, sales100 live) on the hub's parallel instance and append the summary line to the requester's report file."
+      ]
+    },
+    {
+      "id": "X7",
+      "title": "حساب، پلن و پرداخت اشتراک",
+      "title_en": "Accounts, plans and billing",
+      "summary": "ورود فروشنده با OTP و نشست، پروفایل، پلن‌ها و سهمیه، پرداخت اشتراک و درگاه، کیف پول و یادآور تمدید، و صفحه‌های ورود و کیف.",
+      "report": "talk-x7.md",
+      "core": [
+        "backend/app/services/auth_service.py",
+        "backend/app/services/payment_service.py",
+        "backend/app/services/billing_service.py",
+        "backend/app/api/billing.py"
+      ],
+      "owns": [
+        "backend/app/api/auth.py",
+        "backend/app/api/auth_refresh_test.py",
+        "backend/app/api/billing.py",
+        "backend/app/api/wallet.py",
+        "backend/app/services/auth_service.py",
+        "backend/app/services/plan_service.py",
+        "backend/app/services/billing_service.py",
+        "backend/app/services/payment_service.py",
+        "backend/app/services/wallet_service.py",
+        "backend/app/services/wallet_pay_test.py",
+        "backend/app/services/renewal_reminder_service.py",
+        "backend/app/services/profile_service.py",
+        "frontend/app/login/**",
+        "frontend/app/more/wallet/**",
+        "frontend/lib/use-plan.ts",
+        "talk-x7.md"
+      ],
+      "rare": [
+        "backend/app/services/renewal_reminder_service.py"
+      ],
+      "branch": "x7/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Own the seller's account and money with Sozan: OTP login and sessions (auth_service, /auth), profile, plans and quotas (plan_service), subscription billing and the payment gateway (billing_service, payment_service), the wallet and renewal reminders, and the login and wallet pages. SMS delivery is X3's; shared core and deploy are X5's.",
+      "frontend": true,
+      "gates": [
+        "Any change to payment_service, billing_service or wallet_service: the F7 flow tests green and one dry-gateway purchase on the test account (edge_dry), with the order id and status in the PR."
+      ],
+      "rules": [
+        "No real charge, ever, from tests or experiments: the dry gateway (edge_dry) or the test account only.",
+        "PAYMENT_SIGN_SECRET is separate from JWT_SECRET; never reuse one for the other, never log either.",
+        "OTP codes, session tokens and card or account numbers never appear in logs, events, reports or test output.",
+        "The trusted client IP header is ar-real-ip (via backend/app/client_ip.py, owner X5); rate limits use it.",
+        "A paid callback is idempotent: the same gateway reference never credits twice (keep its test).",
+        "Plan prices come only from plan_service; the voice gateway (Z) reads them through GET /billing/plans."
+      ],
+      "external": [
+        "SMS for OTP goes through X3's melipayamak_otp_service / sms_service; ask X3 for a change.",
+        "`GET /billing/plans` and `/health` field `paymentReady` are read by Z's voice gateway: keep their shape or tell Z in voice-agent-talk.md."
       ]
     },
     {
@@ -505,32 +553,21 @@
         "deploy/sozan-chroma.service",
         "deploy/sozan-battery.service",
         "deploy/sozan-battery.timer",
-        "tools/sales100_battery.json",
-        "tools/sales100_battery.py",
-        "tools/synthetic_personas.py",
         "tools/sales_tenant_reset.py",
         "tools/draft_day_stats.py",
         "tools/train_nightly.py",
         "tools/observe_weekly.py",
-        "tools/agentic_probes/p_dm_loop.py",
-        "tools/agentic_probes/p_dm_numbers.py",
-        "tools/agentic_probes/p_dm_paylink.py",
-        "tools/agentic_probes/p_dm_paystock.py",
-        "tools/agentic_probes/p_f7_memory.py",
         "sales-agent-talk.md",
         "backend/app/api/inbox_dry_test.py",
         ".y-tmp/**"
       ],
       "rare": [
-        "tools/sales100_battery.json",
-        "tools/synthetic_personas.py",
-        "tools/sales_tenant_reset.py",
-        "tools/draft_day_stats.py",
-        "tools/observe_weekly.py",
-        "tools/agentic_probes/**",
         "deploy/sozan-chroma.service",
         "deploy/sozan-battery.service",
-        "deploy/sozan-battery.timer"
+        "deploy/sozan-battery.timer",
+        "tools/sales_tenant_reset.py",
+        "tools/draft_day_stats.py",
+        "tools/observe_weekly.py"
       ],
       "external": [
         "Chroma (not installed yet; `deploy/sozan-chroma.service`). Database key only from `memory_key()`.",
@@ -545,7 +582,7 @@
       "mission": "Own the DM inbox and the agent that answers customers: auto-reply modes, the tool loop (stock, order_status, payment_link), number/claim guards, sales policy, customer memory, Chroma shop memory, PII masking, brand tone, and the core of the fine-tune data pipeline.",
       "frontend": true,
       "gates": [
-        "Any change to inbox_agent_service.py, inbox_service.py, sales_policy_service.py, claims_guard.py or pii_mask.py: sales100 100/100 on two consecutive live runs on the parallel instance (sales-agent-plan.md §3.7). 99/100 means no merge. Ask X5 to run it.",
+        "Any change to inbox_agent_service.py, inbox_service.py, sales_policy_service.py, claims_guard.py or pii_mask.py: sales100 100/100 on two consecutive live runs on the parallel instance (sales-agent-plan.md §3.7). 99/100 means no merge. Ask X5 to run it (Q owns the battery code).",
         "Offline structure check you can run: python3 tools/sales100_battery.py (must print 'sales100 structure 101/101')."
       ],
       "rules": [
@@ -587,7 +624,7 @@
         "voice-gateway/voice_status.py"
       ],
       "external": [
-        "HTTP to the hub: `GET {SOZAN_API}/billing/plans` (plan prices; owner X5, `backend/app/api/billing.py`) and `GET {SOZAN_API}/health` (field `paymentReady`; owner X5, `backend/app/main.py`). If either fails, say no price.",
+        "HTTP to the hub: `GET {SOZAN_API}/billing/plans` (plan prices; owner X7, `backend/app/api/billing.py`) and `GET {SOZAN_API}/health` (field `paymentReady`; owner X5, `backend/app/main.py`). If either fails, say no price.",
         "llama-swap on the home machine: only the `ornith-phone` slot, plus `/v1/audio/speech` and `/v1/embeddings` (bge-m3, read-only use).",
         "DNC file `~/local-ai/config/sozan-dnc.txt`; call log `~/local-ai/sozan-voice-log/calls.jsonl` (mode 600, stays on that machine).",
         "Instagram (shared with X3): `voice-gateway/enrich_campaign.py` uses the same `i.instagram.com` endpoints and app user-agent as `backend/app/services/channel_scan_service.py::_instagram_page`. If Instagram changes them, X3 and Z change together."
@@ -660,7 +697,7 @@
         "tools/storefront/**"
       ],
       "external": [
-        "Main work outside the repo: `/home/demon/local-ai/smoke-workspace/site-builder/**` (templates, quality gate, `tools/sozan_factory_fastpath.py`). X4 reads the `status` JSON and the job file: their fields are a contract.",
+        "Main work outside the repo: the factory checkout (hub: `/home/ubuntu/site-builder/**`; `settings.site_builder_dir`) (templates, quality gate, `tools/sozan_factory_fastpath.py`). X4 reads the `status` JSON and the job file: their fields are a contract.",
         "The live storefront calls these hub routes, all yours: `/p/catalog-ids`, `/p/shop-config`, `/p/shop/checkout`, `/p/shop/paid`, `/p/otp/*`, `/p/tickets`, `/catalog/*`.",
         "`tools/monitor/**` and `tools/storefront/**` live on branch `feat/storefront-c`; after merge they are yours automatically."
       ],
@@ -815,11 +852,104 @@
             "Read only `report.md` (never the PNGs in bulk). Ignore anything about `10.10.34.35`: that is the Iranian ISP filter injecting a script, not our code.",
             "Any P0: stop the audit, append `## U → X5: P0 panel <date>` to talk-x5.md with the failing URL and status (for example `502 /_next/static/chunks/...`), and put the same line at the top of your report.",
             "Open 3-5 screenshots of the worst pages yourself and judge what the script cannot measure: visual hierarchy, spacing rhythm, Persian typography (line height, numerals), dark-mode contrast, empty/loading/error states, and whether the main action is reachable with one thumb.",
-            "For each finding decide the owner from the route: /chat X1; /studio, /brand, /campaigns X2; /onboard, /more/channels X3; /shop X4; /login, /more, /more/settings, /more/wallet, /more/docs, /admin, /manage X5; /inbox, /sales Y; /more/inventory, /more/support, /p/<id> C; landing, about, contact, terms, refund, app-shell, panel home and components/ui are yours. Fix yours on a `u/<issue>-mobile-audit` branch; for others append to their report file `## U → <ROLE>: mobile audit <route>` with the exact class/markup change and the measured evidence.",
+            "For each finding decide the owner from the route: /chat X6; /studio, /brand, /campaigns X2; /onboard, /more/channels X3; /shop X4; /login, /more/wallet X7; /more, /more/settings, /more/docs, /admin, /manage X5; /inbox, /sales Y; /more/inventory, /more/domain, /more/support, /p/<id> C; landing, about, contact, terms, refund, app-shell, panel home and components/ui are yours. Fix yours on a `u/<issue>-mobile-audit` branch; for others append to their report file `## U → <ROLE>: mobile audit <route>` with the exact class/markup change and the measured evidence.",
             "Append to talk-u.md: date, P0/P1/P2 counts, top 3 issues, what you fixed, which requests you sent. Commit `docs/ui-audit-live/<date>/report.md` and `report.json` only (screenshots stay local unless the PR needs them)."
           ],
           "done": "every P0/P1 is fixed or has an acknowledged request in its owner's report file, and the next audit shows the counts going down."
         }
+      ]
+    },
+    {
+      "id": "Q",
+      "title": "سنجش و کیفیت",
+      "title_en": "Evaluation and quality",
+      "summary": "هارنس ارزیابی چت (موردهای قفل‌شده، پایه‌ها، گزارش)، باتری‌های qa50، sales100 و تصویر، سناریوهای چت، پروب‌های عاملی، و تحلیل خطاها برای نقش‌های دیگر.",
+      "report": "talk-q.md",
+      "core": [
+        "tools/harness_eval/run.py",
+        "tools/harness_eval/score.py"
+      ],
+      "owns": [
+        "tools/harness_eval/**",
+        "tools/qa50_battery.json",
+        "tools/qa50_battery.py",
+        "tools/chat_scenarios.json",
+        "tools/chat_scenarios.py",
+        "tools/stress_battery.py",
+        "tools/qa_battery.py",
+        "tools/agentic_probes/**",
+        "tools/sales100_battery.json",
+        "tools/sales100_battery.py",
+        "tools/synthetic_personas.py",
+        "tools/qa_image_battery.json",
+        "tools/qa_image_battery.py",
+        "talk-q.md"
+      ],
+      "rare": [
+        "tools/agentic_probes/**",
+        "tools/qa50_battery.json",
+        "tools/chat_scenarios.json",
+        "tools/sales100_battery.json",
+        "tools/qa_image_battery.json",
+        "tools/harness_eval/cases.v1.json",
+        "tools/harness_eval/cases.v2.json",
+        "tools/harness_eval/cases.v2_1.json",
+        "tools/harness_eval/*.lock",
+        "tools/harness_eval/build_fixture.py",
+        "tools/harness_eval/decider_eval.py"
+      ],
+      "branch": "q/<issue>-<slug>",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Own how Sozan is measured: the chat eval harness (tools/harness_eval: locked case lists, fixture, scorer, report, decision rule), the batteries (qa50, sales100, image), chat scenarios, stress runs and agentic probes. Run them on request from other roles, report the verdict against the right baseline, and turn failures into precise requests for the owning role. You never fix product code yourself.",
+      "frontend": false,
+      "gates": [
+        "`python3 tools/harness_eval/selftest.py` prints 'all selftests passed' after any scorer or case change.",
+        "A changed case list is locked (`run.py lock`) and gets a new baseline before any comparison; never compare runs across different case-list hashes."
+      ],
+      "rules": [
+        "Write the decision rule (thresholds, noise floor, what counts as a regression) before you run the candidate; never after.",
+        "Real seller turns used for evaluation stay private: outside git, never pasted into reports, PRs or the case list; counts and labels only.",
+        "Runs use the fixture tenant only (harness-eval); no outbound message, SMS, payment or publish; the canary must stay untouched.",
+        "Live batteries on the hub's parallel instance (qa50, sales100 --live) are run by X5; you own their code and the verdict, and ask X5 in talk-x5.md.",
+        "Cloud spend: a full harness run costs money; state the expected cost in the request and stay under it. The image battery needs the owner's go.",
+        "A product bug you find is a request to its owner (`## Q → <ROLE>: ...` in their report file) with the case id, the failing check and the evidence; never edit their files."
+      ],
+      "external": [
+        "The harness boots the backend in-process and calls `router_service` / `router_loop` (X1) and the shop services (X4) through their public functions.",
+        "Built-fixture mode uses the factory (`/home/ubuntu/site-builder`, owner C) and one docker container named for the fixture; only `build_fixture.py down` removes it.",
+        "Run records and private turns live outside git in `~/sozan-eval/`."
+      ]
+    },
+    {
+      "id": "R",
+      "title": "ناظر: بازبینی و ادغام",
+      "title_en": "Reviewer and merger",
+      "summary": "بازبینی خط‌به‌خط PR همهٔ نقش‌ها با چک‌لیست، و ادغام (squash) فقط پس از CI سبز. کد نمی‌نویسد و مستقر نمی‌کند.",
+      "report": "talk-r.md",
+      "core": [],
+      "owns": [
+        ".agents/skills/sozan-review/**",
+        "talk-r.md"
+      ],
+      "rare": [],
+      "branch": "",
+      "plan": [
+        "owner-plan.md"
+      ],
+      "mission": "Review every role's pull request line by line against the review checklist and merge it (squash into main) only when CI is green and the role's merge gates hold. You do not write product code and you never deploy.",
+      "frontend": false,
+      "gates": [],
+      "rules": [
+        "Merge only after every CI check on the PR's head commit is green; never merge a red or pending PR, never bypass a required check.",
+        "Never push to a role's branch and never fix their code; send the exact change you need as a review comment and in their report file.",
+        "Every changed file must belong to the PR author's role (docs/agents and one CHANGELOG bullet excepted); otherwise request changes.",
+        "The GitHub token stays on the owner's machine: never print, commit, log or paste it.",
+        "Deploys belong to X5 and need the owner's explicit go; a merge is never a deploy."
+      ],
+      "external": [
+        "GitHub `ariaspring46/sozan-core`: read PRs, diffs and checks; merge with squash."
       ]
     },
     {
@@ -966,15 +1096,19 @@
       "steps": [
         [
           "U",
-          "chat frame, api()"
+          "panel frame, api()"
+        ],
+        [
+          "X6",
+          "chat page: thread, composer, confirm card"
         ],
         [
           "X1",
-          "router turn: tool choice, confirm card, lock"
+          "router turn: tool choice, confirm card, lock, reply voice"
         ],
         [
           "X4/X2/X5/Y",
-          "the tool runs: edit_shop, studio_chat, settings, auto-reply"
+          "the tool runs: build_shop, edit_shop, studio_chat, settings, auto-reply"
         ]
       ],
       "tests": [
@@ -984,7 +1118,8 @@
         "app.services.router_text_test",
         "app.services.router_chat_behavior_test",
         "app.api.chat_payload_test",
-        "app.services.router_embed_test"
+        "app.services.router_embed_test",
+        "app.services.shop_voice_service_test"
       ]
     },
     {
@@ -1094,7 +1229,7 @@
       "title": "Seller login, plan and subscription payment",
       "steps": [
         [
-          "X5",
+          "X7",
           "auth_service OTP"
         ],
         [
@@ -1102,7 +1237,7 @@
           "SMS delivery"
         ],
         [
-          "X5",
+          "X7",
           "plan, billing, payment, wallet"
         ]
       ],
@@ -1182,6 +1317,29 @@
       "commands": [
         "python3 tools/ui_check.py",
         "cd frontend && npm run build 2>&1 | tail -15"
+      ]
+    },
+    {
+      "id": "F11",
+      "title": "Change → review → merge",
+      "steps": [
+        [
+          "Q",
+          "harness or battery verdict when a gate asks for it"
+        ],
+        [
+          "R",
+          "line-by-line review against the checklist; squash merge after green CI"
+        ],
+        [
+          "X5",
+          "deploy only with the owner's go"
+        ]
+      ],
+      "tests": [],
+      "commands": [
+        "python3 tools/agent_context/build.py --check",
+        "python3 tools/harness_eval/selftest.py | tail -1"
       ]
     }
   ]

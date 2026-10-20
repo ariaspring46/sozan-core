@@ -65,14 +65,14 @@ When: the owner asks for an audit, after every panel deploy (X5 says so in talk-
 3. Read only `report.md` (never the PNGs in bulk). Ignore anything about `10.10.34.35`: that is the Iranian ISP filter injecting a script, not our code.
 4. Any P0: stop the audit, append `## U → X5: P0 panel <date>` to talk-x5.md with the failing URL and status (for example `502 /_next/static/chunks/...`), and put the same line at the top of your report.
 5. Open 3-5 screenshots of the worst pages yourself and judge what the script cannot measure: visual hierarchy, spacing rhythm, Persian typography (line height, numerals), dark-mode contrast, empty/loading/error states, and whether the main action is reachable with one thumb.
-6. For each finding decide the owner from the route: /chat X1; /studio, /brand, /campaigns X2; /onboard, /more/channels X3; /shop X4; /login, /more, /more/settings, /more/wallet, /more/docs, /admin, /manage X5; /inbox, /sales Y; /more/inventory, /more/support, /p/<id> C; landing, about, contact, terms, refund, app-shell, panel home and components/ui are yours. Fix yours on a `u/<issue>-mobile-audit` branch; for others append to their report file `## U → <ROLE>: mobile audit <route>` with the exact class/markup change and the measured evidence.
+6. For each finding decide the owner from the route: /chat X6; /studio, /brand, /campaigns X2; /onboard, /more/channels X3; /shop X4; /login, /more/wallet X7; /more, /more/settings, /more/docs, /admin, /manage X5; /inbox, /sales Y; /more/inventory, /more/domain, /more/support, /p/<id> C; landing, about, contact, terms, refund, app-shell, panel home and components/ui are yours. Fix yours on a `u/<issue>-mobile-audit` branch; for others append to their report file `## U → <ROLE>: mobile audit <route>` with the exact class/markup change and the measured evidence.
 7. Append to talk-u.md: date, P0/P1/P2 counts, top 3 issues, what you fixed, which requests you sent. Commit `docs/ui-audit-live/<date>/report.md` and `report.json` only (screenshots stay local unless the PR needs them).
 
 Done when: every P0/P1 is fixed or has an acknowledged request in its owner's report file, and the next audit shows the counts going down.
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.6k tokens. Your core files total 16.1k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.7k tokens. Your core files total 16.1k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -134,14 +134,6 @@ Every other file in the repo belongs to another role (see `docs/agents/README.md
 export function isPanelHost(hostHeader: string | null): boolean  # changed 2026-09-18
 export function panelOriginFromHost(hostHeader: string | null): string  # changed 2026-09-18
 ```
-**`frontend/components/chat-parts.tsx`** — owner X1
-```
-export function RevealText({ on, className, children }: { on: boolean; className?: string; children: ReactNode })  # changed 2026-10-06
-```
-**`frontend/components/sozan-orb.tsx`** — owner X1
-```
-export function SozanOrb(  # changed 2026-10-06
-```
 **`frontend/components/onboard-gate.tsx`** — owner X3
 ```
 export function OnboardGate({ children }: { children: React.ReactNode })  # changed 2026-09-18
@@ -155,7 +147,15 @@ export function QuotaUsage({ budget, compact = false }: { budget: AiBudget; comp
 export function formatQuota(percent: number)  # changed 2026-10-09
 export function useAiBudget(): AiBudget | null  # changed 2026-09-28
 ```
-**`frontend/lib/use-plan.ts`** — owner X5
+**`frontend/components/chat-parts.tsx`** — owner X6
+```
+export function RevealText({ on, className, children }: { on: boolean; className?: string; children: ReactNode })  # changed 2026-10-06
+```
+**`frontend/components/sozan-orb.tsx`** — owner X6
+```
+export function SozanOrb(  # changed 2026-10-06
+```
+**`frontend/lib/use-plan.ts`** — owner X7
 ```
 export function usePlan(): PlanInfo | null  # changed 2026-09-27
 ```
@@ -163,9 +163,9 @@ export function usePlan(): PlanInfo | null  # changed 2026-09-27
 **HTTP routes you call** (contract: method, path, parameters, response):
 
 ```
-GET /auth/me  ()  # owner X5, changed 2026-10-02
+GET /auth/me  ()  # owner X7, changed 2026-10-02
     backend/app/api/auth.py: returns keys {id, isAdmin, onboarded, phone, role}
-GET /billing/plans  ()  # owner X5, changed 2026-10-02
+GET /billing/plans  ()  # owner X7, changed 2026-10-02
     backend/app/api/billing.py: response untyped
 GET /campaigns  () -> list[CampaignOut]  # owner X2, changed 2026-10-02
     backend/app/api/campaigns.py: response_model list[CampaignOut]
@@ -185,7 +185,7 @@ GET /shop  ()  # owner X4, changed 2026-10-02
     backend/app/api/shop.py: response untyped
 PATCH /inbox/{thread_id}  (thread_id: str, body: ThreadPatchIn)  # owner Y, changed 2026-10-02
     backend/app/api/inbox.py: ThreadPatchIn {paused: bool | None = None}; response untyped
-POST /auth/refresh  ()  # owner X5, changed 2026-10-06
+POST /auth/refresh  ()  # owner X7, changed 2026-10-06
     backend/app/api/auth.py: returns keys {access_token, token_type}
 POST /campaigns  (body: CampaignCreateIn) -> CampaignOut  # owner X2, changed 2026-10-02
     backend/app/api/campaigns.py: CampaignCreateIn {slug: str = Field(min_length=2, max_length=80, pattern='^[a-z0-9-]+$'); pillar: str; title: str; subtitle: str = ''; cta: str = ''; instagram_caption: str = ''; telegram_caption: str = ''; whatsapp_caption: str = ''}; response_model CampaignOut
@@ -203,30 +203,30 @@ POST /events/seen  ()  # owner X1, changed 2026-10-09
 
 ## 9. Who reviews and merges
 
-A reviewer (ناظر) reviews line by line and is the only one who merges (squash into `main`). You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.
+Role **R** (reviewer, ناظر) reviews line by line and is the only one who merges (squash into `main`), and only after CI is green. When your PR is ready, append `## U → R: review <PR link>` to `talk-r.md` with the gates you ran. You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.
 
 ## 10. Your contract (others call these; change only after their ack)
 
-- `frontend/components/app-shell.tsx`: `AppShell` (changed 2026-10-06) ← C, X1, X2, X3, X4, X5, Y
+- `frontend/components/app-shell.tsx`: `AppShell` (changed 2026-10-06) ← C, X2, X3, X4, X5, X6, X7, Y
 - `frontend/components/auth-image.tsx`: `AuthImage` (changed 2026-09-18) ← C, X2
 - `frontend/components/auth-media.tsx`: `AuthMedia` (changed 2026-10-06) ← X2; `MEDIA_RATIO` (changed 2026-10-06) ← X2; `downloadMedia` (changed 2026-10-06) ← X2
-- `frontend/components/drop-stale-workers.tsx`: `PUSH_WORKER` (changed 2026-10-10) ← X1
-- `frontend/components/empty-state.tsx`: `EmptyState` (changed 2026-10-10) ← C, X2, X3, X4, X5, Y
-- `frontend/components/field.tsx`: `Field` (changed 2026-09-18) ← C, X2, X3, X5, Y
-- `frontend/components/getting-started.tsx`: `GettingStarted` (changed 2026-10-06) ← X1
-- `frontend/components/login-coder-scene.tsx`: `LoginCoderScene` (changed 2026-09-18) ← X3, X5
-- `frontend/components/sozan-mark.tsx`: `SozanMark` (changed 2026-09-18) ← C, X3, X4, X5
+- `frontend/components/drop-stale-workers.tsx`: `PUSH_WORKER` (changed 2026-10-10) ← X6
+- `frontend/components/empty-state.tsx`: `EmptyState` (changed 2026-10-10) ← C, X2, X3, X4, X5, X7, Y
+- `frontend/components/field.tsx`: `Field` (changed 2026-09-18) ← C, X2, X3, X7, Y
+- `frontend/components/getting-started.tsx`: `GettingStarted` (changed 2026-10-06) ← X6
+- `frontend/components/login-coder-scene.tsx`: `LoginCoderScene` (changed 2026-09-18) ← X3, X7
+- `frontend/components/sozan-mark.tsx`: `SozanMark` (changed 2026-09-18) ← C, X3, X4, X7
 - `frontend/components/theme-toggle.tsx`: `ThemeToggle` (changed 2026-09-27) ← X5
-- `frontend/components/ui/button.tsx`: `Button` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y
-- `frontend/components/ui/card.tsx`: `Card` (changed 2026-09-18) ← C, X2, X3, X5, Y
-- `frontend/components/ui/input.tsx`: `Input` (changed 2026-09-18) ← C, X2, X3, X5, Y
+- `frontend/components/ui/button.tsx`: `Button` (changed 2026-09-18) ← C, X2, X3, X4, X5, X6, X7, Y
+- `frontend/components/ui/card.tsx`: `Card` (changed 2026-09-18) ← C, X2, X3, X7, Y
+- `frontend/components/ui/input.tsx`: `Input` (changed 2026-09-18) ← C, X2, X3, X5, X7, Y
 - `frontend/components/ui/select.tsx`: `Select` (changed 2026-09-18) ← C, X3, Y
 - `frontend/components/ui/textarea.tsx`: `Textarea` (changed 2026-09-18) ← C, X2, X3
-- `frontend/lib/api.ts`: `ApiError` (changed 2026-09-21) ← X3, X5; `Brand` (changed 2026-09-18) ← X2; `Campaign` (changed 2026-09-18) ← X2; `api` (changed 2026-09-18) ← C, X1, X2, X3, X4, X5, Y; `catalogImageUrl` (changed 2026-09-18) ← C; `chatMediaUrl` (changed 2026-09-18) ← X1; `clearToken` (changed 2026-09-18) ← X5; `fileUrl` (changed 2026-09-18) ← C; `getApiBase` (changed 2026-09-18) ← C, X2; `getOnboarded` (changed 2026-09-18) ← X3, X5; `getToken` (changed 2026-09-18) ← X1, X2, X3, X5; `refreshSession` (changed 2026-10-06) ← X3; `setOnboarded` (changed 2026-09-18) ← X3, X5; `setToken` (changed 2026-09-18) ← X5; `timeoutSignal` (changed 2026-10-06) ← X1, X3
-- `frontend/lib/back-stack.ts`: `useBackClose` (changed 2026-10-06) ← C, X1, X4
-- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← C, X2, X5, Y; `money` (changed 2026-09-18) ← C, X5, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X5, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← C, X5
-- `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-20) ← X1, X4, Y; `finishIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y; `takeIdempotencyKey` (changed 2026-09-20) ← X1, X4, Y
-- `frontend/lib/utils.ts`: `cn` (changed 2026-09-18) ← X1, X2, X4, Y
+- `frontend/lib/api.ts`: `ApiError` (changed 2026-09-21) ← X3, X7; `Brand` (changed 2026-09-18) ← X2; `Campaign` (changed 2026-09-18) ← X2; `api` (changed 2026-09-18) ← C, X2, X3, X4, X5, X6, X7, Y; `catalogImageUrl` (changed 2026-09-18) ← C; `chatMediaUrl` (changed 2026-09-18) ← X6; `clearToken` (changed 2026-09-18) ← X5; `fileUrl` (changed 2026-09-18) ← C; `getApiBase` (changed 2026-09-18) ← C, X2; `getOnboarded` (changed 2026-09-18) ← X3, X7; `getToken` (changed 2026-09-18) ← X2, X3, X6, X7; `refreshSession` (changed 2026-10-06) ← X3; `setOnboarded` (changed 2026-09-18) ← X3, X7; `setToken` (changed 2026-09-18) ← X7; `timeoutSignal` (changed 2026-10-06) ← X3, X6
+- `frontend/lib/back-stack.ts`: `useBackClose` (changed 2026-10-06) ← C, X4, X6
+- `frontend/lib/digits.ts`: `formatWhen` (changed 2026-09-18) ← C, X2, X7, Y; `money` (changed 2026-09-18) ← C, X7, Y; `parseNonNegativeInt` (changed 2026-09-18) ← C, X7, Y; `priceText` (changed 2026-09-18) ← C; `toLatinDigits` (changed 2026-09-18) ← C, X7
+- `frontend/lib/idempotency.ts`: `emptyIdempotencySlot` (changed 2026-09-20) ← X4, X6, Y; `finishIdempotencyKey` (changed 2026-09-20) ← X4, X6, Y; `takeIdempotencyKey` (changed 2026-09-20) ← X4, X6, Y
+- `frontend/lib/utils.ts`: `cn` (changed 2026-09-18) ← X2, X4, X6, Y
 
 ## 11. Verify (exact commands)
 
@@ -303,12 +303,13 @@ The system works only if every step of every flow keeps its promise. When your c
 
 **F2 — Seller panel chat → tool**
 
-- U: chat frame, api() ← **you**
-- X1: router turn: tool choice, confirm card, lock
-- X4/X2/X5/Y: the tool runs: edit_shop, studio_chat, settings, auto-reply
+- U: panel frame, api() ← **you**
+- X6: chat page: thread, composer, confirm card
+- X1: router turn: tool choice, confirm card, lock, reply voice
+- X4/X2/X5/Y: the tool runs: build_shop, edit_shop, studio_chat, settings, auto-reply
 ```bash
 cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
-  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.api.chat_payload_test app.services.router_embed_test 2>&1 | tail -3
+  python3 -m unittest app.services.router_service_test app.api.router_chat_test app.services.turn_parse_test app.services.router_text_test app.services.router_chat_behavior_test app.api.chat_payload_test app.services.router_embed_test app.services.shop_voice_service_test 2>&1 | tail -3
 ```
 
 **F10 — Panel UI**

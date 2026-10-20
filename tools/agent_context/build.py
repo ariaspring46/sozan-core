@@ -578,6 +578,7 @@ def build(check_only: bool) -> int:
 
     if not check_only:
         (OUT_DIR / "README.md").write_text(index_doc(report_rows, roles, budget, never), encoding="utf-8")
+        (OUT_DIR / "onboarding-messages.md").write_text(onboarding_doc(roles), encoding="utf-8")
         CONTRACTS_FILE.write_text(json.dumps(snap, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
         (OUT_DIR / "budget.json").write_text(json.dumps({
             "core_max": budget["core_max"],
@@ -671,6 +672,10 @@ def verify_commands(role: dict, tests: list[str]) -> list[str]:
                 "", "# simulated call for one persona (home machine only: needs llama-swap and STT; persona ids p01.. in sim_personas.json)", "cd voice-gateway && python3 sim_run.py p01 2>&1 | tail -30"]
     if rid == "Y":
         out += ["", "# sales100 offline structure check (must print: sales100 structure 101/101)", "python3 tools/sales100_battery.py | head -3"]
+    if rid == "Q":
+        out += ["# scorer self-test (must print: all selftests passed)", "python3 tools/harness_eval/selftest.py | tail -1",
+                "", "# case list still matches its lock", "[ \"$(sha256sum tools/harness_eval/cases.json | cut -c1-64)\" = \"$(cat tools/harness_eval/cases.lock)\" ] && echo lock-ok || echo LOCK-MISMATCH",
+                "", "# sales100 offline structure check (must print: sales100 structure 101/101)", "python3 tools/sales100_battery.py | head -3"]
     if role.get("frontend"):
         out += ["", "# UI rules (U1-U7): must print 'ui_check: 0 problem(s)'", "python3 tools/ui_check.py | tail -5"]
         out += ["", "# frontend: type-check and build (CI runs it). package-lock.json resolves from registry.npmmirror.com;", "# if your network blocks it, do not edit the lockfile: say so in your report and rely on CI.", "cd frontend && npm ci --no-audit --no-fund >/dev/null && npm run build 2>&1 | tail -15"]
@@ -700,6 +705,8 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
         "",
         f"You are programmer **{rid}** on Sozan (`ariaspring46/sozan-core`). This file is your whole harness: rules, files, the signatures you need from other roles, exact commands. Read it once at session start. Do not read other docs, plans or report files unless a step below or the task tells you to.",
     ]
+    if rid == "R":
+        return review_doc(role, L)
     if rid == "OWNER":
         L += ["", "## Files", ""] + [f"- `{p}` ({_k(size[p])})" for p in paths if not p.startswith((".zcode/", ".cursor/", "docs/festival/", "docs/ui-audit-live/"))]
         return "\n".join(L) + "\n"
@@ -833,7 +840,7 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
     if local:
         L.append("Your plan's git rule applies: you rebase on fresh `main` and merge locally only after tests and the stage's acceptance condition pass; nothing is pushed to `origin` until the owner says so. The owner decides product questions and gives every 'go' for live or costly actions.")
     else:
-        L.append("A reviewer (ناظر) reviews line by line and is the only one who merges (squash into `main`). You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.")
+        L.append("Role **R** (reviewer, ناظر) reviews line by line and is the only one who merges (squash into `main`), and only after CI is green. When your PR is ready, append `## " + rid + " → R: review <PR link>` to `talk-r.md` with the gates you ran. You never merge your own PR. The owner decides product questions and gives every 'go' for live or costly actions.")
 
     L += ["", "## 10. Your contract (others call these; change only after their ack)", ""]
     contract: dict[str, list[str]] = defaultdict(list)
@@ -921,6 +928,86 @@ def role_doc(role, paths, src, rare, tests, skipped, size, needs, needed_by, end
     return "\n".join(L) + "\n"
 
 
+REVIEW_CHECKLIST = [
+    "Scope: every changed file belongs to the author's role (its `docs/agents/<ROLE>.md` §6), except regenerated `docs/agents/` and one `CHANGELOG.md` bullet.",
+    "Tests: the change has a test that fails on the old code (ask for the mutation evidence in the PR body); no test was skipped, deleted or loosened.",
+    "Contracts: if `docs/agents/contracts.json` changed, each consumer role named in it has an acknowledged request in its report file.",
+    "Secrets and people: no token, key, OTP, `.env` value, phone number or customer text in the diff, the PR body or the commit message.",
+    "Real world: no real message, SMS, call, payment, post, publish or live-shop rebuild in tests or scripts; the dry gateway or mocks are used.",
+    "Gates: the author's merge gates (its harness §11) hold, with evidence (battery summary line, harness verdict, screenshots).",
+    "CI: every check on the head commit is green: backend, frontend, `build.py --check`, `ui_check`.",
+    "Size: one topic; no drive-by refactors; the diff matches the PR text.",
+]
+
+
+def review_doc(role: dict, L: list[str]) -> str:
+    """Harness for R: no files of its own, a checklist and the merge commands."""
+    L += ["", "## 1. Mission", "", role["mission"], "", "## 2. Hard rules", ""]
+    L += [f"{i}. {r}" for i, r in enumerate(GLOBAL_RULES, 1)]
+    L += ["", "**R-specific:**", ""] + [f"{i}. {r}" for i, r in enumerate(role["rules"], len(GLOBAL_RULES) + 1)]
+    L += [
+        "", "## 3. Session start", "",
+        *_code([
+            "tail -n 60 talk-r.md                      # review requests: `## <ROLE> → R: review <PR>`",
+            "gh pr list --state open --limit 20",
+        ]),
+        "", "## 4. Review one PR", "",
+        *_code([
+            "gh pr view <N> --json title,author,headRefName,files,body | head -80",
+            "gh pr diff <N> --name-only                 # scope check against the author's §6",
+            "gh pr diff <N> | head -400                 # read per file; never paste it into a report",
+            "gh pr checks <N>                           # all green, on the head commit",
+            "git fetch -q origin pull/<N>/head:pr-<N> && git switch pr-<N> && python3 tools/agent_context/build.py --check",
+        ]),
+        "", "**Checklist (every item must hold):**", "",
+    ]
+    L += [f"{i}. {item}" for i, item in enumerate(REVIEW_CHECKLIST, 1)]
+    L += [
+        "", "## 5. Verdict", "",
+        "- **Changes needed:** `gh pr review <N> --request-changes -b '<exact change, file:line>'` and append `## R → <ROLE>: PR <N>` to the author's report file with the same list.",
+        "- **Approved:** `gh pr review <N> --approve`, then `gh pr merge <N> --squash` only when every check on the head commit is green. If the head moved after your review, review the new commits first.",
+        "- After a merge append to `talk-r.md`: PR, role, merged commit, and whether it needs a deploy (that request goes to X5 in `talk-x5.md`; X5 deploys only with the owner's go).",
+        "",
+        "## 6. Stop and ask the owner when",
+        "",
+        "- a PR changes a hard rule, `tools/agent_context/roles.json`, CI, deploy scripts or secrets handling;",
+        "- two roles disagree on a contract;",
+        "- a gate cannot be run (hub down, no budget) and the author asks to merge anyway.",
+    ]
+    L += system_sections(role, [])
+    return "\n".join(L) + "\n"
+
+
+def onboarding_doc(roles: list[dict]) -> str:
+    """First message for each role's agent session (copy and paste), generated from roles.json."""
+    L = [
+        "# پیام شروع هر نقش (کپی/پیست)",
+        "",
+        "<!-- generated by tools/agent_context/build.py from roles.json; do not edit by hand -->",
+        "",
+        "هر جلسه با همین پیام شروع می‌شود و جای «<کار>» یک جمله می‌آید. مانیفست نقش کل هارنس است: یک بار کامل بخوان و سند دیگری باز نکن.",
+    ]
+    for role in roles:
+        rid = role["id"]
+        if rid == "OWNER":
+            continue
+        core = "، ".join(f"`{p}`" for p in role.get("core", [])) or "ندارد"
+        L += [
+            "",
+            f"## {rid} — {role['title']}",
+            "",
+            "```",
+            f"You are programmer {rid} ({role.get('title_en', '')}). Read docs/agents/{rid}.md once and follow it exactly.",
+            "Task: <one sentence>. Likely files: <1-3 paths from its §6>.",
+            "```",
+            "",
+            f"- کار: {role.get('summary', '')}",
+            f"- هسته: {core}",
+            f"- گزارش: `{role.get('report', '')}`" + (f"؛ شاخه: `{role['branch']}`" if role.get("branch") else ""),
+        ]
+    return "\n".join(L) + "\n"
+
+
 def _flow_cmd(flow: dict) -> list[str]:
     cmds = []
     if flow.get("tests"):
@@ -976,7 +1063,7 @@ def index_doc(rows, roles, budget, never) -> str:
     reports = {role["id"]: role.get("report", "") for role in roles}
     titles = {role["id"]: role.get("title_en") or role["title"] for role in roles}
     L = [
-        "# Sozan — 9 programmers, one harness each",
+        f"# Sozan — {sum(1 for r in roles if r['id'] != 'OWNER')} roles, one harness each",
         "",
         "<!-- generated by tools/agent_context/build.py; do not edit by hand -->",
         "",
