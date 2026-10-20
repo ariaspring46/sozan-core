@@ -25,3 +25,9 @@
 - وابستگی‌های من (consumed): روترها (brand/campaigns/studio/channels/chat_media/onboard/public_media/router_chat/inbox/shop/storefront/pay از X2,X3,X1,X4,Y,C)؛ از X3: `channel_poll.poll_all`، `melipayamak_otp`، `sms_service`؛ از Y: `inbox_service.(expire_stale_sending/rearm)`، `sales_policy`، `mask_pii`، `voice_service.get_voice`، `training_log.log_label`؛ از X2: `probe_ollama_cloud_once`، `studio_compose.expire_stale`؛ از C: `support_service`، `storefront.(list_sales/retitle)`، `arvan_dns.edge_dry`؛ UI از `U`.
 - پایداری: `settings`/`state_store`/`require_permission`/`llm.py` را هر تغییر باید هماهنگ شود (هزاران agent وابسته)؛ signature باید در این قرارداد ثبت شود.
 - در انتظار: درخواست Z (openrouter از هاب) باز است — صفر تماس، campaign_run اجرا نشده.
+
+## مدیر → X5: ثبت‌نام تازه — رویداد قیف ثبت‌نام (2026-10-20، مرجع: `docs/onboarding-v2.md`؛ شروع فقط بعد از تأیید متن‌ها توسط مالک)
+- فایل‌ها: `backend/app/services/pipeline_release.py`، `backend/app/services/admin_health_service.py`.
+- کار: نام رویدادهای `onboard.step {step, kind, category, ms}` و `onboard.done {kind, category, goals, ms}` در پاکت `observe` پذیرفته شود؛ یک خط قیف (شروع، هر گام، پایان، در ۷ روز اخیر) در گزارش سلامت ادمین بیاید.
+- تست: رویدادی که فیلد نام، شماره یا متن آزاد دارد رد یا پاک شود.
+- ادغام: هم‌زمان با بک‌اند X3. استقرار کل کار فقط با «برو»ی مالک.

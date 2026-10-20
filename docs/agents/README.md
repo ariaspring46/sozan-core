@@ -6,19 +6,19 @@ Every tracked file has exactly one owner (`tools/agent_context/roles.json`). Eac
 
 | role | area | harness | core | active | rare | tests | report file |
 |---|---|---|---|---|---|---|---|
-| X1 | Panel chat router brain | [X1.md](X1.md) (11.2k) | 35.1k | 109.2k | 10.0k | 84.5k | `talk-x1.md` |
-| X6 | Panel chat UI and seller notifications | [X6.md](X6.md) (6.3k) | 18.8k | 28.6k | 2.7k | 0.0k | `talk-x6.md` |
+| X1 | Panel chat router brain | [X1.md](X1.md) (11.4k) | 35.1k | 109.6k | 10.0k | 84.5k | `talk-x1.md` |
+| X6 | Panel chat UI and seller notifications | [X6.md](X6.md) (6.4k) | 18.8k | 28.7k | 2.7k | 0.0k | `talk-x6.md` |
 | X2 | Studio, images and brand content | [X2.md](X2.md) (10.4k) | 41.3k | 82.8k | 49.4k | 32.8k | `talk-x2.md` |
-| X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (11.3k) | 18.4k | 87.9k | 1.2k | 45.9k | `talk-x3.md` |
-| X4 | Shop build and live editing | [X4.md](X4.md) (10.6k) | 32.6k | 106.9k | 0.0k | 47.6k | `talk-x4.md` |
-| X5 | Platform and deploy | [X5.md](X5.md) (13.0k) | 23.1k | 68.1k | 20.2k | 39.2k | `talk-x5.md` |
-| X7 | Accounts, plans and billing | [X7.md](X7.md) (8.9k) | 12.8k | 30.2k | 1.5k | 21.4k | `talk-x7.md` |
+| X3 | Channels, messaging, SMS and onboarding | [X3.md](X3.md) (11.6k) | 18.4k | 88.5k | 1.2k | 45.9k | `talk-x3.md` |
+| X4 | Shop build and live editing | [X4.md](X4.md) (10.8k) | 32.6k | 107.2k | 0.0k | 47.6k | `talk-x4.md` |
+| X5 | Platform and deploy | [X5.md](X5.md) (13.2k) | 23.1k | 68.4k | 20.2k | 39.2k | `talk-x5.md` |
+| X7 | Accounts, plans and billing | [X7.md](X7.md) (9.2k) | 12.8k | 30.7k | 1.5k | 21.4k | `talk-x7.md` |
 | Y | Automated seller (DM agent) and training data | [Y.md](Y.md) (10.2k) | 32.0k | 60.0k | 3.4k | 38.2k | `sales-agent-talk.md` |
 | Z | Phone voice agent | [Z.md](Z.md) (4.9k) | 33.4k | 79.1k | 29.4k | 14.8k | `voice-agent-talk.md` |
-| C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (11.9k) | 23.9k | 73.9k | 11.6k | 33.0k | `storefront-talk.md` |
-| U | UI/UX: design system and frontend platform | [U.md](U.md) (9.7k) | 16.1k | 90.8k | 34.5k | 0.0k | `talk-u.md` |
-| Q | Evaluation and quality | [Q.md](Q.md) (4.5k) | 13.4k | 77.7k | 67.9k | 0.0k | `talk-q.md` |
-| R | Reviewer and merger | [R.md](R.md) (2.4k) | 0.0k | 0.0k | 0.0k | 0.0k | `talk-r.md` |
+| C | Storefronts, catalog, customer orders, domains, support, monitoring | [C.md](C.md) (12.2k) | 23.9k | 73.9k | 11.6k | 33.0k | `storefront-talk.md` |
+| U | UI/UX: design system and frontend platform | [U.md](U.md) (9.9k) | 16.1k | 91.2k | 34.5k | 0.0k | `talk-u.md` |
+| Q | Evaluation and quality | [Q.md](Q.md) (4.7k) | 13.4k | 78.2k | 67.9k | 0.0k | `talk-q.md` |
+| R | Reviewer and merger | [R.md](R.md) (2.4k) | 0.0k | 0.4k | 0.0k | 0.0k | `talk-r.md` |
 
 Token counts are conservative estimates. Context 128.0k; 30.0k reserved for the agent's own prompt; core kept under 45.0k, active source under 80.0k.
 
@@ -58,6 +58,7 @@ If your agent tool loads a project instruction file automatically (CLAUDE.md, AG
 | F9 Shared core: tenant state, LLM, budget, events | X5 → X1/X2/X3/X4/Y/C |
 | F10 Panel UI | U → all frontend roles |
 | F11 Change → review → merge | Q → R → X5 |
+| F12 Sign-up → first steps (onboarding v2, docs/onboarding-v2.md) | X3 → X7 → X4 → C → U → X1 → X5 → Q |
 
 ## Shared files
 

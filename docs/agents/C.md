@@ -54,7 +54,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~11.9k tokens. Your core files total 23.9k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~12.2k tokens. Your core files total 23.9k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -98,7 +98,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Tests:** `backend/app/api/pay_status_rate_test.py`, `backend/app/scenarios/order_lifecycle_test.py`, `backend/app/services/arvan_dns_service_test.py`, `backend/app/services/catalog_sync_service_test.py`, `backend/app/services/order_flow_service_test.py`, `backend/app/services/pay_service_test.py`, `backend/app/services/pay_stock_test.py`, `backend/app/services/shop_otp_service_test.py`, `backend/app/services/storefront_service_test.py`, `backend/app/services/support_service_test.py`
 
-**Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (33.2k)
+**Yours but never read** (generated or huge; change only through its script): `storefront-talk.md` (33.6k)
 
 Every other file in the repo belongs to another role (see `docs/agents/README.md`).
 
@@ -532,6 +532,21 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
 ```bash
 python3 tools/ui_check.py
 cd frontend && npm run build 2>&1 | tail -15
+```
+
+**F12 — Sign-up → first steps (onboarding v2, docs/onboarding-v2.md)**
+
+- X3: onboard page and onboard_service: business kind, category, sources, goals, next_steps, /onboard/checklist
+- X7: profile_service stores the business profile
+- X4: shop_service.set_business → factory --business-kind
+- C: factory: services → rhythm=service ← **you**
+- U: choice cards, chips, GettingStarted from /onboard/checklist
+- X1: one-time welcome message and refine card in chat
+- X5: onboard.step / onboard.done events, funnel line in admin health
+- Q: end-to-end onboarding probe
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.onboard_service_test app.services.shop_service_test 2>&1 | tail -3
 ```
 
 ## 17. Shared files and how to use them

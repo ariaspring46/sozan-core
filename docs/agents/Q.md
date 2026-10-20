@@ -55,7 +55,7 @@ Then restate the task in one sentence and list the 1–3 files from §6 you expe
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~4.5k tokens. Your core files total 13.4k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~4.7k tokens. Your core files total 13.4k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -68,7 +68,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 13.4k | the files most tasks touch; read the relevant one first |
-| active | 77.7k | yours to edit; read only what the task needs |
+| active | 78.2k | yours to edit; read only what the task needs |
 | rare | 67.9k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
@@ -79,6 +79,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Active (you may edit):**
 
+- `./`: `talk-q.md` (0.5k)
 - `tools/`: `stress_battery.py` (8.7k), `synthetic_personas.py` (8.5k), `sales100_battery.py` (7.8k), `chat_scenarios.py` (7.0k), `qa50_battery.py` (3.2k), `qa_image_battery.py` (2.8k), `qa_battery.py` (1.6k)
 - `tools/harness_eval/`: `cases.json` (9.3k), `run.py` (8.6k), `score.py` (4.9k), `report.py` (4.4k), `selftest.py` (4.2k), `README.md` (2.8k), `fixture.py` (2.8k), `common.py` (1.3k)
 
@@ -189,6 +190,21 @@ The system works only if every step of every flow keeps its promise. When your c
 ```bash
 python3 tools/agent_context/build.py --check
 python3 tools/harness_eval/selftest.py | tail -1
+```
+
+**F12 — Sign-up → first steps (onboarding v2, docs/onboarding-v2.md)**
+
+- X3: onboard page and onboard_service: business kind, category, sources, goals, next_steps, /onboard/checklist
+- X7: profile_service stores the business profile
+- X4: shop_service.set_business → factory --business-kind
+- C: factory: services → rhythm=service
+- U: choice cards, chips, GettingStarted from /onboard/checklist
+- X1: one-time welcome message and refine card in chat
+- X5: onboard.step / onboard.done events, funnel line in admin health
+- Q: end-to-end onboarding probe ← **you**
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.onboard_service_test app.services.shop_service_test 2>&1 | tail -3
 ```
 
 ## 17. Shared files and how to use them
