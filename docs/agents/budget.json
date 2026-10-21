@@ -3,22 +3,22 @@
  "owned_source_max": 80000,
  "roles": [
   {
-   "active": 109212,
+   "active": 109578,
    "core": 35094,
    "core_pct": 78,
    "id": "X1",
    "loose_contracts": 8,
-   "manifest": 11177,
+   "manifest": 11415,
    "rare": 10018,
    "tests": 84483
   },
   {
-   "active": 28567,
+   "active": 28727,
    "core": 18802,
    "core_pct": 42,
    "id": "X6",
    "loose_contracts": 0,
-   "manifest": 6344,
+   "manifest": 6353,
    "rare": 2719,
    "tests": 0
   },
@@ -33,42 +33,42 @@
    "tests": 32835
   },
   {
-   "active": 87854,
+   "active": 88452,
    "core": 18443,
    "core_pct": 41,
    "id": "X3",
    "loose_contracts": 22,
-   "manifest": 11324,
+   "manifest": 11562,
    "rare": 1208,
    "tests": 45897
   },
   {
-   "active": 106875,
+   "active": 107249,
    "core": 32586,
    "core_pct": 72,
    "id": "X4",
    "loose_contracts": 15,
-   "manifest": 10576,
+   "manifest": 10814,
    "rare": 0,
    "tests": 47636
   },
   {
-   "active": 68108,
+   "active": 68395,
    "core": 23077,
    "core_pct": 51,
    "id": "X5",
    "loose_contracts": 19,
-   "manifest": 12993,
+   "manifest": 13231,
    "rare": 20193,
    "tests": 39196
   },
   {
-   "active": 30188,
+   "active": 30747,
    "core": 12820,
    "core_pct": 28,
    "id": "X7",
    "loose_contracts": 18,
-   "manifest": 8916,
+   "manifest": 9163,
    "rare": 1452,
    "tests": 21372
   },
@@ -98,32 +98,32 @@
    "core_pct": 53,
    "id": "C",
    "loose_contracts": 23,
-   "manifest": 11943,
+   "manifest": 12181,
    "rare": 11644,
    "tests": 33043
   },
   {
-   "active": 90841,
+   "active": 91203,
    "core": 16103,
    "core_pct": 36,
    "id": "U",
    "loose_contracts": 0,
-   "manifest": 9665,
+   "manifest": 9903,
    "rare": 34504,
    "tests": 0
   },
   {
-   "active": 77697,
+   "active": 78170,
    "core": 13443,
    "core_pct": 30,
    "id": "Q",
    "loose_contracts": 0,
-   "manifest": 4501,
+   "manifest": 4748,
    "rare": 67927,
    "tests": 0
   },
   {
-   "active": 0,
+   "active": 379,
    "core": 0,
    "core_pct": 0,
    "id": "R",
@@ -133,12 +133,12 @@
    "tests": 0
   },
   {
-   "active": 233844,
+   "active": 263636,
    "core": 0,
    "core_pct": 0,
    "id": "OWNER",
    "loose_contracts": 0,
-   "manifest": 3458,
+   "manifest": 3494,
    "rare": 0,
    "tests": 0
   }

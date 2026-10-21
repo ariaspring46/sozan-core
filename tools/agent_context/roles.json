@@ -1341,6 +1341,48 @@
         "python3 tools/agent_context/build.py --check",
         "python3 tools/harness_eval/selftest.py | tail -1"
       ]
+    },
+    {
+      "id": "F12",
+      "title": "Sign-up → first steps (onboarding v2, docs/onboarding-v2.md)",
+      "steps": [
+        [
+          "X3",
+          "onboard page and onboard_service: business kind, category, sources, goals, next_steps, /onboard/checklist"
+        ],
+        [
+          "X7",
+          "profile_service stores the business profile"
+        ],
+        [
+          "X4",
+          "shop_service.set_business → factory --business-kind"
+        ],
+        [
+          "C",
+          "factory: services → rhythm=service"
+        ],
+        [
+          "U",
+          "choice cards, chips, GettingStarted from /onboard/checklist"
+        ],
+        [
+          "X1",
+          "one-time welcome message and refine card in chat"
+        ],
+        [
+          "X5",
+          "onboard.step / onboard.done events, funnel line in admin health"
+        ],
+        [
+          "Q",
+          "end-to-end onboarding probe"
+        ]
+      ],
+      "tests": [
+        "app.services.onboard_service_test",
+        "app.services.shop_service_test"
+      ]
     }
   ]
 }

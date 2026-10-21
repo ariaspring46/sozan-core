@@ -96,3 +96,13 @@ U، فاز نقدت (دوعاملی A/B + شواهد زنده) کامل و پذ�
 - tests: python3 tools/ui_check.py → 0 problem(s)؛ next build سبز؛ ورود در ۳۹۰ و ۱۴۴۰ بدون اسکرول افقی؛ با اینست ۳۲۰px ارتفاع قاب ۵۲۴ و فیلد بالای ناحیهٔ کیبورد
 - branch/PR: u/android-keyboard (پوش گیت‌هاب به‌خاطر نبودن احراز هویت انجام نشد)
 - needs: X5 — استقرار روی هاب؛ ناظر — ریویو. پایهٔ شاخه origin/main تازه نیست (fetch بلاک شد) و باید قبل از ادغام روی main تازه rebase شود
+
+## مدیر → U: ثبت‌نام تازه — اجزای انتخاب و فهرست شروع کار (2026-10-20، مرجع: `docs/onboarding-v2.md`؛ شروع فقط بعد از تأیید متن‌ها توسط مالک)
+- فایل‌ها: `frontend/components/ui/choice-card.tsx` (تازه)، `frontend/components/ui/chip-group.tsx` (تازه)، `frontend/components/getting-started.tsx`.
+- کار:
+  - `ChoiceCard`: کارت تک‌انتخابی با عنوان و زیرنویس، role=radio.
+  - `ChipGroup`: تک‌انتخابی یا چندانتخابی، role=checkbox/radio.
+  - هر دو با صفحه‌کلید کار کنند، هدف لمسی ۴۴ پیکسل داشته باشند و در هر دو تم خوانا باشند.
+  - `GettingStarted` فقط از `GET /onboard/checklist` بخواند، به‌جای ۶ درخواست امروز.
+- تست: `ui_check` = ۰؛ `npm run build` سبز؛ اسکرین‌شات چت با فهرست در ۳۹۰، روشن و تاریک.
+- ادغام: هم‌زمان با بک‌اند X3، پیش از فرانت X3.

@@ -42,3 +42,16 @@
   2. یک export خام موجود بده تا via `harvest_leads.py --from-jsonl` (آفلاین، بدون کوکی) پردازش کنم.
 - قاعدهٔ ۸: endpoint/user-agent Instagram را عوض نکردم → هیچ چیز به Z در voice-agent-talk.md ندارم.
 - وضعیت: در انتظار مالک. بستهٔ دوم برسد، ساخت لیست برای Z یک فرمان است.
+
+## مدیر → X3: ثبت‌نام تازه — بک‌اند و فرانت ثبت‌نام تازه (2026-10-20، مرجع: `docs/onboarding-v2.md`؛ شروع فقط بعد از تأیید متن‌ها توسط مالک)
+- فایل‌ها: `backend/app/services/onboard_service.py`، `backend/app/api/onboard.py`، `frontend/app/onboard/page.tsx` و تست‌ها.
+- بک‌اند (PR اول):
+  - `CATEGORIES` و `GOALS` دقیقاً مطابق بخش ۴ سند.
+  - `next_steps(kind, goals)` مطابق بخش ۳.
+  - فیلدهای تازه و `step` در `/onboard` و `/onboard/draft`؛ فیلدهای فرم تازه (اختیاری) در `/onboard/complete`.
+  - `complete` در پایان `shop_service.set_business(kind, category)` را صدا بزند.
+  - مسیر تازهٔ `GET /onboard/checklist` که معیارهای «انجام‌شده» را از `getting-started.tsx` امروز به بک‌اند می‌آورد.
+- فرانت (PR دوم، بعد از ادغام بک‌اند و اجزای U): بازنویسی صفحه با چهار گام و صفحهٔ «آماده‌ای» با متن دقیق بخش ۲. فهرست‌ها از `GET /onboard` می‌آیند، نه از کد فرانت. `onboard-gate.tsx` دست نخورد.
+- رویداد: پس از ادغام کار X5، در `/onboard/draft` رویداد `onboard.step` و در `complete` رویداد `onboard.done` فرستاده شود (بدون نام یا شماره).
+- تست: complete با فرم قدیمی و تازه؛ ادامه از پیش‌نویس با `step`؛ checklist برای goods، services و both؛ `ui_check` = ۰؛ اسکرین‌شات ۳۶۰/۳۹۰/۴۱۲، روشن و تاریک.
+- ادغام: بک‌اند پس از X7 و X4؛ فرانت آخر، همراه X1.

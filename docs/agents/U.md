@@ -72,7 +72,7 @@ Done when: every P0/P1 is fixed or has an acknowledged request in its owner's re
 
 ## 5. Context budget
 
-Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.7k tokens. Your core files total 16.1k.
+Context window 128.0k; about 30.0k is used by the agent's own system prompt and tools. This file is ~9.9k tokens. Your core files total 16.1k.
 
 - Never load more than the core plus 2–3 extra files at once. Prefer `grep -n` + `sed -n` ranges over full reads for any file above 5k.
 - Cut tool output: `| tail -5`, `| head -40`, `git diff --stat` before `git diff`, `--quiet` flags.
@@ -85,7 +85,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 | set | tokens | how to use |
 |---|---|---|
 | core | 16.1k | the files most tasks touch; read the relevant one first |
-| active | 90.8k | yours to edit; read only what the task needs |
+| active | 91.2k | yours to edit; read only what the task needs |
 | rare | 34.5k | yours; read only when the task names it |
 | tests | 0.0k | read only the test of the module you change |
 
@@ -100,7 +100,7 @@ Context window 128.0k; about 30.0k is used by the agent's own system prompt and 
 
 **Active (you may edit):**
 
-- `./`: `talk-u.md` (6.1k)
+- `./`: `talk-u.md` (6.5k)
 - `frontend/`: `tailwind.config.js` (0.5k), `package.json` (0.2k), `tsconfig.json` (0.2k), `next.config.ts` (0.0k)
 - `frontend/app/`: `globals.css` (7.5k), `layout.tsx` (0.6k), `page.tsx` (0.5k), `manifest.ts` (0.4k), `robots.ts` (0.2k), `sitemap.ts` (0.1k)
 - `frontend/components/`: `landing-page.tsx` (12.7k), `app-shell.tsx` (4.8k), `getting-started.tsx` (2.9k), `landing-phone.tsx` (2.8k), `theme-toggle.tsx` (0.6k), `panel-home.tsx` (0.5k), `brand-logo.tsx` (0.3k), `empty-state.tsx` (0.3k), `drop-stale-workers.tsx` (0.2k), `sozan-mark.tsx` (0.2k), `field.tsx` (0.1k)
@@ -319,6 +319,21 @@ cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
 ```bash
 python3 tools/ui_check.py
 cd frontend && npm run build 2>&1 | tail -15
+```
+
+**F12 — Sign-up → first steps (onboarding v2, docs/onboarding-v2.md)**
+
+- X3: onboard page and onboard_service: business kind, category, sources, goals, next_steps, /onboard/checklist
+- X7: profile_service stores the business profile
+- X4: shop_service.set_business → factory --business-kind
+- C: factory: services → rhythm=service
+- U: choice cards, chips, GettingStarted from /onboard/checklist ← **you**
+- X1: one-time welcome message and refine card in chat
+- X5: onboard.step / onboard.done events, funnel line in admin health
+- Q: end-to-end onboarding probe
+```bash
+cd backend && STATE_DIR=$(mktemp -d) SOZAN_OBSERVE_OUTBOX=0 PYTHONPATH=. \
+  python3 -m unittest app.services.onboard_service_test app.services.shop_service_test 2>&1 | tail -3
 ```
 
 ## 17. Shared files and how to use them
