@@ -402,17 +402,17 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
       </header>
 
       <main id="main">
-        <section className="landing-hero sozan-chat relative overflow-hidden">
-          <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-10 sm:px-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:gap-10 lg:pb-24 lg:pt-16">
+        <section className="landing-hero landing-grid sozan-chat relative overflow-hidden">
+          <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-10 px-5 pb-8 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-6 lg:pb-10 lg:pt-14">
             <div className="landing-hero-copy">
-              <div className="landing-fade landing-fade-kicker mb-6">
+              <div className="landing-fade landing-fade-kicker mb-5">
                 <Kicker>دستیار فروش برای فروشنده‌های ایرانی</Kicker>
               </div>
               <LandingSloganRotator />
-              <p className="landing-fade landing-fade-body landing-lede mt-7 max-w-xl text-base leading-8 sm:text-lg sm:leading-9">
+              <p className="landing-fade landing-fade-body landing-lede mt-6 max-w-xl text-base leading-8 sm:text-lg sm:leading-9">
                 فقط بگو چه می‌خواهی. سوزان با کالاهای خودت فروشگاه اینترنتی می‌سازد، برای اینستاگرام و تلگرام پست و کپشن آماده می‌کند، در جواب دادن به مشتری کنارت است و سفارش و پرداخت را یک‌جا نگه می‌دارد.
               </p>
-              <div className="landing-fade landing-fade-cta mt-9 flex flex-wrap items-center gap-3">
+              <div className="landing-fade landing-fade-cta mt-8 flex flex-wrap items-center gap-3">
                 <a href={start} className="landing-cta inline-flex h-12 items-center justify-center gap-2 rounded-full px-7 text-[15px] font-bold">
                   رایگان شروع کن
                   <ArrowLeft size={18} aria-hidden />
@@ -421,7 +421,7 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
                   ببین چطور کار می‌کند
                 </a>
               </div>
-              <ul className="landing-fade landing-fade-cta mt-7 flex flex-wrap items-center gap-2 text-[12.5px] text-ink/80">
+              <ul className="landing-fade landing-fade-cta mt-6 flex flex-wrap items-center gap-2 text-[12.5px] text-ink/80">
                 {["ورود رسمی؛ بدون پسورد اینستاگرام", "پلن رایگان برای شروع", "بدون کدنویسی"].map((item) => (
                   <li key={item} className="flex items-center gap-1.5 rounded-full bg-ink/5 px-3 py-1.5">
                     <ShieldCheck size={14} className="text-warm" aria-hidden />
@@ -430,23 +430,27 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
                 ))}
               </ul>
             </div>
-            <LandingPhone />
+            <div className="landing-stage">
+              <p className="mb-3 text-center text-xs font-medium tracking-normal text-warm">گفتگوی زندهٔ ساخت فروشگاه</p>
+              <LandingPhone />
+            </div>
           </div>
         </section>
 
-        <section className="border-y border-ink/10">
-          <div className="mx-auto grid max-w-6xl grid-cols-3 gap-2 px-4 py-6 sm:gap-3 sm:px-8 sm:py-8">
+        <section aria-label="سه حرکت محصول" className="border-y border-ink/10">
+          <ol className="mx-auto grid max-w-6xl sm:grid-cols-3">
             {[
-              ["یک گفتگو", "فروشگاه، محتوا، پیام مشتری و فروش"],
-              ["سه کانال", "اینستاگرام، تلگرام و واتساپ"],
-              ["بدون کدنویسی", "همه‌چیز با حرف زدن و چند لمس"],
-            ].map(([title, body]) => (
-              <div key={title} className="sozan-glass rounded-2xl px-3 py-4 text-center sm:px-5 sm:py-5 sm:text-start">
-                <p className="sozan-title-glow landing-display text-[15px] sm:text-xl">{title}</p>
-                <p className="mt-1 text-[11.5px] leading-5 text-ink/70 sm:mt-1.5 sm:text-sm sm:leading-7">{body}</p>
-              </div>
+              ["۰۱", "بگو", "حس فروشگاه، کالاها و کانالت را در چت می‌گویی."],
+              ["۰۲", "بساز", "فروشگاه، پست و کپشن از همان حرف آماده می‌شود."],
+              ["۰۳", "بفروش", "جواب مشتری، سفارش و پرداخت یک‌جا می‌ماند."],
+            ].map(([n, title, body]) => (
+              <li key={n} className="landing-beat px-5 py-6 sm:px-8 sm:py-8">
+                <p className="text-xs font-medium text-warm">{n}</p>
+                <p className="landing-display sozan-title-glow mt-2 text-2xl sm:text-3xl">{title}</p>
+                <p className="mt-2 max-w-xs text-sm leading-7 text-ink/70">{body}</p>
+              </li>
             ))}
-          </div>
+          </ol>
         </section>
 
         <section id="capabilities" className="relative mx-auto max-w-6xl scroll-mt-20 px-5 py-16 sm:px-8 sm:py-24">
@@ -459,17 +463,18 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
               از آوردن کالا تا ساخت ویترین، محتوا، جواب مشتری، گرفتن پول و کنترل موجودی؛ هر بخش به بخش بعدی وصل است.
             </p>
           </div>
-          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {CAPABILITIES.map((item) => {
+          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+            {CAPABILITIES.map((item, index) => {
               const Icon = item.icon;
+              const span = index === 0 ? "lg:col-span-4" : index === 5 ? "lg:col-span-6" : "lg:col-span-2";
               return (
-                <article key={item.title} className="sozan-card landing-lift flex flex-col rounded-[1.6rem] p-6 sm:min-h-[17rem]">
+                <article key={item.title} className={`sozan-card landing-lift flex flex-col rounded-[1.6rem] p-6 ${span} ${index === 0 ? "lg:min-h-[22rem] lg:p-8" : ""}`}>
                   <span className="sozan-tile flex h-11 w-11 items-center justify-center rounded-2xl">
                     <Icon size={21} aria-hidden />
                   </span>
-                  <h3 className="landing-display mt-5 text-xl leading-8">{item.title}</h3>
-                  <p className="landing-lede mt-2.5 text-sm leading-7">{item.body}</p>
-                  <ul className="mt-auto hidden flex-wrap gap-2 pt-5 sm:flex">
+                  <h3 className={`landing-display mt-5 leading-8 ${index === 0 ? "text-3xl" : "text-xl"}`}>{item.title}</h3>
+                  <p className={`landing-lede mt-2.5 leading-7 ${index === 0 ? "max-w-xl text-base" : "text-sm"}`}>{item.body}</p>
+                  <ul className="mt-auto flex flex-wrap gap-2 pt-5">
                     {item.tags.map((tag) => (
                       <li key={tag} className="rounded-full bg-ink/5 px-3 py-1 text-xs text-ink/75">
                         {tag}
@@ -527,9 +532,9 @@ export async function LandingPage({ panelOrigin }: { panelOrigin: string }) {
         <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
           <Kicker>شروع ساده</Kicker>
           <h2 className="landing-display mt-4 text-[clamp(1.8rem,4vw,2.8rem)]">سه قدم تا اولین فروشگاه</h2>
-          <ol className="relative mt-10 grid gap-4 sm:grid-cols-3">
+          <ol className="landing-path relative mt-10 grid gap-4 sm:grid-cols-3">
             {STEPS.map((step) => (
-              <li key={step.n} className="sozan-glass rounded-[1.6rem] p-6">
+              <li key={step.n} className="sozan-glass relative rounded-[1.6rem] p-6">
                 <span className="landing-cta grid h-11 w-11 place-items-center rounded-full font-sozan text-lg font-extrabold">{step.n}</span>
                 <h3 className="mt-4 text-lg font-bold">{step.title}</h3>
                 <p className="landing-lede mt-2 text-sm leading-7">{step.body}</p>
